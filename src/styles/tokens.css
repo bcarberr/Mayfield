@@ -1,0 +1,168 @@
+/**
+ * Design tokens extracted from Figma → "Color Guidelines" page.
+ *
+ * Layers:
+ *   1. Raw theme palettes (`--dark-*`, `--light-*`) mirror Figma variables.
+ *   2. Semantic aliases (`--color-*`) used by app code; theme-switchable.
+ *   3. Tailwind `@theme` token overrides (defined in `src/index.css`) are also
+ *      re-pointed here so utility classes like `bg-surface-modal`,
+ *      `text-text-primary`, etc. automatically follow the active theme.
+ *
+ * Switch themes by setting `data-theme="light"` (or `"dark"`) on `<html>`.
+ * Dark is the default.
+ */
+
+:root {
+  /* ===== Dark palette (raw) ===== */
+  --dark-surface-page-bg: #121212;
+  --dark-surface-container-bg: #1e1e1e;
+  --dark-surface-container-borders: #424242;
+  --dark-surface-rules-lines: #737373;
+  --dark-surface-table-row-header: #292929;
+  --dark-surface-modal-bg: #2e2e2e;
+  --dark-surface-tooltip-bg: #424242;
+  --dark-surface-scrim-overlay: #121212;
+
+  --dark-text-primary: #f5f5f5;
+  --dark-text-secondary: #e0e0e0;
+  --dark-text-tertiary: #9e9e9e;
+  --dark-text-button: #121212;
+  --dark-text-tooltip: #f5f5f5;
+  --dark-text-disabled: #737373;
+  --dark-text-negative: #ff604a;
+  --dark-text-caution: #fac354;
+  --dark-text-positive: #35a151;
+
+  --dark-interactive-active: #1ec1dd;
+  --dark-interactive-primary-hover: #39daf5;
+  --dark-interactive-secondary-hover: #0d404b;
+  --dark-interactive-secondary-pressed: #2a6b79;
+  --dark-interactive-destructive: #ff604a;
+  --dark-interactive-destructive-hover: #ff847b;
+  --dark-interactive-destructive-pressed: #ff9995;
+
+  --dark-feedback-negative: #ff604a;
+  --dark-feedback-caution: #fac354;
+  --dark-feedback-positive: #17ae81;
+  --dark-feedback-info: #817cf6;
+  --dark-feedback-neutral: #9e9e9e;
+  --dark-feedback-bg-negative: #592923;
+  --dark-feedback-bg-caution: #60502e;
+  --dark-feedback-bg-positive: #1b5845;
+  --dark-feedback-bg-info: #464474;
+  --dark-feedback-bg-neutral: #515151;
+  --dark-feedback-hover-negative: #7a342b;
+  --dark-feedback-hover-caution: #7f6736;
+  --dark-feedback-hover-info: #524f8e;
+
+  --dark-datavis-card-bg: #1e1e1e;
+  --dark-datavis-gridlines: #424242;
+  --dark-datavis-titles-values: #f5f5f5;
+  --dark-datavis-axis: #9e9e9e;
+
+  /* ===== Light palette (raw) ===== */
+  --light-surface-page-bg: #fafafa;
+  --light-surface-container-bg: #ffffff;
+  --light-surface-container-borders: #eaeaea;
+  --light-surface-rules-lines: #c9c9c9;
+  --light-surface-table-row-header: #f5f5f5;
+  --light-surface-modal-bg: #f6f6f6;
+  --light-surface-tooltip-bg: #424242;
+  --light-surface-scrim-overlay: #121212;
+
+  --light-text-primary: #212121;
+  --light-text-secondary: #505050;
+  --light-text-tertiary: #737373;
+  --light-text-button: #fafafa;
+  --light-text-tooltip: #f5f5f5;
+  --light-text-disabled: #9e9e9e;
+  --light-text-negative: #da0711;
+  --light-text-caution: #ab8a17;
+  --light-text-positive: #2f7b43;
+
+  --light-interactive-active: #13afca;
+  --light-interactive-primary-hover: #118a9e;
+  --light-interactive-primary-pressed: #146c7b;
+  --light-interactive-secondary-hover: #e6fbff;
+  --light-interactive-secondary-pressed: #b8eeff;
+  --light-interactive-selected: #f3fdff;
+  --light-interactive-destructive: #da0711;
+  --light-interactive-destructive-hover: #8e0217;
+  --light-interactive-destructive-pressed: #670015;
+
+  --light-feedback-negative: #da0711;
+  --light-feedback-caution: #ab8a17;
+  --light-feedback-positive: #35a151;
+  --light-feedback-info: #5a068e;
+  --light-feedback-neutral: #737373;
+  --light-feedback-bg-negative: #f8cdcf;
+  --light-feedback-bg-caution: #f4efc1;
+  --light-feedback-bg-positive: #d7ecdc;
+  --light-feedback-bg-info: #decde8;
+  --light-feedback-bg-neutral: #e3e3e3;
+  --light-feedback-hover-negative: #f2a5a9;
+  --light-feedback-hover-caution: #e5db9f;
+  --light-feedback-hover-info: #c4a5d6;
+
+  --light-datavis-card-bg: #ffffff;
+  --light-datavis-gridlines: #e0e0e0;
+  --light-datavis-titles-values: #212121;
+  --light-datavis-axis: #737373;
+
+  /* ===== Semantic aliases — default (Dark) ===== */
+  --color-primary: var(--dark-interactive-active);
+  --color-primary-hover: var(--dark-interactive-primary-hover);
+  --color-background: var(--dark-surface-page-bg);
+  --color-surface: var(--dark-surface-container-bg);
+  --color-surface-modal: var(--dark-surface-modal-bg);
+  --color-surface-page: var(--dark-surface-page-bg);
+  --color-surface-container: var(--dark-surface-container-bg);
+  --color-border: var(--dark-surface-container-borders);
+  --color-border-rule: var(--dark-surface-rules-lines);
+  --color-border-container: var(--dark-surface-container-borders);
+
+  --color-text-primary: var(--dark-text-primary);
+  --color-text-secondary: var(--dark-text-secondary);
+  --color-text-tertiary: var(--dark-text-tertiary);
+  --color-text-on-primary: var(--dark-text-button);
+
+  --color-interactive-active: var(--dark-interactive-active);
+  --color-interactive-secondary-pressed: var(--dark-interactive-secondary-pressed);
+
+  --color-feedback-negative: var(--dark-feedback-negative);
+  --color-feedback-caution: var(--dark-feedback-caution);
+  --color-feedback-positive: var(--dark-feedback-positive);
+  --color-feedback-info: var(--dark-feedback-info);
+
+  --color-overlay-subtle: rgba(255, 255, 255, 0.06);
+  --color-overlay-scrim: rgba(0, 0, 0, 0.6);
+}
+
+[data-theme="light"] {
+  --color-primary: var(--light-interactive-active);
+  --color-primary-hover: var(--light-interactive-primary-hover);
+  --color-background: var(--light-surface-page-bg);
+  --color-surface: var(--light-surface-container-bg);
+  --color-surface-modal: var(--light-surface-modal-bg);
+  --color-surface-page: var(--light-surface-page-bg);
+  --color-surface-container: var(--light-surface-container-bg);
+  --color-border: var(--light-surface-container-borders);
+  --color-border-rule: var(--light-surface-rules-lines);
+  --color-border-container: var(--light-surface-container-borders);
+
+  --color-text-primary: var(--light-text-primary);
+  --color-text-secondary: var(--light-text-secondary);
+  --color-text-tertiary: var(--light-text-tertiary);
+  --color-text-on-primary: var(--light-text-button);
+
+  --color-interactive-active: var(--light-interactive-active);
+  --color-interactive-secondary-pressed: var(--light-interactive-secondary-pressed);
+
+  --color-feedback-negative: var(--light-feedback-negative);
+  --color-feedback-caution: var(--light-feedback-caution);
+  --color-feedback-positive: var(--light-feedback-positive);
+  --color-feedback-info: var(--light-feedback-info);
+
+  --color-overlay-subtle: rgba(0, 0, 0, 0.06);
+  --color-overlay-scrim: rgba(18, 18, 18, 0.55);
+}
