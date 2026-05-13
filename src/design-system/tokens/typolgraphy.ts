@@ -33,6 +33,13 @@ export const typography = {
     lineHeight: "18px",
     letterSpacing: "0",
   },
+  /** Figma “Base/Semibold”: Lato 14 semibold (same metrics as `bodySemibold`). */
+  baseSemibold: {
+    size: "14px",
+    weight: fontWeight.semibold,
+    lineHeight: "18px",
+    letterSpacing: "0",
+  },
   labelSmall: {
     size: "12px",
     weight: fontWeight.semibold,

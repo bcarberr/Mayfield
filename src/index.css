@@ -1,6 +1,13 @@
 @import "tailwindcss";
 @import "./styles/tokens.css";
 
+/* Figma “Base/Semibold”: Lato 14px semibold (not Tailwind `text-base` / 16px). */
+@utility text-base-semibold {
+  font-size: 0.875rem;
+  font-weight: 600;
+  line-height: 1.125rem;
+}
+
 @theme {
   --color-surface-page: #121212;
   --color-surface-modal: #2e2e2e;

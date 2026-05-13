@@ -17,12 +17,23 @@ export type DataTableProps<Row> = {
   caption?: string;
   /** Hide column header row (still announced via caption) */
   hideHeader?: boolean;
+  /** Optional column sizing (e.g. colgroup for fixed layouts) */
+  colgroup?: ReactNode;
 };
 
-export function DataTable<Row>({ columns, rows, rowKey, className = "", caption, hideHeader }: DataTableProps<Row>) {
+export function DataTable<Row>({
+  columns,
+  rows,
+  rowKey,
+  className = "",
+  caption,
+  hideHeader,
+  colgroup,
+}: DataTableProps<Row>) {
   return (
-    <div className={`overflow-x-auto ${className}`.trim()}>
-      <table className="w-full min-w-[640px] border-collapse text-left text-sm">
+    <div className={`min-w-0 overflow-x-auto ${className}`.trim()}>
+      <table className="w-full min-w-0 table-fixed border-collapse text-left text-sm">
+        {colgroup}
         {caption ? <caption className="sr-only">{caption}</caption> : null}
         {!hideHeader ? (
           <thead>
@@ -41,9 +52,12 @@ export function DataTable<Row>({ columns, rows, rowKey, className = "", caption,
         ) : null}
         <tbody>
           {rows.map((row) => (
-            <tr key={rowKey(row)} className="border-b border-border-rule/80 hover:bg-surface-container/40">
+            <tr key={rowKey(row)} className="hover:bg-surface-container/40">
               {columns.map((c) => (
-                <td key={c.id} className={`px-3 py-2 align-middle text-text-primary ${c.className ?? ""}`.trim()}>
+                <td
+                  key={c.id}
+                  className={`align-middle text-text-primary ${c.className ?? "px-3 py-2"}`.trim()}
+                >
                   {c.cell(row)}
                 </td>
               ))}

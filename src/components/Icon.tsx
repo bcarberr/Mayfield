@@ -91,8 +91,8 @@ export function Icon({ name, size = 24, title, className, style, ...rest }: Icon
   return (
     <span
       {...rest}
-      className={["inline-flex shrink-0 items-center justify-center text-inherit", className].filter(Boolean).join(" ")}
-      style={{ lineHeight: 0, color: "inherit", ...style }}
+      className={["inline-flex shrink-0 items-center justify-center", className].filter(Boolean).join(" ")}
+      style={{ lineHeight: 0, ...style }}
       dangerouslySetInnerHTML={{ __html: markup }}
       role={title ? "img" : undefined}
       aria-label={title}
