@@ -1,0 +1,72 @@
+<!-- Figma get_metadata for node 802:47947 "Connectors Large" — child SYMBOL ids and names (Large=…). -->
+<frame id="802:47947" name="Connectors Large" x="100" y="100" width="920" height="2740">
+  <symbol id="2628:233" name="Large=Opensearch" x="572" y="1292" width="144" height="144" />
+  <symbol id="2628:210" name="Large=Elasticsearch" x="393" y="1292" width="144" height="144" />
+  <symbol id="2628:142" name="Large=crowdstrike logscale" x="200" y="1292" width="144" height="144" />
+  <symbol id="2627:56" name="Large=google mail" x="20" y="1292" width="144" height="144" />
+  <symbol id="2627:45" name="Large=Google Workspace" x="756" y="1114" width="144" height="144" />
+  <symbol id="2627:3" name="Large=Snowflake" x="572" y="1113" width="144" height="144" />
+  <symbol id="2625:8" name="Large=Databricks" x="393" y="1112" width="144" height="144" />
+  <symbol id="130:7823" name="Large=elk" x="756" y="572" width="144" height="144" />
+  <symbol id="130:7822" name="Large=splunk" x="572" y="572" width="144" height="144" />
+  <symbol id="130:7821" name="Large=zscaler" x="388" y="572" width="144" height="144" />
+  <symbol id="130:7820" name="Large=vm carbon black" x="204" y="572" width="144" height="144" />
+  <symbol id="130:7819" name="Large=virus total" x="20" y="572" width="144" height="144" />
+  <symbol id="130:7818" name="Large=recorded future" x="572" y="388" width="144" height="144" />
+  <symbol id="130:7817" name="Large=proofpoint" x="388" y="388" width="144" height="144" />
+  <symbol id="130:7816" name="Large=okta" x="204" y="388" width="144" height="144" />
+  <symbol id="130:7815" name="Large=ms intune" x="20" y="388" width="144" height="144" />
+  <symbol id="130:7814" name="Large=ms defender office365" x="572" y="204" width="144" height="144" />
+  <symbol id="130:7813" name="Large=ms defender endpoint" x="388" y="204" width="144" height="144" />
+  <symbol id="130:7812" name="Large=ms active directory" x="204" y="204" width="144" height="144" />
+  <symbol id="130:7811" name="Large=jamf" x="20" y="204" width="144" height="144" />
+  <symbol id="130:7810" name="Large=crowdstrike" x="384" y="21" width="144" height="144" />
+  <symbol id="130:7809" name="Large=cofense" x="203" y="20" width="144" height="144" />
+  <symbol id="130:7808" name="Large=ms entra id" x="19" y="20" width="144" height="144" />
+  <symbol id="1173:2" name="Large=whoisxmlapi" x="19" y="752" width="144" height="144" />
+  <symbol id="1173:188" name="Large=auth0" x="203" y="752" width="144" height="144" />
+  <symbol id="1177:887" name="Large=aws athena" x="388" y="752" width="144" height="144" />
+  <symbol id="4217:116" name="Large=amazon Redshift" x="753" y="387" width="144" height="144" />
+  <symbol id="1177:1037" name="Large=aws sec lake" x="572" y="752" width="144" height="144" />
+  <symbol id="1949:2" name="Large=amazon cloudwatch" x="19" y="1112" width="144" height="144" />
+  <symbol id="1954:2" name="Large=GCP google big query" x="199" y="1112" width="144" height="144" />
+  <symbol id="1178:1078" name="Large=tego" x="755" y="752" width="144" height="144" />
+  <symbol id="1178:1297" name="Large=datadog" x="21" y="932" width="144" height="144" />
+  <symbol id="1178:1343" name="Large=sentinelOne" x="200" y="932" width="144" height="144" />
+  <symbol id="3148:55" name="Large=cribl search" x="756" y="1292" width="144" height="144" />
+  <symbol id="3195:12752" name="Large=Google SecOps" x="18" y="1472" width="144" height="144" />
+  <symbol id="3214:2" name="Large=MISP Threat Sharing" x="203" y="1472" width="144" height="144" />
+  <symbol id="1178:2014" name="Large=shodan" x="388" y="932" width="144" height="144" />
+  <symbol id="1181:2050" name="Large=servicenow" x="572" y="932" width="144" height="144" />
+  <symbol id="3311:2" name="Large=Armis" x="758" y="1654" width="144" height="144" />
+  <symbol id="1182:2068" name="Large=alienvault OTX" x="756" y="932" width="144" height="144" />
+  <symbol id="3224:1468" name="Large=CisaKev" x="388" y="1471" width="144" height="144" />
+  <symbol id="3224:1722" name="Large=ipapa" x="572" y="1471" width="144" height="144" />
+  <symbol id="3226:72" name="Large=Redshift" x="756" y="1470" width="144" height="144" />
+  <symbol id="3230:85" name="Large=Apache Flink" x="19" y="1652" width="144" height="144" />
+  <symbol id="3232:1114" name="Large=Cyera" x="203" y="1651" width="144" height="144" />
+  <symbol id="3255:141" name="Large=Akamai" x="389" y="1653" width="144" height="144" />
+  <symbol id="3302:174" name="Large=Clickhouse" x="571" y="1652" width="144" height="144" />
+  <symbol id="4167:91" name="Large=Lacework" x="25" y="1829" width="144" height="144" />
+  <symbol id="4167:1003" name="Large=Azure Data Explorer" x="204" y="1832" width="144" height="144" />
+  <symbol id="4167:1006" name="Large=Github" x="388" y="1832" width="144" height="144" />
+  <symbol id="4167:1009" name="Large=Ox Security" x="572" y="1832" width="144" height="144" />
+  <symbol id="4167:1012" name="Large=Exabeam" x="756" y="1832" width="144" height="144" />
+  <symbol id="4167:1015" name="Large=Entra PIM" x="18" y="2012" width="144" height="144" />
+  <symbol id="4174:1139" name="Large=Gitlab" x="204" y="2012" width="144" height="144" />
+  <symbol id="4175:1191" name="Large=ThreatDown" x="387" y="2012" width="144" height="144" />
+  <symbol id="4175:1213" name="Large=mimecast" x="571" y="2013" width="144" height="144" />
+  <symbol id="4247:512" name="Large=OnePassword" x="755" y="2013" width="144" height="144" />
+  <symbol id="4248:1431" name="Large=JumpCloud" x="21" y="2196" width="144" height="144" />
+  <symbol id="4249:1520" name="Large=MalwareBytes" x="204" y="2195" width="144" height="144" />
+  <symbol id="4249:1566" name="Large=Push Security" x="387" y="2196" width="144" height="144" />
+  <symbol id="4288:5502" name="Large=MS Sentinel" x="755" y="2195" width="144" height="144" />
+  <symbol id="4334:54" name="Large=Google Cloud Storage" x="572" y="2379" width="144" height="144" />
+  <symbol id="4334:1292" name="Large=Azure Blob" x="756" y="2377" width="144" height="144" />
+  <symbol id="4337:76" name="Large=Cribl Stream" x="22" y="2562" width="144" height="144" />
+  <symbol id="4288:5521" name="Large=Azure Log Analytics" x="22" y="2379" width="144" height="144" />
+  <symbol id="4288:4997" name="Large=ipapi" x="572" y="2195" width="144" height="144" />
+  <symbol id="4171:2" name="Large=MicrosoftGraph" x="753" y="205" width="144" height="144" />
+  <symbol id="4288:5545" name="Large=AWSOpenSearch" x="203" y="2379" width="144" height="144" />
+  <symbol id="4294:554" name="Large=Amazon S3" x="385" y="2379" width="144" height="144" />
+</frame>
