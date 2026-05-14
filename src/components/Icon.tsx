@@ -20,6 +20,11 @@ import {
   OCSF_EVENT_RAW_BY_NAME,
   type OcsfEventIconName,
 } from "../assets/icons/ocsf-icons";
+import {
+  SEVERITY_SHAPE_ICON_NAMES,
+  SEVERITY_SHAPE_RAW_BY_NAME,
+  type SeverityShapeIconName,
+} from "../assets/icons/severity-icons";
 import checkCircle from "../assets/icons/check-circle.svg?raw";
 import checkCircleOutline from "../assets/icons/check-circle-outline.svg?raw";
 import chevronDown from "../assets/icons/chevron-down.svg?raw";
@@ -74,6 +79,7 @@ export const ICON_NAMES = [
   ...OBSERVABLE_ENTITY_ICON_NAMES,
   ...QUERY_DS_ICON_NAMES,
   ...OCSF_EVENT_ICON_NAMES,
+  ...SEVERITY_SHAPE_ICON_NAMES,
 ] as const;
 
 export type IconName = (typeof ICON_NAMES)[number];
@@ -120,6 +126,10 @@ function isQueryDsIcon(name: IconName): name is QueryDsIconName {
 
 function isOcsfEventIcon(name: IconName): name is OcsfEventIconName {
   return (OCSF_EVENT_ICON_NAMES as readonly string[]).includes(name);
+}
+
+function isSeverityShapeIcon(name: IconName): name is SeverityShapeIconName {
+  return (SEVERITY_SHAPE_ICON_NAMES as readonly string[]).includes(name);
 }
 
 function withDisplaySize(svg: string, size: number): string {
@@ -189,6 +199,21 @@ export function Icon({ name, size = 24, title, className, style, ...rest }: Icon
 
   if (isOcsfEventIcon(name)) {
     const markup = withDisplaySize(OCSF_EVENT_RAW_BY_NAME[name], size);
+    return (
+      <span
+        {...rest}
+        className={spanClass}
+        style={{ lineHeight: 0, ...style }}
+        dangerouslySetInnerHTML={{ __html: markup }}
+        role={title ? "img" : undefined}
+        aria-label={title}
+        aria-hidden={title ? undefined : true}
+      />
+    );
+  }
+
+  if (isSeverityShapeIcon(name)) {
+    const markup = withDisplaySize(SEVERITY_SHAPE_RAW_BY_NAME[name], size);
     return (
       <span
         {...rest}
