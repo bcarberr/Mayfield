@@ -10,6 +10,11 @@ import {
   OBSERVABLE_ENTITY_RAW_BY_NAME,
   type ObservableEntityIconName,
 } from "../assets/icons/observable-icons";
+import {
+  QUERY_DS_ICON_NAMES,
+  QUERY_DS_RAW_BY_NAME,
+  type QueryDsIconName,
+} from "../assets/icons/query-ds-icons";
 import checkCircle from "../assets/icons/check-circle.svg?raw";
 import checkCircleOutline from "../assets/icons/check-circle-outline.svg?raw";
 import chevronDown from "../assets/icons/chevron-down.svg?raw";
@@ -62,6 +67,7 @@ export const ICON_NAMES = [
   ...LEGACY_ICON_NAMES,
   ...MISC_TECHNOLOGY_ICON_NAMES,
   ...OBSERVABLE_ENTITY_ICON_NAMES,
+  ...QUERY_DS_ICON_NAMES,
 ] as const;
 
 export type IconName = (typeof ICON_NAMES)[number];
@@ -102,6 +108,10 @@ function isObservableEntityIcon(name: IconName): name is ObservableEntityIconNam
   return (OBSERVABLE_ENTITY_ICON_NAMES as readonly string[]).includes(name);
 }
 
+function isQueryDsIcon(name: IconName): name is QueryDsIconName {
+  return (QUERY_DS_ICON_NAMES as readonly string[]).includes(name);
+}
+
 function withDisplaySize(svg: string, size: number): string {
   return svg.replace(/<svg\b([^>]*)>/, (_match, attrs: string) => {
     let next = attrs;
@@ -139,6 +149,21 @@ export function Icon({ name, size = 24, title, className, style, ...rest }: Icon
 
   if (isObservableEntityIcon(name)) {
     const markup = withDisplaySize(OBSERVABLE_ENTITY_RAW_BY_NAME[name], size);
+    return (
+      <span
+        {...rest}
+        className={spanClass}
+        style={{ lineHeight: 0, ...style }}
+        dangerouslySetInnerHTML={{ __html: markup }}
+        role={title ? "img" : undefined}
+        aria-label={title}
+        aria-hidden={title ? undefined : true}
+      />
+    );
+  }
+
+  if (isQueryDsIcon(name)) {
+    const markup = withDisplaySize(QUERY_DS_RAW_BY_NAME[name], size);
     return (
       <span
         {...rest}
