@@ -25,6 +25,13 @@ import {
   SEVERITY_SHAPE_RAW_BY_NAME,
   type SeverityShapeIconName,
 } from "../assets/icons/severity-icons";
+import {
+  NAV_ELEMENT_ICON_NAMES,
+  NAV_ELEMENT_RAW_BY_NAME,
+  type NavElementIconName,
+} from "../assets/icons/nav-elements-icons";
+import { NAVI_ICON_NAMES, NAVI_RAW_BY_NAME, type NaviIconName } from "../assets/icons/navi-icons";
+import { EXTRA_ICON_NAMES, EXTRA_RAW_BY_NAME, type ExtraIconName } from "../assets/icons/extra-icons";
 import checkCircle from "../assets/icons/check-circle.svg?raw";
 import checkCircleOutline from "../assets/icons/check-circle-outline.svg?raw";
 import chevronDown from "../assets/icons/chevron-down.svg?raw";
@@ -80,6 +87,9 @@ export const ICON_NAMES = [
   ...QUERY_DS_ICON_NAMES,
   ...OCSF_EVENT_ICON_NAMES,
   ...SEVERITY_SHAPE_ICON_NAMES,
+  ...NAV_ELEMENT_ICON_NAMES,
+  ...NAVI_ICON_NAMES,
+  ...EXTRA_ICON_NAMES,
 ] as const;
 
 export type IconName = (typeof ICON_NAMES)[number];
@@ -130,6 +140,18 @@ function isOcsfEventIcon(name: IconName): name is OcsfEventIconName {
 
 function isSeverityShapeIcon(name: IconName): name is SeverityShapeIconName {
   return (SEVERITY_SHAPE_ICON_NAMES as readonly string[]).includes(name);
+}
+
+function isNavElementIcon(name: IconName): name is NavElementIconName {
+  return (NAV_ELEMENT_ICON_NAMES as readonly string[]).includes(name);
+}
+
+function isNaviIcon(name: IconName): name is NaviIconName {
+  return (NAVI_ICON_NAMES as readonly string[]).includes(name);
+}
+
+function isExtraIcon(name: IconName): name is ExtraIconName {
+  return (EXTRA_ICON_NAMES as readonly string[]).includes(name);
 }
 
 function withDisplaySize(svg: string, size: number): string {
@@ -214,6 +236,51 @@ export function Icon({ name, size = 24, title, className, style, ...rest }: Icon
 
   if (isSeverityShapeIcon(name)) {
     const markup = withDisplaySize(SEVERITY_SHAPE_RAW_BY_NAME[name], size);
+    return (
+      <span
+        {...rest}
+        className={spanClass}
+        style={{ lineHeight: 0, ...style }}
+        dangerouslySetInnerHTML={{ __html: markup }}
+        role={title ? "img" : undefined}
+        aria-label={title}
+        aria-hidden={title ? undefined : true}
+      />
+    );
+  }
+
+  if (isNavElementIcon(name)) {
+    const markup = withDisplaySize(NAV_ELEMENT_RAW_BY_NAME[name], size);
+    return (
+      <span
+        {...rest}
+        className={spanClass}
+        style={{ lineHeight: 0, ...style }}
+        dangerouslySetInnerHTML={{ __html: markup }}
+        role={title ? "img" : undefined}
+        aria-label={title}
+        aria-hidden={title ? undefined : true}
+      />
+    );
+  }
+
+  if (isNaviIcon(name)) {
+    const markup = withDisplaySize(NAVI_RAW_BY_NAME[name], size);
+    return (
+      <span
+        {...rest}
+        className={spanClass}
+        style={{ lineHeight: 0, ...style }}
+        dangerouslySetInnerHTML={{ __html: markup }}
+        role={title ? "img" : undefined}
+        aria-label={title}
+        aria-hidden={title ? undefined : true}
+      />
+    );
+  }
+
+  if (isExtraIcon(name)) {
+    const markup = withDisplaySize(EXTRA_RAW_BY_NAME[name], size);
     return (
       <span
         {...rest}
