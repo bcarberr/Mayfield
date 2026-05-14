@@ -35,6 +35,7 @@
 
   --dark-interactive-active: #1ec1dd;
   --dark-interactive-primary-hover: #39daf5;
+  --dark-interactive-primary-pressed: #89ecfd;
   --dark-interactive-secondary-hover: #0d404b;
   --dark-interactive-secondary-pressed: #2a6b79;
   --dark-interactive-destructive: #ff604a;
@@ -128,6 +129,10 @@
 
   --color-interactive-active: var(--dark-interactive-active);
   --color-interactive-secondary-pressed: var(--dark-interactive-secondary-pressed);
+  --color-primary-pressed: var(--dark-interactive-primary-pressed);
+  --color-switch-track-on-disabled: var(--dark-surface-container-borders);
+  --color-switch-thumb-on-disabled: var(--dark-surface-rules-lines);
+  --color-switch-off-disabled: var(--dark-surface-container-borders);
 
   --color-feedback-negative: var(--dark-feedback-negative);
   --color-feedback-caution: var(--dark-feedback-caution);
@@ -157,6 +162,10 @@
 
   --color-interactive-active: var(--light-interactive-active);
   --color-interactive-secondary-pressed: var(--light-interactive-secondary-pressed);
+  --color-primary-pressed: var(--light-interactive-primary-pressed);
+  --color-switch-track-on-disabled: var(--light-surface-rules-lines);
+  --color-switch-thumb-on-disabled: var(--light-text-tertiary);
+  --color-switch-off-disabled: var(--light-surface-rules-lines);
 
   --color-feedback-negative: var(--light-feedback-negative);
   --color-feedback-caution: var(--light-feedback-caution);

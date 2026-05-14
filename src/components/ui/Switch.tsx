@@ -3,56 +3,90 @@ import { useId, type ReactNode } from "react";
 const cx = (...c: (string | false | undefined)[]) => c.filter(Boolean).join(" ");
 
 export type SwitchProps = {
-  /** Controlled on state */
-  on: boolean;
-  /** Optional label to the right of the control */
-  label?: ReactNode;
-  onCheckedChange?: (next: boolean) => void;
+  /** Controlled checked state */
+  checked: boolean;
   disabled?: boolean;
+  label?: ReactNode;
+  onCheckedChange?: (checked: boolean) => void;
   className?: string;
+  /** Optional stable id; otherwise `useId` is used for label association */
+  id?: string;
 };
 
 /**
- * Toggle from Query DS (Figma v1 — Switch, e.g. node 1603:3694).
- * Track 36×18px, thumb 12px; off = tertiary border + thumb; on = interactive-active + #FAFAFA thumb.
+ * Query DS Switch (Figma: component `1509:4265`, e.g. light/off `1603:3601`).
+ * 36×18px track, 12px thumb. Themes follow `data-theme` via `tokens.css` / `--color-*`.
+ * Interactive hover/pressed use `--color-primary-hover` and `--color-primary-pressed`.
  */
-export function Switch({ on, label, onCheckedChange, disabled, className }: SwitchProps) {
-  const switchId = useId().replace(/:/g, "");
+export function Switch({ checked, disabled, label, onCheckedChange, className, id: idProp }: SwitchProps) {
+  const uid = useId().replace(/:/g, "");
+  const switchId = idProp ?? uid;
   const toggle = () => {
     if (disabled || !onCheckedChange) return;
-    onCheckedChange(!on);
+    onCheckedChange(!checked);
   };
   const interactive = Boolean(onCheckedChange) && !disabled;
+
+  const track = (
+    <span
+      aria-hidden
+      className={cx(
+        "pointer-events-none absolute inset-0 rounded-[9px] transition-colors duration-150 ease-out",
+        disabled &&
+          (checked
+            ? "bg-[var(--color-switch-track-on-disabled)]"
+            : "border border-solid border-[var(--color-switch-off-disabled)] bg-transparent"),
+        !disabled &&
+          checked &&
+          cx(
+            "bg-interactive-active",
+            "enabled:group-hover:bg-[var(--color-primary-hover)] enabled:group-active:bg-[var(--color-primary-pressed)]",
+          ),
+        !disabled &&
+          !checked &&
+          cx(
+            "border border-solid border-text-tertiary bg-transparent",
+            "enabled:group-hover:border-[var(--color-primary-hover)] enabled:group-active:border-[var(--color-primary-pressed)]",
+          ),
+      )}
+    />
+  );
+
+  const thumb = (
+    <span
+      aria-hidden
+      className={cx(
+        "pointer-events-none absolute top-[3px] size-3 rounded-full transition-[left,background-color] duration-150 ease-out",
+        disabled && checked && "left-[21px] bg-[var(--color-switch-thumb-on-disabled)]",
+        disabled && !checked && "left-1 bg-[var(--color-switch-off-disabled)]",
+        !disabled && checked && "left-[21px] bg-text-on-primary",
+        !disabled &&
+          !checked &&
+          cx(
+            "left-1 bg-text-tertiary",
+            "enabled:group-hover:bg-[var(--color-primary-hover)] enabled:group-active:bg-[var(--color-primary-pressed)]",
+          ),
+      )}
+    />
+  );
 
   const control = (
     <button
       id={switchId}
       type="button"
       role="switch"
-      aria-checked={on}
+      aria-checked={checked}
       aria-disabled={disabled || undefined}
       disabled={disabled}
       onClick={toggle}
       className={cx(
-        "relative h-[18px] w-9 shrink-0 overflow-hidden rounded-[9px] p-0 outline-none",
+        "group relative h-[18px] w-9 shrink-0 overflow-hidden rounded-[9px] p-0 outline-none",
         "focus-visible:ring-2 focus-visible:ring-interactive-active focus-visible:ring-offset-2 focus-visible:ring-offset-surface-modal",
         interactive ? "cursor-pointer" : "cursor-default",
       )}
     >
-      <span
-        aria-hidden
-        className={cx(
-          "pointer-events-none absolute inset-0 rounded-[9px] transition-colors",
-          on ? "bg-interactive-active" : "border border-solid border-text-tertiary bg-transparent",
-        )}
-      />
-      <span
-        aria-hidden
-        className={cx(
-          "pointer-events-none absolute top-[3px] size-3 rounded-full transition-[left]",
-          on ? "left-[21px] bg-[#fafafa]" : "left-1 bg-text-tertiary",
-        )}
-      />
+      {track}
+      {thumb}
     </button>
   );
 
@@ -66,12 +100,19 @@ export function Switch({ on, label, onCheckedChange, disabled, className }: Swit
       className={cx(
         "inline-flex items-center gap-2",
         interactive && "cursor-pointer",
-        disabled && "cursor-not-allowed opacity-60",
+        disabled && "cursor-not-allowed",
         className,
       )}
     >
       {control}
-      <span className="text-sm font-semibold leading-[18px] text-text-tertiary">{label}</span>
+      <span
+        className={cx(
+          "text-sm font-semibold leading-[18px] text-text-tertiary",
+          disabled && "opacity-60",
+        )}
+      >
+        {label}
+      </span>
     </label>
   );
 }

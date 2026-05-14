@@ -429,7 +429,7 @@ function MappingToolbarV2() {
           <CopilotMark />
         </div>
         <div className="flex shrink-0 flex-wrap items-center gap-x-6 gap-y-2">
-          <Switch on label="Allow Autosave" />
+          <Switch checked label="Allow Autosave" />
           <Button variant="tertiary" className="gap-1 text-sm font-semibold text-text-secondary hover:text-text-primary">
             <Icon name="close" size={18} />
             Clear All Mappings
@@ -484,7 +484,7 @@ function FieldMappingBar({
             placeholder="Search source fields"
             className="h-7 !w-[240px] max-w-full shrink-0 py-0"
           />
-          <Switch on={false} disabled label="Show Hidden Fields" />
+          <Switch checked={false} disabled label="Show Hidden Fields" />
         </div>
         <div className="hidden md:block" aria-hidden />
         <div className="flex min-w-0 items-center justify-start">
@@ -584,7 +584,7 @@ export function ConfigSchemaMapPage() {
               </button>
               <Icon name="connectors" size={24} className="mt-0.5 shrink-0 text-interactive-active" />
               <h1 className="text-xl font-bold leading-6 tracking-[0.6px] text-text-primary">Amazon Athena</h1>
-              <Switch on label="Connector Enabled" />
+              <Switch checked label="Connector Enabled" />
               <span className="rounded bg-badge-muted px-2 py-1.5 text-xs font-semibold leading-4 tracking-[0.4px] text-[color:var(--dark-text-primary)]">
                 DYNAMIC SCHEMA
               </span>
