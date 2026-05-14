@@ -1,5 +1,5 @@
 import { useId, useMemo, useState } from "react";
-import { Icon, useTheme } from "../design-system";
+import { Icon } from "../design-system";
 import { V4NavThinner } from "../components/V4NavThinner";
 import { Button } from "../components/ui/Button";
 import { DataTable, type DataTableColumn } from "../components/ui/DataTable";
@@ -313,7 +313,6 @@ function Tag({ children }: { children: string }) {
 
 /** Bordered MAP SCHEMA panel — aligned with event-class toolbar row; content through search + schema hints. */
 function MapSchemaOverviewCard() {
-  const { theme } = useTheme();
   const [entitiesOpen, setEntitiesOpen] = useState(false);
   const [recommendedOpen, setRecommendedOpen] = useState(false);
   const [treeView, setTreeView] = useState(false);
@@ -325,17 +324,17 @@ function MapSchemaOverviewCard() {
           <p className="shrink-0 text-[12px] font-bold uppercase leading-[14px] tracking-[0.4px] text-text-tertiary">
             MAP Schema
           </p>
-          <div
+          <button
+            type="button"
+            aria-label="Map schema mode: Basic Mode"
             className={cx(
-              "flex h-7 min-w-0 flex-1 items-center justify-between gap-2 rounded-full px-3",
-              theme === "light" ? "bg-neutral-200" : "bg-[#000000]",
+              "flex h-7 min-w-0 flex-1 items-center justify-between gap-2 rounded-full border px-3 text-left transition-colors",
+              "border-border-container bg-surface-container text-text-secondary hover:text-text-primary",
             )}
           >
-            <span className="min-w-0 truncate text-[14px] font-bold leading-5 tracking-[0.4px] text-text-primary">
-              Basic Mode
-            </span>
-            <Icon name="chevron-down" size={20} className="shrink-0 text-text-primary" />
-          </div>
+            <span className="min-w-0 truncate text-[14px] font-bold leading-5 tracking-[0.4px]">Basic Mode</span>
+            <Icon name="chevron-down" size={20} className="shrink-0" />
+          </button>
         </div>
         <div className="mt-4 flex items-center justify-between gap-2">
           <p className="text-left text-[14px] font-bold leading-5 tracking-[0.4px] text-text-primary">HTTP Activity</p>
@@ -349,7 +348,7 @@ function MapSchemaOverviewCard() {
             readOnly
             tabIndex={-1}
             startAdornment={<Icon name="search" size={18} />}
-            placeholder="Search classification attributes"
+            placeholder="Search"
             className="h-7 w-full border-border-rule px-1.5 py-0"
           />
         </div>
@@ -440,7 +439,7 @@ function CopilotMark() {
         </svg>
         <span className="-ml-0.5 text-base font-semibold leading-6 text-text-primary">Copilot</span>
       </div>
-      <span className="rounded bg-beta px-1.5 py-0.5 text-xs font-bold uppercase tracking-wide text-beta-text ring-1 ring-black/70">
+      <span className="rounded bg-beta px-1.5 py-0.5 text-xs font-bold uppercase tracking-wide text-beta-text">
         BETA
       </span>
     </div>
@@ -627,7 +626,7 @@ export function ConfigSchemaMapPage() {
               <Icon name="connectors" size={24} className="mt-0.5 shrink-0 text-interactive-active" />
               <h1 className="text-xl font-bold leading-6 tracking-[0.6px] text-text-primary">Amazon Athena</h1>
               <Switch on label="Connector Enabled" />
-              <span className="rounded bg-badge-muted px-2 py-1.5 text-xs font-semibold leading-4 tracking-[0.4px] text-text-primary">
+              <span className="rounded bg-badge-muted px-2 py-1.5 text-xs font-semibold leading-4 tracking-[0.4px] text-[color:var(--dark-text-primary)]">
                 DYNAMIC SCHEMA
               </span>
             </div>
