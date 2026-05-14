@@ -32,6 +32,11 @@ import {
 } from "../assets/icons/nav-elements-icons";
 import { NAVI_ICON_NAMES, NAVI_RAW_BY_NAME, type NaviIconName } from "../assets/icons/navi-icons";
 import { EXTRA_ICON_NAMES, EXTRA_RAW_BY_NAME, type ExtraIconName } from "../assets/icons/extra-icons";
+import {
+  ACTION_ICON_NAMES,
+  ACTION_RAW_BY_NAME,
+  type ActionIconName,
+} from "../assets/icons/action-icons";
 import checkCircle from "../assets/icons/check-circle.svg?raw";
 import checkCircleOutline from "../assets/icons/check-circle-outline.svg?raw";
 import chevronDown from "../assets/icons/chevron-down.svg?raw";
@@ -90,6 +95,7 @@ export const ICON_NAMES = [
   ...NAV_ELEMENT_ICON_NAMES,
   ...NAVI_ICON_NAMES,
   ...EXTRA_ICON_NAMES,
+  ...ACTION_ICON_NAMES,
 ] as const;
 
 export type IconName = (typeof ICON_NAMES)[number];
@@ -152,6 +158,10 @@ function isNaviIcon(name: IconName): name is NaviIconName {
 
 function isExtraIcon(name: IconName): name is ExtraIconName {
   return (EXTRA_ICON_NAMES as readonly string[]).includes(name);
+}
+
+function isActionIcon(name: IconName): name is ActionIconName {
+  return (ACTION_ICON_NAMES as readonly string[]).includes(name);
 }
 
 function withDisplaySize(svg: string, size: number): string {
@@ -281,6 +291,21 @@ export function Icon({ name, size = 24, title, className, style, ...rest }: Icon
 
   if (isExtraIcon(name)) {
     const markup = withDisplaySize(EXTRA_RAW_BY_NAME[name], size);
+    return (
+      <span
+        {...rest}
+        className={spanClass}
+        style={{ lineHeight: 0, ...style }}
+        dangerouslySetInnerHTML={{ __html: markup }}
+        role={title ? "img" : undefined}
+        aria-label={title}
+        aria-hidden={title ? undefined : true}
+      />
+    );
+  }
+
+  if (isActionIcon(name)) {
+    const markup = withDisplaySize(ACTION_RAW_BY_NAME[name], size);
     return (
       <span
         {...rest}

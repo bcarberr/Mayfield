@@ -21,5 +21,7 @@ export { NAVI_ICON_NAMES } from "../assets/icons/navi-icons";
 export type { NaviIconName } from "../assets/icons/navi-icons";
 export { EXTRA_ICON_NAMES } from "../assets/icons/extra-icons";
 export type { ExtraIconName } from "../assets/icons/extra-icons";
+export { ACTION_ICON_NAMES } from "../assets/icons/action-icons";
+export type { ActionIconName } from "../assets/icons/action-icons";
 export { Switch, type SwitchProps } from "../components/ui/Switch";
 export { Checkbox, type CheckboxProps } from "../components/uiCheckbox";
