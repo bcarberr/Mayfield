@@ -27,6 +27,7 @@
   --color-accent-required: #ff9393;
   --color-beta: #ff8200;
   --color-beta-text: #010101;
+  --color-datavis-data-peanut-orange: #f0a060;
   /* hover overlay applied on top of any surface — kept low-alpha */
   --color-overlay-subtle: rgba(255, 255, 255, 0.05);
   --color-overlay-scrim: rgba(0, 0, 0, 0.6);

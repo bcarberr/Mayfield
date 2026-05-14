@@ -54,6 +54,7 @@ export const darkPalette = {
     gridlines: "#424242",
     titlesValues: "#f5f5f5",
     axis: "#9e9e9e",
+    dataPeanutOrange: "#f0a060",
   },
 } as const;
 
@@ -109,6 +110,7 @@ export const lightPalette = {
     gridlines: "#e0e0e0",
     titlesValues: "#212121",
     axis: "#737373",
+    dataPeanutOrange: "#b85c2e",
   },
 } as const;
 

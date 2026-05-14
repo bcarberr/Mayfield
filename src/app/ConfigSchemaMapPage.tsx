@@ -424,7 +424,12 @@ function MappingToolbarV2() {
             type="button"
             className="flex h-7 w-60 shrink-0 items-center gap-1 rounded border border-border-rule bg-surface-modal px-3 text-left hover:bg-overlay-subtle"
           >
-            <Icon name="connectors" size={16} className="shrink-0 text-text-secondary" />
+            <Icon
+              name="network-activity"
+              size={16}
+              className="shrink-0 text-datavis-data-peanut-orange"
+              title="Network activity"
+            />
             <span className="min-w-0 flex-1 truncate text-sm font-semibold text-text-primary">HTTP Activity</span>
             <Icon name="chevron-down" size={18} className="shrink-0 text-text-secondary" />
           </button>

@@ -15,6 +15,7 @@ import feedbackInfoOutline from "../assets/icons/feedback-info-outline.svg?raw";
 import inProgress from "../assets/icons/in-progress.svg?raw";
 import noData from "../assets/icons/no-data.svg?raw";
 import noDataBlocked from "../assets/icons/no-data-blocked.svg?raw";
+import networkActivity from "../assets/icons/network-activity.svg?raw";
 import search from "../assets/icons/search.svg?raw";
 import sparkle from "../assets/icons/sparkle.svg?raw";
 import visibility from "../assets/icons/visibility.svg?raw";
@@ -37,6 +38,7 @@ export const ICON_NAMES = [
   "in-progress",
   "no-data",
   "no-data-blocked",
+  "network-activity",
   "partial-results",
   "results",
   "search",
@@ -64,6 +66,7 @@ const RAW_BY_NAME: Record<IconName, string> = {
   "in-progress": inProgress,
   "no-data": noData,
   "no-data-blocked": noDataBlocked,
+  "network-activity": networkActivity,
   "partial-results": checkCircleOutline,
   results: checkCircle,
   search,
