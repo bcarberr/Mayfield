@@ -6,6 +6,7 @@ import chevronDown from "../assets/icons/chevron-down.svg?raw";
 import circle from "../assets/icons/circle.svg?raw";
 import close from "../assets/icons/close.svg?raw";
 import connectors from "../assets/icons/connectors.svg?raw";
+import awsAthena from "../assets/icons/aws-athena.svg?raw";
 import error from "../assets/icons/error.svg?raw";
 import errorOutline from "../assets/icons/error-outline.svg?raw";
 import external from "../assets/icons/external.svg?raw";
@@ -27,6 +28,7 @@ export const ICON_NAMES = [
   "circle",
   "close",
   "connectors",
+  "aws-athena",
   "error",
   "error-outline",
   "external",
@@ -53,6 +55,7 @@ const RAW_BY_NAME: Record<IconName, string> = {
   circle,
   close,
   connectors,
+  "aws-athena": awsAthena,
   error,
   "error-outline": errorOutline,
   external,

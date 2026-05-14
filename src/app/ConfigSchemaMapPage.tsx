@@ -172,11 +172,20 @@ function MapVisibilityTrimode({
         Hide Mapped
       </label>
 
-      <div className="relative h-[18px] w-12 shrink-0 rounded-full border border-border-rule bg-transparent px-[3px]">
+      <div
+        className={cx(
+          "relative h-[18px] w-12 shrink-0 overflow-hidden rounded-full px-[3px] transition-colors duration-150 ease-out",
+          value === "all" && "border border-solid border-border-rule bg-transparent",
+          (value === "hideMapped" || value === "hideUnmapped") &&
+            "border-0 bg-interactive-active hover:bg-[var(--color-primary-hover)] active:bg-[var(--color-primary-pressed)]",
+        )}
+      >
         <span
           aria-hidden
           className={cx(
-            "pointer-events-none absolute top-1/2 z-0 size-3 rounded-full bg-border-container transition-[left,transform] duration-200 ease-out",
+            "pointer-events-none absolute top-1/2 z-0 size-3 rounded-full transition-[left,transform,background-color] duration-200 ease-out",
+            value === "all" && "bg-border-container",
+            (value === "hideMapped" || value === "hideUnmapped") && "bg-text-on-primary",
             value === "hideMapped" && "left-[3px] -translate-y-1/2",
             value === "all" && "left-1/2 -translate-x-1/2 -translate-y-1/2",
             value === "hideUnmapped" && "left-[calc(100%-15px)] -translate-y-1/2",
@@ -582,10 +591,10 @@ export function ConfigSchemaMapPage() {
               >
                 <Icon name="chevron-down" size={18} className="rotate-90" />
               </button>
-              <Icon name="connectors" size={24} className="mt-0.5 shrink-0 text-interactive-active" />
+              <Icon name="aws-athena" size={24} className="mt-0.5 shrink-0" title="Amazon Athena" />
               <h1 className="text-xl font-bold leading-6 tracking-[0.6px] text-text-primary">Amazon Athena</h1>
               <Switch checked label="Connector Enabled" />
-              <span className="rounded bg-badge-muted px-2 py-1.5 text-xs font-semibold leading-4 tracking-[0.4px] text-[color:var(--dark-text-primary)]">
+              <span className="shrink-0 rounded bg-badge-muted px-2 py-1.5 text-xs font-semibold leading-4 tracking-[0.4px] text-text-primary">
                 DYNAMIC SCHEMA
               </span>
             </div>
