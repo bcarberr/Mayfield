@@ -5,6 +5,11 @@ import {
   MISC_TECHNOLOGY_ICON_NAMES,
   type MiscTechnologyIconName,
 } from "../assets/icons/icons";
+import {
+  OBSERVABLE_ENTITY_ICON_NAMES,
+  OBSERVABLE_ENTITY_RAW_BY_NAME,
+  type ObservableEntityIconName,
+} from "../assets/icons/observable-icons";
 import checkCircle from "../assets/icons/check-circle.svg?raw";
 import checkCircleOutline from "../assets/icons/check-circle-outline.svg?raw";
 import chevronDown from "../assets/icons/chevron-down.svg?raw";
@@ -53,7 +58,11 @@ const LEGACY_ICON_NAMES = [
   "warning-outline",
 ] as const;
 
-export const ICON_NAMES = [...LEGACY_ICON_NAMES, ...MISC_TECHNOLOGY_ICON_NAMES] as const;
+export const ICON_NAMES = [
+  ...LEGACY_ICON_NAMES,
+  ...MISC_TECHNOLOGY_ICON_NAMES,
+  ...OBSERVABLE_ENTITY_ICON_NAMES,
+] as const;
 
 export type IconName = (typeof ICON_NAMES)[number];
 
@@ -89,6 +98,10 @@ function isMiscTechnologyIcon(name: IconName): name is MiscTechnologyIconName {
   return (MISC_TECHNOLOGY_ICON_NAMES as readonly string[]).includes(name);
 }
 
+function isObservableEntityIcon(name: IconName): name is ObservableEntityIconName {
+  return (OBSERVABLE_ENTITY_ICON_NAMES as readonly string[]).includes(name);
+}
+
 function withDisplaySize(svg: string, size: number): string {
   return svg.replace(/<svg\b([^>]*)>/, (_match, attrs: string) => {
     let next = attrs;
@@ -121,6 +134,21 @@ export function Icon({ name, size = 24, title, className, style, ...rest }: Icon
       >
         <Svg width={size} height={size} className="block shrink-0" />
       </span>
+    );
+  }
+
+  if (isObservableEntityIcon(name)) {
+    const markup = withDisplaySize(OBSERVABLE_ENTITY_RAW_BY_NAME[name], size);
+    return (
+      <span
+        {...rest}
+        className={spanClass}
+        style={{ lineHeight: 0, ...style }}
+        dangerouslySetInnerHTML={{ __html: markup }}
+        role={title ? "img" : undefined}
+        aria-label={title}
+        aria-hidden={title ? undefined : true}
+      />
     );
   }
 
