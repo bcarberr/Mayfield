@@ -31,6 +31,8 @@ export type CheckboxProps = {
   indeterminate?: boolean;
   disabled?: boolean;
   label?: ReactNode;
+  /** Overrides default label typography (`text-sm font-semibold …`) when `label` is set */
+  labelClassName?: string;
   onCheckedChange?: (checked: boolean) => void;
   className?: string;
   id?: string;
@@ -45,6 +47,7 @@ export function Checkbox({
   indeterminate = false,
   disabled,
   label,
+  labelClassName,
   onCheckedChange,
   className,
   id: idProp,
@@ -116,7 +119,7 @@ export function Checkbox({
       {box}
       <span
         className={cx(
-          "text-sm font-semibold leading-[18px] text-text-tertiary",
+          labelClassName ?? "text-sm font-semibold leading-[18px] text-text-tertiary",
           disabled && "opacity-60",
         )}
       >

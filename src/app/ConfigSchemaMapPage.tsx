@@ -1,5 +1,5 @@
 import { useId, useMemo, useState } from "react";
-import { Icon } from "../design-system";
+import { Checkbox, Icon } from "../design-system";
 import { V4NavThinner } from "../components/V4NavThinner";
 import { Button } from "../components/ui/Button";
 import { DataTable, type DataTableColumn } from "../components/ui/DataTable";
@@ -279,79 +279,222 @@ function Tag({ children }: { children: string }) {
   );
 }
 
+/** Map Schema right-rail entity list — Config-Schema-v2 Figma `7990:109471` (Variant29). */
+const MAP_SCHEMA_ENTITY_GROUPS: string[] = ["Account ID", "Account Name"];
+
+const MAP_SCHEMA_ENTITY_FIELDS: string[] = [
+  "Command Line",
+  "Country",
+  "Credential ID",
+  "CVE ID",
+  "CDW ID",
+  "Email Address",
+  "File Hash",
+  "Filename",
+  "Group ID",
+  "Group Name",
+  "Hostname",
+  "IP Address",
+  "MAC Address",
+  "Port",
+  "Process ID",
+  "Process Name",
+  "Script Content",
+  "Serial Number",
+  "Subnet",
+  "URL",
+  "User Agent",
+  "User ID",
+  "User Name",
+];
+
+type MapSchemaRecommendedRow =
+  | { kind: "field"; name: string; enum?: boolean; info?: boolean }
+  | { kind: "plain"; name: string };
+
+const MAP_SCHEMA_RECOMMENDED: MapSchemaRecommendedRow[] = [
+  { kind: "field", name: "activity_id", enum: true, info: true },
+  { kind: "plain", name: "activity_name" },
+  { kind: "field", name: "category_uid", enum: true, info: true },
+  { kind: "plain", name: "category_name" },
+  { kind: "field", name: "severity_id", enum: true, info: true },
+  { kind: "plain", name: "severity" },
+  { kind: "field", name: "type_id", enum: true, info: true },
+  { kind: "plain", name: "type_name" },
+];
+
+/** Info + drag handle — same pattern as `time* required` row. */
+function MapSchemaRowInfoDragCluster({ title }: { title: string }) {
+  return (
+    <span className="inline-flex shrink-0 items-center gap-[8px] text-text-tertiary">
+      <Icon name="feedback-info-outline" size={16} className="shrink-0" title={title} />
+      <Icon
+        name="action-drag-indicator"
+        className="shrink-0"
+        style={{ width: 8, height: 12.8 }}
+        aria-hidden
+      />
+    </span>
+  );
+}
+
+function MapSchemaEntityRowChevron() {
+  return (
+    <span className="flex h-2.5 w-2.5 shrink-0 items-center justify-center text-text-primary" aria-hidden>
+      <Icon name="chevron-down" size={12} className="-rotate-90 block" />
+    </span>
+  );
+}
+
+function MapSchemaEntityGroupRow({ label }: { label: string }) {
+  return (
+    <div className="flex h-7 w-full items-center gap-2 py-1">
+      <Icon name="feedback-info-outline" size={16} className="shrink-0 text-text-tertiary" title={`About ${label}`} />
+      <MapSchemaEntityRowChevron />
+      <span className="truncate text-xs font-semibold leading-4 tracking-[0.4px] text-text-primary">{label}</span>
+    </div>
+  );
+}
+
+function MapSchemaEntityFieldRow({ label }: { label: string }) {
+  return (
+    <div className="flex h-7 w-full min-w-0 items-center gap-2 py-1">
+      <Icon name="feedback-info-outline" size={16} className="shrink-0 text-text-tertiary" title={`About ${label}`} />
+      <MapSchemaEntityRowChevron />
+      <span className="min-w-0 truncate text-xs font-semibold leading-4 tracking-[0.4px] text-text-secondary">{label}</span>
+    </div>
+  );
+}
+
+function MapSchemaRecommendedFieldRow({ row }: { row: MapSchemaRecommendedRow }) {
+  const infoTitle = `About ${row.name}`;
+  if (row.kind === "plain") {
+    return (
+      <div className="flex h-7 w-full min-w-0 items-center gap-2 py-1">
+        <MapSchemaRowInfoDragCluster title={infoTitle} />
+        <span className="min-w-0 truncate text-xs font-semibold leading-4 tracking-[0.4px] text-text-secondary">{row.name}</span>
+      </div>
+    );
+  }
+  return (
+    <div className="flex h-7 w-full min-w-0 items-center gap-2 py-1">
+      <MapSchemaRowInfoDragCluster title={infoTitle} />
+      <span className="min-w-0 flex-1 truncate text-xs font-semibold leading-4 tracking-[0.4px] text-text-secondary">
+        <span>{row.name} </span>
+        {row.enum ? <span className="font-semibold italic text-[#b4b0ff]">enum</span> : null}
+      </span>
+    </div>
+  );
+}
+
 /** Bordered MAP SCHEMA panel — aligned with event-class toolbar row; content through search + schema hints. */
 function MapSchemaOverviewCard() {
-  const [entitiesOpen, setEntitiesOpen] = useState(false);
-  const [recommendedOpen, setRecommendedOpen] = useState(false);
   const [treeView, setTreeView] = useState(false);
+  const [entitiesOpen, setEntitiesOpen] = useState(true);
+  const [recommendedOpen, setRecommendedOpen] = useState(true);
 
   return (
     <div className="flex min-h-0 flex-1 flex-col rounded border border-border-rule bg-surface-modal px-4 pt-2 pb-3">
-      <div className="shrink-0">
-        <div className="flex shrink-0 items-center gap-2">
-          <p className="shrink-0 text-[12px] font-bold uppercase leading-[14px] tracking-[0.4px] text-text-tertiary">
-            MAP Schema
-          </p>
-          <button
-            type="button"
-            aria-label="Map schema mode: Basic Mode"
-            className={cx(
-              "flex h-7 min-w-0 flex-1 items-center justify-between gap-2 rounded-full border px-3 text-left transition-colors",
-              "border-border-container bg-surface-container text-text-secondary hover:text-text-primary",
-            )}
-          >
-            <span className="min-w-0 truncate text-[14px] font-bold leading-5 tracking-[0.4px]">Basic Mode</span>
-            <Icon name="chevron-down" size={20} className="shrink-0" />
-          </button>
+      <div className="flex min-h-0 flex-1 flex-col">
+        <div className="shrink-0">
+          <div className="flex shrink-0 items-center gap-2">
+            <p className="shrink-0 text-[12px] font-bold uppercase leading-[14px] tracking-[0.4px] text-text-tertiary">
+              MAP Schema
+            </p>
+            <button
+              type="button"
+              aria-label="Map schema mode: Basic Mode"
+              className={cx(
+                "flex h-7 min-w-0 flex-1 items-center justify-between gap-2 rounded-full border px-3 text-left transition-colors",
+                "border-border-container bg-surface-container text-text-secondary hover:text-text-primary",
+              )}
+            >
+              <span className="min-w-0 truncate text-[14px] font-bold leading-5 tracking-[0.4px]">Basic Mode</span>
+              <Icon name="chevron-down" size={20} className="shrink-0" />
+            </button>
+          </div>
+          <div className="mt-4">
+            <p className="text-left text-[14px] font-bold leading-5 tracking-[0.4px] text-text-primary">HTTP Activity</p>
+          </div>
+          <div className="mt-3 border-t border-border-rule pt-3">
+            <Input
+              variant="search"
+              readOnly
+              tabIndex={-1}
+              startAdornment={<Icon name="search" size={18} />}
+              placeholder="Search"
+              className="h-7 w-full border-border-rule px-1.5 py-0"
+            />
+          </div>
+          <div className="mt-3 flex flex-wrap items-center gap-2 text-base-small">
+            <MapSchemaRowInfoDragCluster title="About required fields" />
+            <span className="font-semibold text-text-primary">time*</span>
+            <span className="font-semibold italic text-accent-required">required</span>
+          </div>
         </div>
-        <div className="mt-4 flex items-center justify-between gap-2">
-          <p className="text-left text-[14px] font-bold leading-5 tracking-[0.4px] text-text-primary">HTTP Activity</p>
-          <button type="button" className="rounded p-0.5 text-text-primary hover:bg-overlay-subtle" aria-label="Open menu">
-            <Icon name="chevron-down" size={24} />
-          </button>
+
+        <div className="mt-3 min-h-0 flex-1 overflow-y-auto">
+          <div className="flex flex-col gap-px">
+            <div className="flex h-7 w-full min-h-7 flex-wrap items-center gap-2 py-1">
+              <button
+                type="button"
+                onClick={() => setEntitiesOpen((v) => !v)}
+                aria-expanded={entitiesOpen}
+                className="flex min-w-0 shrink-0 items-center gap-2 rounded py-0.5 pr-1 text-left text-text-primary hover:bg-overlay-subtle focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-interactive-active"
+              >
+                <Icon
+                  name="chevron-down"
+                  size={12}
+                  className={cx("shrink-0 transition-transform duration-150", !entitiesOpen && "-rotate-90")}
+                  aria-hidden
+                />
+                <span className="text-xs font-semibold uppercase leading-4 tracking-[0.4px]">Entities</span>
+              </button>
+              <span className="ml-auto flex min-w-0 flex-1 items-center justify-end gap-2 pl-2">
+                <Checkbox
+                  checked={treeView}
+                  onCheckedChange={setTreeView}
+                  label="Show As Tree View"
+                  labelClassName="text-base-small text-text-secondary"
+                />
+              </span>
+            </div>
+
+            {entitiesOpen ? (
+              <>
+                {MAP_SCHEMA_ENTITY_GROUPS.map((label) => (
+                  <MapSchemaEntityGroupRow key={label} label={label} />
+                ))}
+                {MAP_SCHEMA_ENTITY_FIELDS.map((label) => (
+                  <MapSchemaEntityFieldRow key={label} label={label} />
+                ))}
+              </>
+            ) : null}
+
+            <div className="flex h-7 w-full min-h-7 items-center gap-2 py-1">
+              <button
+                type="button"
+                onClick={() => setRecommendedOpen((v) => !v)}
+                aria-expanded={recommendedOpen}
+                className="flex min-w-0 items-center gap-2 rounded py-0.5 pr-1 text-left text-text-primary hover:bg-overlay-subtle focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-interactive-active"
+              >
+                <Icon
+                  name="chevron-down"
+                  size={12}
+                  className={cx("shrink-0 transition-transform duration-150", !recommendedOpen && "-rotate-90")}
+                  aria-hidden
+                />
+                <span className="text-xs font-semibold uppercase leading-4 tracking-[0.4px]">Recommended</span>
+              </button>
+            </div>
+            {recommendedOpen
+              ? MAP_SCHEMA_RECOMMENDED.map((row, i) => (
+                  <MapSchemaRecommendedFieldRow key={`${row.kind}-${"name" in row ? row.name : i}`} row={row} />
+                ))
+              : null}
+          </div>
         </div>
-        <div className="mt-3 border-t border-border-rule pt-3">
-          <Input
-            variant="search"
-            readOnly
-            tabIndex={-1}
-            startAdornment={<Icon name="search" size={18} />}
-            placeholder="Search"
-            className="h-7 w-full border-border-rule px-1.5 py-0"
-          />
-        </div>
-        <div className="mt-3 flex flex-wrap items-center gap-1.5 text-sm">
-          <span className="font-semibold italic text-accent-required">time*</span>
-          <span className="text-text-secondary">required</span>
-          <Icon name="feedback-info-outline" size={16} className="shrink-0 text-text-tertiary" title="About required fields" />
-        </div>
-        <button
-          type="button"
-          onClick={() => setEntitiesOpen((v) => !v)}
-          className="mt-2 flex w-full items-center gap-1 py-1.5 text-left text-xs font-bold uppercase tracking-wide text-text-tertiary hover:text-text-secondary"
-        >
-          <Icon name="chevron-down" size={16} className={cx("shrink-0 transition-transform", !entitiesOpen && "-rotate-90")} />
-          Entities
-        </button>
-        <button
-          type="button"
-          onClick={() => setRecommendedOpen((v) => !v)}
-          className="flex w-full items-center gap-1 py-1.5 text-left text-xs font-bold uppercase tracking-wide text-text-tertiary hover:text-text-secondary"
-        >
-          <Icon name="chevron-down" size={16} className={cx("shrink-0 transition-transform", !recommendedOpen && "-rotate-90")} />
-          Recommended
-        </button>
       </div>
-      <div className="min-h-0 flex-1" aria-hidden />
-      <label className="flex shrink-0 cursor-pointer items-center justify-end gap-2 pt-2 text-xs font-semibold text-text-secondary">
-        <span>Show tree view</span>
-        <input
-          type="checkbox"
-          checked={treeView}
-          onChange={(e) => setTreeView(e.target.checked)}
-          className="accent-interactive-active"
-        />
-      </label>
     </div>
   );
 }
@@ -415,6 +558,8 @@ function CopilotMark() {
 }
 
 function MappingToolbarV2() {
+  const [allowAutosave, setAllowAutosave] = useState(true);
+
   return (
     <div className="bg-surface-modal">
       <p className="text-base-semibold text-text-primary">Event Class to Map</p>
@@ -443,7 +588,7 @@ function MappingToolbarV2() {
           <CopilotMark />
         </div>
         <div className="flex shrink-0 flex-wrap items-center gap-x-6 gap-y-2">
-          <Switch checked label="Allow Autosave" />
+          <Switch checked={allowAutosave} onCheckedChange={setAllowAutosave} label="Allow Autosave" />
           <Button variant="tertiary" className="gap-1 text-sm font-semibold text-text-secondary hover:text-text-primary">
             <Icon name="close" size={18} />
             Clear All Mappings
@@ -513,6 +658,7 @@ function FieldMappingBar({
 export function ConfigSchemaMapPage() {
   const [rows] = useState(INITIAL_ROWS);
   const [mapVisibility, setMapVisibility] = useState<MapVisibilityMode>("all");
+  const [connectorEnabled, setConnectorEnabled] = useState(true);
 
   const visibleRows = useMemo(() => {
     return rows.filter((r) => {
@@ -598,7 +744,7 @@ export function ConfigSchemaMapPage() {
               </button>
               <Icon name="aws-athena" size={24} className="mt-0.5 shrink-0" title="Amazon Athena" />
               <h1 className="text-xl font-bold leading-6 tracking-[0.6px] text-text-primary">Amazon Athena</h1>
-              <Switch checked label="Connector Enabled" />
+              <Switch checked={connectorEnabled} onCheckedChange={setConnectorEnabled} label="Connector Enabled" />
               <span className="shrink-0 rounded bg-badge-muted px-2 py-1.5 text-xs font-semibold leading-4 tracking-[0.4px] text-text-primary">
                 DYNAMIC SCHEMA
               </span>

@@ -40,6 +40,13 @@ export const typography = {
     lineHeight: "18px",
     letterSpacing: "0",
   },
+  /** Figma “Base/Small”: Lato 12 regular — use Tailwind `text-base-small`. */
+  baseSmall: {
+    size: "12px",
+    weight: fontWeight.regular,
+    lineHeight: "16px",
+    letterSpacing: "0.4px",
+  },
   labelSmall: {
     size: "12px",
     weight: fontWeight.semibold,
