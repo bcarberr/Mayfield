@@ -100,10 +100,10 @@ function ProgressStepper({ currentStep }: { currentStep: StepIndex }) {
         </div>
         <div className="mt-1 flex w-full items-start">
           <p className="w-[110px] shrink-0 text-center text-sm leading-[18px] text-text-primary">1. Connector Info</p>
-          <div className="flex min-w-0 flex-1 flex-wrap items-center justify-center gap-x-6 gap-y-1 text-sm leading-[18px] text-text-primary">
-            <span className="shrink-0 text-center whitespace-nowrap">2. Preview/Import Fields</span>
-            <span className="shrink-0 text-center whitespace-nowrap">3. Map & Review Data</span>
-          </div>
+          <div className="min-w-0 flex-1" aria-hidden />
+          <p className="w-[130px] shrink-0 text-center text-sm leading-[18px] text-text-primary">2. Preview/Import Fields</p>
+          <div className="min-w-0 flex-1" aria-hidden />
+          <p className="w-[130px] shrink-0 text-center text-sm leading-[18px] text-text-primary">3. Map & Review Data</p>
         </div>
       </div>
     </nav>
