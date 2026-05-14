@@ -11,5 +11,7 @@ export { OBSERVABLE_ENTITY_ICON_NAMES } from "../assets/icons/observable-icons";
 export type { ObservableEntityIconName } from "../assets/icons/observable-icons";
 export { QUERY_DS_ICON_NAMES } from "../assets/icons/query-ds-icons";
 export type { QueryDsIconName } from "../assets/icons/query-ds-icons";
+export { OCSF_EVENT_ICON_NAMES } from "../assets/icons/ocsf-icons";
+export type { OcsfEventIconName } from "../assets/icons/ocsf-icons";
 export { Switch, type SwitchProps } from "../components/ui/Switch";
 export { Checkbox, type CheckboxProps } from "../components/uiCheckbox";
