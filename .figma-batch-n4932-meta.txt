@@ -1,0 +1,40 @@
+<frame id="4932:12073" name="Navigation Elements" x="100" y="860" width="408" height="224">
+  <frame id="2062:6543" name="Row 4" x="24" y="180" width="312" height="24">
+    <symbol id="2062:6579" name="Logout" x="0" y="0" width="24" height="24" />
+    <symbol id="2064:19917" name="Connections" x="48" y="0" width="24" height="24" />
+    <symbol id="2078:19924" name="Summary Insights" x="96" y="0" width="24" height="24" />
+    <symbol id="2078:19931" name="Federated Joins" x="144" y="0" width="24" height="24" />
+    <symbol id="2078:19938" name="Applications" x="192" y="0" width="24" height="24" />
+    <symbol id="2079:19944" name="Applications" x="240" y="0" width="24" height="24" />
+    <symbol id="3501:1366" name="Detections" x="288" y="0" width="24" height="24" />
+  </frame>
+  <frame id="5150:12194" name="Row 3" x="24" y="128" width="312" height="24">
+    <symbol id="4933:12101" name="Reports" x="0" y="0" width="24" height="24" />
+    <symbol id="5150:12199" name="Reports Filled" x="48" y="0" width="24" height="24" />
+    <symbol id="4941:12078" name="Tenant Settings" x="96" y="0" width="24" height="24" />
+    <symbol id="4941:12079" name="Tools" x="144" y="0" width="24" height="24" />
+    <symbol id="5150:12200" name="Tools Filled" x="192" y="0" width="24" height="24" />
+    <symbol id="1139:36819" name="favorite" x="240" y="0" width="24" height="24" />
+    <symbol id="2062:6560" name="Intercom" x="288" y="0" width="24" height="24" />
+  </frame>
+  <frame id="4941:12075" name="Row 2" x="24" y="72" width="360" height="24">
+    <symbol id="4933:12097" name="Downloads" x="0" y="0" width="24" height="24" />
+    <symbol id="4933:12098" name="Endpoint" x="48" y="0" width="24" height="24" />
+    <symbol id="4939:12078" name="Expand" x="96" y="0" width="24" height="24" />
+    <symbol id="4941:12076" name="Integrations" x="144" y="0" width="24" height="24" />
+    <symbol id="4941:12077" name="Investigations Outline" x="192" y="0" width="24" height="24" />
+    <symbol id="5150:12198" name="Investigations Filled" x="240" y="0" width="24" height="24" />
+    <symbol id="4933:12100" name="Notifications" x="288" y="0" width="24" height="24" />
+    <symbol id="4933:12099" name="Quick Help" x="336" y="0" width="24" height="24" />
+  </frame>
+  <frame id="4932:12079" name="Row 1" x="24" y="24" width="360" height="24">
+    <symbol id="4941:12073" name="Advanced Search" x="0" y="0" width="24" height="24" />
+    <symbol id="4941:12072" name="Alerts Outline" x="48" y="0" width="24" height="24" />
+    <symbol id="5150:12195" name="Alerts Filled" x="96" y="0" width="24" height="24" />
+    <symbol id="4941:12074" name="Automations" x="144" y="0" width="24" height="24" />
+    <symbol id="4940:12075" name="Chat" x="192" y="0" width="24" height="24" />
+    <symbol id="4939:12079" name="Collapse" x="240" y="0" width="24" height="24" />
+    <symbol id="4933:12096" name="Dashboards Outline" x="288" y="0" width="24" height="24" />
+    <symbol id="5150:12196" name="Dashboards Filled" x="336" y="0" width="24" height="24" />
+  </frame>
+</frame>

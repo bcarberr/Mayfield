@@ -1,0 +1,167 @@
+const imgVector = "http://localhost:3845/assets/0402cd4cb6065332b0cdbc924c076fe5f1c35439.svg";
+const imgVector1 = "http://localhost:3845/assets/81e4d445d499550b54b6a1b2e761d5f49bddbcb1.svg";
+const imgVector2 = "http://localhost:3845/assets/886868ab914db08ab9e37d0959fba47cb917176e.svg";
+const imgVector3 = "http://localhost:3845/assets/da4535ad473fbc59cf8585fccaa3192f2e3b9189.svg";
+const imgVector4 = "http://localhost:3845/assets/b19f209e120a9c16f88134c170be61840167aa43.svg";
+const imgVector5 = "http://localhost:3845/assets/f4839caca5f7b6205376f65136f67b12bfd45fcd.svg";
+const imgVector6 = "http://localhost:3845/assets/431792db457cb8feb316b7355ca28e56c6ba975d.svg";
+const imgVector7 = "http://localhost:3845/assets/717ca4fdbeb6292c837998ed9233216f4036f499.svg";
+const imgVector8 = "http://localhost:3845/assets/f9605191d882636f6ecbe628c522ab7e87e4011b.svg";
+const imgVector9 = "http://localhost:3845/assets/c639fc46ba5c9d899e176808d573de0768b1c73a.svg";
+const imgVector10 = "http://localhost:3845/assets/375e26c99b1ff6d13960945af9fd511df2df0304.svg";
+const imgVector11 = "http://localhost:3845/assets/16478fcb499784c3060d376016ad6f1dadacf117.svg";
+const imgUnion = "http://localhost:3845/assets/2dae941f7c848a86f131be17396ea50366436ac8.svg";
+
+function ExpandLess({ className }: { className?: string }) {
+  return (
+    <div className={className || "overflow-clip relative size-[24px]"} data-node-id="1168:3342" data-name="Expand-Less">
+      <div className="absolute bottom-[35.79%] left-1/4 right-1/4 top-[33.33%]" data-node-id="1168:3341" data-name="Vector">
+        <img alt="" className="absolute block inset-0 max-w-none size-full" src={imgVector} />
+      </div>
+    </div>
+  );
+}
+
+function ChevronRight({ className }: { className?: string }) {
+  return (
+    <div className={className || "overflow-clip relative size-[24px]"} data-node-id="1168:3358" data-name="Chevron-Right">
+      <div className="absolute bottom-1/4 left-[35.79%] right-[33.33%] top-1/4" data-node-id="1168:3357" data-name="Vector">
+        <img alt="" className="absolute block inset-0 max-w-none size-full" src={imgVector1} />
+      </div>
+    </div>
+  );
+}
+
+function ChevronLeft({ className }: { className?: string }) {
+  return (
+    <div className={className || "overflow-clip relative size-[24px]"} data-node-id="1168:3354" data-name="Chevron-Left">
+      <div className="absolute bottom-1/4 left-[33.33%] right-[35.79%] top-1/4" data-node-id="1168:3353" data-name="Vector">
+        <img alt="" className="absolute block inset-0 max-w-none size-full" src={imgVector2} />
+      </div>
+    </div>
+  );
+}
+
+function ArrowUpward({ className }: { className?: string }) {
+  return (
+    <div className={className || "overflow-clip relative size-[24px]"} data-node-id="1168:3350" data-name="Arrow-Upward">
+      <div className="absolute inset-[16.67%]" data-node-id="1168:3349" data-name="Vector">
+        <img alt="" className="absolute block inset-0 max-w-none size-full" src={imgVector3} />
+      </div>
+    </div>
+  );
+}
+
+function ArrowDropUp({ className }: { className?: string }) {
+  return (
+    <div className={className || "overflow-clip relative size-[24px]"} data-node-id="1168:3333" data-name="Arrow-Drop-Up">
+      <div className="absolute inset-[37.5%_29.17%_41.67%_29.17%]" data-node-id="1168:3332" data-name="Vector">
+        <img alt="" className="absolute block inset-0 max-w-none size-full" src={imgVector4} />
+      </div>
+    </div>
+  );
+}
+
+function ArrowDropDown({ className }: { className?: string }) {
+  return (
+    <div className={className || "overflow-clip relative size-[24px]"} data-node-id="1168:3329" data-name="Arrow-Drop-Down">
+      <div className="absolute inset-[41.67%_29.17%_37.5%_29.17%]" data-node-id="1168:3328" data-name="Vector">
+        <img alt="" className="absolute block inset-0 max-w-none size-full" src={imgVector5} />
+      </div>
+    </div>
+  );
+}
+
+function ArrowDownward({ className }: { className?: string }) {
+  return (
+    <div className={className || "overflow-clip relative size-[24px]"} data-node-id="1168:3346" data-name="Arrow-Downward">
+      <div className="absolute inset-[16.67%]" data-node-id="1168:3345" data-name="Vector">
+        <img alt="" className="absolute block inset-0 max-w-none size-full" src={imgVector6} />
+      </div>
+    </div>
+  );
+}
+
+function ExpandMore({ className }: { className?: string }) {
+  return (
+    <div className={className || "overflow-clip relative size-[24px]"} data-node-id="1168:3338" data-name="Expand-More">
+      <div className="absolute bottom-[33.33%] left-1/4 right-1/4 top-[35.79%]" data-node-id="1168:3337" data-name="Vector">
+        <img alt="" className="absolute block inset-0 max-w-none size-full" src={imgVector7} />
+      </div>
+    </div>
+  );
+}
+
+function MoreVert({ className }: { className?: string }) {
+  return (
+    <div className={className || "overflow-clip relative size-[24px]"} data-node-id="1168:3396" data-name="More-Vert">
+      <div className="absolute inset-[16.67%_41.67%]" data-node-id="1168:3389" data-name="Vector">
+        <img alt="" className="absolute block inset-0 max-w-none size-full" src={imgVector8} />
+      </div>
+    </div>
+  );
+}
+
+function Refresh({ className }: { className?: string }) {
+  return (
+    <div className={className || "overflow-clip relative size-[24px]"} data-node-id="1168:3398" data-name="Refresh">
+      <div className="absolute inset-[16.67%_16.67%_16.67%_16.71%]" data-node-id="1168:3395" data-name="Vector">
+        <img alt="" className="absolute block inset-0 max-w-none size-full" src={imgVector9} />
+      </div>
+    </div>
+  );
+}
+
+function SubdirectoryArrowRight({ className }: { className?: string }) {
+  return (
+    <div className={className || "overflow-clip relative size-[24px]"} data-node-id="1168:3386" data-name="Subdirectory-Arrow-Right">
+      <div className="absolute inset-[16.67%_20.83%_12.5%_16.67%]" data-node-id="1168:3385" data-name="Vector">
+        <img alt="" className="absolute block inset-0 max-w-none size-full" src={imgVector10} />
+      </div>
+    </div>
+  );
+}
+
+function DoubleChevron({ className }: { className?: string }) {
+  return (
+    <div className={className || "overflow-clip relative size-[24px]"} data-node-id="2801:30902" data-name="Double Chevron">
+      <div className="absolute bottom-1/4 left-[20.83%] right-[21.58%] top-1/4" data-node-id="2801:30907" data-name="Vector">
+        <img alt="" className="absolute block inset-0 max-w-none size-full" src={imgVector11} />
+      </div>
+    </div>
+  );
+}
+
+function Replay({ className }: { className?: string }) {
+  return (
+    <div className={className || "overflow-clip relative size-[24px]"} data-node-id="4812:336" data-name="Replay">
+      <div className="-translate-x-1/2 -translate-y-1/2 absolute left-1/2 size-[18px] top-1/2" data-node-id="4812:335" data-name="Union">
+        <img alt="" className="absolute block inset-0 max-w-none size-full" src={imgUnion} />
+      </div>
+    </div>
+  );
+}
+
+export default function Navigation() {
+  return (
+    <div className="border border-[#c9c9c9] border-solid relative rounded-[4px] size-full" data-node-id="1168:3334" data-name="Navigation">
+      <div className="absolute h-[24px] left-[23px] top-[71px] w-[216px]" data-node-id="1598:3552" data-name="Row 2">
+        <Replay className="absolute left-[240px] overflow-clip size-[24px] top-0" />
+        <DoubleChevron className="absolute left-[192px] overflow-clip size-[24px] top-0" />
+        <SubdirectoryArrowRight className="absolute left-[144px] overflow-clip size-[24px] top-0" />
+        <Refresh className="absolute left-[96px] overflow-clip size-[24px] top-0" />
+        <MoreVert className="absolute left-[48px] overflow-clip size-[24px] top-0" />
+        <ExpandMore className="absolute left-0 overflow-clip size-[24px] top-0" />
+      </div>
+      <div className="absolute content-stretch flex gap-[24px] items-start left-[23px] top-[23px]" data-node-id="1598:3551" data-name="Row 1">
+        <ArrowDownward className="overflow-clip relative shrink-0 size-[24px]" />
+        <ArrowDropDown className="overflow-clip relative shrink-0 size-[24px]" />
+        <ArrowDropUp className="overflow-clip relative shrink-0 size-[24px]" />
+        <ArrowUpward className="overflow-clip relative shrink-0 size-[24px]" />
+        <ChevronLeft className="overflow-clip relative shrink-0 size-[24px]" />
+        <ChevronRight className="overflow-clip relative shrink-0 size-[24px]" />
+        <ExpandLess className="overflow-clip relative shrink-0 size-[24px]" />
+      </div>
+    </div>
+  );
+}

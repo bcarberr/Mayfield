@@ -1,0 +1,319 @@
+const imgVector = "http://localhost:3845/assets/d1473abbc7f7bd69f1a0330f741130d90758e988.svg";
+const imgVector1 = "http://localhost:3845/assets/41733c74e5c4e1a0623b91195a6b66cde712de2a.svg";
+const imgGroup = "http://localhost:3845/assets/40112b1ba36da53cf307559790a716b8930888f3.svg";
+const imgVector2 = "http://localhost:3845/assets/21c05708ad8113db80d8f8b41670567c218b3277.svg";
+const imgVector3 = "http://localhost:3845/assets/61badb3ed33b69fbe22821f1194cb0aef0db25a4.svg";
+const imgGroup1 = "http://localhost:3845/assets/73dc74f101830e7aa3701d401b76adb0870f04af.svg";
+const imgVector4 = "http://localhost:3845/assets/9c39eaf95dc7c0dd612a5da228ee7e0c68f54296.svg";
+const imgVector5 = "http://localhost:3845/assets/d837badf1400c63f4cc8b822e0e4a5164234882e.svg";
+const imgVector6 = "http://localhost:3845/assets/8b48d7294922a46398dc8792dadc95de514174c6.svg";
+const imgVector7 = "http://localhost:3845/assets/75928b7ebb12f681c82b6f462a1e6780dff6ce75.svg";
+const imgVector8 = "http://localhost:3845/assets/2009f8b11192feba0044762182e8628af403d191.svg";
+const imgVector9 = "http://localhost:3845/assets/0b7be3fb6181376eee63b24f76f7b2a62a42127d.svg";
+const imgVector10 = "http://localhost:3845/assets/549a18eee39b8910c96ffa0303875352fca5fa90.svg";
+const imgVector11 = "http://localhost:3845/assets/2028864aff4fb6ad4324413673f686296c23917c.svg";
+const imgVector12 = "http://localhost:3845/assets/a48d87ac16f52a768ca2b3fd68e0406f73981b32.svg";
+const imgVector13 = "http://localhost:3845/assets/c28c9d6e56162b194a64d6ff1c9e10a7b3db91f8.svg";
+const imgBookmark = "http://localhost:3845/assets/3395e07a0c5ee58815b1655366ae54ef6c70797a.svg";
+const imgVector14 = "http://localhost:3845/assets/37a6ad289d3ae1b4139f2f56c2c75b0aa7790597.svg";
+const imgVector15 = "http://localhost:3845/assets/d648207e88643d92f262adb69c793af904197924.svg";
+const imgVector16 = "http://localhost:3845/assets/7802bbcdde70dd3e39caa32bc588613023aafb50.svg";
+const imgVector17 = "http://localhost:3845/assets/d3e6d627659ac6dc2808b5b45db40d7f6d5af01d.svg";
+const imgVector18 = "http://localhost:3845/assets/e9ec22f455101bb084a6c85fb28bd662b9dc5c09.svg";
+const imgGroup2 = "http://localhost:3845/assets/a62a424781f48a65e2d23132929537afdc581c59.svg";
+const imgVector19 = "http://localhost:3845/assets/a975fac2b5754f1a9d7cf736b98ef5a95eac3fd7.svg";
+const imgVector20 = "http://localhost:3845/assets/7fc61507546551aee7a8b20d347a7a11efdcfaa5.svg";
+const imgVector16 = "http://localhost:3845/assets/7802bbcdde70dd3e39caa32bc588613023aafb50.svg";
+
+function Lock({ className }: { className?: string }) {
+  return (
+    <div className={className || "overflow-clip relative size-[24px]"} data-node-id="3121:27399" data-name="Lock">
+      <div className="absolute inset-[4.17%_16.67%_8.33%_16.67%]" data-node-id="3105:27155" data-name="Vector">
+        <img alt="" className="absolute block inset-0 max-w-none size-full" src={imgVector} />
+      </div>
+    </div>
+  );
+}
+
+function LocalOffer({ className }: { className?: string }) {
+  return (
+    <div className={className || "overflow-clip relative size-[24px]"} data-node-id="3121:27398" data-name="Local Offer">
+      <div className="absolute inset-[8.33%]" data-node-id="3189:32616" data-name="Vector">
+        <img alt="" className="absolute block inset-0 max-w-none size-full" src={imgVector1} />
+      </div>
+    </div>
+  );
+}
+
+function Flaky({ className }: { className?: string }) {
+  return (
+    <div className={className || "overflow-clip relative size-[24px]"} data-node-id="3121:27397" data-name="Flaky">
+      <div className="absolute inset-[8.33%]" data-node-id="3090:27116" data-name="Group">
+        <img alt="" className="absolute block inset-0 max-w-none size-full" src={imgGroup} />
+      </div>
+    </div>
+  );
+}
+
+function Fingerprint({ className }: { className?: string }) {
+  return (
+    <div className={className || "overflow-clip relative size-[24px]"} data-node-id="3121:27396" data-name="Fingerprint">
+      <div className="absolute inset-[8.33%_12.53%_8.33%_12.49%]" data-node-id="3106:27186" data-name="Vector">
+        <img alt="" className="absolute block inset-0 max-w-none size-full" src={imgVector2} />
+      </div>
+    </div>
+  );
+}
+
+function Email({ className }: { className?: string }) {
+  return (
+    <div className={className || "overflow-clip relative size-[24px]"} data-node-id="3121:27395" data-name="Email">
+      <div className="absolute inset-[16.67%_8.33%]" data-node-id="3091:27133" data-name="Vector">
+        <img alt="" className="absolute block inset-0 max-w-none size-full" src={imgVector3} />
+      </div>
+    </div>
+  );
+}
+
+function DoNotDisturbOn({ className }: { className?: string }) {
+  return (
+    <div className={className || "overflow-clip relative size-[24px]"} data-node-id="3121:27394" data-name="Do Not Disturb On">
+      <div className="absolute contents inset-[8.33%]" data-node-id="3090:27110" data-name="Group">
+        <div className="absolute inset-[8.33%]" data-node-id="3090:27111" data-name="Group">
+          <img alt="" className="absolute block inset-0 max-w-none size-full" src={imgGroup1} />
+        </div>
+      </div>
+    </div>
+  );
+}
+
+function Discover({ className }: { className?: string }) {
+  return (
+    <div className={className || "overflow-clip relative size-[24px]"} data-node-id="3179:32583" data-name="Discover">
+      <div className="absolute h-[20.196px] left-[1.59px] top-[1.8px] w-[19.82px]" data-node-id="3179:32582" data-name="Vector">
+        <img alt="" className="absolute block inset-0 max-w-none size-full" src={imgVector4} />
+      </div>
+    </div>
+  );
+}
+
+function ContentPaste({ className }: { className?: string }) {
+  return (
+    <div className={className || "overflow-clip relative size-[24px]"} data-node-id="3121:27393" data-name="Content Paste">
+      <div className="absolute inset-[0_12.5%_8.33%_12.5%]" data-node-id="3090:27129" data-name="Vector">
+        <img alt="" className="absolute block inset-0 max-w-none size-full" src={imgVector5} />
+      </div>
+    </div>
+  );
+}
+
+function Share({ className }: { className?: string }) {
+  return (
+    <div className={className || "overflow-clip relative size-[24px]"} data-node-id="3121:27407" data-name="Share">
+      <div className="absolute inset-[8.33%_12.5%_8.67%_12.5%]" data-node-id="3090:27126" data-name="Vector">
+        <img alt="" className="absolute block inset-0 max-w-none size-full" src={imgVector6} />
+      </div>
+    </div>
+  );
+}
+
+function Security({ className }: { className?: string }) {
+  return (
+    <div className={className || "overflow-clip relative size-[24px]"} data-node-id="3121:27406" data-name="Security">
+      <div className="absolute inset-[4.17%_12.5%]" data-node-id="3094:27139" data-name="Vector">
+        <img alt="" className="absolute block inset-0 max-w-none size-full" src={imgVector7} />
+      </div>
+    </div>
+  );
+}
+
+function PowerOff({ className }: { className?: string }) {
+  return (
+    <div className={className || "overflow-clip relative size-[24px]"} data-node-id="3121:27405" data-name="Power Off">
+      <div className="absolute inset-[12.5%_13.71%_8.33%_11.29%]" data-node-id="3106:27183" data-name="Vector">
+        <img alt="" className="absolute block inset-0 max-w-none size-full" src={imgVector8} />
+      </div>
+    </div>
+  );
+}
+
+function PersonAdd({ className }: { className?: string }) {
+  return (
+    <div className={className || "overflow-clip relative size-[24px]"} data-node-id="3121:27404" data-name="Person Add">
+      <div className="absolute inset-[16.67%_4.17%]" data-node-id="3094:27136" data-name="Vector">
+        <img alt="" className="absolute block inset-0 max-w-none size-full" src={imgVector9} />
+      </div>
+    </div>
+  );
+}
+
+function NoteAdd({ className }: { className?: string }) {
+  return (
+    <div className={className || "overflow-clip relative size-[24px]"} data-node-id="3121:27403" data-name="Note Add">
+      <div className="absolute inset-[8.33%_16.67%]" data-node-id="3090:27123" data-name="Vector">
+        <img alt="" className="absolute block inset-0 max-w-none size-full" src={imgVector10} />
+      </div>
+    </div>
+  );
+}
+
+function Menu({ className }: { className?: string }) {
+  return (
+    <div className={className || "overflow-clip relative size-[24px]"} data-node-id="3121:27402" data-name="Menu">
+      <div className="absolute bottom-1/4 left-[12.5%] right-[12.5%] top-1/4" data-node-id="3089:27094" data-name="Vector">
+        <img alt="" className="absolute block inset-0 max-w-none size-full" src={imgVector11} />
+      </div>
+    </div>
+  );
+}
+
+function LowPriority({ className }: { className?: string }) {
+  return (
+    <div className={className || "overflow-clip relative size-[24px]"} data-node-id="3121:27401" data-name="Low Priority">
+      <div className="absolute inset-[20.83%_8.33%_16.67%_8.33%]" data-node-id="3089:27098" data-name="Vector">
+        <img alt="" className="absolute block inset-0 max-w-none size-full" src={imgVector12} />
+      </div>
+    </div>
+  );
+}
+
+function LockOpen({ className }: { className?: string }) {
+  return (
+    <div className={className || "overflow-clip relative size-[24px]"} data-node-id="3121:27400" data-name="Lock Open">
+      <div className="absolute inset-[4.17%_16.67%_8.33%_16.67%]" data-node-id="3106:27158" data-name="Vector">
+        <img alt="" className="absolute block inset-0 max-w-none size-full" src={imgVector13} />
+      </div>
+    </div>
+  );
+}
+
+function Bookmark({ className }: { className?: string }) {
+  return (
+    <div className={className || "overflow-clip relative size-[24px]"} data-node-id="4050:70" data-name="Bookmark">
+      <img alt="" className="absolute block inset-0 max-w-none size-full" src={imgBookmark} />
+      <div className="absolute inset-[12.5%_20.83%]" data-node-id="4050:72" data-name="Vector">
+        <img alt="" className="absolute block inset-0 max-w-none size-full" src={imgVector14} />
+      </div>
+    </div>
+  );
+}
+
+function DataExploration({ className }: { className?: string }) {
+  return (
+    <div className={className || "overflow-clip relative size-[24px]"} data-node-id="3793:87" data-name="Data Exploration">
+      <div className="-translate-y-1/2 absolute aspect-[20/20] left-[8.33%] right-[8.33%] top-1/2" data-node-id="3793:85" data-name="Vector">
+        <img alt="" className="absolute block inset-0 max-w-none size-full" src={imgVector15} />
+      </div>
+    </div>
+  );
+}
+
+function Snooze({ className }: { className?: string }) {
+  return (
+    <div className={className || "overflow-clip relative size-[24px]"} data-node-id="3121:27408" data-name="Snooze">
+      <div className="absolute inset-[7.54%_8.56%_8.33%_8.57%]" data-node-id="3090:27120" data-name="Vector">
+        <img alt="" className="absolute block inset-0 max-w-none size-full" src={imgVector16} />
+      </div>
+    </div>
+  );
+}
+
+function PushPin({ className }: { className?: string }) {
+  return (
+    <div className={className || "overflow-clip relative size-[24px]"} data-node-id="2063:19127" data-name="Push Pin">
+      <div className="-translate-x-1/2 -translate-y-1/2 absolute h-[15px] left-[calc(50%+0.25px)] top-[calc(50%-0.5px)] w-[10.5px]" data-node-id="2063:19121" data-name="Vector">
+        <img alt="" className="absolute block inset-0 max-w-none size-full" src={imgVector17} />
+      </div>
+    </div>
+  );
+}
+
+function Test({ className }: { className?: string }) {
+  return (
+    <div className={className || "overflow-clip relative size-[24px]"} data-node-id="2063:19126" data-name="Test">
+      <div className="absolute inset-[16.67%_34.17%_8.33%_29.17%]" data-node-id="2063:19119">
+        <img alt="" className="absolute block inset-0 max-w-none size-full" src={imgVector18} />
+      </div>
+    </div>
+  );
+}
+
+function Verified({ className }: { className?: string }) {
+  return (
+    <div className={className || "overflow-clip relative size-[24px]"} data-node-id="2063:19125" data-name="Verified">
+      <div className="absolute inset-[6.25%_4.17%]" data-node-id="2063:19115" data-name="Group">
+        <img alt="" className="absolute block inset-0 max-w-none size-full" src={imgGroup2} />
+      </div>
+    </div>
+  );
+}
+
+function TrackChanges({ className }: { className?: string }) {
+  return (
+    <div className={className || "overflow-clip relative size-[24px]"} data-node-id="2063:19124" data-name="Track Changes">
+      <div className="absolute inset-[8.33%]" data-node-id="2063:19113" data-name="Vector">
+        <img alt="" className="absolute block inset-0 max-w-none size-full" src={imgVector19} />
+      </div>
+    </div>
+  );
+}
+
+function StopCircle({ className }: { className?: string }) {
+  return (
+    <div className={className || "overflow-clip relative size-[24px]"} data-node-id="2063:19123" data-name="Stop Circle">
+      <div className="absolute inset-[8.33%]" data-node-id="2063:19111" data-name="Vector">
+        <img alt="" className="absolute block inset-0 max-w-none size-full" src={imgVector20} />
+      </div>
+    </div>
+  );
+}
+
+function Snooze1({ className }: { className?: string }) {
+  return (
+    <div className={className || "overflow-clip relative size-[24px]"} data-node-id="2063:19122" data-name="Snooze">
+      <div className="absolute inset-[7.54%_8.56%_8.33%_8.57%]" data-node-id="2063:19109" data-name="Vector">
+        <img alt="" className="absolute block inset-0 max-w-none size-full" src={imgVector16} />
+      </div>
+    </div>
+  );
+}
+
+export default function Extra() {
+  return (
+    <div className="border border-[#c9c9c9] border-solid relative rounded-[4px] size-full" data-node-id="3089:27095" data-name="Extra">
+      <div className="absolute content-stretch flex gap-[24px] items-start left-[23px] top-[119px]" data-node-id="1509:2514" data-name="Row4">
+        <Snooze1 className="overflow-clip relative shrink-0 size-[24px]" />
+        <StopCircle className="overflow-clip relative shrink-0 size-[24px]" />
+        <TrackChanges className="overflow-clip relative shrink-0 size-[24px]" />
+        <Verified className="overflow-clip relative shrink-0 size-[24px]" />
+        <Test className="overflow-clip relative shrink-0 size-[24px]" />
+        <PushPin className="overflow-clip relative shrink-0 size-[24px]" />
+      </div>
+      <div className="absolute content-stretch flex gap-[24px] items-start left-[23px] top-[161px]" data-node-id="3106:27159" data-name="Row 3">
+        <Snooze className="overflow-clip relative shrink-0 size-[24px]" />
+        <DataExploration className="overflow-clip relative shrink-0 size-[24px]" />
+        <Bookmark className="overflow-clip relative shrink-0 size-[24px]" />
+      </div>
+      <div className="absolute content-stretch flex gap-[24px] items-start left-[23px] top-[71px]" data-node-id="3091:27130" data-name="Row 2">
+        <LockOpen className="overflow-clip relative shrink-0 size-[24px]" />
+        <LowPriority className="overflow-clip relative shrink-0 size-[24px]" />
+        <Menu className="overflow-clip relative shrink-0 size-[24px]" />
+        <NoteAdd className="overflow-clip relative shrink-0 size-[24px]" />
+        <PersonAdd className="overflow-clip relative shrink-0 size-[24px]" />
+        <PowerOff className="overflow-clip relative shrink-0 size-[24px]" />
+        <Security className="overflow-clip relative shrink-0 size-[24px]" />
+        <Share className="overflow-clip relative shrink-0 size-[24px]" />
+      </div>
+      <div className="absolute content-stretch flex gap-[24px] items-start left-[23px] top-[23px]" data-node-id="3090:27099" data-name="Row 1">
+        <ContentPaste className="overflow-clip relative shrink-0 size-[24px]" />
+        <Discover className="overflow-clip relative shrink-0 size-[24px]" />
+        <DoNotDisturbOn className="overflow-clip relative shrink-0 size-[24px]" />
+        <Email className="overflow-clip relative shrink-0 size-[24px]" />
+        <Fingerprint className="overflow-clip relative shrink-0 size-[24px]" />
+        <Flaky className="overflow-clip relative shrink-0 size-[24px]" />
+        <LocalOffer className="overflow-clip relative shrink-0 size-[24px]" />
+        <Lock className="overflow-clip relative shrink-0 size-[24px]" />
+      </div>
+    </div>
+  );
+}

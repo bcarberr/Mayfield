@@ -1,0 +1,5 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none">
+  <g transform="translate(4,4) scale(0.8888888888888888)"><path id="Vector" d="M16.3636 0H1.63636C0.736364 0 0 0.736364 0 1.63636V11.4545C0 12.3545 0.736364 13.0909 1.63636 13.0909H7.36364V14.7273H5.72727V16.3636H12.2727V14.7273H10.6364V13.0909H16.3636C17.2636 13.0909 18 12.3545 18 11.4545V1.63636C18 0.736364 17.2636 0 16.3636 0ZM16.3636 11.4545H1.63636V1.63636H16.3636V11.4545Z" fill="var(--fill-0, #212121)"/></g>
+  <g transform="translate(14,10) scale(0.35)"><path id="Vector" d="M0.761134 0L0 0.8225L2.47233 3.5L0 6.1775L0.761134 7L4 3.5L0.761134 0Z" fill="currentColor"/></g>
+  <g transform="translate(7,10) scale(0.35)"><g transform="rotate(180 2.0 3.5)"><path id="Vector" d="M0.761134 0L0 0.8225L2.47233 3.5L0 6.1775L0.761134 7L4 3.5L0.761134 0Z" fill="currentColor"/></g></g>
+</svg>

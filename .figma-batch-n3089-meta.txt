@@ -1,0 +1,36 @@
+<frame id="3089:27095" name="Extra" x="604" y="1035" width="408" height="211">
+  <frame id="1509:2514" name="Row4 " x="24" y="120" width="264" height="24">
+    <symbol id="2063:19122" name="Snooze" x="0" y="0" width="24" height="24" />
+    <symbol id="2063:19123" name="Stop Circle" x="48" y="0" width="24" height="24" />
+    <symbol id="2063:19124" name="Track Changes" x="96" y="0" width="24" height="24" />
+    <symbol id="2063:19125" name="Verified" x="144" y="0" width="24" height="24" />
+    <symbol id="2063:19126" name="Test" x="192" y="0" width="24" height="24" />
+    <symbol id="2063:19127" name="Push Pin" x="240" y="0" width="24" height="24" />
+    <symbol id="2063:19130" name="Connection-old" x="288" y="0" width="24" height="24" hidden="true" />
+  </frame>
+  <frame id="3106:27159" name="Row 3 " x="24" y="162" width="120" height="24">
+    <symbol id="3121:27408" name="Snooze" x="0" y="0" width="24" height="24" />
+    <symbol id="3793:87" name="Data Exploration" x="48" y="0" width="24" height="24" />
+    <symbol id="4050:70" name="Bookmark" x="96" y="0" width="24" height="24" />
+  </frame>
+  <frame id="3091:27130" name="Row 2" x="24" y="72" width="360" height="24">
+    <symbol id="3121:27400" name="Lock Open" x="0" y="0" width="24" height="24" />
+    <symbol id="3121:27401" name="Low Priority" x="48" y="0" width="24" height="24" />
+    <symbol id="3121:27402" name="Menu" x="96" y="0" width="24" height="24" />
+    <symbol id="3121:27403" name="Note Add" x="144" y="0" width="24" height="24" />
+    <symbol id="3121:27404" name="Person Add" x="192" y="0" width="24" height="24" />
+    <symbol id="3121:27405" name="Power Off" x="240" y="0" width="24" height="24" />
+    <symbol id="3121:27406" name="Security" x="288" y="0" width="24" height="24" />
+    <symbol id="3121:27407" name="Share" x="336" y="0" width="24" height="24" />
+  </frame>
+  <frame id="3090:27099" name="Row 1" x="24" y="24" width="360" height="24">
+    <symbol id="3121:27393" name="Content Paste" x="0" y="0" width="24" height="24" />
+    <symbol id="3179:32583" name="Discover" x="48" y="0" width="24" height="24" />
+    <symbol id="3121:27394" name="Do Not Disturb On" x="96" y="0" width="24" height="24" />
+    <symbol id="3121:27395" name="Email" x="144" y="0" width="24" height="24" />
+    <symbol id="3121:27396" name="Fingerprint" x="192" y="0" width="24" height="24" />
+    <symbol id="3121:27397" name="Flaky" x="240" y="0" width="24" height="24" />
+    <symbol id="3121:27398" name="Local Offer" x="288" y="0" width="24" height="24" />
+    <symbol id="3121:27399" name="Lock" x="336" y="0" width="24" height="24" />
+  </frame>
+</frame>

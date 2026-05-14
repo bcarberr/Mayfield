@@ -1,0 +1,383 @@
+const imgVector = "http://localhost:3845/assets/037f151ffb87a3512e914008f1e5c8338a480d52.svg";
+const imgVector1 = "http://localhost:3845/assets/76c78bbc60adeae7de95addb8e3358763458d794.svg";
+const imgVector2 = "http://localhost:3845/assets/4458f518ca9d3cd170463b7e4af8d84e59289958.svg";
+const imgVector3 = "http://localhost:3845/assets/da67f710bd4fd620fc14f3734ae747ad12be77b7.svg";
+const imgVector4 = "http://localhost:3845/assets/cecd8e65284a7a0abd8ab5a0e425d56af8f735e5.svg";
+const imgVector5 = "http://localhost:3845/assets/1289d33d920be1825d44e87c850aa9b70c7bc75b.svg";
+const imgVector6 = "http://localhost:3845/assets/a6897efcb2de1cda3dd4fbfd2000e8e1d540d389.svg";
+const imgVector7 = "http://localhost:3845/assets/66f26fe1657669b441cb23aa2e8aa5fce882a033.svg";
+const imgVector8 = "http://localhost:3845/assets/68902f55e078a181ee0e87a9d172444d6ab8dc4d.svg";
+const imgVector9 = "http://localhost:3845/assets/2c2efb09f9e9cf1132a686ce8ed1409e6ffe4959.svg";
+const imgVector10 = "http://localhost:3845/assets/d5cdd3ba08ec56148ccb703626ca22cbed15b994.svg";
+const imgVector11 = "http://localhost:3845/assets/bfc8466e954284e2621ef54d8fb5396024290455.svg";
+const imgVector12 = "http://localhost:3845/assets/bed073d88c7625e175b54ecb9c0eb81df6ae51bd.svg";
+const imgVector13 = "http://localhost:3845/assets/7d9e2e3907b8ee076f85ec6680aa0a415a9005a8.svg";
+const imgVector14 = "http://localhost:3845/assets/be7918971b80b12878284e26228f9b0360f9b301.svg";
+const imgVector15 = "http://localhost:3845/assets/ca5a4081f7e7c62b72c1f11a1bcde372061904dc.svg";
+const imgIntercom = "http://localhost:3845/assets/59488007ea4c17b6caf6a8b9961d87e0dbb87aec.svg";
+const imgVector16 = "http://localhost:3845/assets/71563007c5c129d6275ed09dd9e073c1ca7b5391.svg";
+const imgVector17 = "http://localhost:3845/assets/c21d78a5f6dce24dca96a8976549dea1e8617bc1.svg";
+const imgVector18 = "http://localhost:3845/assets/e0202d1ba445f20e7bf134edf01ee455c7d0522e.svg";
+const imgVector19 = "http://localhost:3845/assets/6d6144cc03429863406afdf0f8d5034222a5218e.svg";
+const imgVector20 = "http://localhost:3845/assets/9f48032b14c014a469f331cb0cd64337c221e6c0.svg";
+const imgVector21 = "http://localhost:3845/assets/54fbfd478be81a766e824303baf25c5215cce240.svg";
+const imgVector22 = "http://localhost:3845/assets/e35c5747c33a18432a22f41368d66c322149251e.svg";
+const imgVector23 = "http://localhost:3845/assets/980583b43b7599f19c4cb98d6a73c78368d8211b.svg";
+const imgVector24 = "http://localhost:3845/assets/1706755a893a359b0729a33b9c5ab71734b826b0.svg";
+const imgVector25 = "http://localhost:3845/assets/ea488fdf4d9f5ba2035012fed807877062fa5dea.svg";
+const imgVector26 = "http://localhost:3845/assets/5ab4c1d8f822fa36ac2e27625827b7ecdcceb792.svg";
+const imgConnections = "http://localhost:3845/assets/a26928a99bddd2b2bcd395158c1cf045931e2022.svg";
+const imgVector27 = "http://localhost:3845/assets/818caf772f078d91598e191e784fbc494722c557.svg";
+
+function DashboardsFilled({ className }: { className?: string }) {
+  return (
+    <div className={className || "overflow-clip relative size-[24px]"} data-node-id="5150:12196" data-name="Dashboards Filled">
+      <div className="absolute inset-[12.5%]" data-node-id="5150:12193" data-name="Vector">
+        <img alt="" className="absolute block inset-0 max-w-none size-full" src={imgVector} />
+      </div>
+    </div>
+  );
+}
+
+function DashboardsOutline({ className }: { className?: string }) {
+  return (
+    <div className={className || "overflow-clip relative size-[24px]"} data-node-id="4933:12096" data-name="Dashboards Outline">
+      <div className="absolute inset-[12.5%]" data-node-id="4920:12025" data-name="Vector">
+        <img alt="" className="absolute block inset-0 max-w-none size-full" src={imgVector1} />
+      </div>
+    </div>
+  );
+}
+
+function Collapse({ className }: { className?: string }) {
+  return (
+    <div className={className || "overflow-clip relative size-[24px]"} data-node-id="4939:12079" data-name="Collapse">
+      <div className="absolute inset-[20.83%_12.5%]" data-node-id="5125:12179" data-name="Vector">
+        <img alt="" className="absolute block inset-0 max-w-none size-full" src={imgVector2} />
+      </div>
+    </div>
+  );
+}
+
+function Chat({ className }: { className?: string }) {
+  return (
+    <div className={className || "overflow-clip relative size-[24px]"} data-node-id="4940:12075" data-name="Chat">
+      <div className="absolute inset-[8.33%]" data-node-id="4940:12074" data-name="Vector">
+        <img alt="" className="absolute block inset-0 max-w-none size-full" src={imgVector3} />
+      </div>
+    </div>
+  );
+}
+
+function Automations({ className }: { className?: string }) {
+  return (
+    <div className={className || "overflow-clip relative size-[24px]"} data-node-id="4941:12074" data-name="Automations">
+      <div className="absolute inset-[8.54%_8.33%]" data-node-id="4920:12420" data-name="Vector">
+        <img alt="" className="absolute block inset-0 max-w-none size-full" src={imgVector4} />
+      </div>
+    </div>
+  );
+}
+
+function AlertsFilled({ className }: { className?: string }) {
+  return (
+    <div className={className || "overflow-clip relative size-[24px]"} data-node-id="5150:12195" data-name="Alerts Filled">
+      <div className="absolute inset-[8.33%_16.67%]" data-node-id="5150:12190" data-name="Vector">
+        <img alt="" className="absolute block inset-0 max-w-none size-full" src={imgVector5} />
+      </div>
+    </div>
+  );
+}
+
+function AlertsOutline({ className }: { className?: string }) {
+  return (
+    <div className={className || "overflow-clip relative size-[24px]"} data-node-id="4941:12072" data-name="Alerts Outline">
+      <div className="absolute inset-[8.33%_16.67%]" data-node-id="4920:12418" data-name="Vector">
+        <img alt="" className="absolute block inset-0 max-w-none size-full" src={imgVector6} />
+      </div>
+    </div>
+  );
+}
+
+function AdvancedSearch({ className }: { className?: string }) {
+  return (
+    <div className={className || "overflow-clip relative size-[24px]"} data-node-id="4941:12073" data-name="Advanced Search">
+      <div className="absolute inset-[16.67%_4.17%_4.17%_4.17%]" data-node-id="4920:12416" data-name="Vector">
+        <img alt="" className="absolute block inset-0 max-w-none size-full" src={imgVector7} />
+      </div>
+    </div>
+  );
+}
+
+function QuickHelp({ className }: { className?: string }) {
+  return (
+    <div className={className || "overflow-clip relative size-[24px]"} data-node-id="4933:12099" data-name="Quick Help">
+      <div className="absolute inset-[8.33%]" data-node-id="4933:12090" data-name="Vector">
+        <img alt="" className="absolute block inset-0 max-w-none size-full" src={imgVector8} />
+      </div>
+    </div>
+  );
+}
+
+function Notifications({ className }: { className?: string }) {
+  return (
+    <div className={className || "overflow-clip relative size-[24px]"} data-node-id="4933:12100" data-name="Notifications">
+      <div className="absolute inset-[10.42%_16.67%_8.33%_16.67%]" data-node-id="4933:12093" data-name="Vector">
+        <img alt="" className="absolute block inset-0 max-w-none size-full" src={imgVector9} />
+      </div>
+    </div>
+  );
+}
+
+function InvestigationsFilled({ className }: { className?: string }) {
+  return (
+    <div className={className || "overflow-clip relative size-[24px]"} data-node-id="5150:12198" data-name="Investigations Filled">
+      <div className="absolute inset-[4.17%_4.17%_8.33%_4.17%]" data-node-id="5150:12197" data-name="Vector">
+        <img alt="" className="absolute block inset-0 max-w-none size-full" src={imgVector10} />
+      </div>
+    </div>
+  );
+}
+
+function InvestigationsOutline({ className }: { className?: string }) {
+  return (
+    <div className={className || "overflow-clip relative size-[24px]"} data-node-id="4941:12077" data-name="Investigations Outline">
+      <div className="absolute inset-[4.17%_4.17%_8.33%_4.17%]" data-node-id="4920:12417" data-name="Vector">
+        <img alt="" className="absolute block inset-0 max-w-none size-full" src={imgVector11} />
+      </div>
+    </div>
+  );
+}
+
+function Integrations({ className }: { className?: string }) {
+  return (
+    <div className={className || "overflow-clip relative size-[24px]"} data-node-id="4941:12076" data-name="Integrations">
+      <div className="absolute inset-[12.5%_20.83%]" data-node-id="4920:12383" data-name="Vector">
+        <img alt="" className="absolute block inset-0 max-w-none size-full" src={imgVector12} />
+      </div>
+    </div>
+  );
+}
+
+function Expand({ className }: { className?: string }) {
+  return (
+    <div className={className || "overflow-clip relative size-[24px]"} data-node-id="4939:12078" data-name="Expand">
+      <div className="absolute flex inset-[20.83%_12.5%] items-center justify-center" style={{ containerType: "size" }}>
+        <div className="flex-none h-[100cqh] rotate-180 w-[100cqw]">
+          <div className="relative size-full" data-node-id="5125:12180" data-name="Vector">
+            <img alt="" className="absolute block inset-0 max-w-none size-full" src={imgVector13} />
+          </div>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+function Endpoint({ className }: { className?: string }) {
+  return (
+    <div className={className || "overflow-clip relative size-[24px]"} data-node-id="4933:12098" data-name="Endpoint">
+      <div className="absolute inset-[8.33%_4.17%]" data-node-id="4920:12378" data-name="Vector">
+        <img alt="" className="absolute block inset-0 max-w-none size-full" src={imgVector14} />
+      </div>
+    </div>
+  );
+}
+
+function Downloads({ className }: { className?: string }) {
+  return (
+    <div className={className || "overflow-clip relative size-[24px]"} data-node-id="4933:12097" data-name="Downloads">
+      <div className="absolute inset-[16.67%]" data-node-id="4920:12432" data-name="Vector">
+        <img alt="" className="absolute block inset-0 max-w-none size-full" src={imgVector15} />
+      </div>
+    </div>
+  );
+}
+
+function Intercom({ className }: { className?: string }) {
+  return (
+    <div className={className || "overflow-clip relative size-[24px]"} data-node-id="2062:6560" data-name="Intercom">
+      <div className="absolute inset-[8.33%_8.33%_8.55%_8.33%]" data-node-id="2062:6542" data-name="intercom">
+        <img alt="" className="absolute block inset-0 max-w-none size-full" src={imgIntercom} />
+      </div>
+    </div>
+  );
+}
+
+function Favorite({ className }: { className?: string }) {
+  return (
+    <div className={className || "overflow-clip relative size-[24px]"} data-node-id="1139:36819" data-name="favorite">
+      <div className="absolute inset-[12.5%_12.5%_16.25%_12.5%]" data-node-id="1139:36818" data-name="Vector">
+        <img alt="" className="absolute block inset-0 max-w-none size-full" src={imgVector16} />
+      </div>
+    </div>
+  );
+}
+
+function ToolsFilled({ className }: { className?: string }) {
+  return (
+    <div className={className || "overflow-clip relative size-[24px]"} data-node-id="5150:12200" data-name="Tools Filled">
+      <div className="absolute inset-[8.33%]" data-node-id="5150:12180" data-name="Vector">
+        <img alt="" className="absolute block inset-0 max-w-none size-full" src={imgVector17} />
+      </div>
+    </div>
+  );
+}
+
+function Tools({ className }: { className?: string }) {
+  return (
+    <div className={className || "overflow-clip relative size-[24px]"} data-node-id="4941:12079" data-name="Tools">
+      <div className="absolute inset-[8.33%]" data-node-id="4920:12421" data-name="Vector">
+        <img alt="" className="absolute block inset-0 max-w-none size-full" src={imgVector18} />
+      </div>
+    </div>
+  );
+}
+
+function TenantSettings({ className }: { className?: string }) {
+  return (
+    <div className={className || "overflow-clip relative size-[24px]"} data-node-id="4941:12078" data-name="Tenant Settings">
+      <div className="absolute inset-[8.33%]" data-node-id="5106:12178" data-name="Vector">
+        <img alt="" className="absolute block inset-0 max-w-none size-full" src={imgVector19} />
+      </div>
+    </div>
+  );
+}
+
+function ReportsFilled({ className }: { className?: string }) {
+  return (
+    <div className={className || "overflow-clip relative size-[24px]"} data-node-id="5150:12199" data-name="Reports Filled">
+      <div className="absolute inset-[8.33%_16.67%]" data-node-id="5150:12174" data-name="Vector">
+        <img alt="" className="absolute block inset-0 max-w-none size-full" src={imgVector20} />
+      </div>
+    </div>
+  );
+}
+
+function Reports({ className }: { className?: string }) {
+  return (
+    <div className={className || "overflow-clip relative size-[24px]"} data-node-id="4933:12101" data-name="Reports">
+      <div className="absolute inset-[8.33%_16.67%]" data-node-id="4933:12095" data-name="Vector">
+        <img alt="" className="absolute block inset-0 max-w-none size-full" src={imgVector21} />
+      </div>
+    </div>
+  );
+}
+
+function Detections({ className }: { className?: string }) {
+  return (
+    <div className={className || "overflow-clip relative size-[24px]"} data-node-id="3501:1366" data-name="Detections">
+      <div className="-translate-x-1/2 -translate-y-1/2 absolute left-1/2 size-[20px] top-1/2" data-node-id="3501:1364" data-name="Vector">
+        <img alt="" className="absolute block inset-0 max-w-none size-full" src={imgVector22} />
+      </div>
+    </div>
+  );
+}
+
+function Applications({ className }: { className?: string }) {
+  return (
+    <div className={className || "overflow-clip relative size-[24px]"} data-node-id="2079:19944" data-name="Applications">
+      <div className="-translate-x-1/2 -translate-y-1/2 absolute h-[12px] left-1/2 top-1/2 w-[24px]" data-node-id="2079:19943" data-name="Vector">
+        <img alt="" className="absolute block inset-0 max-w-none size-full" src={imgVector23} />
+      </div>
+    </div>
+  );
+}
+
+function Applications1({ className }: { className?: string }) {
+  return (
+    <div className={className || "overflow-clip relative size-[24px]"} data-node-id="2078:19938" data-name="Applications">
+      <div className="-translate-x-1/2 -translate-y-1/2 absolute left-[calc(50%+0.5px)] size-[21px] top-[calc(50%+0.5px)]" data-node-id="2078:19936" data-name="Vector">
+        <img alt="" className="absolute block inset-0 max-w-none size-full" src={imgVector24} />
+      </div>
+    </div>
+  );
+}
+
+function FederatedJoins({ className }: { className?: string }) {
+  return (
+    <div className={className || "overflow-clip relative size-[24px]"} data-node-id="2078:19931" data-name="Federated Joins">
+      <div className="-translate-x-1/2 -translate-y-1/2 absolute flex h-[22.68px] items-center justify-center left-[calc(50%+0.15px)] top-[calc(50%+0.34px)] w-[23.692px]">
+        <div className="-scale-y-100 flex-none rotate-180">
+          <div className="h-[22.68px] relative w-[23.692px]" data-node-id="2078:19929" data-name="Vector">
+            <img alt="" className="absolute block inset-0 max-w-none size-full" src={imgVector25} />
+          </div>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+function SummaryInsights({ className }: { className?: string }) {
+  return (
+    <div className={className || "overflow-clip relative size-[24px]"} data-node-id="2078:19924" data-name="Summary Insights">
+      <div className="-translate-x-1/2 -translate-y-1/2 absolute h-[22.909px] left-1/2 top-[calc(50%+0.45px)] w-[24px]" data-node-id="2078:19923" data-name="Vector">
+        <img alt="" className="absolute block inset-0 max-w-none size-full" src={imgVector26} />
+      </div>
+    </div>
+  );
+}
+
+function Connections({ className }: { className?: string }) {
+  return (
+    <div className={className || "overflow-clip relative size-[24px]"} data-node-id="2064:19917" data-name="Connections">
+      <div className="absolute inset-[12.5%_10.98%_12.5%_20.83%]" data-node-id="2064:19916" data-name="Connections">
+        <img alt="" className="absolute block inset-0 max-w-none size-full" src={imgConnections} />
+      </div>
+    </div>
+  );
+}
+
+function Logout({ className }: { className?: string }) {
+  return (
+    <div className={className || "overflow-clip relative size-[24px]"} data-node-id="2062:6579" data-name="Logout">
+      <div className="absolute inset-[12.5%]" data-node-id="2062:6578" data-name="Vector">
+        <img alt="" className="absolute block inset-0 max-w-none size-full" src={imgVector27} />
+      </div>
+    </div>
+  );
+}
+
+export default function NavigationElements() {
+  return (
+    <div className="border border-[#c9c9c9] border-solid relative rounded-[4px] size-full" data-node-id="4932:12073" data-name="Navigation Elements">
+      <div className="absolute content-stretch flex gap-[24px] items-center left-[23px] top-[179px]" data-node-id="2062:6543" data-name="Row 4">
+        <Logout className="overflow-clip relative shrink-0 size-[24px]" />
+        <Connections className="overflow-clip relative shrink-0 size-[24px]" />
+        <SummaryInsights className="overflow-clip relative shrink-0 size-[24px]" />
+        <FederatedJoins className="overflow-clip relative shrink-0 size-[24px]" />
+        <Applications1 className="overflow-clip relative shrink-0 size-[24px]" />
+        <Applications className="overflow-clip relative shrink-0 size-[24px]" />
+        <Detections className="overflow-clip relative shrink-0 size-[24px]" />
+      </div>
+      <div className="absolute content-stretch flex gap-[24px] items-center left-[23px] top-[127px]" data-node-id="5150:12194" data-name="Row 3">
+        <Reports className="overflow-clip relative shrink-0 size-[24px]" />
+        <ReportsFilled className="overflow-clip relative shrink-0 size-[24px]" />
+        <TenantSettings className="overflow-clip relative shrink-0 size-[24px]" />
+        <Tools className="overflow-clip relative shrink-0 size-[24px]" />
+        <ToolsFilled className="overflow-clip relative shrink-0 size-[24px]" />
+        <Favorite className="overflow-clip relative shrink-0 size-[24px]" />
+        <Intercom className="overflow-clip relative shrink-0 size-[24px]" />
+      </div>
+      <div className="absolute content-stretch flex gap-[24px] items-center left-[23px] top-[71px]" data-node-id="4941:12075" data-name="Row 2">
+        <Downloads className="overflow-clip relative shrink-0 size-[24px]" />
+        <Endpoint className="overflow-clip relative shrink-0 size-[24px]" />
+        <Expand className="overflow-clip relative shrink-0 size-[24px]" />
+        <Integrations className="overflow-clip relative shrink-0 size-[24px]" />
+        <InvestigationsOutline className="overflow-clip relative shrink-0 size-[24px]" />
+        <InvestigationsFilled className="overflow-clip relative shrink-0 size-[24px]" />
+        <Notifications className="overflow-clip relative shrink-0 size-[24px]" />
+        <QuickHelp className="overflow-clip relative shrink-0 size-[24px]" />
+      </div>
+      <div className="absolute content-stretch flex gap-[24px] items-start left-[23px] top-[23px]" data-node-id="4932:12079" data-name="Row 1">
+        <AdvancedSearch className="overflow-clip relative shrink-0 size-[24px]" />
+        <AlertsOutline className="overflow-clip relative shrink-0 size-[24px]" />
+        <AlertsFilled className="overflow-clip relative shrink-0 size-[24px]" />
+        <Automations className="overflow-clip relative shrink-0 size-[24px]" />
+        <Chat className="overflow-clip relative shrink-0 size-[24px]" />
+        <Collapse className="overflow-clip relative shrink-0 size-[24px]" />
+        <DashboardsOutline className="overflow-clip relative shrink-0 size-[24px]" />
+        <DashboardsFilled className="overflow-clip relative shrink-0 size-[24px]" />
+      </div>
+    </div>
+  );
+}

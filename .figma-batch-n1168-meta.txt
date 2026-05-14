@@ -1,0 +1,20 @@
+<frame id="1168:3334" name="Navigation" x="100" y="1163" width="408" height="120">
+  <frame id="1598:3552" name="Row 2" x="24" y="72" width="216" height="24">
+    <symbol id="4812:336" name="Replay" x="240" y="0" width="24" height="24" />
+    <symbol id="2801:30902" name="Double Chevron" x="192" y="0" width="24" height="24" />
+    <symbol id="1168:3386" name="Subdirectory-Arrow-Right" x="144" y="0" width="24" height="24" />
+    <symbol id="1168:3398" name="Refresh" x="96" y="0" width="24" height="24" />
+    <symbol id="1168:3396" name="More-Vert" x="48" y="0" width="24" height="24" />
+    <symbol id="1168:3338" name="Expand-More" x="0" y="0" width="24" height="24" />
+  </frame>
+  <frame id="1598:3551" name="Row 1" x="24" y="24" width="312" height="24">
+    <symbol id="1168:3346" name="Arrow-Downward" x="0" y="0" width="24" height="24" />
+    <symbol id="1168:3329" name="Arrow-Drop-Down" x="48" y="0" width="24" height="24" />
+    <symbol id="1168:3333" name="Arrow-Drop-Up" x="96" y="0" width="24" height="24" />
+    <symbol id="1168:3350" name="Arrow-Upward" x="144" y="0" width="24" height="24" />
+    <symbol id="1168:3354" name="Chevron-Left" x="192" y="0" width="24" height="24" />
+    <symbol id="1168:3358" name="Chevron-Right" x="240" y="0" width="24" height="24" />
+    <symbol id="4641:13612" name="Double-Arrow" x="288" y="0" width="24" height="24" hidden="true" />
+    <symbol id="1168:3342" name="Expand-Less" x="288" y="0" width="24" height="24" />
+  </frame>
+</frame>

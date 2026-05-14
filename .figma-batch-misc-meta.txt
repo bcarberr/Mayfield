@@ -1,0 +1,19 @@
+<frame id="1172:3420" name="Misc Technology" x="100" y="639" width="408" height="174">
+  <frame id="584:1128" name="Row 3" x="24" y="120" width="24" height="24" />
+  <frame id="1598:3550" name="Row 2" x="24" y="72" width="168" height="24">
+    <symbol id="1172:3424" name="Repeat" x="0" y="0" width="24" height="24" />
+    <symbol id="1172:3419" name="Schema" x="48" y="0" width="24" height="24" />
+    <symbol id="1172:3428" name="Swap Horiz" x="96" y="0" width="24" height="24" />
+    <symbol id="163:36766" name="Email Open" x="144" y="0" width="24" height="24" />
+  </frame>
+  <frame id="1598:3549" name="Row 1" x="24" y="24" width="360" height="24">
+    <symbol id="1172:3415" name="Category" x="0" y="0" width="24" height="24" />
+    <symbol id="1172:3438" name="Device Hub" x="48" y="0" width="24" height="24" />
+    <symbol id="1209:3400" name="DNS" x="96" y="0" width="24" height="24" />
+    <symbol id="1221:3488" name="Flag" x="144" y="0" width="24" height="24" />
+    <symbol id="1172:3448" name="Map" x="192" y="0" width="24" height="24" />
+    <symbol id="1195:3457" name="Play Arrow" x="240" y="0" width="24" height="24" />
+    <symbol id="1172:3411" name="Play Arrow Outline" x="288" y="0" width="24" height="24" />
+    <symbol id="1172:3434" name="Playlist Add" x="336" y="0" width="24" height="24" />
+  </frame>
+</frame>

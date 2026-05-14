@@ -1,0 +1,164 @@
+const imgVector = "http://localhost:3845/assets/c125445a572b96d29a6122252eaf4afbf0a6f484.svg";
+const imgVector1 = "http://localhost:3845/assets/ffb339e25d7bda6adf8f3b27b0e6869898d13aae.svg";
+const imgVector2 = "http://localhost:3845/assets/4e42d1f8574b5b146d360c6cf2fbdce096707e0b.svg";
+const imgVector3 = "http://localhost:3845/assets/a265986ba9c77b31a564b8576ea8f661977e7c3c.svg";
+const imgVector4 = "http://localhost:3845/assets/0767512675896b2e03c0ac7eab9354e05b2004d9.svg";
+const imgVector5 = "http://localhost:3845/assets/cf87bbcf7222932720622bcf333c60743b456d46.svg";
+const imgVector6 = "http://localhost:3845/assets/ce310b0a62201178dadd47993195763dd3472ba0.svg";
+const imgVector7 = "http://localhost:3845/assets/664e5cce01d0b7d7cd8b74e1d07b83499ba740ff.svg";
+const imgVector8 = "http://localhost:3845/assets/0713644388b2400d85d00c861b91d2b416cb533a.svg";
+const imgVector9 = "http://localhost:3845/assets/5a3100119dcd22e93b620005db283df442230939.svg";
+const imgVector10 = "http://localhost:3845/assets/a53bd727e9d4eef3bbff48c90dcab2869c29c6c2.svg";
+
+function PlaylistAdd({ className }: { className?: string }) {
+  return (
+    <div className={className || "overflow-clip relative size-[24px]"} data-node-id="1172:3434" data-name="Playlist Add">
+      <div className="absolute bottom-[16.67%] left-[12.5%] right-[8.33%] top-1/4" data-node-id="1172:3433" data-name="Vector">
+        <img alt="" className="absolute block inset-0 max-w-none size-full" src={imgVector} />
+      </div>
+    </div>
+  );
+}
+
+function PlayArrowOutline({ className }: { className?: string }) {
+  return (
+    <div className={className || "overflow-clip relative size-[24px]"} data-node-id="1172:3411" data-name="Play Arrow Outline">
+      <div className="absolute inset-[20.83%_20.83%_20.83%_33.33%]" data-node-id="1172:3409" data-name="Vector">
+        <img alt="" className="absolute block inset-0 max-w-none size-full" src={imgVector1} />
+      </div>
+    </div>
+  );
+}
+
+function PlayArrow({ className }: { className?: string }) {
+  return (
+    <div className={className || "overflow-clip relative size-[24px]"} data-node-id="1195:3457" data-name="Play Arrow">
+      <div className="absolute inset-[20.83%_20.83%_20.83%_33.33%]" data-node-id="1195:3456" data-name="Vector">
+        <img alt="" className="absolute block inset-0 max-w-none size-full" src={imgVector2} />
+      </div>
+    </div>
+  );
+}
+
+function Map({ className }: { className?: string }) {
+  return (
+    <div className={className || "overflow-clip relative size-[24px]"} data-node-id="1172:3448" data-name="Map">
+      <div className="absolute inset-[12.5%]" data-node-id="1172:3447" data-name="Vector">
+        <img alt="" className="absolute block inset-0 max-w-none size-full" src={imgVector3} />
+      </div>
+    </div>
+  );
+}
+
+function Flag({ className }: { className?: string }) {
+  return (
+    <div className={className || "overflow-clip relative size-[24px]"} data-node-id="1221:3488" data-name="Flag">
+      <div className="absolute inset-[16.67%_16.67%_12.5%_20.83%]" data-node-id="1221:3487" data-name="Vector">
+        <img alt="" className="absolute block inset-0 max-w-none size-full" src={imgVector4} />
+      </div>
+    </div>
+  );
+}
+
+function Dns({ className }: { className?: string }) {
+  return (
+    <div className={className || "overflow-clip relative size-[24px]"} data-node-id="1209:3400" data-name="DNS">
+      <div className="absolute inset-[12.5%]" data-node-id="1208:3420" data-name="Vector">
+        <img alt="" className="absolute block inset-0 max-w-none size-full" src={imgVector5} />
+      </div>
+    </div>
+  );
+}
+
+function DeviceHub({ className }: { className?: string }) {
+  return (
+    <div className={className || "overflow-clip relative size-[24px]"} data-node-id="1172:3438" data-name="Device Hub">
+      <div className="absolute inset-[12.5%]" data-node-id="1172:3437" data-name="Vector">
+        <img alt="" className="absolute block inset-0 max-w-none size-full" src={imgVector6} />
+      </div>
+    </div>
+  );
+}
+
+function Category({ className }: { className?: string }) {
+  return (
+    <div className={className || "overflow-clip relative size-[24px]"} data-node-id="1172:3415" data-name="Category">
+      <div className="absolute inset-[8.33%_8.33%_8.33%_12.5%]" data-node-id="1172:3414" data-name="Vector">
+        <img alt="" className="absolute block inset-0 max-w-none size-full" src={imgVector7} />
+      </div>
+    </div>
+  );
+}
+
+function EmailOpen({ className }: { className?: string }) {
+  return (
+    <div className={className || "overflow-clip relative size-[24px]"} data-node-id="163:36766" data-name="Email Open">
+      <div className="-translate-x-1/2 -translate-y-1/2 absolute h-[19.008px] left-1/2 top-[calc(50%-0.5px)] w-[20px]" data-node-id="163:36765" data-name="Vector">
+        <img alt="" className="absolute block inset-0 max-w-none size-full" src={imgVector8} />
+      </div>
+    </div>
+  );
+}
+
+function SwapHoriz({ className }: { className?: string }) {
+  return (
+    <div className={className || "overflow-clip relative size-[24px]"} data-node-id="1172:3428" data-name="Swap Horiz">
+      <div className="absolute inset-[20.83%_12.5%]" data-node-id="1172:3427" data-name="Vector">
+        <img alt="" className="absolute block inset-0 max-w-none size-full" src={imgVector9} />
+      </div>
+    </div>
+  );
+}
+
+function Schema({ className }: { className?: string }) {
+  return (
+    <div className={className || "overflow-clip relative size-[24px]"} data-node-id="1172:3419" data-name="Schema">
+      <div className="absolute inset-[16.67%]" data-node-id="3175:1624">
+        <div className="absolute bg-black inset-[-6.25%_62.5%_68.75%_0]" data-node-id="3175:1625" />
+        <div className="absolute bg-black inset-[-6.25%_0_68.75%_62.5%]" data-node-id="3175:1626" />
+        <div className="absolute bg-black inset-[62.5%_0_0_62.5%]" data-node-id="3175:1627" />
+        <div className="absolute bg-black inset-[6.25%_12.5%_81.25%_31.25%]" data-node-id="3175:1628" />
+        <div className="absolute bg-black bottom-[12.5%] left-[18.75%] right-[12.5%] top-3/4" data-node-id="3175:1629" />
+        <div className="absolute bottom-[12.5%] flex items-center justify-center left-[12.5%] right-3/4 top-[31.25%]" style={{ containerType: "size" }}>
+          <div className="-rotate-90 flex-none h-[100cqw] w-[100cqh]">
+            <div className="bg-black relative size-full" data-node-id="3175:1630" />
+          </div>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+function Repeat({ className }: { className?: string }) {
+  return (
+    <div className={className || "overflow-clip relative size-[24px]"} data-node-id="1172:3424" data-name="Repeat">
+      <div className="absolute inset-[8.33%_12.5%]" data-node-id="1172:3423" data-name="Vector">
+        <img alt="" className="absolute block inset-0 max-w-none size-full" src={imgVector10} />
+      </div>
+    </div>
+  );
+}
+
+export default function MiscTechnology() {
+  return (
+    <div className="border border-[#c9c9c9] border-solid relative rounded-[4px] size-full" data-node-id="1172:3420" data-name="Misc Technology">
+      <div className="absolute left-[23px] size-[24px] top-[119px]" data-node-id="584:1128" data-name="Row 3" />
+      <div className="absolute content-stretch flex gap-[24px] items-start left-[23px] top-[71px]" data-node-id="1598:3550" data-name="Row 2">
+        <Repeat className="overflow-clip relative shrink-0 size-[24px]" />
+        <Schema className="overflow-clip relative shrink-0 size-[24px]" />
+        <SwapHoriz className="overflow-clip relative shrink-0 size-[24px]" />
+        <EmailOpen className="overflow-clip relative shrink-0 size-[24px]" />
+      </div>
+      <div className="absolute content-stretch flex gap-[24px] items-start left-[23px] top-[23px]" data-node-id="1598:3549" data-name="Row 1">
+        <Category className="overflow-clip relative shrink-0 size-[24px]" />
+        <DeviceHub className="overflow-clip relative shrink-0 size-[24px]" />
+        <Dns className="overflow-clip relative shrink-0 size-[24px]" />
+        <Flag className="overflow-clip relative shrink-0 size-[24px]" />
+        <Map className="overflow-clip relative shrink-0 size-[24px]" />
+        <PlayArrow className="overflow-clip relative shrink-0 size-[24px]" />
+        <PlayArrowOutline className="overflow-clip relative shrink-0 size-[24px]" />
+        <PlaylistAdd className="overflow-clip relative shrink-0 size-[24px]" />
+      </div>
+    </div>
+  );
+}
