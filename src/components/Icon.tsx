@@ -1,5 +1,10 @@
 import type { HTMLAttributes } from "react";
 
+import {
+  MISC_TECHNOLOGY_ICON_COMPONENTS,
+  MISC_TECHNOLOGY_ICON_NAMES,
+  type MiscTechnologyIconName,
+} from "../assets/icons/icons";
 import checkCircle from "../assets/icons/check-circle.svg?raw";
 import checkCircleOutline from "../assets/icons/check-circle-outline.svg?raw";
 import chevronDown from "../assets/icons/chevron-down.svg?raw";
@@ -22,7 +27,7 @@ import visibility from "../assets/icons/visibility.svg?raw";
 import warning from "../assets/icons/warning.svg?raw";
 import warningOutline from "../assets/icons/warning-outline.svg?raw";
 
-export const ICON_NAMES = [
+const LEGACY_ICON_NAMES = [
   "check-circle",
   "check-circle-outline",
   "chevron-down",
@@ -48,9 +53,13 @@ export const ICON_NAMES = [
   "warning-outline",
 ] as const;
 
+export const ICON_NAMES = [...LEGACY_ICON_NAMES, ...MISC_TECHNOLOGY_ICON_NAMES] as const;
+
 export type IconName = (typeof ICON_NAMES)[number];
 
-const RAW_BY_NAME: Record<IconName, string> = {
+type LegacyIconName = (typeof LEGACY_ICON_NAMES)[number];
+
+const RAW_BY_NAME: Record<LegacyIconName, string> = {
   "check-circle": checkCircle,
   "check-circle-outline": checkCircleOutline,
   "chevron-down": chevronDown,
@@ -76,6 +85,10 @@ const RAW_BY_NAME: Record<IconName, string> = {
   "warning-outline": warningOutline,
 };
 
+function isMiscTechnologyIcon(name: IconName): name is MiscTechnologyIconName {
+  return (MISC_TECHNOLOGY_ICON_NAMES as readonly string[]).includes(name);
+}
+
 function withDisplaySize(svg: string, size: number): string {
   return svg.replace(/<svg\b([^>]*)>/, (_match, attrs: string) => {
     let next = attrs;
@@ -93,11 +106,29 @@ export type IconProps = {
 } & Omit<HTMLAttributes<HTMLSpanElement>, "children" | "dangerouslySetInnerHTML">;
 
 export function Icon({ name, size = 24, title, className, style, ...rest }: IconProps) {
+  const spanClass = ["inline-flex shrink-0 items-center justify-center", className].filter(Boolean).join(" ");
+
+  if (isMiscTechnologyIcon(name)) {
+    const Svg = MISC_TECHNOLOGY_ICON_COMPONENTS[name];
+    return (
+      <span
+        {...rest}
+        className={spanClass}
+        style={{ lineHeight: 0, ...style }}
+        role={title ? "img" : undefined}
+        aria-label={title}
+        aria-hidden={title ? undefined : true}
+      >
+        <Svg width={size} height={size} className="block shrink-0" />
+      </span>
+    );
+  }
+
   const markup = withDisplaySize(RAW_BY_NAME[name], size);
   return (
     <span
       {...rest}
-      className={["inline-flex shrink-0 items-center justify-center", className].filter(Boolean).join(" ")}
+      className={spanClass}
       style={{ lineHeight: 0, ...style }}
       dangerouslySetInnerHTML={{ __html: markup }}
       role={title ? "img" : undefined}
