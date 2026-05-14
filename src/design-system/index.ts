@@ -23,5 +23,7 @@ export { EXTRA_ICON_NAMES } from "../assets/icons/extra-icons";
 export type { ExtraIconName } from "../assets/icons/extra-icons";
 export { ACTION_ICON_NAMES } from "../assets/icons/action-icons";
 export type { ActionIconName } from "../assets/icons/action-icons";
+export { CONNECTOR_LARGE_ICON_NAMES } from "../assets/icons/connector-large-icons";
+export type { ConnectorLargeIconName } from "../assets/icons/connector-large-icons";
 export { Switch, type SwitchProps } from "../components/ui/Switch";
 export { Checkbox, type CheckboxProps } from "../components/uiCheckbox";

@@ -17,17 +17,41 @@ import json
 import re
 import urllib.parse
 import urllib.request
+from concurrent.futures import ThreadPoolExecutor, as_completed
 from pathlib import Path
 
 ROOT = Path(__file__).resolve().parents[1]
 ICONS = ROOT / "src" / "assets" / "icons"
 BUNDLE = ROOT / "tools" / "connectors_large_bundle.txt"
 CANVAS = 144.0
+FETCH_TIMEOUT_S = 20
+MAX_WORKERS = 12
 
 
 def fetch(url: str) -> str:
-    with urllib.request.urlopen(url, timeout=60) as r:
+    with urllib.request.urlopen(url, timeout=FETCH_TIMEOUT_S) as r:
         return r.read().decode("utf-8")
+
+
+def fetch_hash(h: str) -> tuple[str, str]:
+    last_err: OSError | None = None
+    for host in ("127.0.0.1", "localhost"):
+        url = f"http://{host}:3845/assets/{h}.svg"
+        try:
+            return h, fetch(url)
+        except OSError as e:
+            last_err = e
+    raise RuntimeError(f"failed to download {h}.svg: {last_err}") from last_err
+
+
+def prefetch_svgs(hashes: set[str]) -> dict[str, str]:
+    out: dict[str, str] = {}
+    with ThreadPoolExecutor(max_workers=MAX_WORKERS) as ex:
+        futs = {ex.submit(fetch_hash, h): h for h in hashes}
+        for fut in as_completed(futs):
+            h, svg = fut.result()
+            out[h] = svg
+    return out
 
 
 def data_uri_svg(svg: str) -> str:
@@ -59,19 +83,10 @@ def parse_inset(spec: str) -> tuple[float, float, float, float]:
     return x, y, w, h
 
 
-def build_composite(layers: list[tuple[str, str]]) -> str:
+def build_composite(layers: list[tuple[str, str]], cache: dict[str, str]) -> str:
     parts: list[str] = []
     for h, inset in layers:
-        svg = ""
-        for host in ("127.0.0.1", "localhost"):
-            url = f"http://{host}:3845/assets/{h}.svg"
-            try:
-                svg = fetch(url)
-                break
-            except OSError:
-                continue
-        if not svg:
-            raise RuntimeError(f"failed to download {h}.svg")
+        svg = cache[h]
         x, y, w, h = parse_inset(inset)
         href = data_uri_svg(svg)
         parts.append(
@@ -95,6 +110,8 @@ def parse_bundle(text: str) -> list[tuple[str, list[tuple[str, str]]]]:
     for raw in text.splitlines():
         line = raw.strip()
         if not line or line.startswith("#"):
+            continue
+        if not line.startswith("connector-large-"):
             continue
         if "=" not in line:
             raise ValueError(f"bad bundle line: {line!r}")
@@ -141,12 +158,18 @@ def main() -> None:
     if not BUNDLE.is_file():
         raise SystemExit(f"missing {BUNDLE}")
     pairs_spec = parse_bundle(BUNDLE.read_text())
+    all_hashes: set[str] = set()
+    for _, layers in pairs_spec:
+        for h, _ in layers:
+            all_hashes.add(h)
+    print(f"prefetching {len(all_hashes)} unique asset(s)…")
+    cache = prefetch_svgs(all_hashes)
     ICONS.mkdir(parents=True, exist_ok=True)
     out_pairs: list[tuple[str, str]] = []
     for key, layers in pairs_spec:
         fname = f"{key}.svg"
         dest = ICONS / fname
-        svg = build_composite(layers)
+        svg = build_composite(layers, cache)
         dest.write_text(svg)
         out_pairs.append((key, fname))
     emit_ts(out_pairs)
