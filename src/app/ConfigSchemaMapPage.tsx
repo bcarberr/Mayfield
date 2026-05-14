@@ -4,54 +4,13 @@ import { V4NavThinner } from "../components/V4NavThinner";
 import { Button } from "../components/ui/Button";
 import { DataTable, type DataTableColumn } from "../components/ui/DataTable";
 import { Input } from "../components/ui/Input";
+import { Switch } from "../components/ui/Switch";
 import { ThemeToggle } from "../components/ThemeToggle";
 
 const cx = (...c: (string | false | undefined)[]) => c.filter(Boolean).join(" ");
 
 const ADVANCED_MODE_CALLOUT =
   "Advanced Mode allows mapping of more details and will give more context for investigations and threat hunting.";
-
-function Switch({
-  on,
-  label,
-  onCheckedChange,
-}: {
-  on: boolean;
-  label: string;
-  onCheckedChange?: (next: boolean) => void;
-}) {
-  const switchId = useId().replace(/:/g, "");
-  const toggle = () => onCheckedChange?.(!on);
-
-  return (
-    <label
-      htmlFor={switchId}
-      className={cx("flex items-center gap-2", onCheckedChange && "cursor-pointer")}
-    >
-      <button
-        id={switchId}
-        type="button"
-        role="switch"
-        aria-checked={on}
-        aria-label={label}
-        onClick={toggle}
-        className={cx(
-          "relative h-[18px] w-9 shrink-0 rounded-full transition-colors",
-          on ? "bg-interactive-active" : "border border-border-container bg-transparent",
-          onCheckedChange ? "cursor-pointer" : "cursor-default",
-        )}
-      >
-        <span
-          className={cx(
-            "absolute top-[3px] size-3 rounded-full transition-[left]",
-            on ? "left-[21px] bg-text-on-primary" : "left-1 bg-border-container",
-          )}
-        />
-      </button>
-      <span className="text-sm font-semibold leading-[18px] text-text-tertiary">{label}</span>
-    </label>
-  );
-}
 
 type StepIndex = 1 | 2 | 3;
 
@@ -286,7 +245,7 @@ const INITIAL_ROWS: MappingRow[] = [
   { source: "user_agent", sample: "Mozilla/5.0…", mapped: false },
 ];
 
-/** Source / target columns mirror FieldMappingBar `md:grid-cols-[1fr_auto_1fr]` + `gap-x-6` (3rem gutter between 1fr tracks); actions stay 4rem. */
+/** Source / target columns mirror FieldMappingBar grid + `gap-x-6` (3rem between 1fr tracks); actions stay 4rem. */
 const MAPPING_FIELD_COLGROUP = (
   <colgroup>
     <col style={{ width: "calc((100% - 4rem - 3rem) / 2)" }} />
@@ -525,7 +484,7 @@ function FieldMappingBar({
             placeholder="Search source fields"
             className="h-7 !w-[240px] max-w-full shrink-0 py-0"
           />
-          <Switch on={false} label="Show Hidden Fields" />
+          <Switch on={false} disabled label="Show Hidden Fields" />
         </div>
         <div className="hidden md:block" aria-hidden />
         <div className="flex min-w-0 items-center justify-start">
