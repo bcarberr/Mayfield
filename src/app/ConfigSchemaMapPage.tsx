@@ -328,7 +328,7 @@ function MapSchemaOverviewCard() {
           <div
             className={cx(
               "flex h-7 min-w-0 flex-1 items-center justify-between gap-2 rounded-full px-3",
-              theme === "light" ? "bg-neutral-200" : "bg-black",
+              theme === "light" ? "bg-neutral-200" : "bg-[#000000]",
             )}
           >
             <span className="min-w-0 truncate text-[14px] font-bold leading-5 tracking-[0.4px] text-text-primary">
