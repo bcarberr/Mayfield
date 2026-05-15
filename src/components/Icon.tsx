@@ -185,12 +185,12 @@ function withDisplaySize(svg: string, size: number): string {
 
 export type IconProps = {
   name: IconName;
-  /** Display size in CSS pixels. Artwork matches the Figma 24px component slot. */
+  /** Display size in CSS pixels. Default 18×18 (Query DS icon slot). */
   size?: number;
   title?: string;
 } & Omit<HTMLAttributes<HTMLSpanElement>, "children" | "dangerouslySetInnerHTML">;
 
-export function Icon({ name, size = 24, title, className, style, ...rest }: IconProps) {
+export function Icon({ name, size = 18, title, className, style, ...rest }: IconProps) {
   const spanClass = ["inline-flex shrink-0 items-center justify-center", className].filter(Boolean).join(" ");
 
   if (isMiscTechnologyIcon(name)) {
