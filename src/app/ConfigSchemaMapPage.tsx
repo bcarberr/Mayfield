@@ -1,6 +1,7 @@
 import { useId, useMemo, useState } from "react";
 import { Checkbox, Icon } from "../design-system";
 import { V4NavThinner } from "../components/V4NavThinner";
+import { ROUTES } from "./routes";
 import { Button } from "../components/ui/Button";
 import { DataTable, type DataTableColumn } from "../components/ui/DataTable";
 import { Input } from "../components/ui/Input";
@@ -421,7 +422,7 @@ function MapSchemaOverviewCard() {
               variant="search"
               readOnly
               tabIndex={-1}
-              startAdornment={<Icon name="search" size={18} />}
+              startAdornment={<Icon name="search" />}
               placeholder="Search"
               className="h-7 w-full border-border-rule px-1.5 py-0"
             />
@@ -576,21 +577,21 @@ function MappingToolbarV2() {
               title="Network activity"
             />
             <span className="min-w-0 flex-1 truncate text-sm font-semibold text-text-primary">HTTP Activity</span>
-            <Icon name="chevron-down" size={18} className="shrink-0 text-text-secondary" />
+            <Icon name="chevron-down" className="shrink-0 text-text-secondary" />
           </button>
           <button
             type="button"
             className="shrink-0 rounded p-0.5 text-text-tertiary hover:bg-overlay-subtle hover:text-text-secondary"
             aria-label="About event class"
           >
-            <Icon name="feedback-info-outline" size={18} />
+            <Icon name="feedback-info-outline" />
           </button>
           <CopilotMark />
         </div>
         <div className="flex shrink-0 flex-wrap items-center gap-x-6 gap-y-2">
           <Switch checked={allowAutosave} onCheckedChange={setAllowAutosave} label="Allow Autosave" />
           <Button variant="tertiary" className="gap-1 text-sm font-semibold text-text-secondary hover:text-text-primary">
-            <Icon name="close" size={18} />
+            <Icon name="close" />
             Clear All Mappings
           </Button>
         </div>
@@ -630,7 +631,7 @@ function FieldMappingBar({
             <span className="text-text-primary">Target: </span>
             <span className="text-text-secondary">Query Data Model</span>
           </p>
-          <Icon name="feedback-info-outline" size={18} className="shrink-0 text-text-tertiary" />
+          <Icon name="feedback-info-outline" className="shrink-0 text-text-tertiary" />
         </div>
         <div className="hidden md:block" aria-hidden />
 
@@ -639,7 +640,7 @@ function FieldMappingBar({
             variant="search"
             readOnly
             tabIndex={-1}
-            startAdornment={<Icon name="search" size={18} />}
+            startAdornment={<Icon name="search" />}
             placeholder="Search source fields"
             className="h-7 !w-[240px] max-w-full shrink-0 py-0"
           />
@@ -719,7 +720,7 @@ export function ConfigSchemaMapPage() {
         cell: () => (
           <div className="flex w-full justify-end">
             <Button variant="ghost" className="text-text-tertiary hover:text-text-primary" aria-label="Clear row">
-              <Icon name="close" size={18} />
+              <Icon name="close" />
             </Button>
           </div>
         ),
@@ -730,22 +731,25 @@ export function ConfigSchemaMapPage() {
 
   return (
     <div className="flex h-full min-h-0 bg-surface-page text-text-primary">
-      <V4NavThinner variant="federated-search" />
-      <div className="flex min-h-0 min-w-0 flex-1 flex-col bg-surface-modal px-4">
+      <V4NavThinner
+        variant="federated-search"
+        activeSection="connectors"
+        navTargets={{
+          search: ROUTES.search,
+          connectors: ROUTES.schemaMap,
+        }}
+      />
+      <div className="flex min-h-0 min-w-0 flex-1 flex-col bg-surface-modal px-5">
         <header className="shrink-0 bg-surface-modal">
           <div className="flex flex-wrap items-start justify-between gap-4 border-b border-border-rule px-0 pt-5 pb-4">
             <div className="flex min-w-0 flex-1 flex-wrap items-center gap-3">
-              <button
-                type="button"
-                className="mt-0.5 shrink-0 text-text-secondary hover:text-text-primary"
-                aria-label="Back"
-              >
-                <Icon name="chevron-down" size={18} className="rotate-90" />
-              </button>
-              <Icon name="aws-athena" size={24} className="mt-0.5 shrink-0" title="Amazon Athena" />
-              <h1 className="text-xl font-bold leading-6 tracking-[0.6px] text-text-primary">Amazon Athena</h1>
+              <Button variant="ghost" className="shrink-0 p-1" aria-label="Back">
+                <Icon name="chevron-down" size={20} className="rotate-90 text-text-primary" />
+              </Button>
+              <Icon name="aws-athena" size={24} className="shrink-0" title="Amazon Athena" />
+              <h1 className="truncate text-page-title text-text-primary">Amazon Athena</h1>
               <Switch checked={connectorEnabled} onCheckedChange={setConnectorEnabled} label="Connector Enabled" />
-              <span className="shrink-0 rounded bg-badge-muted px-2 py-1.5 text-xs font-semibold leading-4 tracking-[0.4px] text-text-primary">
+              <span className="shrink-0 rounded bg-badge-muted px-2 py-1.5 text-xs font-semibold leading-4 tracking-[0.4px] text-white [html[data-theme=light]_&]:text-text-on-primary">
                 DYNAMIC SCHEMA
               </span>
             </div>
