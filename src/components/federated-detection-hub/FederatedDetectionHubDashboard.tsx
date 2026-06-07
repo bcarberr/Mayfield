@@ -154,7 +154,7 @@ function HubCard({
         className,
       )}
     >
-      <header className="flex shrink-0 items-center gap-3 bg-datavis-card-bg px-4 pb-3 pt-4 sm:px-6 sm:pt-7">
+      <header className="flex shrink-0 items-center gap-3 bg-datavis-card-bg px-4 py-3 sm:px-6">
         <h2 className="shrink-0 text-base-semibold text-text-primary">{title}</h2>
         {titleTrailing ? (
           <div className="min-w-0 flex-1 text-right">{titleTrailing}</div>
@@ -166,14 +166,14 @@ function HubCard({
         </Button>
       </header>
       <div className="mx-4 h-px shrink-0 bg-datavis-gridlines sm:mx-6" aria-hidden />
-      <div className="min-h-0 flex-1 bg-datavis-card-bg p-4 sm:p-6 sm:pt-4">{children}</div>
+      <div className="flex min-h-0 flex-1 flex-col bg-datavis-card-bg p-4 sm:p-6 sm:pt-4">{children}</div>
     </section>
   );
 }
 
 function HubTabs({ active, onChange }: { active: HubTab; onChange: (tab: HubTab) => void }) {
   return (
-    <nav className="flex shrink-0 gap-6 border-b border-border-rule px-5" aria-label="Detection hub sections">
+    <nav className="flex shrink-0 gap-6 border-b border-border-rule px-6" aria-label="Detection hub sections">
       {HUB_TABS.map((tab) => {
         const isActive = tab === active;
         return (
@@ -201,23 +201,27 @@ function HubTabs({ active, onChange }: { active: HubTab; onChange: (tab: HubTab)
 function SystemHealthCard() {
   return (
     <HubCard
+      className="h-full"
       title="System Health"
       titleTrailing={<span className="text-sm font-semibold text-text-tertiary">Last evaluated: 18h ago</span>}
     >
-      <div className="flex flex-col gap-4">
-        <div className="flex items-center gap-3">
-          <Icon name="action-check" size={24} className="shrink-0 text-text-primary" aria-hidden />
-          <span className="text-2xl font-bold tracking-wide text-text-primary">System Healthy</span>
-        </div>
-        <ul className="space-y-3">
+      <div className="grid grid-cols-[27px_minmax(0,1fr)] gap-x-3 gap-y-4">
+        <Icon
+          name="action-check"
+          size={20}
+          className="inline-flex h-5 w-[27px] shrink-0 self-center text-text-primary [&>svg]:!h-5 [&>svg]:!w-[27px]"
+          aria-hidden
+        />
+        <span className="text-2xl font-bold tracking-wide text-text-primary">System Healthy</span>
+        <ul className="col-start-2 space-y-3">
           <li className="flex items-baseline gap-3">
             <span className="w-16 shrink-0 text-2xl font-bold tabular-nums text-text-primary">65/79</span>
             <span className="text-sm font-semibold text-text-primary">Detections running normally</span>
           </li>
           <li className="flex items-baseline gap-3">
             <span className="flex w-16 shrink-0 items-center gap-1">
-              <Icon name="warning" size={18} className="text-feedback-negative" aria-hidden />
               <span className="text-2xl font-bold tabular-nums text-text-primary">9</span>
+              <Icon name="warning" size={18} className="text-feedback-negative" aria-hidden />
             </span>
             <span className="text-sm font-semibold text-text-primary">Detections need attention</span>
           </li>
@@ -226,8 +230,8 @@ function SystemHealthCard() {
             <span className="text-sm font-semibold text-text-primary">Detections are inactive</span>
           </li>
         </ul>
-        <div className="flex justify-end pt-1">
-          <Button type="button" variant="secondary" className="h-6 px-3 py-0 text-sm">
+        <div className="col-start-2 flex justify-end pt-1">
+          <Button type="button" variant="secondary" size="small">
             View detections need attentions
           </Button>
         </div>
@@ -236,23 +240,35 @@ function SystemHealthCard() {
   );
 }
 
-/** Figma `7671:8959` — Top Findings donut + legend. */
+/** Figma `7671:8959` / donut `7671:9014` — 188px ring, 137px hole. */
+const TOP_FINDINGS_DONUT_OUTER_PX = 188;
+const TOP_FINDINGS_DONUT_INNER_PX = 137;
+const TOP_FINDINGS_DONUT_INSET_PX = (TOP_FINDINGS_DONUT_OUTER_PX - TOP_FINDINGS_DONUT_INNER_PX) / 2;
+
 function TopFindingsCard() {
   const segments = [
-    { label: "Suspicious PowerShell Execution", color: "var(--color-datavis-data-rouge-40)" },
-    { label: "Privilege Escalation Attempts", color: "var(--color-feedback-info)" },
-    { label: "Credential Dumping Activity", color: "var(--color-datavis-data-pop-teal-20)" },
+    { label: "Suspicious PowerShell Execution", color: "#b4549a" },
+    { label: "Privilege Escalation Attempts", color: "#817cf6" },
+    { label: "Credential Dumping Activity", color: "#5fd3f8" },
   ] as const;
 
-  const gradient = "conic-gradient(var(--color-datavis-data-rouge-40) 0% 38%, var(--color-feedback-info) 38% 70%, var(--color-datavis-data-pop-teal-20) 70% 100%)";
+  const gradient = "conic-gradient(#b4549a 0% 38%, #817cf6 38% 70%, #5fd3f8 70% 100%)";
 
   return (
-    <HubCard title="Top Findings Detection">
-      <div className="flex flex-col items-center gap-6 sm:flex-row sm:items-start">
-        <div className="relative size-[7.5rem] shrink-0 rounded-full" style={{ background: gradient }} aria-hidden>
-          <div className="absolute inset-3 flex flex-col items-center justify-center rounded-full bg-datavis-card-bg text-center">
-            <span className="text-lg font-bold tabular-nums text-text-primary">1389</span>
-            <span className="text-base-small text-text-tertiary">Findings</span>
+    <HubCard className="h-full" title="Top Findings Detection">
+      <div className="flex flex-1 flex-col items-center gap-6 sm:flex-row sm:items-start">
+        <div
+          className="relative shrink-0 rounded-full"
+          style={{ width: TOP_FINDINGS_DONUT_OUTER_PX, height: TOP_FINDINGS_DONUT_OUTER_PX, background: gradient }}
+          aria-hidden
+        >
+          <div
+            className="absolute flex flex-col items-center justify-center rounded-full bg-datavis-card-bg text-center text-text-primary"
+            style={{ inset: TOP_FINDINGS_DONUT_INSET_PX }}
+          >
+            {/* Figma `7671:9022` — markdown-h1: Lato 24 / 32, tracking 0.7px, regular. */}
+            <span className="text-2xl font-normal leading-8 tracking-[0.7px] tabular-nums">1389</span>
+            <span className="text-2xl font-normal leading-8 tracking-[0.7px]">Findings</span>
           </div>
         </div>
         <ul className="min-w-0 flex-1 space-y-3">
@@ -286,11 +302,17 @@ function SeverityBreakdownCard() {
   const max = Math.max(...rows.map((r) => r.value));
 
   return (
-    <HubCard title="Severity Breakdown (Overall 1389 Findings)">
-      <div className="flex flex-col gap-4">
+    <HubCard className="h-full" title="Severity Breakdown (Overall 1389 Findings)">
+      <div
+        className="flex flex-1 flex-col justify-between"
+        style={{ minHeight: TOP_FINDINGS_DONUT_OUTER_PX - 24 }}
+      >
         {rows.map((row) => (
-          <div key={row.label} className="grid grid-cols-[4.5rem_1fr_2rem] items-center gap-3">
-            <span className="text-sm font-semibold text-text-primary">{row.label}</span>
+          <div key={row.label} className="flex min-h-[34px] flex-col justify-end gap-1.5">
+            <div className="flex items-baseline justify-between gap-3">
+              <span className="text-sm font-semibold text-text-primary">{row.label}</span>
+              <span className="shrink-0 text-sm font-bold tabular-nums text-text-primary">{row.value}</span>
+            </div>
             <div className="relative h-3 rounded-sm bg-datavis-gridlines">
               <div
                 className="absolute inset-y-0 left-0 rounded-sm"
@@ -300,7 +322,6 @@ function SeverityBreakdownCard() {
                 }}
               />
             </div>
-            <span className="text-right text-sm font-bold tabular-nums text-text-primary">{row.value}</span>
           </div>
         ))}
       </div>
@@ -475,7 +496,7 @@ function ManageDetectionsContent() {
 
   return (
     <>
-      <div className="grid shrink-0 grid-cols-1 gap-4 xl:grid-cols-3">
+      <div className="grid shrink-0 grid-cols-1 items-stretch gap-4 xl:grid-cols-3">
         <SystemHealthCard />
         <TopFindingsCard />
         <SeverityBreakdownCard />
@@ -489,10 +510,10 @@ export function FederatedDetectionHubDashboard() {
   const [activeTab, setActiveTab] = useState<HubTab>("Manage Detections");
 
   return (
-    <div className="flex min-h-0 flex-1 flex-col overflow-hidden">
+    <div className="flex min-h-0 flex-1 flex-col overflow-hidden pt-6">
       <HubTabs active={activeTab} onChange={setActiveTab} />
 
-      <div className="flex min-h-0 flex-1 flex-col gap-4 overflow-y-auto p-4 sm:p-5">
+      <div className="flex min-h-0 flex-1 flex-col gap-4 overflow-y-auto px-6 py-4 sm:py-5">
         {activeTab === "Manage Detections" ? (
           <ManageDetectionsContent />
         ) : (
