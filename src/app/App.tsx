@@ -7,6 +7,14 @@ const SearchLandingPage = lazy(() => import("./SearchLandingPage").then((m) => (
 const SummaryInsightsPage = lazy(() =>
   import("./SummaryInsightsPage").then((m) => ({ default: m.SummaryInsightsPage })),
 );
+const DataPipelinesPage = lazy(() =>
+  import("./DataPipelinesPage").then((m) => ({ default: m.DataPipelinesPage })),
+);
+const FederatedDetectionHubPage = lazy(() =>
+  import("./FederatedDetectionHubPage").then((m) => ({ default: m.FederatedDetectionHubPage })),
+);
+const AiAgentsPage = lazy(() => import("./AiAgentsPage").then((m) => ({ default: m.AiAgentsPage })));
+const SettingsPage = lazy(() => import("./SettingsPage").then((m) => ({ default: m.SettingsPage })));
 const WorkspacePlaceholderPage = lazy(() =>
   import("./WorkspacePlaceholderPage").then((m) => ({ default: m.WorkspacePlaceholderPage })),
 );
@@ -28,13 +36,11 @@ export function App() {
           <Route path={ROUTES.connectors} element={<ConnectorsPage />} />
           <Route path={ROUTES.addons} element={<WorkspacePlaceholderPage activeSection="addons" title="Addons" />} />
           <Route path={ROUTES.search} element={<SearchLandingPage />} />
+          <Route path={ROUTES.federatedDetectionHub} element={<FederatedDetectionHubPage />} />
           <Route path={ROUTES.summaryInsights} element={<SummaryInsightsPage />} />
-          <Route
-            path={ROUTES.detections}
-            element={<WorkspacePlaceholderPage activeSection="detections" title="Detections" />}
-          />
-          <Route path={ROUTES.intel} element={<WorkspacePlaceholderPage activeSection="intel" title="Intel" />} />
-          <Route path={ROUTES.tools} element={<WorkspacePlaceholderPage activeSection="tools" title="Tools" />} />
+          <Route path={ROUTES.dataPipelines} element={<DataPipelinesPage />} />
+          <Route path={ROUTES.aiAgents} element={<AiAgentsPage />} />
+          <Route path={ROUTES.settings} element={<SettingsPage />} />
           <Route
             path={ROUTES.adminSettings}
             element={<WorkspacePlaceholderPage activeSection="adminSettings" title="Admin Settings" />}

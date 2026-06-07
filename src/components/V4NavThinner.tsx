@@ -1,25 +1,22 @@
 import type { ImgHTMLAttributes, ReactNode } from "react";
 import { Link } from "react-router-dom";
 
-import { Icon, type IconName } from "../design-system";
 import logomarkA from "../assets/nav-v4/logomark-a.svg?url";
 import logomarkB from "../assets/nav-v4/logomark-b.svg?url";
 import logomarkFsA from "../assets/nav-v4/logomark-fs-a.svg?url";
 import logomarkFsB from "../assets/nav-v4/logomark-fs-b.svg?url";
+import addonsSvg from "../assets/nav-v4/addons.svg?raw";
+import adminSettingsSvg from "../assets/nav-v4/admin-settings.svg?raw";
+import aiAgentsSvg from "../assets/nav-v4/ai-agents.svg?raw";
+import chatIntercomSvg from "../assets/nav-v4/chat-intercom.svg?raw";
 import connectorsFigmaSvg from "../assets/nav-v4/connectors-figma.svg?raw";
+import federatedDetectionHubSvg from "../assets/nav-v4/federated-detection-hub.svg?raw";
+import dataMobilitySvg from "../assets/nav-v4/data-mobility.svg?raw";
+import searchSvg from "../assets/nav-v4/search.svg?raw";
+import settingsSvg from "../assets/nav-v4/settings.svg?raw";
 import summaryInsightsSvg from "../assets/nav-v4/summary-insights.svg?raw";
-import vector1Svg from "../assets/nav-v4/vector-1.svg?raw";
-import vector2Svg from "../assets/nav-v4/vector-2.svg?raw";
 
 const cx = (...c: (string | false | undefined)[]) => c.filter(Boolean).join(" ");
-
-/** ~20px rail glyphs (Tailwind `size-5` = 1.25rem). */
-const NAV_ICON = "size-5";
-const RAIL_ICON_PX = 20;
-
-function NavRailIcon({ name }: { name: IconName }) {
-  return <Icon name={name} size={RAIL_ICON_PX} className="nav-rail-icon shrink-0 text-current" aria-hidden />;
-}
 
 /** Inline SVG from disk so `fill="currentColor"` picks up rail `text-*` from the parent `NavSlot`. */
 function NavSvgInline({ svg, className }: { svg: string; className?: string }) {
@@ -101,7 +98,7 @@ function NavSlot({
   }
 
   return (
-    <button type="button" title={title} aria-current={active ? "page" : undefined} className={shared}>
+    <button type="button" title={title} aria-label={title} aria-current={active ? "page" : undefined} className={shared}>
       {body}
     </button>
   );
@@ -111,10 +108,11 @@ function NavSlot({
 export type V4NavActiveSection =
   | "summary"
   | "search"
+  | "federatedDetectionHub"
   | "connectors"
-  | "detections"
-  | "intel"
-  | "tools"
+  | "dataPipelines"
+  | "aiAgents"
+  | "settings"
   | "addons"
   | "adminSettings";
 
@@ -127,6 +125,10 @@ export type V4NavThinnerProps = {
   navTargets?: Partial<Record<V4NavActiveSection, string>>;
 };
 
+/**
+ * Thin vertical nav rail — Figma `6582:59669` (`v4 Nav-thinner`).
+ * Icon assets exported from the same frame; sizes match Figma slot geometry.
+ */
 export function V4NavThinner({
   variant = "federated-search",
   activeSection,
@@ -153,40 +155,49 @@ export function V4NavThinner({
       </div>
 
       <NavSlot title="Summary & insights" active={resolvedActive === "summary"} to={navTargets?.summary}>
-        {isFederated ? (
-          <NavSvgInline svg={vector2Svg} className={NAV_ICON} />
-        ) : (
-          <NavSvgInline svg={summaryInsightsSvg} className={NAV_ICON} />
-        )}
+        <NavSvgInline svg={summaryInsightsSvg} className="size-10" />
       </NavSlot>
 
       <NavSlot title="Search" active={resolvedActive === "search"} to={navTargets?.search}>
-        <NavSvgInline svg={vector1Svg} className={NAV_ICON} />
+        <NavSvgInline svg={searchSvg} className="size-10" />
+      </NavSlot>
+
+      <NavSlot
+        title="Federated Detection Hub"
+        active={resolvedActive === "federatedDetectionHub"}
+        to={navTargets?.federatedDetectionHub}
+      >
+        <NavSvgInline svg={federatedDetectionHubSvg} className="h-[27px] w-7" />
       </NavSlot>
 
       <NavSlot title="Connectors" active={resolvedActive === "connectors"} to={navTargets?.connectors}>
-        <NavSvgInline svg={connectorsFigmaSvg} className={NAV_ICON} />
+        <NavSvgInline svg={connectorsFigmaSvg} className="size-6" />
       </NavSlot>
 
-      <NavSlot title="Detections" active={resolvedActive === "detections"} to={navTargets?.detections}>
-        <NavRailIcon name="nav-detections" />
+      <NavSlot title="Data Pipeline" active={resolvedActive === "dataPipelines"} to={navTargets?.dataPipelines}>
+        <NavSvgInline svg={dataMobilitySvg} className="h-4 w-6" />
       </NavSlot>
 
-      <NavSlot title="Intel" active={resolvedActive === "intel"} to={navTargets?.intel}>
-        <NavRailIcon name="nav-investigations-outline" />
+      <NavSlot title="AI Agents" active={resolvedActive === "aiAgents"} to={navTargets?.aiAgents}>
+        <NavSvgInline svg={aiAgentsSvg} className="h-6 w-[18px]" />
       </NavSlot>
 
-      <NavSlot title="Tools" active={resolvedActive === "tools"} to={navTargets?.tools}>
-        <NavRailIcon name="nav-tools" />
+      <NavSlot title="Addons" active={resolvedActive === "addons"} to={navTargets?.addons}>
+        <NavSvgInline svg={addonsSvg} className="h-[23px] w-[25px]" />
+      </NavSlot>
+
+      <NavSlot title="Admin Settings" active={resolvedActive === "adminSettings"} to={navTargets?.adminSettings}>
+        <NavSvgInline svg={adminSettingsSvg} className="size-[25px]" />
+      </NavSlot>
+
+      <NavSlot title="Settings" active={resolvedActive === "settings"} to={navTargets?.settings}>
+        <NavSvgInline svg={settingsSvg} className="size-6" />
       </NavSlot>
 
       <div className="min-h-0 flex-1" aria-hidden />
 
-      <NavSlot title="Addons" active={resolvedActive === "addons"} to={navTargets?.addons}>
-        <NavRailIcon name="nav-integrations" />
-      </NavSlot>
-      <NavSlot title="Admin Settings" active={resolvedActive === "adminSettings"} to={navTargets?.adminSettings}>
-        <NavRailIcon name="nav-tenant-settings" />
+      <NavSlot title="Chat">
+        <NavSvgInline svg={chatIntercomSvg} className="size-[18px]" />
       </NavSlot>
     </aside>
   );

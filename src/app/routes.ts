@@ -2,10 +2,11 @@
 export const ROUTES = {
   connectors: "/connectors",
   search: "/search",
+  federatedDetectionHub: "/federated-detection-hub",
   summaryInsights: "/summary-insights",
-  detections: "/detections",
-  intel: "/intel",
-  tools: "/tools",
+  dataPipelines: "/data-pipelines",
+  aiAgents: "/ai-agents",
+  settings: "/settings",
   addons: "/addons",
   adminSettings: "/admin-settings",
 } as const;
