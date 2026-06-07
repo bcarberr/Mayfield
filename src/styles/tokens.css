@@ -38,6 +38,7 @@
   --dark-interactive-primary-pressed: #89ecfd;
   --dark-interactive-secondary-hover: #0d404b;
   --dark-interactive-secondary-pressed: #2a6b79;
+  --dark-interactive-selected: #14333d;
   --dark-interactive-destructive: #ff604a;
   --dark-interactive-destructive-hover: #ff847b;
   --dark-interactive-destructive-pressed: #ff9995;
@@ -144,6 +145,7 @@
   --color-button-disabled-label: #737373;
 
   --color-interactive-active: var(--dark-interactive-active);
+  --color-interactive-selected: var(--dark-interactive-selected);
   --color-interactive-secondary-hover: var(--dark-interactive-secondary-hover);
   --color-interactive-secondary-pressed: var(--dark-interactive-secondary-pressed);
   --color-primary-pressed: var(--dark-interactive-primary-pressed);
@@ -196,6 +198,7 @@
   --color-button-disabled-label: #c9c9c9;
 
   --color-interactive-active: var(--light-interactive-active);
+  --color-interactive-selected: var(--light-interactive-selected);
   --color-interactive-secondary-hover: var(--light-interactive-secondary-hover);
   --color-interactive-secondary-pressed: var(--light-interactive-secondary-pressed);
   --color-primary-pressed: var(--light-interactive-primary-pressed);

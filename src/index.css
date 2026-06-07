@@ -50,6 +50,14 @@
   animation: overlay-scrim-in 200ms ease-out both;
 }
 
+/** Figma `02 dp` elevation — Datavis widget cards (`7671:8911`). */
+@utility shadow-datavis-card {
+  box-shadow:
+    0 1px 5px 0 #00000033,
+    0 3px 1px 0 #0000001f,
+    0 2px 2px 0 #00000024;
+}
+
 @theme {
   --color-surface-page: #121212;
   --color-surface-modal: #2e2e2e;
@@ -63,6 +71,7 @@
   --color-text-disabled: #737373;
   --color-text-on-primary: #121212;
   --color-interactive-active: #1ec1dd;
+  --color-interactive-selected: #14333d;
   --color-interactive-secondary-hover: #0d404b;
   --color-interactive-secondary-pressed: #2a6b79;
   --color-nav-bg: #00263a;

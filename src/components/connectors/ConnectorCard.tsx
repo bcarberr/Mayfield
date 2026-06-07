@@ -70,7 +70,7 @@ export function ConnectorCard({ connector, onEnabledChange, onConfigure }: Conne
   return (
     <article
       className={cx(
-        "relative flex min-h-[104px] min-w-0 gap-3 rounded-[4px] border border-border-container bg-surface-container p-4",
+        "relative flex min-h-[104px] min-w-0 gap-3 rounded-[4px] border border-border-container bg-surface-container p-4 shadow-datavis-card",
         !connector.enabled && "opacity-70",
       )}
     >
