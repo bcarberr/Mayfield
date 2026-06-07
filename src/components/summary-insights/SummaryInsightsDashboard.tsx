@@ -2,8 +2,11 @@ import { useEffect, useMemo, useRef, useState, type CSSProperties, type ReactNod
 import { createPortal } from "react-dom";
 import { useNavigate } from "react-router-dom";
 import { Icon } from "../../design-system";
+import { FilterColumnPanel, type FilterColumnPanelTool } from "../ui/FilterColumnPanel";
 import { Button } from "../ui/Button";
+import { ColumnHeaderMenu } from "../ui/ColumnHeaderMenu";
 import { Input } from "../ui/Input";
+import { useResizableColumns } from "../ui/useResizableColumns";
 import { Checkbox } from "../uiCheckbox";
 import { ROUTES } from "../../app/routes";
 import { FederatedAnalyticsBreadcrumb } from "./FederatedAnalyticsBreadcrumb";
@@ -207,22 +210,6 @@ const SEVERITY_ICON: Record<
   Informational: "severity-info",
 };
 
-function ColumnHeaderMenu({ label, menuLabel }: { label: string; menuLabel: string }) {
-  return (
-    <div className="flex w-full min-w-0 translate-y-px items-center justify-between gap-1">
-      <span className="truncate">{label}</span>
-      <Button
-        type="button"
-        variant="ghost"
-        className="size-7 shrink-0 p-0 text-text-tertiary hover:text-text-primary [&_svg]:!size-4"
-        aria-label={menuLabel}
-      >
-        <Icon name="extra-menu" size={16} />
-      </Button>
-    </div>
-  );
-}
-
 function connectorSwatch(connector: string) {
   if (connector.startsWith("BCs")) return "bg-feedback-info";
   if (connector.includes("Athena")) return "bg-interactive-active";
@@ -315,7 +302,7 @@ function RowActionsMenu({ rowId }: { rowId: string }) {
   }, [open, rowId]);
 
   return (
-    <div className="relative flex justify-center">
+    <div className="relative flex justify-start">
       <Button
         ref={buttonRef}
         type="button"
@@ -358,22 +345,20 @@ function RowActionsMenu({ rowId }: { rowId: string }) {
 
 function FindingEventsTable({ rows }: { rows: FindingRow[] }) {
   const [selected, setSelected] = useState<Set<string>>(() => new Set());
-  const [colWidths, setColWidths] = useState<number[]>(() => [...FINDING_EVENTS_COL_DEFAULTS]);
-  const [hasManualWidths, setHasManualWidths] = useState(false);
-  const [containerWidth, setContainerWidth] = useState(0);
-  const [isResizing, setIsResizing] = useState(false);
-  const containerRef = useRef<HTMLDivElement>(null);
-  const dragRef = useRef<{ columnIndex: number; startX: number; startWidths: number[] } | null>(null);
-
-  useEffect(() => {
-    const el = containerRef.current;
-    if (!el) return;
-    const update = () => setContainerWidth(el.clientWidth);
-    update();
-    const ro = new ResizeObserver(update);
-    ro.observe(el);
-    return () => ro.disconnect();
-  }, []);
+  const {
+    containerRef,
+    colStyle,
+    baseTotal,
+    tableFillsContainer,
+    isResizing,
+    resizeHandle,
+    displayWidths,
+    minTableWidth,
+  } = useResizableColumns({
+    selectColWidth: FINDING_EVENTS_SELECT_COL_WIDTH,
+    colDefaults: FINDING_EVENTS_COL_DEFAULTS,
+    colMins: FINDING_EVENTS_COL_MINS,
+  });
 
   const allIds = useMemo(() => rows.map((r) => r.id), [rows]);
   const total = allIds.length;
@@ -394,120 +379,13 @@ function FindingEventsTable({ rows }: { rows: FindingRow[] }) {
     });
   };
 
-  const baseTotal = useMemo(
-    () => FINDING_EVENTS_SELECT_COL_WIDTH + colWidths.slice(1).reduce((a, b) => a + b, 0),
-    [colWidths],
-  );
-
-  const displayWidths = useMemo(() => {
-    const resizableWidths = colWidths.slice(1);
-    const resizableBaseTotal = resizableWidths.reduce((a, b) => a + b, 0);
-
-    if (hasManualWidths || containerWidth <= 0 || containerWidth <= baseTotal) {
-      return [FINDING_EVENTS_SELECT_COL_WIDTH, ...resizableWidths];
-    }
-
-    const scale = (containerWidth - FINDING_EVENTS_SELECT_COL_WIDTH) / resizableBaseTotal;
-    return [FINDING_EVENTS_SELECT_COL_WIDTH, ...resizableWidths.map((w) => w * scale)];
-  }, [colWidths, containerWidth, baseTotal, hasManualWidths]);
-
-  const tableFillsContainer = !hasManualWidths && containerWidth > 0 && containerWidth >= baseTotal;
-
-  const colStyle = (i: number): CSSProperties => ({
-    width: displayWidths[i],
-    minWidth: displayWidths[i],
-    ...(i === 0 ? { maxWidth: FINDING_EVENTS_SELECT_COL_WIDTH } : {}),
-  });
-
-  const onResizePointerDown = (columnIndex: number) => (e: React.PointerEvent<HTMLButtonElement>) => {
-    e.preventDefault();
-    e.stopPropagation();
-
-    let startWidths = displayWidths;
-    if (!hasManualWidths) {
-      const materialized = [FINDING_EVENTS_SELECT_COL_WIDTH, ...displayWidths.slice(1)];
-      setColWidths(materialized);
-      setHasManualWidths(true);
-      startWidths = materialized;
-    }
-
-    dragRef.current = { columnIndex, startX: e.clientX, startWidths: [...startWidths] };
-    setIsResizing(true);
-    e.currentTarget.setPointerCapture(e.pointerId);
-  };
-
-  const onResizePointerMove = (e: React.PointerEvent<HTMLButtonElement>) => {
-    const d = dragRef.current;
-    if (!d) return;
-
-    const delta = e.clientX - d.startX;
-    const col = d.columnIndex;
-    const lastCol = d.startWidths.length - 1;
-
-    setColWidths((prev) => {
-      const next = [...prev];
-
-      if (col === 0) {
-        next[1] = Math.max(d.startWidths[1]! - delta, FINDING_EVENTS_COL_MINS[1]!);
-        return next;
-      }
-
-      if (col === lastCol) {
-        next[col] = Math.max(d.startWidths[col]! + delta, FINDING_EVENTS_COL_MINS[col]!);
-        return next;
-      }
-
-      const right = col + 1;
-      const minL = FINDING_EVENTS_COL_MINS[col]!;
-      const minR = FINDING_EVENTS_COL_MINS[right]!;
-      const sum = d.startWidths[col]! + d.startWidths[right]!;
-      const nextLeft = Math.min(Math.max(d.startWidths[col]! + delta, minL), sum - minR);
-      next[col] = nextLeft;
-      next[right] = sum - nextLeft;
-      return next;
-    });
-  };
-
-  const endResize = (e: React.PointerEvent<HTMLButtonElement>) => {
-    if (e.currentTarget.hasPointerCapture(e.pointerId)) {
-      e.currentTarget.releasePointerCapture(e.pointerId);
-    }
-    dragRef.current = null;
-    setIsResizing(false);
-  };
-
-  const resizeHandle = (columnIndex: number) => (
-    <button
-      type="button"
-      tabIndex={-1}
-      aria-label="Resize column"
-      className={cx(
-        "group/resize absolute -right-1.5 top-0 z-10 h-full w-3 cursor-col-resize touch-none border-0 bg-transparent p-0",
-        "hover:bg-overlay-subtle active:bg-overlay-subtle",
-      )}
-      onPointerDown={onResizePointerDown(columnIndex)}
-      onPointerMove={onResizePointerMove}
-      onPointerUp={endResize}
-      onPointerCancel={endResize}
-      onLostPointerCapture={() => {
-        dragRef.current = null;
-        setIsResizing(false);
-      }}
-    >
-      <span
-        className="pointer-events-none absolute inset-y-0 left-1/2 w-px -translate-x-1/2 bg-transparent transition-colors group-hover/resize:bg-interactive-active group-active/resize:bg-interactive-active"
-        aria-hidden
-      />
-    </button>
-  );
-
   return (
     <div ref={containerRef} className={cx("min-h-0 w-full min-w-0", isResizing && "select-none")}>
       <table
         className="table-fixed border-collapse text-left text-sm"
         style={{
           width: tableFillsContainer ? "100%" : baseTotal,
-          minWidth: Math.max(720, baseTotal),
+          minWidth: Math.max(minTableWidth, baseTotal),
         }}
       >
       <caption className="sr-only">Finding events</caption>
@@ -600,7 +478,7 @@ function FindingEventsTable({ rows }: { rows: FindingRow[] }) {
           const et = eventTypeIconMeta(row.eventType);
           return (
             <tr key={row.id} className="h-10 border-b border-datavis-gridlines hover:bg-overlay-subtle">
-              <td style={colStyle(0)} className="h-10 border-r border-datavis-gridlines px-0 py-0 align-middle">
+              <td style={colStyle(0)} className="h-10 px-0 py-0 align-middle">
                 <div className="flex items-center justify-center">
                   <Checkbox
                     checked={selected.has(row.id)}
@@ -649,7 +527,7 @@ function FindingEventsTable({ rows }: { rows: FindingRow[] }) {
                   <span className="truncate text-sm text-text-secondary">{row.connector}</span>
                 </span>
               </td>
-              <td style={colStyle(8)} className="h-10 px-0 py-0 align-middle">
+              <td style={colStyle(8)} className="h-10 px-2 py-0 align-middle">
                 <RowActionsMenu rowId={row.id} />
               </td>
             </tr>
@@ -664,6 +542,7 @@ function FindingEventsTable({ rows }: { rows: FindingRow[] }) {
 export function SummaryInsightsDashboard() {
   const navigate = useNavigate();
   const [severityFilter, setSeverityFilter] = useState<SeverityLevel | null>(null);
+  const [tableTool, setTableTool] = useState<FilterColumnPanelTool | null>(null);
   const categoryRows: BarRow[] = useMemo(
     () => [
       { label: "Vulnerabilities", value: 408 },
@@ -900,24 +779,11 @@ export function SummaryInsightsDashboard() {
         </div>
         <DatavisGridlineRule inset={false} />
         <div className="flex min-h-0 flex-1 overflow-auto bg-datavis-card-bg">
-          <div className="flex w-10 shrink-0 flex-col items-center gap-1 border-r border-datavis-gridlines py-3">
-            <Button
-              type="button"
-              variant="ghost"
-              className="size-7 shrink-0 p-0 text-text-tertiary hover:text-text-primary [&_svg]:!size-4"
-              aria-label="Filter"
-            >
-              <Icon name="action-filter-list" size={16} />
-            </Button>
-            <Button
-              type="button"
-              variant="ghost"
-              className="size-7 shrink-0 p-0 text-text-tertiary hover:text-text-primary [&_svg]:!size-4"
-              aria-label="Column layout"
-            >
-              <Icon name="action-view-module" size={16} />
-            </Button>
-          </div>
+          <FilterColumnPanel
+            active={tableTool}
+            onFilterClick={() => setTableTool(tableTool === "filter" ? null : "filter")}
+            onColumnsClick={() => setTableTool(tableTool === "columns" ? null : "columns")}
+          />
           <div className="min-h-0 min-w-0 flex-1 pb-3">
             <FindingEventsTable rows={filteredTableRows} />
           </div>

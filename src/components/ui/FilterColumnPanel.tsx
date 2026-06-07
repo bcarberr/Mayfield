@@ -17,19 +17,18 @@ export function FilterColumnPanel({
   onColumnsClick: () => void;
 }) {
   const sectionClass =
-    "group flex w-full shrink-0 items-center justify-center px-1 transition-colors hover:bg-interactive-secondary-hover";
+    "group flex w-full shrink-0 items-center justify-center bg-datavis-card-bg px-1 transition-colors hover:bg-interactive-secondary-hover";
   const iconButtonClass =
     "p-[3px] text-text-secondary transition-colors group-hover:text-text-primary focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-interactive-active";
+  const railIconClass = "shrink-0 [&>svg]:!w-3";
+  const filterIconClass = cx(railIconClass, "[&>svg]:!h-2");
+  const columnIconClass = cx(railIconClass, "[&>svg]:!h-[9px]");
+
+  const dividerClass = "h-px w-full shrink-0 bg-datavis-gridlines";
 
   return (
-    <div className="flex w-8 shrink-0 flex-col self-stretch rounded-tl-[4px] border border-border-container bg-surface-container">
-      <div
-        className={cx(
-          sectionClass,
-          "h-14",
-          active === "filter" ? "bg-interactive-selected" : "bg-surface-container",
-        )}
-      >
+    <div className="flex w-8 shrink-0 flex-col self-stretch rounded-tl-[4px] border border-border-container bg-datavis-card-bg">
+      <div className={cx(sectionClass, "h-14")}>
         <button
           type="button"
           className={iconButtonClass}
@@ -37,17 +36,11 @@ export function FilterColumnPanel({
           aria-pressed={active === "filter"}
           onClick={onFilterClick}
         >
-          <Icon name="action-filter-list" size={16} />
+          <Icon name="action-filter-list" size={12} className={filterIconClass} />
         </button>
       </div>
-      <div className="h-px w-full shrink-0 bg-datavis-gridlines" aria-hidden />
-      <div
-        className={cx(
-          sectionClass,
-          "h-14",
-          active === "columns" ? "bg-interactive-selected" : "bg-surface-container",
-        )}
-      >
+      <div className={dividerClass} aria-hidden />
+      <div className={cx(sectionClass, "h-14")}>
         <button
           type="button"
           className={iconButtonClass}
@@ -55,10 +48,11 @@ export function FilterColumnPanel({
           aria-pressed={active === "columns"}
           onClick={onColumnsClick}
         >
-          <Icon name="action-view-column" size={16} />
+          <Icon name="action-view-column" size={12} className={columnIconClass} />
         </button>
       </div>
-      <div className="min-h-0 flex-1 bg-surface-container" aria-hidden />
+      <div className={dividerClass} aria-hidden />
+      <div className="min-h-0 flex-1 bg-datavis-card-bg" aria-hidden />
     </div>
   );
 }

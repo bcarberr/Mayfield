@@ -8,13 +8,24 @@ export type SlideOverProps = {
   ariaLabel?: string;
   /** When true, covers the left nav rail with the same scrim so rail items are not interactive. */
   dimNav?: boolean;
+  /** Optional classes for the sliding panel (e.g. max width). */
+  panelClassName?: string;
 };
+
+const cx = (...c: (string | false | undefined)[]) => c.filter(Boolean).join(" ");
 
 /**
  * Full-height panel that slides in over the main content column.
  * Parent must be `position: relative` with bounded height.
  */
-export function SlideOver({ open, onClose, children, ariaLabel = "Panel", dimNav = false }: SlideOverProps) {
+export function SlideOver({
+  open,
+  onClose,
+  children,
+  ariaLabel = "Panel",
+  dimNav = false,
+  panelClassName,
+}: SlideOverProps) {
   useEffect(() => {
     if (!open) return;
     const onKey = (e: KeyboardEvent) => {
@@ -47,7 +58,10 @@ export function SlideOver({ open, onClose, children, ariaLabel = "Panel", dimNav
         role="dialog"
         aria-modal="true"
         aria-label={ariaLabel}
-        className="relative z-10 ml-auto flex h-full min-h-0 w-full animate-slide-over-in flex-col bg-surface-modal shadow-[-4px_0_24px_rgba(0,0,0,0.25)]"
+        className={cx(
+          "relative z-10 ml-auto flex h-full min-h-0 w-full animate-slide-over-in flex-col bg-surface-modal shadow-[-4px_0_24px_rgba(0,0,0,0.25)]",
+          panelClassName,
+        )}
       >
         {children}
       </div>
