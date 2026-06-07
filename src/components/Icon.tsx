@@ -48,6 +48,7 @@ import chevronDown from "../assets/icons/chevron-down.svg?raw";
 import circle from "../assets/icons/circle.svg?raw";
 import close from "../assets/icons/close.svg?raw";
 import connectors from "../assets/icons/connectors.svg?raw";
+import cyclone from "../assets/icons/cyclone.svg?raw";
 import awsAthena from "../assets/icons/aws-athena.svg?raw";
 import error from "../assets/icons/error.svg?raw";
 import errorOutline from "../assets/icons/error-outline.svg?raw";
@@ -71,6 +72,7 @@ const LEGACY_ICON_NAMES = [
   "circle",
   "close",
   "connectors",
+  "cyclone",
   "aws-athena",
   "error",
   "error-outline",
@@ -115,6 +117,7 @@ const RAW_BY_NAME: Record<LegacyIconName, string> = {
   circle,
   close,
   connectors,
+  cyclone,
   "aws-athena": awsAthena,
   error,
   "error-outline": errorOutline,
@@ -176,9 +179,8 @@ function isConnectorLargeIcon(name: IconName): name is ConnectorLargeIconName {
 
 function withDisplaySize(svg: string, size: number): string {
   return svg.replace(/<svg\b([^>]*)>/, (_match, attrs: string) => {
-    let next = attrs;
-    if (!/\bwidth=/.test(next)) next += ` width="${size}"`;
-    if (!/\bheight=/.test(next)) next += ` height="${size}"`;
+    let next = attrs.replace(/\swidth="[^"]*"/, "").replace(/\sheight="[^"]*"/, "");
+    next += ` width="${size}" height="${size}"`;
     return `<svg${next}>`;
   });
 }

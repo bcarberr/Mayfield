@@ -24,6 +24,13 @@ function applyTheme(theme: Theme) {
   document.documentElement.style.colorScheme = theme;
 }
 
+/** Apply stored / preferred theme before React mounts to avoid a blank flash. */
+export function initTheme(): Theme {
+  const theme = readInitialTheme();
+  applyTheme(theme);
+  return theme;
+}
+
 /**
  * Reads / writes the active theme. Updates `<html data-theme>`, syncs
  * `localStorage`, and listens for OS-level changes when no explicit value

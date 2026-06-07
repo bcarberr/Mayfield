@@ -1,0 +1,14 @@
+import type { V4NavActiveSection } from "../components/V4NavThinner";
+import { ROUTES } from "./routes";
+
+/** Paths for every linked item on `V4NavThinner` (federated rail). */
+export const NAV_RAIL_TARGETS: Partial<Record<V4NavActiveSection, string>> = {
+  summary: ROUTES.summaryInsights,
+  search: ROUTES.search,
+  connectors: ROUTES.connectors,
+  detections: ROUTES.detections,
+  intel: ROUTES.intel,
+  tools: ROUTES.tools,
+  addons: ROUTES.addons,
+  adminSettings: ROUTES.adminSettings,
+};

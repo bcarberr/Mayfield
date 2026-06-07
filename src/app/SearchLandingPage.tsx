@@ -5,7 +5,7 @@ import { SearchTopHeader } from "../components/SearchTopHeader";
 import { V4NavThinner } from "../components/V4NavThinner";
 import { Button } from "../components/ui/Button";
 import connectionAbstractUrl from "../assets/connection-abstract.svg";
-import { ROUTES } from "./routes";
+import { NAV_RAIL_TARGETS } from "./navRailTargets";
 
 const toolbarBtnRing = "ring-offset-surface-container";
 
@@ -75,30 +75,27 @@ export function SearchLandingPage() {
       <V4NavThinner
         variant="federated-search"
         activeSection="search"
-        navTargets={{
-          search: ROUTES.search,
-          connectors: ROUTES.schemaMap,
-        }}
+        navTargets={NAV_RAIL_TARGETS}
       />
 
       <div className="relative flex min-h-0 min-w-0 flex-1 flex-col overflow-hidden">
-        <div
-          className="pointer-events-none absolute inset-x-0 bottom-0 z-0 h-[840px] max-h-full select-none overflow-hidden [html[data-theme=light]_&]:opacity-50"
-          aria-hidden
-        >
-          <img
-            src={connectionAbstractUrl}
-            alt=""
-            className="h-full w-full object-cover object-bottom"
-            draggable={false}
-          />
-        </div>
+        <SearchTopHeader />
+        <SearchToolbarActions />
 
-        <div className="relative z-[1] flex min-h-0 flex-1 flex-col">
-          <SearchTopHeader />
-          <SearchToolbarActions />
+        <div className="relative min-h-0 flex-1 overflow-hidden">
+          <div
+            className="pointer-events-none absolute inset-0 z-0 select-none overflow-hidden [html[data-theme=light]_&]:opacity-50"
+            aria-hidden
+          >
+            <img
+              src={connectionAbstractUrl}
+              alt=""
+              className="h-full w-full object-cover object-bottom"
+              draggable={false}
+            />
+          </div>
 
-          <main className="flex min-h-0 flex-1 flex-col items-center overflow-y-auto px-6 py-12 sm:py-16 md:py-20">
+          <main className="relative z-[1] flex min-h-0 flex-1 flex-col items-center overflow-y-auto px-6 py-12 sm:py-16 md:py-20">
             <div className="flex w-full max-w-[720px] flex-col items-stretch">
               <h1 className="text-center text-3xl font-bold leading-9 tracking-[0.5px] text-text-primary sm:text-4xl sm:leading-tight">
                 Welcome Bonnie Carberry!

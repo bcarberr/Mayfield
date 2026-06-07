@@ -1,7 +1,5 @@
-import { useId, useMemo, useState } from "react";
+import { useId, useMemo, useState, type ReactNode } from "react";
 import { Checkbox, Icon } from "../design-system";
-import { V4NavThinner } from "../components/V4NavThinner";
-import { ROUTES } from "./routes";
 import { Button } from "../components/ui/Button";
 import { DataTable, type DataTableColumn } from "../components/ui/DataTable";
 import { Input } from "../components/ui/Input";
@@ -500,11 +498,11 @@ function MapSchemaOverviewCard() {
   );
 }
 
-function FloatingActions() {
+function FloatingActions({ onCancel }: { onCancel: () => void }) {
   return (
-    <div className="pointer-events-none fixed bottom-0 right-0 z-20 flex justify-end p-4">
+    <div className="pointer-events-none absolute bottom-0 right-0 z-20 flex justify-end p-4">
       <div className="pointer-events-auto flex items-center gap-2 rounded-tl-lg rounded-bl-lg bg-surface-container/80 px-3 py-2.5 shadow-lg ring-1 ring-border-container backdrop-blur-sm">
-        <Button variant="tertiary" className="text-text-secondary hover:text-text-primary">
+        <Button type="button" variant="tertiary" className="text-text-secondary hover:text-text-primary" onClick={onCancel}>
           Cancel
         </Button>
         <Button variant="tertiary" className="text-text-secondary hover:text-text-primary">
@@ -604,59 +602,71 @@ function FieldMappingBar({
   rows,
   mapVisibility,
   onMapVisibilityChange,
+  table,
 }: {
   rows: MappingRow[];
   mapVisibility: MapVisibilityMode;
   onMapVisibilityChange: (next: MapVisibilityMode) => void;
+  table: ReactNode;
 }) {
   const mapped = rows.filter(isMappedRow).length;
   return (
-    <div className="shrink-0 bg-surface-modal px-0 py-4">
-      <p className="mb-3 text-sm font-semibold text-text-secondary">
-        Mapped Fields: <span className="text-text-primary">{mapped}</span>
-      </p>
-      <div className="grid w-full min-w-0 grid-cols-1 gap-y-3 md:grid-cols-[minmax(0,1fr)_3rem_minmax(0,1fr)_4rem] md:gap-x-0">
-        <div className="flex min-w-0 flex-wrap items-baseline gap-x-[16px] md:min-w-0">
-          <p className="min-w-0 text-sm font-semibold leading-[18px]">
-            <span className="text-text-primary">Source: </span>
-            <span className="text-text-secondary">sample-securitystuff-schema-this-long</span>
-          </p>
-          <p className="shrink-0 text-xs font-semibold italic leading-[18px] tracking-wide text-text-tertiary">
-            Sample data shown*
-          </p>
-        </div>
-        <div className="hidden md:block" aria-hidden />
-        <div className="flex min-w-0 flex-wrap items-center justify-start gap-2">
-          <p className="text-sm font-semibold leading-[18px]">
-            <span className="text-text-primary">Target: </span>
-            <span className="text-text-secondary">Query Data Model</span>
-          </p>
-          <Icon name="feedback-info-outline" className="shrink-0 text-text-tertiary" />
-        </div>
-        <div className="hidden md:block" aria-hidden />
+    <div className="flex min-h-0 min-w-0 flex-1 flex-col bg-surface-modal px-0 py-4">
+      <div className="shrink-0">
+        <p className="mb-3 text-sm font-semibold text-text-secondary">
+          Mapped Fields: <span className="text-text-primary">{mapped}</span>
+        </p>
+        <div className="grid w-full min-w-0 grid-cols-1 gap-y-3 md:grid-cols-[minmax(0,1fr)_3rem_minmax(0,1fr)_4rem] md:gap-x-0">
+          <div className="flex min-w-0 flex-wrap items-baseline gap-x-[16px] md:min-w-0">
+            <p className="min-w-0 text-sm font-semibold leading-[18px]">
+              <span className="text-text-primary">Source: </span>
+              <span className="text-text-secondary">sample-securitystuff-schema-this-long</span>
+            </p>
+            <p className="shrink-0 text-xs font-semibold italic leading-[18px] tracking-wide text-text-tertiary">
+              Sample data shown*
+            </p>
+          </div>
+          <div className="hidden md:block" aria-hidden />
+          <div className="flex min-w-0 flex-wrap items-center justify-start gap-2">
+            <p className="text-sm font-semibold leading-[18px]">
+              <span className="text-text-primary">Target: </span>
+              <span className="text-text-secondary">Query Data Model</span>
+            </p>
+            <Icon name="feedback-info-outline" className="shrink-0 text-text-tertiary" />
+          </div>
+          <div className="hidden md:block" aria-hidden />
 
-        <div className="flex min-w-0 flex-wrap items-center gap-x-[16px] gap-y-2">
-          <Input
-            variant="search"
-            readOnly
-            tabIndex={-1}
-            startAdornment={<Icon name="search" />}
-            placeholder="Search source fields"
-            className="h-7 !w-[240px] max-w-full shrink-0 py-0"
-          />
-          <Switch checked={false} disabled label="Show Hidden Fields" />
+          <div className="flex min-w-0 w-full flex-col gap-2 md:min-w-0">
+            <Input
+              variant="search"
+              readOnly
+              tabIndex={-1}
+              startAdornment={<Icon name="search" />}
+              placeholder="Search source fields"
+              className="h-7 w-full min-w-0 py-0"
+            />
+            <Switch checked={false} disabled label="Show Hidden Fields" />
+          </div>
+          <div className="hidden md:block" aria-hidden />
+          <div className="flex min-w-0 items-center justify-start">
+            <MapVisibilityTrimode value={mapVisibility} onChange={onMapVisibilityChange} />
+          </div>
+          <div className="hidden md:block" aria-hidden />
         </div>
-        <div className="hidden md:block" aria-hidden />
-        <div className="flex min-w-0 items-center justify-start">
-          <MapVisibilityTrimode value={mapVisibility} onChange={onMapVisibilityChange} />
-        </div>
-        <div className="hidden md:block" aria-hidden />
       </div>
+      <div className="min-h-0 w-full min-w-0 flex-1 overflow-y-auto px-0 pb-28 pt-2">{table}</div>
     </div>
   );
 }
 
-export function ConfigSchemaMapPage() {
+export type ConnectorSetupPanelProps = {
+  onClose: () => void;
+  /** Connector being configured — from `?setup=` on the connectors route. */
+  connectorId?: string;
+};
+
+/** 3-step connector setup wizard (schema mapping). Shown in a slide-over from `ConnectorsPage`. */
+export function ConnectorSetupPanel({ onClose }: ConnectorSetupPanelProps) {
   const [rows] = useState(INITIAL_ROWS);
   const [mapVisibility, setMapVisibility] = useState<MapVisibilityMode>("all");
   const [connectorEnabled, setConnectorEnabled] = useState(true);
@@ -730,83 +740,74 @@ export function ConfigSchemaMapPage() {
   );
 
   return (
-    <div className="flex h-full min-h-0 bg-surface-page text-text-primary">
-      <V4NavThinner
-        variant="federated-search"
-        activeSection="connectors"
-        navTargets={{
-          search: ROUTES.search,
-          connectors: ROUTES.schemaMap,
-        }}
-      />
-      <div className="flex min-h-0 min-w-0 flex-1 flex-col bg-surface-modal px-5">
-        <header className="shrink-0 bg-surface-modal">
-          <div className="flex flex-wrap items-start justify-between gap-4 border-b border-border-rule px-0 pt-5 pb-4">
-            <div className="flex min-w-0 flex-1 flex-wrap items-center gap-3">
-              <Button variant="ghost" className="shrink-0 p-1" aria-label="Back">
+    <div className="relative flex h-full min-h-0 flex-col bg-surface-modal px-5 text-text-primary">
+      <header className="shrink-0 bg-surface-modal">
+        <div className="flex flex-wrap items-start justify-between gap-4 border-b border-border-rule px-0 pt-5 pb-4">
+          <div className="flex min-w-0 flex-1 flex-wrap items-center gap-3">
+            <Button variant="ghost" className="shrink-0 p-1" aria-label="Back" onClick={onClose}>
+              <Icon name="chevron-down" size={20} className="rotate-90 text-text-primary" />
+            </Button>
+            <Icon name="aws-athena" size={24} className="shrink-0" title="Amazon Athena" />
+            <h1 className="truncate text-page-title text-text-primary">Amazon Athena</h1>
+            <Switch checked={connectorEnabled} onCheckedChange={setConnectorEnabled} label="Connector Enabled" />
+            <span className="shrink-0 rounded bg-badge-muted px-2 py-1.5 text-xs font-semibold leading-4 tracking-[0.4px] text-white [html[data-theme=light]_&]:text-text-on-primary">
+              DYNAMIC SCHEMA
+            </span>
+          </div>
+          <div className="flex shrink-0 items-center gap-2">
+            <ThemeToggle />
+            <div className="flex items-center gap-1 text-base leading-6 tracking-[0.5px] text-text-primary">
+              <Button variant="ghost" className="p-1" aria-label="Previous step">
                 <Icon name="chevron-down" size={20} className="rotate-90 text-text-primary" />
               </Button>
-              <Icon name="aws-athena" size={24} className="shrink-0" title="Amazon Athena" />
-              <h1 className="truncate text-page-title text-text-primary">Amazon Athena</h1>
-              <Switch checked={connectorEnabled} onCheckedChange={setConnectorEnabled} label="Connector Enabled" />
-              <span className="shrink-0 rounded bg-badge-muted px-2 py-1.5 text-xs font-semibold leading-4 tracking-[0.4px] text-white [html[data-theme=light]_&]:text-text-on-primary">
-                DYNAMIC SCHEMA
-              </span>
-            </div>
-            <div className="flex shrink-0 items-center gap-2">
-              <ThemeToggle />
-              <div className="flex items-center gap-1 text-base leading-6 tracking-[0.5px] text-text-primary">
-                <Button variant="ghost" className="p-1" aria-label="Previous step">
-                  <Icon name="chevron-down" size={20} className="rotate-90 text-text-primary" />
-                </Button>
-                <span className="min-w-[96px] text-center text-base font-normal leading-6">Step 3 of 3</span>
-                <Button variant="ghost" className="p-1" aria-label="Next step">
-                  <Icon name="chevron-down" size={20} className="-rotate-90 text-text-primary" />
-                </Button>
-              </div>
-              <Button variant="ghost" className="rounded-2xl p-1" aria-label="Close" title="Close">
-                <Icon name="close" size={24} />
+              <span className="min-w-[96px] text-center text-base font-normal leading-6">Step 3 of 3</span>
+              <Button variant="ghost" className="p-1" aria-label="Next step">
+                <Icon name="chevron-down" size={20} className="-rotate-90 text-text-primary" />
               </Button>
             </div>
+            <Button variant="ghost" className="rounded-2xl p-1" aria-label="Close" title="Close" onClick={onClose}>
+              <Icon name="close" size={24} />
+            </Button>
           </div>
+        </div>
 
-          <div className="flex flex-wrap items-end justify-between gap-6 border-b border-border-rule px-0 py-4">
-            <ProgressStepper currentStep={3} />
-            <ConnectionTitleLink />
-          </div>
+        <div className="flex flex-wrap items-end justify-between gap-6 border-b border-border-rule px-0 py-4">
+          <ProgressStepper currentStep={3} />
+          <ConnectionTitleLink />
+        </div>
 
-          <p className="py-3 text-base-semibold italic text-text-tertiary">
-            {ADVANCED_MODE_CALLOUT}
-          </p>
-        </header>
+        <p className="py-3 text-base-semibold italic text-text-tertiary">{ADVANCED_MODE_CALLOUT}</p>
+      </header>
 
-        <div className="flex min-h-0 flex-1 flex-col bg-surface-modal md:flex-row md:items-stretch">
+      <div className="flex min-h-0 flex-1 flex-col bg-surface-modal md:flex-row md:items-stretch">
           <div className="flex min-h-0 min-w-0 flex-1 flex-col overflow-hidden">
             <div className="shrink-0 border-b border-border-rule px-0 py-4">
               <MappingToolbarV2 />
             </div>
-            <FieldMappingBar rows={rows} mapVisibility={mapVisibility} onMapVisibilityChange={setMapVisibility} />
-
-            <div className="min-h-0 w-full min-w-0 flex-1 overflow-y-auto px-0 pb-28 pt-2">
-              <DataTable<MappingRow>
-                caption="Map source fields from the security schema to the query data model."
-                colgroup={MAPPING_FIELD_COLGROUP}
-                hideHeader
-                className="w-full min-w-0"
-                rowKey={(r) => r.source}
-                rows={visibleRows}
-                columns={columns}
-              />
-            </div>
+            <FieldMappingBar
+              rows={rows}
+              mapVisibility={mapVisibility}
+              onMapVisibilityChange={setMapVisibility}
+              table={
+                <DataTable<MappingRow>
+                  caption="Map source fields from the security schema to the query data model."
+                  colgroup={MAPPING_FIELD_COLGROUP}
+                  hideHeader
+                  className="w-full min-w-0"
+                  rowKey={(r) => r.source}
+                  rows={visibleRows}
+                  columns={columns}
+                />
+              }
+            />
           </div>
 
           <div className="flex min-h-0 w-full flex-1 flex-col border-t border-border-rule py-4 md:w-[300px] md:flex-none md:border-t-0 md:py-4 md:pl-4">
             <MapSchemaOverviewCard />
           </div>
         </div>
-      </div>
 
-      <FloatingActions />
+      <FloatingActions onCancel={onClose} />
     </div>
   );
 }

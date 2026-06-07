@@ -55,6 +55,8 @@ export const darkPalette = {
     titlesValues: "#f5f5f5",
     axis: "#9e9e9e",
     dataPeanutOrange: "#f0a060",
+    dataSmaltGreen20: "#b1edd4",
+    dataSmaltGreen40: "#6dc6a1",
   },
 } as const;
 
@@ -111,6 +113,8 @@ export const lightPalette = {
     titlesValues: "#212121",
     axis: "#737373",
     dataPeanutOrange: "#b85c2e",
+    dataSmaltGreen20: "#7ec4a3",
+    dataSmaltGreen40: "#469a72",
   },
 } as const;
 

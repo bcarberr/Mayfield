@@ -24,6 +24,32 @@
   letter-spacing: 0.6px;
 }
 
+@keyframes slide-over-in {
+  from {
+    transform: translateX(100%);
+  }
+  to {
+    transform: translateX(0);
+  }
+}
+
+@keyframes overlay-scrim-in {
+  from {
+    opacity: 0;
+  }
+  to {
+    opacity: 1;
+  }
+}
+
+@utility animate-slide-over-in {
+  animation: slide-over-in 280ms cubic-bezier(0.32, 0.72, 0, 1) both;
+}
+
+@utility animate-overlay-scrim-in {
+  animation: overlay-scrim-in 200ms ease-out both;
+}
+
 @theme {
   --color-surface-page: #121212;
   --color-surface-modal: #2e2e2e;
@@ -40,12 +66,20 @@
   --color-interactive-secondary-pressed: #2a6b79;
   --color-nav-bg: #00263a;
   --color-nav-highlight: #03667e;
+  --color-nav-icon: #e0e0e0;
+  --color-nav-icon-hover: #f5f5f5;
+  --color-nav-icon-active: #1ec1dd;
+  --color-nav-overlay-subtle: rgba(255, 255, 255, 0.06);
   --color-badge-muted: #464474;
   --color-accent-enum: #b4b0ff;
   --color-accent-required: #ff9393;
   --color-beta: #ff8200;
   --color-beta-text: #010101;
   --color-datavis-data-peanut-orange: #f0a060;
+  --color-datavis-data-smalt-green-20: #b1edd4;
+  --color-datavis-data-smalt-green-40: #6dc6a1;
+  --color-datavis-card-bg: #1e1e1e;
+  --color-datavis-gridlines: #424242;
   /* hover overlay applied on top of any surface — kept low-alpha */
   --color-overlay-subtle: rgba(255, 255, 255, 0.05);
   --color-overlay-scrim: rgba(0, 0, 0, 0.6);
@@ -55,6 +89,7 @@ html,
 body,
 #root {
   height: 100%;
+  min-height: 100vh;
 }
 
 body {

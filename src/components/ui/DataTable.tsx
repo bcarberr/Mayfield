@@ -31,7 +31,7 @@ export function DataTable<Row>({
   colgroup,
 }: DataTableProps<Row>) {
   return (
-    <div className={`min-w-0 overflow-x-auto ${className}`.trim()}>
+    <div className={`min-w-0 w-full overflow-x-auto ${className}`.trim()}>
       <table className="w-full min-w-0 table-fixed border-collapse text-left text-sm">
         {colgroup}
         {caption ? <caption className="sr-only">{caption}</caption> : null}

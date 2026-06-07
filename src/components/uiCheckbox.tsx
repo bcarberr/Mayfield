@@ -36,6 +36,8 @@ export type CheckboxProps = {
   onCheckedChange?: (checked: boolean) => void;
   className?: string;
   id?: string;
+  /** Passed to the checkbox control for icon-only uses (e.g. table header select-all). */
+  "aria-label"?: string;
 };
 
 /**
@@ -51,6 +53,7 @@ export function Checkbox({
   onCheckedChange,
   className,
   id: idProp,
+  "aria-label": ariaLabel,
 }: CheckboxProps) {
   const uid = useId().replace(/:/g, "");
   const boxId = idProp ?? uid;
@@ -70,6 +73,7 @@ export function Checkbox({
       type="button"
       role="checkbox"
       aria-checked={indeterminate ? "mixed" : checked}
+      aria-label={ariaLabel}
       aria-disabled={disabled || undefined}
       disabled={disabled}
       onClick={toggle}
