@@ -1,5 +1,5 @@
 import { lazy, Suspense } from "react";
-import { Navigate, Route, Routes } from "react-router-dom";
+import { Route, Routes } from "react-router-dom";
 import { ROUTES } from "./routes";
 
 const ConnectorsPage = lazy(() => import("./ConnectorsPage").then((m) => ({ default: m.ConnectorsPage })));
@@ -24,7 +24,7 @@ export function App() {
     <div className="h-full min-h-screen min-h-0">
       <Suspense fallback={<RouteFallback />}>
         <Routes>
-          <Route path="/" element={<Navigate to={ROUTES.connectors} replace />} />
+          <Route path="/" element={<SummaryInsightsPage />} />
           <Route path={ROUTES.connectors} element={<ConnectorsPage />} />
           <Route path={ROUTES.addons} element={<WorkspacePlaceholderPage activeSection="addons" title="Addons" />} />
           <Route path={ROUTES.search} element={<SearchLandingPage />} />
