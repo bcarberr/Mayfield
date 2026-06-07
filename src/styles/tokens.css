@@ -63,6 +63,9 @@
   --dark-datavis-data-peanut-orange: #f0a060;
   --dark-datavis-data-smalt-green-20: #b1edd4;
   --dark-datavis-data-smalt-green-40: #6dc6a1;
+  --dark-datavis-data-weak-red-30: #ff9393;
+  --dark-datavis-data-rouge-40: #d675bc;
+  --dark-datavis-data-pop-teal-20: #a9e7f3;
 
   /* ===== Light palette (raw) ===== */
   --light-surface-page-bg: #fafafa;
@@ -115,6 +118,9 @@
   --light-datavis-data-peanut-orange: #b85c2e;
   --light-datavis-data-smalt-green-20: #7ec4a3;
   --light-datavis-data-smalt-green-40: #469a72;
+  --light-datavis-data-weak-red-30: #d46b6b;
+  --light-datavis-data-rouge-40: #a04692;
+  --light-datavis-data-pop-teal-20: #5eb0c2;
 
   /* ===== Semantic aliases — default (Dark) ===== */
   --color-primary: var(--dark-interactive-active);
@@ -124,6 +130,7 @@
   --color-surface-modal: var(--dark-surface-modal-bg);
   --color-surface-page: var(--dark-surface-page-bg);
   --color-surface-container: var(--dark-surface-container-bg);
+  --color-surface-table-row-header: var(--dark-surface-table-row-header);
   --color-border: var(--dark-surface-container-borders);
   --color-border-rule: var(--dark-surface-rules-lines);
   --color-border-container: var(--dark-surface-container-borders);
@@ -152,6 +159,9 @@
   --color-datavis-data-peanut-orange: var(--dark-datavis-data-peanut-orange);
   --color-datavis-data-smalt-green-20: var(--dark-datavis-data-smalt-green-20);
   --color-datavis-data-smalt-green-40: var(--dark-datavis-data-smalt-green-40);
+  --color-datavis-data-weak-red-30: var(--dark-datavis-data-weak-red-30);
+  --color-datavis-data-rouge-40: var(--dark-datavis-data-rouge-40);
+  --color-datavis-data-pop-teal-20: var(--dark-datavis-data-pop-teal-20);
   --color-datavis-card-bg: var(--dark-datavis-card-bg);
   --color-datavis-gridlines: var(--dark-datavis-gridlines);
 
@@ -173,6 +183,7 @@
   --color-surface-modal: var(--light-surface-modal-bg);
   --color-surface-page: var(--light-surface-page-bg);
   --color-surface-container: var(--light-surface-container-bg);
+  --color-surface-table-row-header: var(--light-surface-table-row-header);
   --color-border: var(--light-surface-container-borders);
   --color-border-rule: var(--light-surface-rules-lines);
   --color-border-container: var(--light-surface-container-borders);
@@ -200,6 +211,9 @@
   --color-datavis-data-peanut-orange: var(--light-datavis-data-peanut-orange);
   --color-datavis-data-smalt-green-20: var(--light-datavis-data-smalt-green-20);
   --color-datavis-data-smalt-green-40: var(--light-datavis-data-smalt-green-40);
+  --color-datavis-data-weak-red-30: var(--light-datavis-data-weak-red-30);
+  --color-datavis-data-rouge-40: var(--light-datavis-data-rouge-40);
+  --color-datavis-data-pop-teal-20: var(--light-datavis-data-pop-teal-20);
   --color-datavis-card-bg: var(--light-datavis-card-bg);
   --color-datavis-gridlines: var(--light-datavis-gridlines);
 

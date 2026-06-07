@@ -57,6 +57,9 @@ export const darkPalette = {
     dataPeanutOrange: "#f0a060",
     dataSmaltGreen20: "#b1edd4",
     dataSmaltGreen40: "#6dc6a1",
+    dataWeakRed30: "#ff9393",
+    dataRouge40: "#d675bc",
+    dataPopTeal20: "#a9e7f3",
   },
 } as const;
 
@@ -115,6 +118,9 @@ export const lightPalette = {
     dataPeanutOrange: "#b85c2e",
     dataSmaltGreen20: "#7ec4a3",
     dataSmaltGreen40: "#469a72",
+    dataWeakRed30: "#d46b6b",
+    dataRouge40: "#a04692",
+    dataPopTeal20: "#5eb0c2",
   },
 } as const;
 

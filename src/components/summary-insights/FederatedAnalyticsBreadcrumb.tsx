@@ -58,19 +58,19 @@ const EVENT_CATEGORIES: readonly MenuItem[] = [
     id: "discovery",
     label: "Discovery",
     icon: "ocsf-discovery",
-    iconClassName: "text-accent-enum",
+    iconClassName: "text-datavis-data-weak-red-30",
   },
   {
     id: "application-activity",
     label: "Application Activity",
     icon: "ocsf-application-activity",
-    iconClassName: "text-accent-enum",
+    iconClassName: "text-datavis-data-rouge-40",
   },
   {
     id: "remediation",
     label: "Remediation",
     icon: "ocsf-remediation",
-    iconClassName: "text-interactive-active",
+    iconClassName: "text-datavis-data-pop-teal-20",
   },
 ] as const;
 

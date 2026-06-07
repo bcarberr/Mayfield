@@ -209,7 +209,7 @@ const SEVERITY_ICON: Record<
 
 function ColumnHeaderMenu({ label, menuLabel }: { label: string; menuLabel: string }) {
   return (
-    <div className="flex w-full min-w-0 items-center justify-between gap-1">
+    <div className="flex w-full min-w-0 translate-y-px items-center justify-between gap-1">
       <span className="truncate">{label}</span>
       <Button
         type="button"
@@ -517,8 +517,8 @@ function FindingEventsTable({ rows }: { rows: FindingRow[] }) {
         ))}
       </colgroup>
       <thead>
-        <tr className="border-b border-datavis-gridlines bg-datavis-card-bg">
-          <th scope="col" style={colStyle(0)} className="relative border-r border-datavis-gridlines px-0 py-2.5 align-middle">
+        <tr className="h-10 border-b border-datavis-gridlines bg-surface-table-row-header">
+          <th scope="col" style={colStyle(0)} className="relative h-10 border-r border-datavis-gridlines px-0 py-0 align-middle">
             <div className="flex items-center justify-center">
               <Checkbox
                 checked={allSelected}
@@ -532,7 +532,7 @@ function FindingEventsTable({ rows }: { rows: FindingRow[] }) {
           <th
             scope="col"
             style={colStyle(1)}
-            className="relative border-r border-datavis-gridlines px-2 py-2.5 align-middle text-xs font-bold uppercase tracking-wide text-text-primary"
+            className="relative h-10 border-r border-datavis-gridlines px-2 py-0 align-middle text-xs font-bold uppercase tracking-wide text-text-primary"
           >
             <ColumnHeaderMenu label="Severity" menuLabel="Severity column options" />
             {resizeHandle(1)}
@@ -540,7 +540,7 @@ function FindingEventsTable({ rows }: { rows: FindingRow[] }) {
           <th
             scope="col"
             style={colStyle(2)}
-            className="relative border-r border-datavis-gridlines px-2 py-2.5 align-middle text-xs font-bold uppercase tracking-wide text-text-primary"
+            className="relative h-10 border-r border-datavis-gridlines px-2 py-0 align-middle text-xs font-bold uppercase tracking-wide text-text-primary"
           >
             <ColumnHeaderMenu label="Title" menuLabel="Title column options" />
             {resizeHandle(2)}
@@ -548,7 +548,7 @@ function FindingEventsTable({ rows }: { rows: FindingRow[] }) {
           <th
             scope="col"
             style={colStyle(3)}
-            className="relative border-r border-datavis-gridlines px-2 py-2.5 align-middle text-xs font-bold uppercase tracking-wide text-text-primary"
+            className="relative h-10 border-r border-datavis-gridlines px-2 py-0 align-middle text-xs font-bold uppercase tracking-wide text-text-primary"
           >
             <ColumnHeaderMenu label="Time" menuLabel="Time column options" />
             {resizeHandle(3)}
@@ -556,7 +556,7 @@ function FindingEventsTable({ rows }: { rows: FindingRow[] }) {
           <th
             scope="col"
             style={colStyle(4)}
-            className="relative border-r border-datavis-gridlines px-2 py-2.5 align-middle text-xs font-bold uppercase tracking-wide text-text-primary"
+            className="relative h-10 border-r border-datavis-gridlines px-2 py-0 align-middle text-xs font-bold uppercase tracking-wide text-text-primary"
           >
             <ColumnHeaderMenu label="Activity" menuLabel="Activity column options" />
             {resizeHandle(4)}
@@ -564,7 +564,7 @@ function FindingEventsTable({ rows }: { rows: FindingRow[] }) {
           <th
             scope="col"
             style={colStyle(5)}
-            className="relative border-r border-datavis-gridlines px-2 py-2.5 align-middle text-xs font-bold uppercase tracking-wide text-text-primary"
+            className="relative h-10 border-r border-datavis-gridlines px-2 py-0 align-middle text-xs font-bold uppercase tracking-wide text-text-primary"
           >
             <ColumnHeaderMenu label="Status" menuLabel="Status column options" />
             {resizeHandle(5)}
@@ -572,7 +572,7 @@ function FindingEventsTable({ rows }: { rows: FindingRow[] }) {
           <th
             scope="col"
             style={colStyle(6)}
-            className="relative border-r border-datavis-gridlines px-2 py-2.5 align-middle text-xs font-bold uppercase tracking-wide text-text-primary"
+            className="relative h-10 border-r border-datavis-gridlines px-2 py-0 align-middle text-xs font-bold uppercase tracking-wide text-text-primary"
           >
             <ColumnHeaderMenu label="Event type" menuLabel="Event type column options" />
             {resizeHandle(6)}
@@ -580,7 +580,7 @@ function FindingEventsTable({ rows }: { rows: FindingRow[] }) {
           <th
             scope="col"
             style={colStyle(7)}
-            className="relative border-r border-datavis-gridlines px-2 py-2.5 align-middle text-xs font-bold uppercase tracking-wide text-text-primary"
+            className="relative h-10 border-r border-datavis-gridlines px-2 py-0 align-middle text-xs font-bold uppercase tracking-wide text-text-primary"
           >
             <ColumnHeaderMenu label="Connector" menuLabel="Connector column options" />
             {resizeHandle(7)}
@@ -588,9 +588,9 @@ function FindingEventsTable({ rows }: { rows: FindingRow[] }) {
           <th
             scope="col"
             style={colStyle(8)}
-            className="relative px-2 py-2.5 align-middle text-xs font-bold uppercase tracking-wide text-text-primary"
+            className="relative h-10 px-2 py-0 align-middle text-xs font-bold uppercase tracking-wide text-text-primary"
           >
-            <span className="block truncate">Actions</span>
+            <span className="block translate-y-px truncate">Actions</span>
             {resizeHandle(8)}
           </th>
         </tr>
@@ -599,8 +599,8 @@ function FindingEventsTable({ rows }: { rows: FindingRow[] }) {
         {rows.map((row) => {
           const et = eventTypeIconMeta(row.eventType);
           return (
-            <tr key={row.id} className="border-b border-datavis-gridlines hover:bg-overlay-subtle">
-              <td style={colStyle(0)} className="border-r border-datavis-gridlines px-0 py-2.5 align-middle">
+            <tr key={row.id} className="h-10 border-b border-datavis-gridlines hover:bg-overlay-subtle">
+              <td style={colStyle(0)} className="h-10 border-r border-datavis-gridlines px-0 py-0 align-middle">
                 <div className="flex items-center justify-center">
                   <Checkbox
                     checked={selected.has(row.id)}
@@ -609,9 +609,9 @@ function FindingEventsTable({ rows }: { rows: FindingRow[] }) {
                   />
                 </div>
               </td>
-              <td style={colStyle(1)} className="px-2 py-2.5 align-middle">
+              <td style={colStyle(1)} className="h-10 px-2 py-0 align-middle">
                 <span className="inline-flex items-center gap-2">
-                  <span className="inline-flex size-3 shrink-0 items-center justify-center overflow-hidden [&_svg]:block [&_svg]:!h-3 [&_svg]:!w-3">
+                  <span className="inline-flex h-3 w-2.5 shrink-0 items-center justify-center overflow-hidden [&_svg]:block [&_svg]:!h-3 [&_svg]:!w-2.5">
                     <Icon
                       name={SEVERITY_ICON[row.severity]}
                       size={12}
@@ -622,25 +622,25 @@ function FindingEventsTable({ rows }: { rows: FindingRow[] }) {
                   <span className="text-sm text-text-secondary">{row.severity}</span>
                 </span>
               </td>
-              <td style={colStyle(2)} className="min-w-0 px-2 py-2.5 align-middle">
+              <td style={colStyle(2)} className="h-10 min-w-0 px-2 py-0 align-middle">
                 <span className="block truncate text-sm text-text-secondary">{row.title}</span>
               </td>
-              <td style={colStyle(3)} className="px-2 py-2.5 align-middle tabular-nums">
+              <td style={colStyle(3)} className="h-10 px-2 py-0 align-middle tabular-nums">
                 <span className="text-sm text-text-secondary">{row.time}</span>
               </td>
-              <td style={colStyle(4)} className="px-2 py-2.5 align-middle">
+              <td style={colStyle(4)} className="h-10 px-2 py-0 align-middle">
                 <span className="text-sm text-text-secondary">{row.activity}</span>
               </td>
-              <td style={colStyle(5)} className="px-2 py-2.5 align-middle">
+              <td style={colStyle(5)} className="h-10 px-2 py-0 align-middle">
                 <span className="text-sm text-text-secondary">{row.status}</span>
               </td>
-              <td style={colStyle(6)} className="px-2 py-2.5 align-middle">
+              <td style={colStyle(6)} className="h-10 px-2 py-0 align-middle">
                 <span className="inline-flex min-w-0 items-center gap-2">
                   <Icon name={et.name} className={cx("shrink-0", et.className)} aria-hidden />
                   <span className="truncate text-sm text-text-secondary">{row.eventType}</span>
                 </span>
               </td>
-              <td style={colStyle(7)} className="px-2 py-2.5 align-middle">
+              <td style={colStyle(7)} className="h-10 px-2 py-0 align-middle">
                 <span className="inline-flex min-w-0 items-center gap-2">
                   <span
                     className={cx("size-2.5 shrink-0 rounded-sm", connectorSwatch(row.connector))}
@@ -649,7 +649,7 @@ function FindingEventsTable({ rows }: { rows: FindingRow[] }) {
                   <span className="truncate text-sm text-text-secondary">{row.connector}</span>
                 </span>
               </td>
-              <td style={colStyle(8)} className="px-0 py-2.5 align-middle">
+              <td style={colStyle(8)} className="h-10 px-0 py-0 align-middle">
                 <RowActionsMenu rowId={row.id} />
               </td>
             </tr>
@@ -918,7 +918,7 @@ export function SummaryInsightsDashboard() {
               <Icon name="action-view-module" size={16} />
             </Button>
           </div>
-          <div className="min-h-0 min-w-0 flex-1 pb-3 pt-1">
+          <div className="min-h-0 min-w-0 flex-1 pb-3">
             <FindingEventsTable rows={filteredTableRows} />
           </div>
         </div>

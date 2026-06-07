@@ -54,6 +54,7 @@
   --color-surface-page: #121212;
   --color-surface-modal: #2e2e2e;
   --color-surface-container: #1e1e1e;
+  --color-surface-table-row-header: #292929;
   --color-border-rule: #737373;
   --color-border-container: #424242;
   --color-text-primary: #f5f5f5;
@@ -78,6 +79,9 @@
   --color-datavis-data-peanut-orange: #f0a060;
   --color-datavis-data-smalt-green-20: #b1edd4;
   --color-datavis-data-smalt-green-40: #6dc6a1;
+  --color-datavis-data-weak-red-30: #ff9393;
+  --color-datavis-data-rouge-40: #d675bc;
+  --color-datavis-data-pop-teal-20: #a9e7f3;
   --color-datavis-card-bg: #1e1e1e;
   --color-datavis-gridlines: #424242;
   /* hover overlay applied on top of any surface — kept low-alpha */
