@@ -6,13 +6,15 @@ export type SlideOverProps = {
   children: ReactNode;
   /** Accessible name when the panel has no visible title element. */
   ariaLabel?: string;
+  /** When true, covers the left nav rail with the same scrim so rail items are not interactive. */
+  dimNav?: boolean;
 };
 
 /**
- * Full-height panel that slides in over the main content column (nav rail stays visible).
+ * Full-height panel that slides in over the main content column.
  * Parent must be `position: relative` with bounded height.
  */
-export function SlideOver({ open, onClose, children, ariaLabel = "Panel" }: SlideOverProps) {
+export function SlideOver({ open, onClose, children, ariaLabel = "Panel", dimNav = false }: SlideOverProps) {
   useEffect(() => {
     if (!open) return;
     const onKey = (e: KeyboardEvent) => {
@@ -25,7 +27,16 @@ export function SlideOver({ open, onClose, children, ariaLabel = "Panel" }: Slid
   if (!open) return null;
 
   return (
-    <div className="absolute inset-0 z-40 flex min-h-0 overflow-hidden">
+    <>
+      {dimNav ? (
+        <button
+          type="button"
+          className="fixed inset-y-0 left-0 z-40 w-10 animate-overlay-scrim-in bg-overlay-scrim"
+          aria-label="Close panel"
+          onClick={onClose}
+        />
+      ) : null}
+      <div className="absolute inset-0 z-40 flex min-h-0 overflow-hidden">
       <button
         type="button"
         className="absolute inset-0 animate-overlay-scrim-in bg-overlay-scrim"
@@ -41,5 +52,6 @@ export function SlideOver({ open, onClose, children, ariaLabel = "Panel" }: Slid
         {children}
       </div>
     </div>
+    </>
   );
 }

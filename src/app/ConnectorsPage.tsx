@@ -40,7 +40,9 @@ export function ConnectorsPage() {
 
   return (
     <div className="flex h-full min-h-0 bg-surface-page text-text-primary">
-      <V4NavThinner variant="federated-search" activeSection="connectors" navTargets={NAV_RAIL_TARGETS} />
+      <div className="relative h-full shrink-0" inert={setupOpen ? true : undefined}>
+        <V4NavThinner variant="federated-search" activeSection="connectors" navTargets={NAV_RAIL_TARGETS} />
+      </div>
 
       <div className="relative flex min-h-0 min-w-0 flex-1 flex-col overflow-hidden">
         <SearchTopHeader
@@ -83,7 +85,7 @@ export function ConnectorsPage() {
         </main>
 
         {setupOpen ? (
-          <SlideOver open onClose={closeSetup} ariaLabel="Connector setup">
+          <SlideOver open dimNav onClose={closeSetup} ariaLabel="Connector setup">
             <Suspense
               fallback={
                 <div className="flex h-full items-center justify-center text-sm text-text-tertiary">
