@@ -10,6 +10,9 @@ export const ROUTES = {
   adminSettings: "/admin-settings",
 } as const;
 
+/** Default landing page — rendered at `/` and aliased at `ROUTES.summaryInsights`. */
+export const DEFAULT_ROUTE = ROUTES.summaryInsights;
+
 /** Query param that opens the connector setup slide-over on `ROUTES.connectors`. */
 export const CONNECTOR_SETUP_SEARCH_PARAM = "setup";
 
