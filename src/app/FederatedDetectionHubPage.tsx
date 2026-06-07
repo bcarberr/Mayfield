@@ -1,4 +1,4 @@
-import { useEffect } from "react";
+import { useEffect, useState } from "react";
 import { Icon } from "../design-system";
 import { FederatedDetectionHubDashboard } from "../components/federated-detection-hub/FederatedDetectionHubDashboard";
 import { SearchTopHeader } from "../components/SearchTopHeader";
@@ -11,6 +11,8 @@ import { NAV_RAIL_TARGETS } from "./navRailTargets";
  * Federated Detection Hub — Figma `7671:7964` (`02a` Manage Detections).
  */
 export function FederatedDetectionHubPage() {
+  const [searchQuery, setSearchQuery] = useState("");
+
   useEffect(() => {
     const previous = document.title;
     document.title = "Federated Detection Hub";
@@ -37,6 +39,8 @@ export function FederatedDetectionHubPage() {
                 <Input
                   variant="search"
                   placeholder="Search Detections"
+                  value={searchQuery}
+                  onChange={(event) => setSearchQuery(event.target.value)}
                   className="h-8 !bg-surface-container"
                   startAdornment={<Icon name="search" size={18} aria-hidden />}
                   aria-label="Search detections"
@@ -55,7 +59,7 @@ export function FederatedDetectionHubPage() {
           }
         />
 
-        <FederatedDetectionHubDashboard />
+        <FederatedDetectionHubDashboard searchQuery={searchQuery} onSearchQueryChange={setSearchQuery} />
       </div>
     </div>
   );

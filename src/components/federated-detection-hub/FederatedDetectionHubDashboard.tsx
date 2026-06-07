@@ -29,6 +29,28 @@ function rowMatchesSeverityFilter(rowSeverity: DetectionSeverity, filter: Breakd
   return rowSeverity === filter;
 }
 
+function detectionMatchesSearch(row: DetectionRow, query: string, enabled: boolean): boolean {
+  const q = query.trim().toLowerCase();
+  if (!q) return true;
+
+  const findings =
+    row.findings === "error" ? "error" : row.findings === "none" ? "none" : String(row.findings);
+
+  const haystack = [
+    row.name,
+    row.description,
+    row.severity,
+    row.lastRun,
+    row.recurrence,
+    findings,
+    enabled ? "enabled" : "disabled",
+  ]
+    .join(" ")
+    .toLowerCase();
+
+  return haystack.includes(q);
+}
+
 type DetectionRow = {
   id: string;
   name: string;
@@ -749,6 +771,7 @@ function DetectionsTable({
   onEnabledChange,
   detectionNameFilter,
   severityFilter,
+  searchQuery,
   onClearFilters,
 }: {
   rows: DetectionRow[];
@@ -761,6 +784,7 @@ function DetectionsTable({
   onEnabledChange: (id: string, enabled: boolean) => void;
   detectionNameFilter: string | null;
   severityFilter: BreakdownSeverity | null;
+  searchQuery: string;
   onClearFilters: () => void;
 }) {
   const {
@@ -782,7 +806,8 @@ function DetectionsTable({
   const thClass =
     "relative h-10 border-r border-datavis-gridlines px-2 py-0 align-middle text-xs font-bold uppercase tracking-wide text-text-primary";
   const tdClass = "h-10 px-2 py-0 align-middle text-sm text-text-secondary";
-  const hasActiveFilters = detectionNameFilter != null || severityFilter != null;
+  const hasActiveFilters =
+    detectionNameFilter != null || severityFilter != null || searchQuery.trim().length > 0;
 
   return (
     <section className="flex min-h-0 min-w-0 flex-1 flex-col overflow-hidden rounded-[4px] border border-border-container bg-datavis-card-bg shadow-datavis-card">
@@ -799,6 +824,9 @@ function DetectionsTable({
         </Button>
         {detectionNameFilter ? (
           <span className="truncate text-sm text-text-secondary">{detectionNameFilter}</span>
+        ) : null}
+        {searchQuery.trim() ? (
+          <span className="truncate text-sm text-text-secondary">“{searchQuery.trim()}”</span>
         ) : null}
         {severityFilter ? (
           <span className="shrink-0 text-sm text-text-secondary">{severityFilter} severity</span>
@@ -939,7 +967,13 @@ function DetectionsTable({
   );
 }
 
-function ManageDetectionsContent() {
+function ManageDetectionsContent({
+  searchQuery,
+  onSearchQueryChange,
+}: {
+  searchQuery: string;
+  onSearchQueryChange: (query: string) => void;
+}) {
   const [tableTool, setTableTool] = useState<FilterColumnPanelTool | null>("filter");
   const [expandedIds, setExpandedIds] = useState<Set<string>>(() => new Set());
   const [drawerDetectionId, setDrawerDetectionId] = useState<string | null>(null);
@@ -954,9 +988,11 @@ function ManageDetectionsContent() {
       DETECTION_ROWS.filter((row) => {
         if (detectionNameFilter && row.name !== detectionNameFilter) return false;
         if (severityFilter && !rowMatchesSeverityFilter(row.severity, severityFilter)) return false;
+        const enabled = enabledById[row.id] ?? row.enabled;
+        if (!detectionMatchesSearch(row, searchQuery, enabled)) return false;
         return true;
       }),
-    [detectionNameFilter, severityFilter],
+    [detectionNameFilter, severityFilter, searchQuery, enabledById],
   );
 
   const drawerRow = useMemo(
@@ -999,9 +1035,11 @@ function ManageDetectionsContent() {
         onEnabledChange={(id, enabled) => setEnabledById((current) => ({ ...current, [id]: enabled }))}
         detectionNameFilter={detectionNameFilter}
         severityFilter={severityFilter}
+        searchQuery={searchQuery}
         onClearFilters={() => {
           setDetectionNameFilter(null);
           setSeverityFilter(null);
+          onSearchQueryChange("");
         }}
       />
       {drawerRow ? (
@@ -1022,7 +1060,13 @@ function ManageDetectionsContent() {
   );
 }
 
-export function FederatedDetectionHubDashboard() {
+export function FederatedDetectionHubDashboard({
+  searchQuery,
+  onSearchQueryChange,
+}: {
+  searchQuery: string;
+  onSearchQueryChange: (query: string) => void;
+}) {
   const [activeTab, setActiveTab] = useState<HubTab>("Manage Detections");
 
   return (
@@ -1031,7 +1075,7 @@ export function FederatedDetectionHubDashboard() {
 
       <div className="flex min-h-0 flex-1 flex-col gap-4 overflow-y-auto px-6 py-4 sm:py-5">
         {activeTab === "Manage Detections" ? (
-          <ManageDetectionsContent />
+          <ManageDetectionsContent searchQuery={searchQuery} onSearchQueryChange={onSearchQueryChange} />
         ) : (
           <div className="flex flex-1 items-center justify-center rounded-[4px] border border-border-container bg-datavis-card-bg p-12 text-center shadow-datavis-card">
             <p className="text-sm text-text-tertiary">{activeTab} — content coming soon.</p>

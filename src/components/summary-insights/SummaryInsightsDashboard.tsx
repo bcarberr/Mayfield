@@ -232,6 +232,26 @@ function connectorSwatch(connector: string) {
   return "bg-feedback-negative";
 }
 
+function findingMatchesSearch(row: FindingRow, query: string): boolean {
+  const q = query.trim().toLowerCase();
+  if (!q) return true;
+
+  const haystack = [
+    row.title,
+    row.description,
+    row.severity,
+    row.time,
+    row.activity,
+    row.status,
+    row.eventType,
+    row.connector,
+  ]
+    .join(" ")
+    .toLowerCase();
+
+  return haystack.includes(q);
+}
+
 /** px widths: select, severity, title, time, activity, status, event type, connector, actions */
 const FINDING_EVENTS_SELECT_COL_WIDTH = 40;
 const FINDING_EVENTS_COL_DEFAULTS: readonly number[] = [
@@ -622,6 +642,7 @@ function FindingEventsTable({
 export function SummaryInsightsDashboard() {
   const navigate = useNavigate();
   const [severityFilter, setSeverityFilter] = useState<SeverityLevel | null>(null);
+  const [searchQuery, setSearchQuery] = useState("");
   const [tableTool, setTableTool] = useState<FilterColumnPanelTool | null>(null);
   const [drawerFindingId, setDrawerFindingId] = useState<string | null>(null);
   const categoryRows: BarRow[] = useMemo(
@@ -822,9 +843,16 @@ export function SummaryInsightsDashboard() {
   );
 
   const filteredTableRows = useMemo(
-    () => (severityFilter ? tableRows.filter((row) => row.severity === severityFilter) : tableRows),
-    [tableRows, severityFilter],
+    () =>
+      tableRows.filter((row) => {
+        if (severityFilter && row.severity !== severityFilter) return false;
+        if (!findingMatchesSearch(row, searchQuery)) return false;
+        return true;
+      }),
+    [tableRows, severityFilter, searchQuery],
   );
+
+  const hasActiveFilters = severityFilter != null || searchQuery.trim().length > 0;
 
   const drawerRow = useMemo(
     () => (drawerFindingId ? tableRows.find((row) => row.id === drawerFindingId) : undefined),
@@ -871,23 +899,29 @@ export function SummaryInsightsDashboard() {
             <p className="shrink-0 text-base-small text-text-secondary">
               {filteredTableRows.length} of {tableRows.length} Results
               {severityFilter ? ` · ${severityFilter}` : ""}
+              {searchQuery.trim() ? ` · “${searchQuery.trim()}”` : ""}
             </p>
             <div className="w-[300px] shrink-0">
               <Input
                 variant="search"
                 placeholder="Search"
+                value={searchQuery}
+                onChange={(event) => setSearchQuery(event.target.value)}
                 className="h-7 !bg-datavis-card-bg"
                 aria-label="Search findings"
               />
             </div>
-            {severityFilter ? (
+            {hasActiveFilters ? (
               <Button
                 type="button"
                 variant="ghost"
                 className="h-7 shrink-0 px-2 text-base-small text-text-tertiary hover:text-text-primary"
-                onClick={() => setSeverityFilter(null)}
+                onClick={() => {
+                  setSeverityFilter(null);
+                  setSearchQuery("");
+                }}
               >
-                Clear severity filter
+                Clear filters
               </Button>
             ) : null}
           </div>
