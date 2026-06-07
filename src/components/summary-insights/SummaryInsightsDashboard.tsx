@@ -3,6 +3,8 @@ import { createPortal } from "react-dom";
 import { useNavigate } from "react-router-dom";
 import { Icon } from "../../design-system";
 import { FilterColumnPanel, type FilterColumnPanelTool } from "../ui/FilterColumnPanel";
+import { SeverityTableIcon } from "../ui/SeverityTableIcon";
+import { SlideOver } from "../ui/SlideOver";
 import { Button } from "../ui/Button";
 import { ColumnHeaderMenu } from "../ui/ColumnHeaderMenu";
 import { Input } from "../ui/Input";
@@ -188,15 +190,29 @@ function InsightCard({
   );
 }
 
+type FindingEventType = "HTTP Activity" | "Vulnerability";
+
 type FindingRow = {
   id: string;
   severity: keyof typeof SEV_BAR;
   title: string;
+  description: string;
   time: string;
   activity: string;
   status: string;
-  eventType: string;
+  eventType: FindingEventType;
   connector: string;
+};
+
+const EVENT_TYPE_ICON: Record<FindingEventType, { name: "network-activity" | "ocsf-findings"; className: string }> = {
+  "HTTP Activity": {
+    name: "network-activity",
+    className: "text-datavis-data-peanut-orange",
+  },
+  Vulnerability: {
+    name: "ocsf-findings",
+    className: "text-datavis-data-smalt-green-40",
+  },
 };
 
 const SEVERITY_ICON: Record<
@@ -214,17 +230,6 @@ function connectorSwatch(connector: string) {
   if (connector.startsWith("BCs")) return "bg-feedback-info";
   if (connector.includes("Athena")) return "bg-interactive-active";
   return "bg-feedback-negative";
-}
-
-function eventTypeIconMeta(eventType: string): { name: "network-activity" | "feedback-info" | "severity-other"; className: string } {
-  const t = eventType.toLowerCase();
-  if (t.includes("http") || t.includes("activity")) {
-    return { name: "network-activity", className: "text-datavis-data-peanut-orange" };
-  }
-  if (t.includes("vulnerab") || t.includes("incident") || t.includes("detection")) {
-    return { name: "feedback-info", className: "text-feedback-positive" };
-  }
-  return { name: "severity-other", className: "text-text-tertiary" };
 }
 
 /** px widths: select, severity, title, time, activity, status, event type, connector, actions */
@@ -343,7 +348,78 @@ function RowActionsMenu({ rowId }: { rowId: string }) {
   );
 }
 
-function FindingEventsTable({ rows }: { rows: FindingRow[] }) {
+function FindingDetailPanel({ row, onClose }: { row: FindingRow; onClose: () => void }) {
+  const eventType = EVENT_TYPE_ICON[row.eventType];
+
+  return (
+    <div className="flex h-full min-h-0 flex-col text-text-primary">
+      <header className="flex shrink-0 items-start justify-between gap-3 border-b border-border-rule px-5 py-4">
+        <div className="min-w-0">
+          <p className="text-xs font-bold uppercase tracking-wide text-text-tertiary">Finding</p>
+          <h2 className="mt-1 text-page-title text-text-primary">{row.title}</h2>
+        </div>
+        <Button
+          type="button"
+          variant="ghost"
+          className="shrink-0 p-1 text-text-tertiary hover:text-text-primary"
+          aria-label="Close finding details"
+          onClick={onClose}
+        >
+          <Icon name="close" size={20} />
+        </Button>
+      </header>
+      <div className="min-h-0 flex-1 overflow-y-auto px-5 py-4">
+        <div className="flex flex-wrap items-center gap-2">
+          <SeverityTableIcon name={SEVERITY_ICON[row.severity]} color={SEV_BAR[row.severity]} />
+          <span className="text-sm font-semibold text-text-primary">{row.severity}</span>
+          <span className="text-sm text-text-tertiary">·</span>
+          <Icon
+            name={eventType.name}
+            size={16}
+            className={cx("size-4 shrink-0 [&_svg]:!size-4", eventType.className)}
+            aria-hidden
+          />
+          <span className="text-sm text-text-secondary">{row.eventType}</span>
+        </div>
+        <p className="mt-4 text-sm leading-relaxed text-text-secondary">{row.description}</p>
+        <dl className="mt-6 space-y-3 border-t border-border-rule pt-4 text-sm">
+          <div className="flex gap-3">
+            <dt className="w-28 shrink-0 text-text-tertiary">Time</dt>
+            <dd className="text-text-secondary">{row.time}</dd>
+          </div>
+          <div className="flex gap-3">
+            <dt className="w-28 shrink-0 text-text-tertiary">Activity</dt>
+            <dd className="text-text-secondary">{row.activity}</dd>
+          </div>
+          <div className="flex gap-3">
+            <dt className="w-28 shrink-0 text-text-tertiary">Status</dt>
+            <dd className="text-text-secondary">{row.status}</dd>
+          </div>
+          <div className="flex gap-3">
+            <dt className="w-28 shrink-0 text-text-tertiary">Connector</dt>
+            <dd className="text-text-secondary">{row.connector}</dd>
+          </div>
+        </dl>
+      </div>
+      <footer className="flex shrink-0 justify-end gap-2 border-t border-border-rule px-5 py-4">
+        <Button type="button" variant="secondary" onClick={onClose}>
+          Close
+        </Button>
+        <Button type="button" variant="primary">
+          View event
+        </Button>
+      </footer>
+    </div>
+  );
+}
+
+function FindingEventsTable({
+  rows,
+  onOpenFinding,
+}: {
+  rows: FindingRow[];
+  onOpenFinding: (id: string) => void;
+}) {
   const [selected, setSelected] = useState<Set<string>>(() => new Set());
   const {
     containerRef,
@@ -475,7 +551,7 @@ function FindingEventsTable({ rows }: { rows: FindingRow[] }) {
       </thead>
       <tbody>
         {rows.map((row) => {
-          const et = eventTypeIconMeta(row.eventType);
+          const et = EVENT_TYPE_ICON[row.eventType];
           return (
             <tr key={row.id} className="h-10 border-b border-datavis-gridlines hover:bg-overlay-subtle">
               <td style={colStyle(0)} className="h-10 px-0 py-0 align-middle">
@@ -489,19 +565,18 @@ function FindingEventsTable({ rows }: { rows: FindingRow[] }) {
               </td>
               <td style={colStyle(1)} className="h-10 px-2 py-0 align-middle">
                 <span className="inline-flex items-center gap-2">
-                  <span className="inline-flex h-3 w-2.5 shrink-0 items-center justify-center overflow-hidden [&_svg]:block [&_svg]:!h-3 [&_svg]:!w-2.5">
-                    <Icon
-                      name={SEVERITY_ICON[row.severity]}
-                      size={12}
-                      style={{ color: SEV_BAR[row.severity] }}
-                      aria-hidden
-                    />
-                  </span>
+                  <SeverityTableIcon name={SEVERITY_ICON[row.severity]} color={SEV_BAR[row.severity]} />
                   <span className="text-sm text-text-secondary">{row.severity}</span>
                 </span>
               </td>
               <td style={colStyle(2)} className="h-10 min-w-0 px-2 py-0 align-middle">
-                <span className="block truncate text-sm text-text-secondary">{row.title}</span>
+                <button
+                  type="button"
+                  className="block w-full truncate text-left text-sm font-semibold text-interactive-active hover:underline focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-interactive-active"
+                  onClick={() => onOpenFinding(row.id)}
+                >
+                  {row.title}
+                </button>
               </td>
               <td style={colStyle(3)} className="h-10 px-2 py-0 align-middle tabular-nums">
                 <span className="text-sm text-text-secondary">{row.time}</span>
@@ -514,7 +589,12 @@ function FindingEventsTable({ rows }: { rows: FindingRow[] }) {
               </td>
               <td style={colStyle(6)} className="h-10 px-2 py-0 align-middle">
                 <span className="inline-flex min-w-0 items-center gap-2">
-                  <Icon name={et.name} className={cx("shrink-0", et.className)} aria-hidden />
+                  <Icon
+                    name={et.name}
+                    size={16}
+                    className={cx("size-4 shrink-0 [&_svg]:!size-4", et.className)}
+                    aria-hidden
+                  />
                   <span className="truncate text-sm text-text-secondary">{row.eventType}</span>
                 </span>
               </td>
@@ -543,6 +623,7 @@ export function SummaryInsightsDashboard() {
   const navigate = useNavigate();
   const [severityFilter, setSeverityFilter] = useState<SeverityLevel | null>(null);
   const [tableTool, setTableTool] = useState<FilterColumnPanelTool | null>(null);
+  const [drawerFindingId, setDrawerFindingId] = useState<string | null>(null);
   const categoryRows: BarRow[] = useMemo(
     () => [
       { label: "Vulnerabilities", value: 408 },
@@ -572,6 +653,8 @@ export function SummaryInsightsDashboard() {
         id: "1",
         severity: "Critical",
         title: "This and that happened over cat r…",
+        description:
+          "Repeated POST requests to an internal catalog service exceeded baseline volume during peak traffic, indicating potential data exfiltration or misconfigured automation.",
         time: "2024-07-31 14:22:08",
         activity: "Post",
         status: "Failure",
@@ -582,6 +665,8 @@ export function SummaryInsightsDashboard() {
         id: "2",
         severity: "High",
         title: "Multiple failed logins from unusual region and follow-on…",
+        description:
+          "Fifteen failed authentication attempts originated from an atypical geography, followed by a successful login from the same source within ten minutes.",
         time: "2024-07-31 13:05:41",
         activity: "Put",
         status: "Unknown",
@@ -592,6 +677,8 @@ export function SummaryInsightsDashboard() {
         id: "3",
         severity: "High",
         title: "Policy violation: privileged container launch detected in…",
+        description:
+          "A workload in the production namespace launched with privileged security context, violating the cluster hardening policy for non-system namespaces.",
         time: "2024-07-31 11:40:12",
         activity: "Delete",
         status: "Other",
@@ -602,6 +689,8 @@ export function SummaryInsightsDashboard() {
         id: "4",
         severity: "Medium",
         title: "Scheduled scan completed with warnings on production cl…",
+        description:
+          "The nightly vulnerability scan finished with warnings on three production cluster nodes where agent versions were out of compliance.",
         time: "2024-07-31 09:12:00",
         activity: "Connect",
         status: "New",
@@ -612,16 +701,20 @@ export function SummaryInsightsDashboard() {
         id: "5",
         severity: "Low",
         title: "Certificate renewal reminder for edge gateway cluster…",
+        description:
+          "TLS certificates on the edge gateway cluster expire within fourteen days; automated renewal has not yet been confirmed for two ingress hosts.",
         time: "2024-07-30 22:18:55",
         activity: "Create",
         status: "In Progress",
-        eventType: "Detection",
+        eventType: "Vulnerability",
         connector: "BC-CS-Athena",
       },
       {
         id: "6",
         severity: "Informational",
         title: "Connector health check succeeded across all regions…",
+        description:
+          "All configured connectors reported healthy heartbeat and ingestion latency within SLA across US, EU, and APAC regions.",
         time: "2024-07-30 18:00:03",
         activity: "Update",
         status: "Suppressed",
@@ -632,6 +725,8 @@ export function SummaryInsightsDashboard() {
         id: "7",
         severity: "Critical",
         title: "Anomalous outbound DNS tunneling pattern observed…",
+        description:
+          "High-entropy DNS queries to a newly registered domain suggest possible DNS tunneling from a compromised host in the analytics subnet.",
         time: "2024-07-30 16:44:19",
         activity: "Post",
         status: "Failure",
@@ -642,16 +737,20 @@ export function SummaryInsightsDashboard() {
         id: "8",
         severity: "High",
         title: "Service principal credential rotation outside change win…",
+        description:
+          "A service principal credential was rotated outside the approved change window without a linked change ticket in the ITSM system.",
         time: "2024-07-30 12:01:47",
         activity: "Put",
         status: "Unknown",
-        eventType: "Incident",
+        eventType: "Vulnerability",
         connector: "BC-CS",
       },
       {
         id: "9",
         severity: "Medium",
         title: "Unusual API call volume from service account in staging…",
+        description:
+          "A staging service account issued four times its normal API call volume over one hour, primarily against storage list endpoints.",
         time: "2024-07-30 09:33:22",
         activity: "Post",
         status: "New",
@@ -662,26 +761,32 @@ export function SummaryInsightsDashboard() {
         id: "10",
         severity: "Low",
         title: "Deprecated TLS version negotiated on internal load balanc…",
+        description:
+          "An internal load balancer accepted TLS 1.0 during a health probe from a legacy monitoring agent that has not yet been upgraded.",
         time: "2024-07-29 21:15:08",
         activity: "Connect",
         status: "In Progress",
-        eventType: "Detection",
+        eventType: "Vulnerability",
         connector: "BC-CS-Athena",
       },
       {
         id: "11",
         severity: "Critical",
         title: "Ransomware-like file encryption activity detected on fil…",
+        description:
+          "Rapid mass file renames and entropy spikes on a file server share match ransomware behavior patterns and require immediate containment.",
         time: "2024-07-29 17:48:51",
         activity: "Delete",
         status: "Failure",
-        eventType: "Incident",
+        eventType: "Vulnerability",
         connector: "BC-CS",
       },
       {
         id: "12",
         severity: "Informational",
         title: "Weekly compliance report generated for SOC 2 controls…",
+        description:
+          "The automated SOC 2 compliance report was generated successfully with no new control failures since the previous weekly run.",
         time: "2024-07-29 14:00:00",
         activity: "Create",
         status: "Suppressed",
@@ -692,6 +797,8 @@ export function SummaryInsightsDashboard() {
         id: "13",
         severity: "High",
         title: "Impossible travel login attempt from two continents…",
+        description:
+          "The same user account authenticated from North America and Europe within a thirty-minute window, exceeding plausible travel velocity.",
         time: "2024-07-29 08:27:36",
         activity: "Post",
         status: "Unknown",
@@ -702,10 +809,12 @@ export function SummaryInsightsDashboard() {
         id: "14",
         severity: "Medium",
         title: "S3 bucket policy changed to allow public read access…",
+        description:
+          "An object storage bucket policy was modified to grant public read access to all objects, diverging from the organization baseline.",
         time: "2024-07-28 23:59:14",
         activity: "Update",
         status: "Other",
-        eventType: "Detection",
+        eventType: "HTTP Activity",
         connector: "BC-CS",
       },
     ],
@@ -717,12 +826,18 @@ export function SummaryInsightsDashboard() {
     [tableRows, severityFilter],
   );
 
+  const drawerRow = useMemo(
+    () => (drawerFindingId ? tableRows.find((row) => row.id === drawerFindingId) : undefined),
+    [drawerFindingId, tableRows],
+  );
+
   const handleSeverityBarClick = (severity: SeverityLevel) => {
     setSeverityFilter((current) => (current === severity ? null : severity));
   };
 
   return (
-    <div className="flex min-h-0 flex-1 flex-col overflow-y-auto bg-surface-page">
+    <div className="relative flex min-h-0 flex-1 flex-col overflow-hidden">
+      <div className="flex min-h-0 flex-1 flex-col overflow-y-auto bg-surface-page">
       <div className="flex shrink-0 flex-wrap items-center justify-between gap-3 px-4 py-2.5 sm:px-5">
         <FederatedAnalyticsBreadcrumb />
         <Button
@@ -785,10 +900,21 @@ export function SummaryInsightsDashboard() {
             onColumnsClick={() => setTableTool(tableTool === "columns" ? null : "columns")}
           />
           <div className="min-h-0 min-w-0 flex-1 pb-3">
-            <FindingEventsTable rows={filteredTableRows} />
+            <FindingEventsTable rows={filteredTableRows} onOpenFinding={setDrawerFindingId} />
           </div>
         </div>
       </section>
+      </div>
+      {drawerRow ? (
+        <SlideOver
+          open
+          onClose={() => setDrawerFindingId(null)}
+          ariaLabel={`Finding: ${drawerRow.title}`}
+          panelClassName="max-w-[480px]"
+        >
+          <FindingDetailPanel row={drawerRow} onClose={() => setDrawerFindingId(null)} />
+        </SlideOver>
+      ) : null}
     </div>
   );
 }

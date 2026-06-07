@@ -177,11 +177,38 @@ function isConnectorLargeIcon(name: IconName): name is ConnectorLargeIconName {
   return (CONNECTOR_LARGE_ICON_NAMES as readonly string[]).includes(name);
 }
 
+function stripSvgDimensions(attrs: string): string {
+  return attrs.replace(/\swidth="[^"]*"/, "").replace(/\sheight="[^"]*"/, "");
+}
+
+function parseViewBoxDimensions(attrs: string): { width: number; height: number } | null {
+  const match = attrs.match(/\bviewBox=["']([^"']+)["']/);
+  if (!match) return null;
+  const parts = match[1].trim().split(/[\s,]+/).map(Number);
+  if (parts.length !== 4) return null;
+  const width = parts[2];
+  const height = parts[3];
+  if (!Number.isFinite(width) || !Number.isFinite(height) || width <= 0 || height <= 0) return null;
+  return { width, height };
+}
+
 function withDisplaySize(svg: string, size: number): string {
   return svg.replace(/<svg\b([^>]*)>/, (_match, attrs: string) => {
-    let next = attrs.replace(/\swidth="[^"]*"/, "").replace(/\sheight="[^"]*"/, "");
-    next += ` width="${size}" height="${size}"`;
-    return `<svg${next}>`;
+    const next = stripSvgDimensions(attrs);
+    return `<svg${next} width="${size}" height="${size}">`;
+  });
+}
+
+/** Severity shapes use non-square viewBoxes — size is rendered height; width follows aspect ratio. */
+function withDisplayHeight(svg: string, height: number): string {
+  return svg.replace(/<svg\b([^>]*)>/, (_match, attrs: string) => {
+    const next = stripSvgDimensions(attrs);
+    const viewBox = parseViewBoxDimensions(next);
+    if (viewBox) {
+      const width = Math.round(((height * viewBox.width) / viewBox.height) * 100) / 100;
+      return `<svg${next} width="${width}" height="${height}">`;
+    }
+    return `<svg${next} width="${height}" height="${height}">`;
   });
 }
 
@@ -257,7 +284,7 @@ export function Icon({ name, size = 18, title, className, style, ...rest }: Icon
   }
 
   if (isSeverityShapeIcon(name)) {
-    const markup = withDisplaySize(SEVERITY_SHAPE_RAW_BY_NAME[name], size);
+    const markup = withDisplayHeight(SEVERITY_SHAPE_RAW_BY_NAME[name], size);
     return (
       <span
         {...rest}

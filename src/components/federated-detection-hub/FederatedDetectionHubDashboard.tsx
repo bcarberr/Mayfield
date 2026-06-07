@@ -1,8 +1,9 @@
 import { Fragment, useMemo, useRef, useState, type ReactNode } from "react";
-import { Icon, Switch, type IconName } from "../../design-system";
+import { Icon, Switch, type SeverityShapeIconName } from "../../design-system";
 import { Button } from "../ui/Button";
 import { ColumnHeaderMenu } from "../ui/ColumnHeaderMenu";
 import { FilterColumnPanel, type FilterColumnPanelTool } from "../ui/FilterColumnPanel";
+import { SeverityTableIcon } from "../ui/SeverityTableIcon";
 import { SlideOver } from "../ui/SlideOver";
 import { useResizableColumns } from "../ui/useResizableColumns";
 
@@ -49,7 +50,7 @@ const SEV_COLORS: Record<DetectionSeverity, string> = {
   Low: "#57969e",
 };
 
-const SEV_ICONS: Record<DetectionSeverity, IconName> = {
+const SEV_ICONS: Record<DetectionSeverity, SeverityShapeIconName> = {
   Fatal: "severity-fatal",
   Critical: "severity-critical",
   High: "severity-high",
@@ -679,9 +680,7 @@ function DetectionDetailPanel({
       </header>
       <div className="min-h-0 flex-1 overflow-y-auto px-5 py-4">
         <div className="flex items-center gap-2">
-          <span className="inline-flex size-3 shrink-0 items-center justify-center">
-            <Icon name={SEV_ICONS[row.severity]} size={12} style={{ color: SEV_COLORS[row.severity] }} aria-hidden />
-          </span>
+          <SeverityTableIcon name={SEV_ICONS[row.severity]} color={SEV_COLORS[row.severity]} />
           <span className="text-sm font-semibold text-text-primary">{row.severity}</span>
           <span className="text-sm text-text-tertiary">·</span>
           <span className="text-sm text-text-secondary">{enabled ? "Enabled" : "Disabled"}</span>
@@ -905,14 +904,7 @@ function DetectionsTable({
                       </td>
                       <td style={colStyle(3)} className={tdClass}>
                         <span className="inline-flex items-center gap-2">
-                          <span className="inline-flex size-3 shrink-0 items-center justify-center">
-                            <Icon
-                              name={SEV_ICONS[row.severity]}
-                              size={12}
-                              style={{ color: SEV_COLORS[row.severity] }}
-                              aria-hidden
-                            />
-                          </span>
+                          <SeverityTableIcon name={SEV_ICONS[row.severity]} color={SEV_COLORS[row.severity]} />
                           <span>{row.severity}</span>
                         </span>
                       </td>
