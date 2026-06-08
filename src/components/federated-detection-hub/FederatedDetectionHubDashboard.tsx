@@ -3,11 +3,16 @@ import { Icon, Switch, type SeverityShapeIconName } from "../../design-system";
 import { Button } from "../ui/Button";
 import { ColumnHeaderMenu } from "../ui/ColumnHeaderMenu";
 import { FilterColumnPanel, type FilterColumnPanelTool } from "../ui/FilterColumnPanel";
+import { Input } from "../ui/Input";
 import { SeverityTableIcon } from "../ui/SeverityTableIcon";
 import { SlideOver } from "../ui/SlideOver";
 import { useResizableColumns } from "../ui/useResizableColumns";
 
 const cx = (...c: (string | false | undefined)[]) => c.filter(Boolean).join(" ");
+
+function DatavisGridlineRule({ inset = true }: { inset?: boolean }) {
+  return <div className={cx("h-px shrink-0 bg-datavis-gridlines", inset && "mx-[20px]")} aria-hidden />;
+}
 
 /** Figma `7671:7964` — Manage Detections tab content. */
 const HUB_TABS = [
@@ -772,6 +777,8 @@ function DetectionsTable({
   detectionNameFilter,
   severityFilter,
   searchQuery,
+  onSearchQueryChange,
+  totalCount,
   onClearFilters,
 }: {
   rows: DetectionRow[];
@@ -785,6 +792,8 @@ function DetectionsTable({
   detectionNameFilter: string | null;
   severityFilter: BreakdownSeverity | null;
   searchQuery: string;
+  onSearchQueryChange: (query: string) => void;
+  totalCount: number;
   onClearFilters: () => void;
 }) {
   const {
@@ -811,28 +820,40 @@ function DetectionsTable({
 
   return (
     <section className="flex min-h-0 min-w-0 flex-1 flex-col overflow-hidden rounded-[4px] border border-border-container bg-datavis-card-bg shadow-datavis-card">
-      <div className="flex shrink-0 items-center gap-2 border-b border-datavis-gridlines px-4 py-2 sm:px-5">
-        <Button
-          type="button"
-          variant="ghost"
-          className="h-7 gap-1.5 px-2 text-sm text-text-tertiary hover:text-text-primary [&_svg]:!h-2 [&_svg]:!w-3"
-          disabled={!hasActiveFilters}
-          onClick={onClearFilters}
-        >
-          <Icon name="action-filter-list" size={12} aria-hidden />
-          Clear All Filters
-        </Button>
-        {detectionNameFilter ? (
-          <span className="truncate text-sm text-text-secondary">{detectionNameFilter}</span>
-        ) : null}
-        {searchQuery.trim() ? (
-          <span className="truncate text-sm text-text-secondary">“{searchQuery.trim()}”</span>
-        ) : null}
-        {severityFilter ? (
-          <span className="shrink-0 text-sm text-text-secondary">{severityFilter} severity</span>
-        ) : null}
+      <div className="shrink-0 bg-datavis-card-bg pb-3 pl-4 pr-[20px] pt-3 sm:pl-5">
+        <h2 className="text-base-semibold text-text-primary">Detections</h2>
+        <div className="mt-2 flex flex-wrap items-center gap-3">
+          <p className="shrink-0 text-base-small text-text-secondary">
+            {rows.length} of {totalCount} Results
+            {detectionNameFilter ? ` · ${detectionNameFilter}` : ""}
+            {searchQuery.trim() ? ` · “${searchQuery.trim()}”` : ""}
+            {severityFilter ? ` · ${severityFilter}` : ""}
+          </p>
+          <div className="w-[300px] shrink-0">
+            <Input
+              variant="search"
+              placeholder="Search"
+              value={searchQuery}
+              onChange={(event) => onSearchQueryChange(event.target.value)}
+              className="h-7 !bg-datavis-card-bg"
+              aria-label="Search detections"
+            />
+          </div>
+          {hasActiveFilters ? (
+            <Button
+              type="button"
+              variant="ghost"
+              className="h-7 shrink-0 gap-1.5 px-2 text-base-small text-text-tertiary hover:text-text-primary [&_svg]:!h-2 [&_svg]:!w-3"
+              onClick={onClearFilters}
+            >
+              <Icon name="action-filter-list" size={12} aria-hidden />
+              Clear All Filters
+            </Button>
+          ) : null}
+        </div>
       </div>
-      <div className="flex min-h-0 flex-1 overflow-auto">
+      <DatavisGridlineRule inset={false} />
+      <div className="flex min-h-0 flex-1 overflow-auto bg-datavis-card-bg">
         <FilterColumnPanel
           active={tableTool}
           onFilterClick={() => onTableToolChange(tableTool === "filter" ? null : "filter")}
@@ -967,14 +988,9 @@ function DetectionsTable({
   );
 }
 
-function ManageDetectionsContent({
-  searchQuery,
-  onSearchQueryChange,
-}: {
-  searchQuery: string;
-  onSearchQueryChange: (query: string) => void;
-}) {
+function ManageDetectionsContent() {
   const [tableTool, setTableTool] = useState<FilterColumnPanelTool | null>("filter");
+  const [searchQuery, setSearchQuery] = useState("");
   const [expandedIds, setExpandedIds] = useState<Set<string>>(() => new Set());
   const [drawerDetectionId, setDrawerDetectionId] = useState<string | null>(null);
   const [detectionNameFilter, setDetectionNameFilter] = useState<string | null>(null);
@@ -1036,10 +1052,12 @@ function ManageDetectionsContent({
         detectionNameFilter={detectionNameFilter}
         severityFilter={severityFilter}
         searchQuery={searchQuery}
+        onSearchQueryChange={setSearchQuery}
+        totalCount={DETECTION_ROWS.length}
         onClearFilters={() => {
           setDetectionNameFilter(null);
           setSeverityFilter(null);
-          onSearchQueryChange("");
+          setSearchQuery("");
         }}
       />
       {drawerRow ? (
@@ -1060,13 +1078,7 @@ function ManageDetectionsContent({
   );
 }
 
-export function FederatedDetectionHubDashboard({
-  searchQuery,
-  onSearchQueryChange,
-}: {
-  searchQuery: string;
-  onSearchQueryChange: (query: string) => void;
-}) {
+export function FederatedDetectionHubDashboard() {
   const [activeTab, setActiveTab] = useState<HubTab>("Manage Detections");
 
   return (
@@ -1075,7 +1087,7 @@ export function FederatedDetectionHubDashboard({
 
       <div className="flex min-h-0 flex-1 flex-col gap-4 overflow-y-auto px-6 py-4 sm:py-5">
         {activeTab === "Manage Detections" ? (
-          <ManageDetectionsContent searchQuery={searchQuery} onSearchQueryChange={onSearchQueryChange} />
+          <ManageDetectionsContent />
         ) : (
           <div className="flex flex-1 items-center justify-center rounded-[4px] border border-border-container bg-datavis-card-bg p-12 text-center shadow-datavis-card">
             <p className="text-sm text-text-tertiary">{activeTab} — content coming soon.</p>

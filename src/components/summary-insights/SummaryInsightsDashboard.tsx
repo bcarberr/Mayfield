@@ -915,13 +915,14 @@ export function SummaryInsightsDashboard() {
               <Button
                 type="button"
                 variant="ghost"
-                className="h-7 shrink-0 px-2 text-base-small text-text-tertiary hover:text-text-primary"
+                className="h-7 shrink-0 gap-1.5 px-2 text-base-small text-text-tertiary hover:text-text-primary [&_svg]:!h-2 [&_svg]:!w-3"
                 onClick={() => {
                   setSeverityFilter(null);
                   setSearchQuery("");
                 }}
               >
-                Clear filters
+                <Icon name="action-filter-list" size={12} aria-hidden />
+                Clear All Filters
               </Button>
             ) : null}
           </div>
