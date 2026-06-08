@@ -327,12 +327,7 @@ function MapSchemaRowInfoDragCluster({ title }: { title: string }) {
   return (
     <span className="inline-flex shrink-0 items-center gap-[8px] text-text-tertiary">
       <Icon name="feedback-info-outline" size={16} className="shrink-0" title={title} />
-      <Icon
-        name="action-drag-indicator"
-        className="shrink-0"
-        style={{ width: 8, height: 12.8 }}
-        aria-hidden
-      />
+      <Icon name="action-drag-indicator" size={11} className="shrink-0" aria-hidden />
     </span>
   );
 }

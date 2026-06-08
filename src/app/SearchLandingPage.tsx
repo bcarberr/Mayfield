@@ -96,7 +96,7 @@ export function SearchLandingPage() {
           </div>
 
           <main className="relative z-[1] flex min-h-0 flex-1 flex-col items-center overflow-y-auto px-6 py-12 sm:py-16 md:py-20">
-            <div className="flex w-full max-w-[720px] flex-col items-stretch">
+            <div className="mt-[60px] flex w-full max-w-[720px] flex-col items-stretch">
               <h1 className="text-center text-3xl font-bold leading-9 tracking-[0.5px] text-text-primary sm:text-4xl sm:leading-tight">
                 Welcome Bonnie Carberry!
               </h1>

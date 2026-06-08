@@ -774,6 +774,7 @@ function DetectionsTable({
   onTableToolChange,
   expandedIds,
   onToggleExpand,
+  onToggleExpandAll,
   onOpenDetection,
   enabledById,
   onEnabledChange,
@@ -789,6 +790,7 @@ function DetectionsTable({
   onTableToolChange: (tool: FilterColumnPanelTool | null) => void;
   expandedIds: Set<string>;
   onToggleExpand: (id: string) => void;
+  onToggleExpandAll: () => void;
   onOpenDetection: (id: string) => void;
   enabledById: Record<string, boolean>;
   onEnabledChange: (id: string, enabled: boolean) => void;
@@ -820,6 +822,7 @@ function DetectionsTable({
   const tdClass = "h-10 px-2 py-0 align-middle text-sm text-text-secondary";
   const hasActiveFilters =
     detectionNameFilter != null || severityFilter != null || searchQuery.trim().length > 0;
+  const allExpanded = rows.length > 0 && rows.every((row) => expandedIds.has(row.id));
 
   return (
     <section className="flex min-h-0 min-w-0 flex-1 flex-col overflow-hidden rounded-[4px] border border-border-container bg-datavis-card-bg shadow-datavis-card">
@@ -882,6 +885,25 @@ function DetectionsTable({
             <thead>
               <tr className="h-10 border-b border-datavis-gridlines bg-surface-table-row-header">
                 <th scope="col" style={colStyle(0)} className={cx(thClass, "px-0")}>
+                  <div className="flex justify-center">
+                    <button
+                      type="button"
+                      className="inline-flex items-center p-0 text-text-tertiary hover:text-text-primary"
+                      aria-expanded={allExpanded}
+                      aria-label={
+                        allExpanded ? "Collapse all detection descriptions" : "Expand all detection descriptions"
+                      }
+                      onClick={onToggleExpandAll}
+                    >
+                      <Icon
+                        name="navi-arrow-drop-down"
+                        size={32}
+                        className={cx("block shrink-0 transition-transform", allExpanded ? "rotate-0" : "-rotate-90")}
+                        aria-hidden
+                      />
+                      <Icon name="navi-chevron-right" size={20} className="-ml-4 block shrink-0" aria-hidden />
+                    </button>
+                  </div>
                   {resizeHandle(0)}
                 </th>
                 <th scope="col" style={colStyle(1)} className={thClass}>
@@ -1028,6 +1050,22 @@ function ManageDetectionsContent() {
     });
   };
 
+  const toggleExpandAll = () => {
+    setExpandedIds((current) => {
+      const visibleIds = filteredRows.map((row) => row.id);
+      const everyVisibleExpanded =
+        visibleIds.length > 0 && visibleIds.every((id) => current.has(id));
+
+      if (everyVisibleExpanded) {
+        const next = new Set(current);
+        for (const id of visibleIds) next.delete(id);
+        return next;
+      }
+
+      return new Set([...current, ...visibleIds]);
+    });
+  };
+
   const handleSegmentClick = (label: string) => {
     setDetectionNameFilter((current) => (current === label ? null : label));
   };
@@ -1049,6 +1087,7 @@ function ManageDetectionsContent() {
         onTableToolChange={setTableTool}
         expandedIds={expandedIds}
         onToggleExpand={toggleExpand}
+        onToggleExpandAll={toggleExpandAll}
         onOpenDetection={setDrawerDetectionId}
         enabledById={enabledById}
         onEnabledChange={(id, enabled) => setEnabledById((current) => ({ ...current, [id]: enabled }))}

@@ -1,5 +1,6 @@
 import { useState, type DragEvent } from "react";
 import { Icon } from "../../design-system";
+import { Button } from "../ui/Button";
 import type { ConnectorCategory, ConnectorCategoryId } from "./connectorsData";
 
 const cx = (...c: (string | false | undefined)[]) => c.filter(Boolean).join(" ");
@@ -9,10 +10,12 @@ type ConnectorFiltersProps = {
   enabledCategories: ReadonlySet<ConnectorCategoryId>;
   visibleCount: number;
   totalCount: number;
+  filtersAltered: boolean;
   expanded: boolean;
   onExpandedChange: (expanded: boolean) => void;
   onCategoryToggle: (categoryId: ConnectorCategoryId, enabled: boolean) => void;
   onCategoryOrderChange: (order: ConnectorCategoryId[]) => void;
+  onResetFilters: () => void;
 };
 
 function reorderCategoryIds(
@@ -81,9 +84,9 @@ function FilterTagMoveHandle({ isDragging, label }: { isDragging: boolean; label
     >
       <Icon
         name="action-drag-indicator"
-        size={8}
+        size={11}
         className={cx(
-          "size-2 shrink-0 transition-colors [&>svg]:!size-[8px]",
+          "shrink-0 transition-colors",
           isDragging
             ? "text-interactive-active"
             : "text-text-tertiary group-hover/handle:text-interactive-active",
@@ -148,10 +151,12 @@ export function ConnectorFilters({
   enabledCategories,
   visibleCount,
   totalCount,
+  filtersAltered,
   expanded,
   onExpandedChange,
   onCategoryToggle,
   onCategoryOrderChange,
+  onResetFilters,
 }: ConnectorFiltersProps) {
   const [draggedId, setDraggedId] = useState<ConnectorCategoryId | null>(null);
   const [dragOverId, setDragOverId] = useState<ConnectorCategoryId | null>(null);
@@ -187,25 +192,37 @@ export function ConnectorFilters({
 
   return (
     <section className="shrink-0">
-      <button
-        type="button"
-        aria-expanded={expanded}
-        className="-ml-[7px] flex items-center gap-0.5 rounded py-0.5 text-left focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-interactive-active focus-visible:ring-offset-2 focus-visible:ring-offset-surface-page"
-        onClick={() => onExpandedChange(!expanded)}
-      >
-        <Icon
-          name="navi-arrow-drop-down"
-          size={24}
-          className={cx("shrink-0 text-interactive-active transition-transform", !expanded && "-rotate-90")}
-          aria-hidden
-        />
-        <span className="text-base-semibold">
-          <span className="text-interactive-active">Filters: </span>
-          <span className="font-normal text-text-primary">
-            Connectors {visibleCount} of {totalCount}
+      <div className="flex flex-wrap items-center gap-2">
+        <button
+          type="button"
+          aria-expanded={expanded}
+          className="-ml-[7px] flex items-center gap-0.5 rounded py-0.5 text-left focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-interactive-active focus-visible:ring-offset-2 focus-visible:ring-offset-surface-page"
+          onClick={() => onExpandedChange(!expanded)}
+        >
+          <Icon
+            name="navi-arrow-drop-down"
+            size={24}
+            className={cx("shrink-0 text-interactive-active transition-transform", !expanded && "-rotate-90")}
+            aria-hidden
+          />
+          <span className="text-base-semibold">
+            <span className="text-interactive-active">Filters: </span>
+            <span className="font-normal text-text-primary">
+              Connectors {visibleCount} of {totalCount}
+            </span>
           </span>
-        </span>
-      </button>
+        </button>
+        {filtersAltered ? (
+          <Button
+            type="button"
+            variant="ghost"
+            className="h-7 shrink-0 px-2 text-base-small text-text-tertiary hover:text-text-primary"
+            onClick={onResetFilters}
+          >
+            Reset Connectors to default
+          </Button>
+        ) : null}
+      </div>
 
       {expanded ? (
         <div className="mt-2 flex flex-wrap gap-2">

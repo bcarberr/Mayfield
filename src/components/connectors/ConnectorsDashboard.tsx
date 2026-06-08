@@ -8,6 +8,20 @@ import {
   type ConnectorInstance,
 } from "./connectorsData";
 
+const DEFAULT_CATEGORY_ORDER = CONNECTOR_CATEGORIES.map((category) => category.id);
+const DEFAULT_ENABLED_CATEGORIES = new Set(DEFAULT_CATEGORY_ORDER);
+
+function isDefaultCategoryOrder(order: readonly ConnectorCategoryId[]) {
+  return order.length === DEFAULT_CATEGORY_ORDER.length && order.every((id, index) => id === DEFAULT_CATEGORY_ORDER[index]);
+}
+
+function isDefaultEnabledCategories(enabled: ReadonlySet<ConnectorCategoryId>) {
+  return (
+    enabled.size === DEFAULT_ENABLED_CATEGORIES.size &&
+    DEFAULT_CATEGORY_ORDER.every((id) => enabled.has(id))
+  );
+}
+
 export type ConnectorsDashboardProps = {
   onConfigureConnector?: (connectorId: string) => void;
 };
@@ -17,11 +31,9 @@ export function ConnectorsDashboard({ onConfigureConnector }: ConnectorsDashboar
   const [connectors, setConnectors] = useState<ConnectorInstance[]>(() =>
     CONNECTOR_INSTANCES.map((connector) => ({ ...connector })),
   );
-  const [categoryOrder, setCategoryOrder] = useState<ConnectorCategoryId[]>(() =>
-    CONNECTOR_CATEGORIES.map((category) => category.id),
-  );
+  const [categoryOrder, setCategoryOrder] = useState<ConnectorCategoryId[]>(() => [...DEFAULT_CATEGORY_ORDER]);
   const [enabledCategories, setEnabledCategories] = useState<Set<ConnectorCategoryId>>(
-    () => new Set(CONNECTOR_CATEGORIES.map((category) => category.id)),
+    () => new Set(DEFAULT_ENABLED_CATEGORIES),
   );
   const [filtersExpanded, setFiltersExpanded] = useState(false);
 
@@ -56,6 +68,14 @@ export function ConnectorsDashboard({ onConfigureConnector }: ConnectorsDashboar
     [connectors, enabledCategories],
   );
 
+  const filtersAltered =
+    !isDefaultCategoryOrder(categoryOrder) || !isDefaultEnabledCategories(enabledCategories);
+
+  const resetFilters = () => {
+    setCategoryOrder([...DEFAULT_CATEGORY_ORDER]);
+    setEnabledCategories(new Set(DEFAULT_ENABLED_CATEGORIES));
+  };
+
   const setConnectorEnabled = (connectorId: string, enabled: boolean) => {
     setConnectors((current) =>
       current.map((connector) => (connector.id === connectorId ? { ...connector, enabled } : connector)),
@@ -78,10 +98,12 @@ export function ConnectorsDashboard({ onConfigureConnector }: ConnectorsDashboar
         enabledCategories={enabledCategories}
         visibleCount={visibleCount}
         totalCount={connectors.length}
+        filtersAltered={filtersAltered}
         expanded={filtersExpanded}
         onExpandedChange={setFiltersExpanded}
         onCategoryToggle={setCategoryEnabled}
         onCategoryOrderChange={setCategoryOrder}
+        onResetFilters={resetFilters}
       />
 
       <div className="flex flex-col gap-8">

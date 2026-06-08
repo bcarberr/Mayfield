@@ -344,7 +344,9 @@ export function Icon({ name, size = 18, title, className, style, ...rest }: Icon
   }
 
   if (isActionIcon(name)) {
-    const markup = withDisplaySize(ACTION_RAW_BY_NAME[name], size);
+    const raw = ACTION_RAW_BY_NAME[name];
+    const markup =
+      name === "action-drag-indicator" ? withDisplayHeight(raw, size) : withDisplaySize(raw, size);
     return (
       <span
         {...rest}
