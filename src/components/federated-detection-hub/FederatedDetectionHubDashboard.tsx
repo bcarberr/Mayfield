@@ -26,13 +26,11 @@ const HUB_TABS = [
 
 type HubTab = (typeof HUB_TABS)[number];
 
-type DetectionSeverity = "Fatal" | "Critical" | "High" | "Medium" | "Low";
+type DetectionSeverity = "Critical" | "High" | "Medium" | "Low";
 
-/** Severities shown in the breakdown chart — Fatal rolls up under Critical when filtering. */
 type BreakdownSeverity = "Critical" | "High" | "Medium" | "Low";
 
 function rowMatchesSeverityFilter(rowSeverity: DetectionSeverity, filter: BreakdownSeverity) {
-  if (filter === "Critical") return rowSeverity === "Critical" || rowSeverity === "Fatal";
   return rowSeverity === filter;
 }
 
@@ -76,7 +74,6 @@ type DetectionRow = {
 const DETECTION_COLUMN_COUNT = 8;
 
 const SEV_COLORS: Record<DetectionSeverity, string> = {
-  Fatal: "#ff604a",
   Critical: "#ff604a",
   High: "#f28830",
   Medium: "#fac354",
@@ -84,7 +81,6 @@ const SEV_COLORS: Record<DetectionSeverity, string> = {
 };
 
 const SEV_ICONS: Record<DetectionSeverity, SeverityShapeIconName> = {
-  Fatal: "severity-fatal",
   Critical: "severity-critical",
   High: "severity-high",
   Medium: "severity-medium",
@@ -100,7 +96,7 @@ const DETECTION_ROWS: DetectionRow[] = [
     description:
       "Flags encoded or obfuscated PowerShell commands executed outside approved automation accounts, often used for fileless malware staging and credential access.",
     enabled: true,
-    severity: "Fatal",
+    severity: "High",
     lastRun: "1 min ago",
     recurrence: "Every Tue 12:00 AM",
     findings: 861,
@@ -136,7 +132,7 @@ const DETECTION_ROWS: DetectionRow[] = [
     severity: "High",
     lastRun: "1 hour 15 mins ago",
     recurrence: "Every Tue 12:00 AM",
-    findings: "error",
+    findings: 87,
   },
   {
     id: "5",
@@ -158,7 +154,7 @@ const DETECTION_ROWS: DetectionRow[] = [
     severity: "Medium",
     lastRun: "6 hours ago",
     recurrence: "Every Tue 12:00 AM",
-    findings: "error",
+    findings: 24,
   },
   {
     id: "7",
@@ -180,7 +176,7 @@ const DETECTION_ROWS: DetectionRow[] = [
     severity: "Low",
     lastRun: "8 hours ago",
     recurrence: "Every Tue 12:00 AM",
-    findings: "error",
+    findings: 11,
   },
   {
     id: "9",
@@ -191,7 +187,7 @@ const DETECTION_ROWS: DetectionRow[] = [
     severity: "Medium",
     lastRun: "10 hours ago",
     recurrence: "Every Tue 12:00 AM",
-    findings: "error",
+    findings: 56,
   },
   {
     id: "10",
@@ -202,7 +198,7 @@ const DETECTION_ROWS: DetectionRow[] = [
     severity: "High",
     lastRun: "18 hours ago",
     recurrence: "Every Tue 12:00 AM",
-    findings: "error",
+    findings: 33,
   },
   {
     id: "11",
@@ -246,7 +242,7 @@ const DETECTION_ROWS: DetectionRow[] = [
     severity: "High",
     lastRun: "2 days ago",
     recurrence: "Every Tue 12:00 AM",
-    findings: "error",
+    findings: 72,
   },
   {
     id: "15",
@@ -254,7 +250,7 @@ const DETECTION_ROWS: DetectionRow[] = [
     description:
       "Alerts when endpoint protection services are stopped, uninstalled, or excluded paths are added without approved change tickets.",
     enabled: true,
-    severity: "Fatal",
+    severity: "High",
     lastRun: "2 days ago",
     recurrence: "Every Tue 12:00 AM",
     findings: 18,
@@ -268,7 +264,7 @@ const DETECTION_ROWS: DetectionRow[] = [
     severity: "Low",
     lastRun: "3 days ago",
     recurrence: "Every Tue 12:00 AM",
-    findings: "error",
+    findings: 9,
   },
 ];
 

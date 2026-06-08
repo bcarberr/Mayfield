@@ -14,7 +14,7 @@ function DatavisGridlineRule({ inset = true }: { inset?: boolean }) {
   return <div className={cx("h-px shrink-0 bg-datavis-gridlines", inset && "mx-[20px]")} aria-hidden />;
 }
 
-type DetectionSeverity = "Fatal" | "Critical" | "High" | "Medium" | "Low";
+type DetectionSeverity = "Critical" | "High" | "Medium" | "Low";
 
 type LibraryCategory = "Network" | "Endpoint" | "Identity" | "Web" | "Cloud" | "Database" | "Email";
 
@@ -33,7 +33,6 @@ type LibraryDetectionRow = {
 };
 
 const SEV_COLORS: Record<DetectionSeverity, string> = {
-  Fatal: "var(--color-feedback-negative)",
   Critical: "var(--color-feedback-negative)",
   High: "#f28830",
   Medium: "var(--color-feedback-caution)",
@@ -41,7 +40,6 @@ const SEV_COLORS: Record<DetectionSeverity, string> = {
 };
 
 const SEV_ICONS: Record<DetectionSeverity, SeverityShapeIconName> = {
-  Fatal: "severity-fatal",
   Critical: "severity-critical",
   High: "severity-high",
   Medium: "severity-medium",
@@ -56,7 +54,7 @@ const LIBRARY_DETECTION_ROWS: LibraryDetectionRow[] = [
       "Detects command-and-control beaconing and DNS tunneling patterns associated with APT28 infrastructure across perimeter and internal resolvers.",
     enabled: true,
     category: "Network",
-    severity: "Fatal",
+    severity: "High",
     lastRun: "Oct 31, 2024 2:15 PM",
     recurrence: "Every 30 minutes",
     findings: 42,
@@ -84,7 +82,7 @@ const LIBRARY_DETECTION_ROWS: LibraryDetectionRow[] = [
       "Correlates rapid file rename and encryption events on endpoints with known ransomware extensions and shadow copy deletion.",
     enabled: true,
     category: "Endpoint",
-    severity: "Fatal",
+    severity: "High",
     lastRun: "Oct 31, 2024 12:30 PM",
     recurrence: "Every 15 minutes",
     findings: 7,
@@ -742,11 +740,9 @@ export function DetectionLibraryContent() {
   const summaryStats = useMemo(() => {
     const total = LIBRARY_DETECTION_ROWS.length;
     const enabled = LIBRARY_DETECTION_ROWS.filter((row) => enabledById[row.id] ?? row.enabled).length;
-    const criticalFatal = LIBRARY_DETECTION_ROWS.filter(
-      (row) => row.severity === "Critical" || row.severity === "Fatal",
-    ).length;
+    const critical = LIBRARY_DETECTION_ROWS.filter((row) => row.severity === "Critical").length;
     const high = LIBRARY_DETECTION_ROWS.filter((row) => row.severity === "High").length;
-    return { total, enabled, criticalFatal, high };
+    return { total, enabled, critical, high };
   }, [enabledById]);
 
   const drawerRow = drawerDetectionId
@@ -775,7 +771,7 @@ export function DetectionLibraryContent() {
       <div className="grid shrink-0 grid-cols-1 gap-4 sm:grid-cols-2 xl:grid-cols-4">
         <LibraryStatCard label="Total Detections" value={summaryStats.total} />
         <LibraryStatCard label="Enabled" value={summaryStats.enabled} />
-        <LibraryStatCard label="Critical/Fatal Severity" value={summaryStats.criticalFatal} />
+        <LibraryStatCard label="Critical Severity" value={summaryStats.critical} />
         <LibraryStatCard label="High Severity" value={summaryStats.high} />
       </div>
 

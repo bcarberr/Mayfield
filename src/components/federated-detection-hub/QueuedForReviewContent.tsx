@@ -14,7 +14,7 @@ function DatavisGridlineRule({ inset = true }: { inset?: boolean }) {
   return <div className={cx("h-px shrink-0 bg-datavis-gridlines", inset && "mx-[20px]")} aria-hidden />;
 }
 
-type DetectionSeverity = "Fatal" | "Critical" | "High" | "Medium" | "Low";
+type DetectionSeverity = "Critical" | "High" | "Medium" | "Low";
 
 type QueuedDetectionRow = {
   id: string;
@@ -28,7 +28,6 @@ type QueuedDetectionRow = {
 };
 
 const SEV_COLORS: Record<DetectionSeverity, string> = {
-  Fatal: "var(--color-feedback-negative)",
   Critical: "var(--color-feedback-negative)",
   High: "#f28830",
   Medium: "var(--color-feedback-caution)",
@@ -36,7 +35,6 @@ const SEV_COLORS: Record<DetectionSeverity, string> = {
 };
 
 const SEV_ICONS: Record<DetectionSeverity, SeverityShapeIconName> = {
-  Fatal: "severity-fatal",
   Critical: "severity-critical",
   High: "severity-high",
   Medium: "severity-medium",
@@ -52,7 +50,7 @@ const QUEUED_DETECTION_ROWS: QueuedDetectionRow[] = [
     enabled: true,
     queuedBy: "Admin User",
     queuedDate: "Oct 12, 2025",
-    severity: "Fatal",
+    severity: "High",
     findings: 3,
   },
   {
