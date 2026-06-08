@@ -60,14 +60,35 @@ function ChartGridLines() {
   );
 }
 
+type FindingCategory =
+  | "Vulnerabilities"
+  | "Compliance"
+  | "Detections"
+  | "Incidents"
+  | "Security"
+  | "Data Security";
+
+function isFindingCategory(label: string): label is FindingCategory {
+  return (
+    label === "Vulnerabilities" ||
+    label === "Compliance" ||
+    label === "Detections" ||
+    label === "Incidents" ||
+    label === "Security" ||
+    label === "Data Security"
+  );
+}
+
 function HorizontalBarPanel({
   rows,
   selectedLabel,
   onBarClick,
+  filterAriaLabel = (label) => `Filter findings by ${label}`,
 }: {
   rows: BarRow[];
-  selectedLabel?: SeverityLevel | null;
-  onBarClick?: (label: SeverityLevel) => void;
+  selectedLabel?: string | null;
+  onBarClick?: (label: string) => void;
+  filterAriaLabel?: (label: string) => string;
 }) {
   return (
     <div className="flex min-h-0 min-w-0 flex-1 flex-col lg:h-full">
@@ -77,9 +98,8 @@ function HorizontalBarPanel({
           {rows.map((row) => {
             const pct = Math.min(100, Math.max((row.value / X_MAX) * 100, row.value > 0 ? 6 : 0));
             const fill = row.color ?? CHART_CATEGORY_FILL;
-            const severityLabel = isSeverityLevel(row.label) ? row.label : null;
-            const interactive = Boolean(onBarClick && severityLabel);
-            const selected = interactive && selectedLabel === severityLabel;
+            const interactive = Boolean(onBarClick);
+            const selected = interactive && selectedLabel === row.label;
             const filterActive = interactive && selectedLabel != null;
             const dimmed = filterActive && !selected;
 
@@ -122,19 +142,19 @@ function HorizontalBarPanel({
               </>
             );
 
-            if (interactive && severityLabel) {
+            if (interactive) {
               return (
                 <button
                   key={row.label}
                   type="button"
                   aria-pressed={selected}
-                  aria-label={`Filter findings by ${row.label} severity`}
+                  aria-label={filterAriaLabel(row.label)}
                   className={cx(
                     "group flex min-h-6 w-full shrink-0 items-center gap-2 rounded-sm text-left sm:gap-3",
                     "cursor-pointer transition-colors",
                     "focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-interactive-active focus-visible:ring-offset-2 focus-visible:ring-offset-datavis-card-bg",
                   )}
-                  onClick={() => onBarClick!(severityLabel)}
+                  onClick={() => onBarClick!(row.label)}
                 >
                   {rowBody}
                 </button>
@@ -195,6 +215,7 @@ type FindingEventType = "HTTP Activity" | "Vulnerability";
 type FindingRow = {
   id: string;
   severity: keyof typeof SEV_BAR;
+  category: FindingCategory;
   title: string;
   description: string;
   time: string;
@@ -240,6 +261,7 @@ function findingMatchesSearch(row: FindingRow, query: string): boolean {
     row.title,
     row.description,
     row.severity,
+    row.category,
     row.time,
     row.activity,
     row.status,
@@ -642,6 +664,7 @@ function FindingEventsTable({
 export function SummaryInsightsDashboard() {
   const navigate = useNavigate();
   const [severityFilter, setSeverityFilter] = useState<SeverityLevel | null>(null);
+  const [categoryFilter, setCategoryFilter] = useState<FindingCategory | null>(null);
   const [searchQuery, setSearchQuery] = useState("");
   const [tableTool, setTableTool] = useState<FilterColumnPanelTool | null>(null);
   const [drawerFindingId, setDrawerFindingId] = useState<string | null>(null);
@@ -673,6 +696,7 @@ export function SummaryInsightsDashboard() {
       {
         id: "1",
         severity: "Critical",
+        category: "Detections",
         title: "This and that happened over cat r…",
         description:
           "Repeated POST requests to an internal catalog service exceeded baseline volume during peak traffic, indicating potential data exfiltration or misconfigured automation.",
@@ -685,6 +709,7 @@ export function SummaryInsightsDashboard() {
       {
         id: "2",
         severity: "High",
+        category: "Incidents",
         title: "Multiple failed logins from unusual region and follow-on…",
         description:
           "Fifteen failed authentication attempts originated from an atypical geography, followed by a successful login from the same source within ten minutes.",
@@ -697,6 +722,7 @@ export function SummaryInsightsDashboard() {
       {
         id: "3",
         severity: "High",
+        category: "Vulnerabilities",
         title: "Policy violation: privileged container launch detected in…",
         description:
           "A workload in the production namespace launched with privileged security context, violating the cluster hardening policy for non-system namespaces.",
@@ -709,6 +735,7 @@ export function SummaryInsightsDashboard() {
       {
         id: "4",
         severity: "Medium",
+        category: "Compliance",
         title: "Scheduled scan completed with warnings on production cl…",
         description:
           "The nightly vulnerability scan finished with warnings on three production cluster nodes where agent versions were out of compliance.",
@@ -721,6 +748,7 @@ export function SummaryInsightsDashboard() {
       {
         id: "5",
         severity: "Low",
+        category: "Vulnerabilities",
         title: "Certificate renewal reminder for edge gateway cluster…",
         description:
           "TLS certificates on the edge gateway cluster expire within fourteen days; automated renewal has not yet been confirmed for two ingress hosts.",
@@ -733,6 +761,7 @@ export function SummaryInsightsDashboard() {
       {
         id: "6",
         severity: "Informational",
+        category: "Security",
         title: "Connector health check succeeded across all regions…",
         description:
           "All configured connectors reported healthy heartbeat and ingestion latency within SLA across US, EU, and APAC regions.",
@@ -745,6 +774,7 @@ export function SummaryInsightsDashboard() {
       {
         id: "7",
         severity: "Critical",
+        category: "Detections",
         title: "Anomalous outbound DNS tunneling pattern observed…",
         description:
           "High-entropy DNS queries to a newly registered domain suggest possible DNS tunneling from a compromised host in the analytics subnet.",
@@ -757,6 +787,7 @@ export function SummaryInsightsDashboard() {
       {
         id: "8",
         severity: "High",
+        category: "Incidents",
         title: "Service principal credential rotation outside change win…",
         description:
           "A service principal credential was rotated outside the approved change window without a linked change ticket in the ITSM system.",
@@ -769,6 +800,7 @@ export function SummaryInsightsDashboard() {
       {
         id: "9",
         severity: "Medium",
+        category: "Detections",
         title: "Unusual API call volume from service account in staging…",
         description:
           "A staging service account issued four times its normal API call volume over one hour, primarily against storage list endpoints.",
@@ -781,6 +813,7 @@ export function SummaryInsightsDashboard() {
       {
         id: "10",
         severity: "Low",
+        category: "Data Security",
         title: "Deprecated TLS version negotiated on internal load balanc…",
         description:
           "An internal load balancer accepted TLS 1.0 during a health probe from a legacy monitoring agent that has not yet been upgraded.",
@@ -793,6 +826,7 @@ export function SummaryInsightsDashboard() {
       {
         id: "11",
         severity: "Critical",
+        category: "Vulnerabilities",
         title: "Ransomware-like file encryption activity detected on fil…",
         description:
           "Rapid mass file renames and entropy spikes on a file server share match ransomware behavior patterns and require immediate containment.",
@@ -805,6 +839,7 @@ export function SummaryInsightsDashboard() {
       {
         id: "12",
         severity: "Informational",
+        category: "Compliance",
         title: "Weekly compliance report generated for SOC 2 controls…",
         description:
           "The automated SOC 2 compliance report was generated successfully with no new control failures since the previous weekly run.",
@@ -817,6 +852,7 @@ export function SummaryInsightsDashboard() {
       {
         id: "13",
         severity: "High",
+        category: "Incidents",
         title: "Impossible travel login attempt from two continents…",
         description:
           "The same user account authenticated from North America and Europe within a thirty-minute window, exceeding plausible travel velocity.",
@@ -829,6 +865,7 @@ export function SummaryInsightsDashboard() {
       {
         id: "14",
         severity: "Medium",
+        category: "Data Security",
         title: "S3 bucket policy changed to allow public read access…",
         description:
           "An object storage bucket policy was modified to grant public read access to all objects, diverging from the organization baseline.",
@@ -845,22 +882,30 @@ export function SummaryInsightsDashboard() {
   const filteredTableRows = useMemo(
     () =>
       tableRows.filter((row) => {
+        if (categoryFilter && row.category !== categoryFilter) return false;
         if (severityFilter && row.severity !== severityFilter) return false;
         if (!findingMatchesSearch(row, searchQuery)) return false;
         return true;
       }),
-    [tableRows, severityFilter, searchQuery],
+    [tableRows, categoryFilter, severityFilter, searchQuery],
   );
 
-  const hasActiveFilters = severityFilter != null || searchQuery.trim().length > 0;
+  const hasActiveFilters =
+    categoryFilter != null || severityFilter != null || searchQuery.trim().length > 0;
 
   const drawerRow = useMemo(
     () => (drawerFindingId ? tableRows.find((row) => row.id === drawerFindingId) : undefined),
     [drawerFindingId, tableRows],
   );
 
-  const handleSeverityBarClick = (severity: SeverityLevel) => {
-    setSeverityFilter((current) => (current === severity ? null : severity));
+  const handleCategoryBarClick = (label: string) => {
+    if (!isFindingCategory(label)) return;
+    setCategoryFilter((current) => (current === label ? null : label));
+  };
+
+  const handleSeverityBarClick = (label: string) => {
+    if (!isSeverityLevel(label)) return;
+    setSeverityFilter((current) => (current === label ? null : label));
   };
 
   return (
@@ -881,13 +926,18 @@ export function SummaryInsightsDashboard() {
 
       <div className="grid min-h-0 shrink-0 grid-cols-1 items-stretch gap-4 p-4 sm:p-5 lg:grid-cols-2 lg:grid-rows-1">
         <InsightCard title="Categories of Finding Events">
-          <HorizontalBarPanel rows={categoryRows} />
+          <HorizontalBarPanel
+            rows={categoryRows}
+            selectedLabel={categoryFilter}
+            onBarClick={handleCategoryBarClick}
+          />
         </InsightCard>
         <InsightCard title="Findings Severity ID">
           <HorizontalBarPanel
             rows={severityRows}
             selectedLabel={severityFilter}
             onBarClick={handleSeverityBarClick}
+            filterAriaLabel={(label) => `Filter findings by ${label} severity`}
           />
         </InsightCard>
       </div>
@@ -898,6 +948,7 @@ export function SummaryInsightsDashboard() {
           <div className="mt-2 flex flex-wrap items-center gap-3">
             <p className="shrink-0 text-base-small text-text-secondary">
               {filteredTableRows.length} of {tableRows.length} Results
+              {categoryFilter ? ` · ${categoryFilter}` : ""}
               {severityFilter ? ` · ${severityFilter}` : ""}
               {searchQuery.trim() ? ` · “${searchQuery.trim()}”` : ""}
             </p>
@@ -917,6 +968,7 @@ export function SummaryInsightsDashboard() {
                 variant="ghost"
                 className="h-7 shrink-0 gap-1.5 px-2 text-base-small text-text-tertiary hover:text-text-primary [&_svg]:!h-2 [&_svg]:!w-3"
                 onClick={() => {
+                  setCategoryFilter(null);
                   setSeverityFilter(null);
                   setSearchQuery("");
                 }}

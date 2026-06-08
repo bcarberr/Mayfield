@@ -645,20 +645,23 @@ function SeverityBreakdownCard({
 }
 
 function DetectionActions({ name }: { name: string }) {
-  const btn = "size-7 shrink-0 p-0 text-text-tertiary hover:text-text-primary [&_svg]:!size-4";
+  const actionBtn =
+    "size-7 shrink-0 p-0 text-text-tertiary hover:text-text-primary [&_svg]:!size-3 [&_svg]:!h-3 [&_svg]:!w-3";
+  const moreBtn =
+    "size-7 shrink-0 p-0 text-text-tertiary hover:text-text-primary [&_svg]:!size-4 [&_svg]:!h-4 [&_svg]:!w-4";
 
   return (
     <div className="flex items-center justify-start gap-0.5">
-      <Button type="button" variant="ghost" className={btn} aria-label={`Edit ${name}`}>
-        <Icon name="action-edit" size={16} />
+      <Button type="button" variant="ghost" className={actionBtn} aria-label={`Edit ${name}`}>
+        <Icon name="action-edit" size={12} />
       </Button>
-      <Button type="button" variant="ghost" className={btn} aria-label={`Copy ${name}`}>
-        <Icon name="action-content-copy" size={16} />
+      <Button type="button" variant="ghost" className={actionBtn} aria-label={`Copy ${name}`}>
+        <Icon name="action-content-copy" size={12} />
       </Button>
-      <Button type="button" variant="ghost" className={btn} aria-label={`Delete ${name}`}>
-        <Icon name="action-delete" size={16} />
+      <Button type="button" variant="ghost" className={actionBtn} aria-label={`Delete ${name}`}>
+        <Icon name="action-delete" size={12} />
       </Button>
-      <Button type="button" variant="ghost" className={btn} aria-label={`More actions for ${name}`}>
+      <Button type="button" variant="ghost" className={moreBtn} aria-label={`More actions for ${name}`}>
         <Icon name="navi-more-vert" size={16} />
       </Button>
     </div>
