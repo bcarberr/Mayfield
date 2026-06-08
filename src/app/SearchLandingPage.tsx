@@ -1,6 +1,7 @@
 import { useState } from "react";
 import { Icon } from "../design-system";
 import { SearchEntityEventSelect } from "../components/SearchEntityEventSelect";
+import { SearchHeaderFilters } from "../components/SearchHeaderFilters";
 import { SearchTopHeader } from "../components/SearchTopHeader";
 import { V4NavThinner } from "../components/V4NavThinner";
 import { Button } from "../components/ui/Button";
@@ -79,7 +80,7 @@ export function SearchLandingPage() {
       />
 
       <div className="relative flex min-h-0 min-w-0 flex-1 flex-col overflow-hidden">
-        <SearchTopHeader />
+        <SearchTopHeader headerAfterTitle={<SearchHeaderFilters />} />
         <SearchToolbarActions />
 
         <div className="relative min-h-0 flex-1 overflow-hidden">

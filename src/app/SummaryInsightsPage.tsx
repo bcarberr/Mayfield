@@ -1,3 +1,4 @@
+import { SearchHeaderFilters } from "../components/SearchHeaderFilters";
 import { SearchTopHeader } from "../components/SearchTopHeader";
 import { SummaryInsightsDashboard } from "../components/summary-insights/SummaryInsightsDashboard";
 import { V4NavThinner } from "../components/V4NavThinner";
@@ -16,7 +17,11 @@ export function SummaryInsightsPage() {
       />
 
       <div className="flex min-h-0 min-w-0 flex-1 flex-col overflow-hidden">
-        <SearchTopHeader title="Federated Analytics" chromeSurface="page" />
+        <SearchTopHeader
+          title="Federated Analytics"
+          chromeSurface="page"
+          headerAfterTitle={<SearchHeaderFilters />}
+        />
         <SummaryInsightsDashboard />
       </div>
     </div>

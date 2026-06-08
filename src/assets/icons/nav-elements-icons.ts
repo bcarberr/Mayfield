@@ -27,12 +27,13 @@ import nav_notifications from "./nav-notifications.svg?raw";
 import nav_quick_help from "./nav-quick-help.svg?raw";
 import nav_reports from "./nav-reports.svg?raw";
 import nav_reports_filled from "./nav-reports-filled.svg?raw";
+import nav_star from "./nav-star.svg?raw";
 import nav_summary_insights from "./nav-summary-insights.svg?raw";
 import nav_tenant_settings from "./nav-tenant-settings.svg?raw";
 import nav_tools from "./nav-tools.svg?raw";
 import nav_tools_filled from "./nav-tools-filled.svg?raw";
 
-export const NAV_ELEMENT_ICON_NAMES = ["nav-advanced-search", "nav-alerts-filled", "nav-alerts-outline", "nav-applications-horizontal", "nav-applications-stacked", "nav-automations", "nav-chat", "nav-collapse", "nav-connections", "nav-dashboards-filled", "nav-dashboards-outline", "nav-detections", "nav-downloads", "nav-endpoint", "nav-expand", "nav-favorite", "nav-federated-joins", "nav-integrations", "nav-intercom", "nav-investigations-filled", "nav-investigations-outline", "nav-logout", "nav-notifications", "nav-quick-help", "nav-reports", "nav-reports-filled", "nav-summary-insights", "nav-tenant-settings", "nav-tools", "nav-tools-filled"] as const;
+export const NAV_ELEMENT_ICON_NAMES = ["nav-advanced-search", "nav-alerts-filled", "nav-alerts-outline", "nav-applications-horizontal", "nav-applications-stacked", "nav-automations", "nav-chat", "nav-collapse", "nav-connections", "nav-dashboards-filled", "nav-dashboards-outline", "nav-detections", "nav-downloads", "nav-endpoint", "nav-expand", "nav-favorite", "nav-federated-joins", "nav-integrations", "nav-intercom", "nav-investigations-filled", "nav-investigations-outline", "nav-logout", "nav-notifications", "nav-quick-help", "nav-reports", "nav-reports-filled", "nav-star", "nav-summary-insights", "nav-tenant-settings", "nav-tools", "nav-tools-filled"] as const;
 
 export type NavElementIconName = (typeof NAV_ELEMENT_ICON_NAMES)[number];
 
@@ -63,6 +64,7 @@ export const NAV_ELEMENT_RAW_BY_NAME: Record<NavElementIconName, string> = {
   "nav-quick-help": nav_quick_help,
   "nav-reports": nav_reports,
   "nav-reports-filled": nav_reports_filled,
+  "nav-star": nav_star,
   "nav-summary-insights": nav_summary_insights,
   "nav-tenant-settings": nav_tenant_settings,
   "nav-tools": nav_tools,

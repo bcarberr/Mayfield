@@ -8,8 +8,8 @@ const cx = (...c: (string | false | undefined)[]) => c.filter(Boolean).join(" ")
 export type SearchTopHeaderProps = {
   /** Page title (defaults to Federated Search). */
   title?: string;
-  /** Search field rendered 32px right of the page title. */
-  headerSearch?: ReactNode;
+  /** Content rendered 32px right of the page title (e.g. search field, filter controls). */
+  headerAfterTitle?: ReactNode;
   /** Page actions rendered 32px left of the theme toggle (e.g. primary buttons). */
   titleTrailing?: ReactNode;
   className?: string;
@@ -23,7 +23,7 @@ export type SearchTopHeaderProps = {
  */
 export function SearchTopHeader({
   title = "Federated Search",
-  headerSearch,
+  headerAfterTitle,
   titleTrailing,
   className,
   chromeSurface = "container",
@@ -37,7 +37,7 @@ export function SearchTopHeader({
       <div className="flex min-h-12 items-center justify-between gap-3 px-5 py-2 sm:gap-4">
         <div className="flex min-w-0 flex-1 items-center">
           <h1 className="shrink-0 truncate text-page-title text-text-primary">{title}</h1>
-          {headerSearch ? <div className="ml-8 shrink-0">{headerSearch}</div> : null}
+          {headerAfterTitle ? <div className="ml-8 min-w-0 shrink">{headerAfterTitle}</div> : null}
         </div>
 
         <div className="flex shrink-0 items-center gap-2 sm:gap-3">

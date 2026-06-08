@@ -48,7 +48,7 @@ export function ConnectorsPage() {
         <SearchTopHeader
           title="Connectors"
           chromeSurface="page"
-          headerSearch={
+          headerAfterTitle={
             <div className="w-[240px] shrink-0">
               <Input
                 variant="search"
