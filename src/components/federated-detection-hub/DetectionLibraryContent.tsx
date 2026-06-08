@@ -2,6 +2,13 @@ import { Fragment, useMemo, useState } from "react";
 import { Checkbox, Icon, Switch, type SeverityShapeIconName } from "../../design-system";
 import { Button } from "../ui/Button";
 import { ColumnHeaderMenu } from "../ui/ColumnHeaderMenu";
+import {
+  compareBooleans,
+  compareFindings,
+  compareNumbers,
+  compareStrings,
+  useColumnSort,
+} from "../ui/useColumnSort";
 import { FilterColumnPanel, type FilterColumnPanelTool } from "../ui/FilterColumnPanel";
 import { Input } from "../ui/Input";
 import { SeverityTableIcon } from "../ui/SeverityTableIcon";
@@ -407,6 +414,23 @@ function LibraryDetectionDetailPanel({
   );
 }
 
+const LIBRARY_SEVERITY_ORDER: Record<DetectionSeverity, number> = {
+  Critical: 0,
+  High: 1,
+  Medium: 2,
+  Low: 3,
+};
+
+type LibrarySortColumn =
+  | "name"
+  | "state"
+  | "category"
+  | "severity"
+  | "lastRun"
+  | "recurrence"
+  | "findings"
+  | "connectors";
+
 const LIBRARY_EXPAND_COL_WIDTH = 40;
 const LIBRARY_COLUMN_COUNT = 10;
 const LIBRARY_COL_DEFAULTS: readonly number[] = [
@@ -488,6 +512,22 @@ function LibraryDetectionsTable({
   const tdClass = "h-10 px-2 py-0 align-middle text-sm text-text-secondary";
   const hasActiveFilters = searchQuery.trim().length > 0;
   const allExpanded = rows.length > 0 && rows.every((row) => expandedIds.has(row.id));
+  const sortComparators = useMemo(
+    (): Record<LibrarySortColumn, (a: LibraryDetectionRow, b: LibraryDetectionRow) => number> => ({
+      name: (a, b) => compareStrings(a.name, b.name),
+      state: (a, b) =>
+        compareBooleans(enabledById[a.id] ?? a.enabled, enabledById[b.id] ?? b.enabled),
+      category: (a, b) => compareStrings(a.category, b.category),
+      severity: (a, b) => LIBRARY_SEVERITY_ORDER[a.severity] - LIBRARY_SEVERITY_ORDER[b.severity],
+      lastRun: (a, b) => compareStrings(a.lastRun, b.lastRun),
+      recurrence: (a, b) => compareStrings(a.recurrence, b.recurrence),
+      findings: (a, b) => compareFindings(a.findings, b.findings),
+      connectors: (a, b) => compareNumbers(a.connectorsActive, b.connectorsActive),
+    }),
+    [enabledById],
+  );
+  const { sortedRows, getSortProps } = useColumnSort(sortComparators);
+  const displayRows = sortedRows(rows);
 
   return (
     <section className="flex min-h-0 min-w-0 flex-1 flex-col overflow-hidden rounded-[4px] border border-border-container bg-datavis-card-bg shadow-datavis-card">
@@ -578,35 +618,55 @@ function LibraryDetectionsTable({
                   {resizeHandle(0)}
                 </th>
                 <th scope="col" style={colStyle(1)} className={thClass}>
-                  <ColumnHeaderMenu label="Detections" menuLabel="Detections column options" />
+                  <ColumnHeaderMenu
+                    label="Detections"
+                    menuLabel="Detections column options"
+                    {...getSortProps("name")}
+                  />
                   {resizeHandle(1)}
                 </th>
                 <th scope="col" style={colStyle(2)} className={thClass}>
-                  <ColumnHeaderMenu label="State" menuLabel="State column options" />
+                  <ColumnHeaderMenu label="State" menuLabel="State column options" {...getSortProps("state")} />
                   {resizeHandle(2)}
                 </th>
                 <th scope="col" style={colStyle(3)} className={thClass}>
-                  <ColumnHeaderMenu label="Category" menuLabel="Category column options" />
+                  <ColumnHeaderMenu label="Category" menuLabel="Category column options" {...getSortProps("category")} />
                   {resizeHandle(3)}
                 </th>
                 <th scope="col" style={colStyle(4)} className={thClass}>
-                  <ColumnHeaderMenu label="Severity" menuLabel="Severity column options" />
+                  <ColumnHeaderMenu
+                    label="Severity"
+                    menuLabel="Severity column options"
+                    {...getSortProps("severity")}
+                  />
                   {resizeHandle(4)}
                 </th>
                 <th scope="col" style={colStyle(5)} className={thClass}>
-                  <ColumnHeaderMenu label="Last Run" menuLabel="Last Run column options" />
+                  <ColumnHeaderMenu label="Last Run" menuLabel="Last Run column options" {...getSortProps("lastRun")} />
                   {resizeHandle(5)}
                 </th>
                 <th scope="col" style={colStyle(6)} className={thClass}>
-                  <ColumnHeaderMenu label="Recurrence" menuLabel="Recurrence column options" />
+                  <ColumnHeaderMenu
+                    label="Recurrence"
+                    menuLabel="Recurrence column options"
+                    {...getSortProps("recurrence")}
+                  />
                   {resizeHandle(6)}
                 </th>
                 <th scope="col" style={colStyle(7)} className={thClass}>
-                  <ColumnHeaderMenu label="Detection Findings" menuLabel="Detection Findings column options" />
+                  <ColumnHeaderMenu
+                    label="Detection Findings"
+                    menuLabel="Detection Findings column options"
+                    {...getSortProps("findings")}
+                  />
                   {resizeHandle(7)}
                 </th>
                 <th scope="col" style={colStyle(8)} className={thClass}>
-                  <ColumnHeaderMenu label="Connectors" menuLabel="Connectors column options" />
+                  <ColumnHeaderMenu
+                    label="Connectors"
+                    menuLabel="Connectors column options"
+                    {...getSortProps("connectors")}
+                  />
                   {resizeHandle(8)}
                 </th>
                 <th scope="col" style={colStyle(9)} className="relative h-10 px-2 py-0 align-middle text-xs font-bold uppercase tracking-wide text-text-primary">
@@ -616,7 +676,7 @@ function LibraryDetectionsTable({
               </tr>
             </thead>
             <tbody>
-              {rows.map((row) => {
+              {displayRows.map((row) => {
                 const expanded = expandedIds.has(row.id);
                 const enabled = enabledById[row.id] ?? row.enabled;
                 return (

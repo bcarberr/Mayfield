@@ -2,6 +2,12 @@ import { Fragment, useMemo, useState } from "react";
 import { Checkbox, Icon, Switch, type SeverityShapeIconName } from "../../design-system";
 import { Button } from "../ui/Button";
 import { ColumnHeaderMenu } from "../ui/ColumnHeaderMenu";
+import {
+  compareBooleans,
+  compareFindings,
+  compareStrings,
+  useColumnSort,
+} from "../ui/useColumnSort";
 import { FilterColumnPanel, type FilterColumnPanelTool } from "../ui/FilterColumnPanel";
 import { Input } from "../ui/Input";
 import { SeverityTableIcon } from "../ui/SeverityTableIcon";
@@ -235,6 +241,15 @@ function QueuedDetectionDetailPanel({
   );
 }
 
+const QUEUED_SEVERITY_ORDER: Record<DetectionSeverity, number> = {
+  Critical: 0,
+  High: 1,
+  Medium: 2,
+  Low: 3,
+};
+
+type QueuedSortColumn = "name" | "state" | "queuedBy" | "queuedDate" | "severity" | "findings";
+
 const REVIEW_EXPAND_COL_WIDTH = 40;
 const REVIEW_COLUMN_COUNT = 8;
 const REVIEW_COL_DEFAULTS: readonly number[] = [
@@ -312,6 +327,20 @@ function QueuedReviewTable({
   const tdClass = "h-10 px-2 py-0 align-middle text-sm text-text-secondary";
   const hasActiveFilters = searchQuery.trim().length > 0;
   const allExpanded = rows.length > 0 && rows.every((row) => expandedIds.has(row.id));
+  const sortComparators = useMemo(
+    (): Record<QueuedSortColumn, (a: QueuedDetectionRow, b: QueuedDetectionRow) => number> => ({
+      name: (a, b) => compareStrings(a.name, b.name),
+      state: (a, b) =>
+        compareBooleans(enabledById[a.id] ?? a.enabled, enabledById[b.id] ?? b.enabled),
+      queuedBy: (a, b) => compareStrings(a.queuedBy, b.queuedBy),
+      queuedDate: (a, b) => compareStrings(a.queuedDate, b.queuedDate),
+      severity: (a, b) => QUEUED_SEVERITY_ORDER[a.severity] - QUEUED_SEVERITY_ORDER[b.severity],
+      findings: (a, b) => compareFindings(a.findings, b.findings),
+    }),
+    [enabledById],
+  );
+  const { sortedRows, getSortProps } = useColumnSort(sortComparators);
+  const displayRows = sortedRows(rows);
 
   return (
     <section className="flex min-h-0 min-w-0 flex-1 flex-col overflow-hidden rounded-[4px] border border-border-container bg-datavis-card-bg shadow-datavis-card">
@@ -402,27 +431,43 @@ function QueuedReviewTable({
                   {resizeHandle(0)}
                 </th>
                 <th scope="col" style={colStyle(1)} className={thClass}>
-                  <ColumnHeaderMenu label="Detections" menuLabel="Detections column options" />
+                  <ColumnHeaderMenu
+                    label="Detections"
+                    menuLabel="Detections column options"
+                    {...getSortProps("name")}
+                  />
                   {resizeHandle(1)}
                 </th>
                 <th scope="col" style={colStyle(2)} className={thClass}>
-                  <ColumnHeaderMenu label="State" menuLabel="State column options" />
+                  <ColumnHeaderMenu label="State" menuLabel="State column options" {...getSortProps("state")} />
                   {resizeHandle(2)}
                 </th>
                 <th scope="col" style={colStyle(3)} className={thClass}>
-                  <ColumnHeaderMenu label="Queued By" menuLabel="Queued By column options" />
+                  <ColumnHeaderMenu label="Queued By" menuLabel="Queued By column options" {...getSortProps("queuedBy")} />
                   {resizeHandle(3)}
                 </th>
                 <th scope="col" style={colStyle(4)} className={thClass}>
-                  <ColumnHeaderMenu label="Queued Date" menuLabel="Queued Date column options" />
+                  <ColumnHeaderMenu
+                    label="Queued Date"
+                    menuLabel="Queued Date column options"
+                    {...getSortProps("queuedDate")}
+                  />
                   {resizeHandle(4)}
                 </th>
                 <th scope="col" style={colStyle(5)} className={thClass}>
-                  <ColumnHeaderMenu label="Severity" menuLabel="Severity column options" />
+                  <ColumnHeaderMenu
+                    label="Severity"
+                    menuLabel="Severity column options"
+                    {...getSortProps("severity")}
+                  />
                   {resizeHandle(5)}
                 </th>
                 <th scope="col" style={colStyle(6)} className={thClass}>
-                  <ColumnHeaderMenu label="Detection Findings" menuLabel="Detection Findings column options" />
+                  <ColumnHeaderMenu
+                    label="Detection Findings"
+                    menuLabel="Detection Findings column options"
+                    {...getSortProps("findings")}
+                  />
                   {resizeHandle(6)}
                 </th>
                 <th scope="col" style={colStyle(7)} className="relative h-10 px-2 py-0 align-middle text-xs font-bold uppercase tracking-wide text-text-primary">
@@ -432,7 +477,7 @@ function QueuedReviewTable({
               </tr>
             </thead>
             <tbody>
-              {rows.map((row) => {
+              {displayRows.map((row) => {
                 const expanded = expandedIds.has(row.id);
                 const enabled = enabledById[row.id] ?? row.enabled;
                 return (

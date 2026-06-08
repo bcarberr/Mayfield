@@ -2,6 +2,12 @@ import { Fragment, useMemo, useRef, useState, type ReactNode } from "react";
 import { Checkbox, Icon, Switch, type SeverityShapeIconName } from "../../design-system";
 import { Button } from "../ui/Button";
 import { ColumnHeaderMenu } from "../ui/ColumnHeaderMenu";
+import {
+  compareBooleans,
+  compareFindings,
+  compareStrings,
+  useColumnSort,
+} from "../ui/useColumnSort";
 import { FilterColumnPanel, type FilterColumnPanelTool } from "../ui/FilterColumnPanel";
 import { Input } from "../ui/Input";
 import { SeverityTableIcon } from "../ui/SeverityTableIcon";
@@ -808,6 +814,15 @@ function DetectionDetailPanel({
 }
 
 /** px widths: expand, detections, state, severity, last run, recurrence, findings, actions */
+const DETECTION_SEVERITY_ORDER: Record<DetectionSeverity, number> = {
+  Critical: 0,
+  High: 1,
+  Medium: 2,
+  Low: 3,
+};
+
+type DetectionSortColumn = "name" | "state" | "severity" | "lastRun" | "recurrence" | "findings";
+
 const DETECTION_EXPAND_COL_WIDTH = 40;
 const DETECTION_COL_DEFAULTS: readonly number[] = [
   DETECTION_EXPAND_COL_WIDTH,
@@ -895,6 +910,20 @@ function DetectionsTable({
     showOnlyActive ||
     searchQuery.trim().length > 0;
   const allExpanded = rows.length > 0 && rows.every((row) => expandedIds.has(row.id));
+  const sortComparators = useMemo(
+    (): Record<DetectionSortColumn, (a: DetectionRow, b: DetectionRow) => number> => ({
+      name: (a, b) => compareStrings(a.name, b.name),
+      state: (a, b) =>
+        compareBooleans(enabledById[a.id] ?? a.enabled, enabledById[b.id] ?? b.enabled),
+      severity: (a, b) => DETECTION_SEVERITY_ORDER[a.severity] - DETECTION_SEVERITY_ORDER[b.severity],
+      lastRun: (a, b) => compareStrings(a.lastRun, b.lastRun),
+      recurrence: (a, b) => compareStrings(a.recurrence, b.recurrence),
+      findings: (a, b) => compareFindings(a.findings, b.findings),
+    }),
+    [enabledById],
+  );
+  const { sortedRows, getSortProps } = useColumnSort(sortComparators);
+  const displayRows = sortedRows(rows);
 
   return (
     <section className="flex min-h-0 min-w-0 flex-1 flex-col overflow-hidden rounded-[4px] border border-border-container bg-datavis-card-bg shadow-datavis-card">
@@ -989,27 +1018,43 @@ function DetectionsTable({
                   {resizeHandle(0)}
                 </th>
                 <th scope="col" style={colStyle(1)} className={thClass}>
-                  <ColumnHeaderMenu label="Detections" menuLabel="Detections column options" />
+                  <ColumnHeaderMenu
+                    label="Detections"
+                    menuLabel="Detections column options"
+                    {...getSortProps("name")}
+                  />
                   {resizeHandle(1)}
                 </th>
                 <th scope="col" style={colStyle(2)} className={thClass}>
-                  <ColumnHeaderMenu label="State" menuLabel="State column options" />
+                  <ColumnHeaderMenu label="State" menuLabel="State column options" {...getSortProps("state")} />
                   {resizeHandle(2)}
                 </th>
                 <th scope="col" style={colStyle(3)} className={thClass}>
-                  <ColumnHeaderMenu label="Severity" menuLabel="Severity column options" />
+                  <ColumnHeaderMenu
+                    label="Severity"
+                    menuLabel="Severity column options"
+                    {...getSortProps("severity")}
+                  />
                   {resizeHandle(3)}
                 </th>
                 <th scope="col" style={colStyle(4)} className={thClass}>
-                  <ColumnHeaderMenu label="Last Run" menuLabel="Last Run column options" />
+                  <ColumnHeaderMenu label="Last Run" menuLabel="Last Run column options" {...getSortProps("lastRun")} />
                   {resizeHandle(4)}
                 </th>
                 <th scope="col" style={colStyle(5)} className={thClass}>
-                  <ColumnHeaderMenu label="Recurrence" menuLabel="Recurrence column options" />
+                  <ColumnHeaderMenu
+                    label="Recurrence"
+                    menuLabel="Recurrence column options"
+                    {...getSortProps("recurrence")}
+                  />
                   {resizeHandle(5)}
                 </th>
                 <th scope="col" style={colStyle(6)} className={thClass}>
-                  <ColumnHeaderMenu label="Detection Findings" menuLabel="Detection Findings column options" />
+                  <ColumnHeaderMenu
+                    label="Detection Findings"
+                    menuLabel="Detection Findings column options"
+                    {...getSortProps("findings")}
+                  />
                   {resizeHandle(6)}
                 </th>
                 <th scope="col" style={colStyle(7)} className="relative h-10 px-2 py-0 align-middle text-xs font-bold uppercase tracking-wide text-text-primary">
@@ -1019,7 +1064,7 @@ function DetectionsTable({
               </tr>
             </thead>
             <tbody>
-              {rows.map((row) => {
+              {displayRows.map((row) => {
                 const expanded = expandedIds.has(row.id);
                 const enabled = enabledById[row.id] ?? row.enabled;
                 return (

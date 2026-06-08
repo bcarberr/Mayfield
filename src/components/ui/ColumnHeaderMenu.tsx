@@ -1,10 +1,54 @@
 import { Icon } from "../../design-system";
 import { Button } from "./Button";
+import type { ColumnSortDirection } from "./useColumnSort";
 
-export function ColumnHeaderMenu({ label, menuLabel }: { label: string; menuLabel: string }) {
+const cx = (...classes: (string | false | undefined)[]) => classes.filter(Boolean).join(" ");
+
+function sortToggleLabel(label: string, direction: ColumnSortDirection | null): string {
+  if (direction === "asc") return `Sort ${label} descending`;
+  if (direction === "desc") return `Clear ${label} sort`;
+  return `Sort ${label} ascending`;
+}
+
+export function ColumnHeaderMenu({
+  label,
+  menuLabel,
+  sortable,
+  sortDirection = null,
+  onSortToggle,
+}: {
+  label: string;
+  menuLabel: string;
+  sortable?: boolean;
+  sortDirection?: ColumnSortDirection | null;
+  onSortToggle?: () => void;
+}) {
+  const arrowDirection = sortDirection === "desc" ? "desc" : "asc";
+
   return (
     <div className="flex w-full min-w-0 translate-y-px items-center justify-between gap-1">
-      <span className="truncate">{label}</span>
+      <div className="flex min-w-0 flex-1 items-center gap-1">
+        <span className="truncate">{label}</span>
+        {sortable ? (
+          <button
+            type="button"
+            className={cx(
+              "inline-flex h-5 w-5 shrink-0 items-center justify-center rounded-sm text-text-tertiary transition-colors hover:text-interactive-active",
+              sortDirection != null && "text-interactive-active",
+            )}
+            aria-label={sortToggleLabel(label, sortDirection)}
+            aria-pressed={sortDirection != null}
+            onClick={onSortToggle}
+          >
+            <Icon
+              name={arrowDirection === "desc" ? "navi-arrow-downward" : "navi-arrow-upward"}
+              size={15}
+              className={cx("!h-[15.4px] !w-[15.4px]", sortDirection != null && "text-interactive-active")}
+              aria-hidden
+            />
+          </button>
+        ) : null}
+      </div>
       <Button
         type="button"
         variant="ghost"

@@ -7,6 +7,7 @@ import { SeverityTableIcon } from "../ui/SeverityTableIcon";
 import { SlideOver } from "../ui/SlideOver";
 import { Button } from "../ui/Button";
 import { ColumnHeaderMenu } from "../ui/ColumnHeaderMenu";
+import { compareStrings, useColumnSort } from "../ui/useColumnSort";
 import { Input } from "../ui/Input";
 import { useResizableColumns } from "../ui/useResizableColumns";
 import { Checkbox } from "../uiCheckbox";
@@ -274,6 +275,16 @@ function findingMatchesSearch(row: FindingRow, query: string): boolean {
   return haystack.includes(q);
 }
 
+const FINDING_SEVERITY_ORDER: Record<keyof typeof SEV_BAR, number> = {
+  Critical: 0,
+  High: 1,
+  Medium: 2,
+  Low: 3,
+  Informational: 4,
+};
+
+type FindingSortColumn = "severity" | "title" | "time" | "activity" | "status" | "eventType" | "connector";
+
 /** px widths: select, severity, title, time, activity, status, event type, connector, actions */
 const FINDING_EVENTS_SELECT_COL_WIDTH = 40;
 const FINDING_EVENTS_COL_DEFAULTS: readonly number[] = [
@@ -497,6 +508,21 @@ function FindingEventsTable({
     });
   };
 
+  const sortComparators = useMemo(
+    (): Record<FindingSortColumn, (a: FindingRow, b: FindingRow) => number> => ({
+      severity: (a, b) => FINDING_SEVERITY_ORDER[a.severity] - FINDING_SEVERITY_ORDER[b.severity],
+      title: (a, b) => compareStrings(a.title, b.title),
+      time: (a, b) => compareStrings(a.time, b.time),
+      activity: (a, b) => compareStrings(a.activity, b.activity),
+      status: (a, b) => compareStrings(a.status, b.status),
+      eventType: (a, b) => compareStrings(a.eventType, b.eventType),
+      connector: (a, b) => compareStrings(a.connector, b.connector),
+    }),
+    [],
+  );
+  const { sortedRows, getSortProps } = useColumnSort(sortComparators);
+  const displayRows = sortedRows(rows);
+
   return (
     <div ref={containerRef} className={cx("min-h-0 w-full min-w-0", isResizing && "select-none")}>
       <table
@@ -530,7 +556,11 @@ function FindingEventsTable({
             style={colStyle(1)}
             className="relative h-10 border-r border-datavis-gridlines px-2 py-0 align-middle text-xs font-bold uppercase tracking-wide text-text-primary"
           >
-            <ColumnHeaderMenu label="Severity" menuLabel="Severity column options" />
+            <ColumnHeaderMenu
+              label="Severity"
+              menuLabel="Severity column options"
+              {...getSortProps("severity")}
+            />
             {resizeHandle(1)}
           </th>
           <th
@@ -538,7 +568,7 @@ function FindingEventsTable({
             style={colStyle(2)}
             className="relative h-10 border-r border-datavis-gridlines px-2 py-0 align-middle text-xs font-bold uppercase tracking-wide text-text-primary"
           >
-            <ColumnHeaderMenu label="Title" menuLabel="Title column options" />
+            <ColumnHeaderMenu label="Title" menuLabel="Title column options" {...getSortProps("title")} />
             {resizeHandle(2)}
           </th>
           <th
@@ -546,7 +576,7 @@ function FindingEventsTable({
             style={colStyle(3)}
             className="relative h-10 border-r border-datavis-gridlines px-2 py-0 align-middle text-xs font-bold uppercase tracking-wide text-text-primary"
           >
-            <ColumnHeaderMenu label="Time" menuLabel="Time column options" />
+            <ColumnHeaderMenu label="Time" menuLabel="Time column options" {...getSortProps("time")} />
             {resizeHandle(3)}
           </th>
           <th
@@ -554,7 +584,7 @@ function FindingEventsTable({
             style={colStyle(4)}
             className="relative h-10 border-r border-datavis-gridlines px-2 py-0 align-middle text-xs font-bold uppercase tracking-wide text-text-primary"
           >
-            <ColumnHeaderMenu label="Activity" menuLabel="Activity column options" />
+            <ColumnHeaderMenu label="Activity" menuLabel="Activity column options" {...getSortProps("activity")} />
             {resizeHandle(4)}
           </th>
           <th
@@ -562,7 +592,7 @@ function FindingEventsTable({
             style={colStyle(5)}
             className="relative h-10 border-r border-datavis-gridlines px-2 py-0 align-middle text-xs font-bold uppercase tracking-wide text-text-primary"
           >
-            <ColumnHeaderMenu label="Status" menuLabel="Status column options" />
+            <ColumnHeaderMenu label="Status" menuLabel="Status column options" {...getSortProps("status")} />
             {resizeHandle(5)}
           </th>
           <th
@@ -570,7 +600,11 @@ function FindingEventsTable({
             style={colStyle(6)}
             className="relative h-10 border-r border-datavis-gridlines px-2 py-0 align-middle text-xs font-bold uppercase tracking-wide text-text-primary"
           >
-            <ColumnHeaderMenu label="Event type" menuLabel="Event type column options" />
+            <ColumnHeaderMenu
+              label="Event type"
+              menuLabel="Event type column options"
+              {...getSortProps("eventType")}
+            />
             {resizeHandle(6)}
           </th>
           <th
@@ -578,7 +612,7 @@ function FindingEventsTable({
             style={colStyle(7)}
             className="relative h-10 border-r border-datavis-gridlines px-2 py-0 align-middle text-xs font-bold uppercase tracking-wide text-text-primary"
           >
-            <ColumnHeaderMenu label="Connector" menuLabel="Connector column options" />
+            <ColumnHeaderMenu label="Connector" menuLabel="Connector column options" {...getSortProps("connector")} />
             {resizeHandle(7)}
           </th>
           <th
@@ -592,7 +626,7 @@ function FindingEventsTable({
         </tr>
       </thead>
       <tbody>
-        {rows.map((row) => {
+        {displayRows.map((row) => {
           const et = EVENT_TYPE_ICON[row.eventType];
           return (
             <tr key={row.id} className="h-10 border-b border-datavis-gridlines hover:bg-overlay-subtle">
