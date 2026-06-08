@@ -38,6 +38,26 @@ function detectionNeedsAttention(row: DetectionRow): boolean {
   return row.findings === "error";
 }
 
+type SystemHealthFilter = "running-normally" | "need-attention" | "inactive";
+
+const SYSTEM_HEALTH_FILTER_LABELS: Record<SystemHealthFilter, string> = {
+  "running-normally": "Running normally",
+  "need-attention": "Need attention",
+  inactive: "Inactive",
+};
+
+function detectionIsEnabled(row: DetectionRow, enabledById: Record<string, boolean>): boolean {
+  return enabledById[row.id] ?? row.enabled;
+}
+
+function detectionRunsNormally(row: DetectionRow, enabledById: Record<string, boolean>): boolean {
+  return detectionIsEnabled(row, enabledById) && !detectionNeedsAttention(row);
+}
+
+function detectionIsInactive(row: DetectionRow, enabledById: Record<string, boolean>): boolean {
+  return !detectionIsEnabled(row, enabledById);
+}
+
 function detectionMatchesSearch(row: DetectionRow, query: string, enabled: boolean): boolean {
   const q = query.trim().toLowerCase();
   if (!q) return true;
@@ -268,8 +288,6 @@ const DETECTION_ROWS: DetectionRow[] = [
   },
 ];
 
-const NEED_ATTENTION_COUNT = DETECTION_ROWS.filter(detectionNeedsAttention).length;
-
 function HubCard({
   title,
   titleTrailing,
@@ -333,12 +351,26 @@ function HubTabs({ active, onChange }: { active: HubTab; onChange: (tab: HubTab)
 
 /** Figma `7671:8909` — System Health widget. */
 function SystemHealthCard({
+  runningNormallyCount,
+  totalCount,
   needAttentionCount,
-  onViewNeedAttention,
+  inactiveCount,
+  selectedFilter,
+  onFilterClick,
 }: {
+  runningNormallyCount: number;
+  totalCount: number;
   needAttentionCount: number;
-  onViewNeedAttention: () => void;
+  inactiveCount: number;
+  selectedFilter: SystemHealthFilter | null;
+  onFilterClick: (filter: SystemHealthFilter) => void;
 }) {
+  const linkClass = (filter: SystemHealthFilter) =>
+    cx(
+      "text-left text-sm font-semibold transition-colors hover:text-interactive-active hover:underline",
+      selectedFilter === filter ? "text-interactive-active underline" : "text-text-primary",
+    );
+
   return (
     <HubCard
       className="h-full"
@@ -355,26 +387,44 @@ function SystemHealthCard({
         <span className="text-2xl font-bold tracking-wide text-text-primary">System Healthy</span>
         <ul className="col-start-2 space-y-3">
           <li className="flex items-baseline gap-3">
-            <span className="w-16 shrink-0 text-2xl font-bold tabular-nums text-text-primary">65/79</span>
-            <span className="text-sm font-semibold text-text-primary">Detections running normally</span>
+            <span className="w-16 shrink-0 text-2xl font-bold tabular-nums text-text-primary">
+              {runningNormallyCount}/{totalCount}
+            </span>
+            <button
+              type="button"
+              aria-pressed={selectedFilter === "running-normally"}
+              className={linkClass("running-normally")}
+              onClick={() => onFilterClick("running-normally")}
+            >
+              Detections running normally
+            </button>
           </li>
           <li className="flex items-baseline gap-3">
             <span className="flex w-16 shrink-0 items-center gap-1">
               <span className="text-2xl font-bold tabular-nums text-text-primary">{needAttentionCount}</span>
               <Icon name="error-outline" size={18} className="shrink-0 text-feedback-negative" aria-hidden />
             </span>
-            <span className="text-sm font-semibold text-text-primary">Detections need attention</span>
+            <button
+              type="button"
+              aria-pressed={selectedFilter === "need-attention"}
+              className={linkClass("need-attention")}
+              onClick={() => onFilterClick("need-attention")}
+            >
+              Detections need attention
+            </button>
           </li>
           <li className="flex items-baseline gap-3">
-            <span className="w-16 shrink-0 text-2xl font-bold tabular-nums text-text-primary">5</span>
-            <span className="text-sm font-semibold text-text-primary">Detections are inactive</span>
+            <span className="w-16 shrink-0 text-2xl font-bold tabular-nums text-text-primary">{inactiveCount}</span>
+            <button
+              type="button"
+              aria-pressed={selectedFilter === "inactive"}
+              className={linkClass("inactive")}
+              onClick={() => onFilterClick("inactive")}
+            >
+              Detections are inactive
+            </button>
           </li>
         </ul>
-        <div className="col-start-2 flex justify-end pt-1">
-          <Button type="button" variant="secondary" size="small" onClick={onViewNeedAttention}>
-            View detections need attentions
-          </Button>
-        </div>
       </div>
     </HubCard>
   );
@@ -792,7 +842,7 @@ function DetectionsTable({
   onEnabledChange,
   detectionNameFilter,
   severityFilter,
-  needsAttentionFilter,
+  systemHealthFilter,
   searchQuery,
   onSearchQueryChange,
   showOnlyActive,
@@ -811,7 +861,7 @@ function DetectionsTable({
   onEnabledChange: (id: string, enabled: boolean) => void;
   detectionNameFilter: string | null;
   severityFilter: BreakdownSeverity | null;
-  needsAttentionFilter: boolean;
+  systemHealthFilter: SystemHealthFilter | null;
   searchQuery: string;
   onSearchQueryChange: (query: string) => void;
   showOnlyActive: boolean;
@@ -841,7 +891,8 @@ function DetectionsTable({
   const hasActiveFilters =
     detectionNameFilter != null ||
     severityFilter != null ||
-    needsAttentionFilter ||
+    systemHealthFilter != null ||
+    showOnlyActive ||
     searchQuery.trim().length > 0;
   const allExpanded = rows.length > 0 && rows.every((row) => expandedIds.has(row.id));
 
@@ -855,7 +906,8 @@ function DetectionsTable({
             {detectionNameFilter ? ` · ${detectionNameFilter}` : ""}
             {searchQuery.trim() ? ` · “${searchQuery.trim()}”` : ""}
             {severityFilter ? ` · ${severityFilter}` : ""}
-            {needsAttentionFilter ? " · Need attention" : ""}
+            {systemHealthFilter ? ` · ${SYSTEM_HEALTH_FILTER_LABELS[systemHealthFilter]}` : ""}
+            {showOnlyActive ? " · Active only" : ""}
           </p>
           <div className="flex shrink-0 flex-wrap items-center gap-3">
             <div className="w-[300px] shrink-0">
@@ -1065,20 +1117,34 @@ function ManageDetectionsContent() {
     Object.fromEntries(DETECTION_ROWS.map((r) => [r.id, r.enabled])),
   );
   const [showOnlyActive, setShowOnlyActive] = useState(false);
-  const [needsAttentionFilter, setNeedsAttentionFilter] = useState(false);
+  const [systemHealthFilter, setSystemHealthFilter] = useState<SystemHealthFilter | null>(null);
+
+  const systemHealthCounts = useMemo(() => {
+    const inactive = DETECTION_ROWS.filter((row) => detectionIsInactive(row, enabledById)).length;
+    const needAttention = DETECTION_ROWS.filter(detectionNeedsAttention).length;
+    const runningNormally = DETECTION_ROWS.filter((row) => detectionRunsNormally(row, enabledById)).length;
+    return {
+      inactive,
+      needAttention,
+      runningNormally,
+      total: DETECTION_ROWS.length,
+    };
+  }, [enabledById]);
 
   const filteredRows = useMemo(
     () =>
       DETECTION_ROWS.filter((row) => {
         if (detectionNameFilter && row.name !== detectionNameFilter) return false;
         if (severityFilter && !rowMatchesSeverityFilter(row.severity, severityFilter)) return false;
-        if (needsAttentionFilter && !detectionNeedsAttention(row)) return false;
+        if (systemHealthFilter === "need-attention" && !detectionNeedsAttention(row)) return false;
+        if (systemHealthFilter === "inactive" && !detectionIsInactive(row, enabledById)) return false;
+        if (systemHealthFilter === "running-normally" && !detectionRunsNormally(row, enabledById)) return false;
         const enabled = enabledById[row.id] ?? row.enabled;
         if (showOnlyActive && !enabled) return false;
         if (!detectionMatchesSearch(row, searchQuery, enabled)) return false;
         return true;
       }),
-    [detectionNameFilter, severityFilter, needsAttentionFilter, searchQuery, enabledById, showOnlyActive],
+    [detectionNameFilter, severityFilter, systemHealthFilter, searchQuery, enabledById, showOnlyActive],
   );
 
   const drawerRow = useMemo(
@@ -1113,16 +1179,16 @@ function ManageDetectionsContent() {
 
   const handleSegmentClick = (label: string) => {
     setDetectionNameFilter((current) => (current === label ? null : label));
-    setNeedsAttentionFilter(false);
+    setSystemHealthFilter(null);
   };
 
   const handleSeverityClick = (severity: BreakdownSeverity) => {
     setSeverityFilter((current) => (current === severity ? null : severity));
-    setNeedsAttentionFilter(false);
+    setSystemHealthFilter(null);
   };
 
-  const handleViewNeedAttention = () => {
-    setNeedsAttentionFilter(true);
+  const handleSystemHealthFilterClick = (filter: SystemHealthFilter) => {
+    setSystemHealthFilter((current) => (current === filter ? null : filter));
     setDetectionNameFilter(null);
     setSeverityFilter(null);
   };
@@ -1131,8 +1197,12 @@ function ManageDetectionsContent() {
     <>
       <div className="grid shrink-0 grid-cols-1 items-stretch gap-4 xl:grid-cols-3">
         <SystemHealthCard
-          needAttentionCount={NEED_ATTENTION_COUNT}
-          onViewNeedAttention={handleViewNeedAttention}
+          runningNormallyCount={systemHealthCounts.runningNormally}
+          totalCount={systemHealthCounts.total}
+          needAttentionCount={systemHealthCounts.needAttention}
+          inactiveCount={systemHealthCounts.inactive}
+          selectedFilter={systemHealthFilter}
+          onFilterClick={handleSystemHealthFilterClick}
         />
         <TopFindingsCard selectedLabel={detectionNameFilter} onSegmentClick={handleSegmentClick} />
         <SeverityBreakdownCard selectedSeverity={severityFilter} onSeverityClick={handleSeverityClick} />
@@ -1149,7 +1219,7 @@ function ManageDetectionsContent() {
         onEnabledChange={(id, enabled) => setEnabledById((current) => ({ ...current, [id]: enabled }))}
         detectionNameFilter={detectionNameFilter}
         severityFilter={severityFilter}
-        needsAttentionFilter={needsAttentionFilter}
+        systemHealthFilter={systemHealthFilter}
         searchQuery={searchQuery}
         onSearchQueryChange={setSearchQuery}
         showOnlyActive={showOnlyActive}
@@ -1158,7 +1228,8 @@ function ManageDetectionsContent() {
         onClearFilters={() => {
           setDetectionNameFilter(null);
           setSeverityFilter(null);
-          setNeedsAttentionFilter(false);
+          setSystemHealthFilter(null);
+          setShowOnlyActive(false);
           setSearchQuery("");
         }}
       />
