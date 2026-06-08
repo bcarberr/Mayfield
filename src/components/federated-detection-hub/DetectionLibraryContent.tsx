@@ -1,5 +1,5 @@
 import { Fragment, useMemo, useState } from "react";
-import { Icon, Switch, type SeverityShapeIconName } from "../../design-system";
+import { Checkbox, Icon, Switch, type SeverityShapeIconName } from "../../design-system";
 import { Button } from "../ui/Button";
 import { ColumnHeaderMenu } from "../ui/ColumnHeaderMenu";
 import { FilterColumnPanel, type FilterColumnPanelTool } from "../ui/FilterColumnPanel";
@@ -448,6 +448,8 @@ function LibraryDetectionsTable({
   onEnabledChange,
   searchQuery,
   onSearchQueryChange,
+  showOnlyActive,
+  onShowOnlyActiveChange,
   totalCount,
   onClearFilters,
 }: {
@@ -462,6 +464,8 @@ function LibraryDetectionsTable({
   onEnabledChange: (id: string, enabled: boolean) => void;
   searchQuery: string;
   onSearchQueryChange: (query: string) => void;
+  showOnlyActive: boolean;
+  onShowOnlyActiveChange: (checked: boolean) => void;
   totalCount: number;
   onClearFilters: () => void;
 }) {
@@ -496,14 +500,22 @@ function LibraryDetectionsTable({
             {rows.length} of {totalCount} Results
             {searchQuery.trim() ? ` · “${searchQuery.trim()}”` : ""}
           </p>
-          <div className="w-[300px] shrink-0">
-            <Input
-              variant="search"
-              placeholder="Search"
-              value={searchQuery}
-              onChange={(event) => onSearchQueryChange(event.target.value)}
-              className="h-7 !bg-datavis-card-bg"
-              aria-label="Search detection library"
+          <div className="flex shrink-0 flex-wrap items-center gap-3">
+            <div className="w-[300px] shrink-0">
+              <Input
+                variant="search"
+                placeholder="Search"
+                value={searchQuery}
+                onChange={(event) => onSearchQueryChange(event.target.value)}
+                className="h-7 !bg-datavis-card-bg"
+                aria-label="Search detection library"
+              />
+            </div>
+            <Checkbox
+              checked={showOnlyActive}
+              onCheckedChange={onShowOnlyActiveChange}
+              label="Show only Active Detections"
+              className="shrink-0"
             />
           </div>
           {hasActiveFilters ? (
@@ -608,9 +620,15 @@ function LibraryDetectionsTable({
             <tbody>
               {rows.map((row) => {
                 const expanded = expandedIds.has(row.id);
+                const enabled = enabledById[row.id] ?? row.enabled;
                 return (
                   <Fragment key={row.id}>
-                    <tr className="h-10 border-b border-datavis-gridlines hover:bg-overlay-subtle">
+                    <tr
+                      className={cx(
+                        "h-10 border-b border-datavis-gridlines hover:bg-overlay-subtle",
+                        !enabled && "opacity-70",
+                      )}
+                    >
                       <td style={colStyle(0)} className="h-10 px-0 py-0 align-middle">
                         <div className="flex justify-center">
                           <button
@@ -681,7 +699,12 @@ function LibraryDetectionsTable({
                       </td>
                     </tr>
                     {expanded ? (
-                      <tr className="border-b border-datavis-gridlines bg-surface-table-row-header">
+                      <tr
+                        className={cx(
+                          "border-b border-datavis-gridlines bg-surface-table-row-header",
+                          !enabled && "opacity-70",
+                        )}
+                      >
                         <td colSpan={LIBRARY_COLUMN_COUNT} className="px-4 py-3 align-top">
                           <p className="text-sm leading-relaxed text-text-secondary">{row.description}</p>
                         </td>
@@ -706,13 +729,15 @@ export function DetectionLibraryContent() {
   const [enabledById, setEnabledById] = useState<Record<string, boolean>>(() =>
     Object.fromEntries(LIBRARY_DETECTION_ROWS.map((r) => [r.id, r.enabled])),
   );
+  const [showOnlyActive, setShowOnlyActive] = useState(false);
 
   const filteredRows = useMemo(() => {
     return LIBRARY_DETECTION_ROWS.filter((row) => {
       const enabled = enabledById[row.id] ?? row.enabled;
+      if (showOnlyActive && !enabled) return false;
       return libraryMatchesSearch(row, searchQuery, enabled);
     });
-  }, [searchQuery, enabledById]);
+  }, [searchQuery, enabledById, showOnlyActive]);
 
   const summaryStats = useMemo(() => {
     const total = LIBRARY_DETECTION_ROWS.length;
@@ -766,6 +791,8 @@ export function DetectionLibraryContent() {
         onEnabledChange={(id, enabled) => setEnabledById((prev) => ({ ...prev, [id]: enabled }))}
         searchQuery={searchQuery}
         onSearchQueryChange={setSearchQuery}
+        showOnlyActive={showOnlyActive}
+        onShowOnlyActiveChange={setShowOnlyActive}
         totalCount={LIBRARY_DETECTION_ROWS.length}
         onClearFilters={() => setSearchQuery("")}
       />

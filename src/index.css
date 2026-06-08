@@ -93,6 +93,9 @@
   --color-datavis-data-pop-teal-20: #a9e7f3;
   --color-datavis-card-bg: #1e1e1e;
   --color-datavis-gridlines: #424242;
+  --color-feedback-positive: #17ae81;
+  --color-feedback-negative: #ff604a;
+  --color-feedback-caution: #fac354;
   /* hover overlay applied on top of any surface — kept low-alpha */
   --color-overlay-subtle: rgba(255, 255, 255, 0.05);
   --color-overlay-scrim: rgba(0, 0, 0, 0.6);

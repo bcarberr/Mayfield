@@ -1,5 +1,5 @@
 import { Fragment, useMemo, useRef, useState, type ReactNode } from "react";
-import { Icon, Switch, type SeverityShapeIconName } from "../../design-system";
+import { Checkbox, Icon, Switch, type SeverityShapeIconName } from "../../design-system";
 import { Button } from "../ui/Button";
 import { ColumnHeaderMenu } from "../ui/ColumnHeaderMenu";
 import { FilterColumnPanel, type FilterColumnPanelTool } from "../ui/FilterColumnPanel";
@@ -34,6 +34,10 @@ type BreakdownSeverity = "Critical" | "High" | "Medium" | "Low";
 function rowMatchesSeverityFilter(rowSeverity: DetectionSeverity, filter: BreakdownSeverity) {
   if (filter === "Critical") return rowSeverity === "Critical" || rowSeverity === "Fatal";
   return rowSeverity === filter;
+}
+
+function detectionNeedsAttention(row: DetectionRow): boolean {
+  return row.findings === "error";
 }
 
 function detectionMatchesSearch(row: DetectionRow, query: string, enabled: boolean): boolean {
@@ -87,6 +91,8 @@ const SEV_ICONS: Record<DetectionSeverity, SeverityShapeIconName> = {
   Low: "severity-low",
 };
 
+const OVERALL_FINDINGS_COUNT = 1389;
+
 const DETECTION_ROWS: DetectionRow[] = [
   {
     id: "1",
@@ -97,7 +103,7 @@ const DETECTION_ROWS: DetectionRow[] = [
     severity: "Fatal",
     lastRun: "1 min ago",
     recurrence: "Every Tue 12:00 AM",
-    findings: 2,
+    findings: 861,
   },
   {
     id: "2",
@@ -119,7 +125,7 @@ const DETECTION_ROWS: DetectionRow[] = [
     severity: "High",
     lastRun: "58 mins ago",
     recurrence: "Every Tue 12:00 AM",
-    findings: 5,
+    findings: 209,
   },
   {
     id: "4",
@@ -130,7 +136,7 @@ const DETECTION_ROWS: DetectionRow[] = [
     severity: "High",
     lastRun: "1 hour 15 mins ago",
     recurrence: "Every Tue 12:00 AM",
-    findings: 2,
+    findings: "error",
   },
   {
     id: "5",
@@ -152,7 +158,7 @@ const DETECTION_ROWS: DetectionRow[] = [
     severity: "Medium",
     lastRun: "6 hours ago",
     recurrence: "Every Tue 12:00 AM",
-    findings: 2,
+    findings: "error",
   },
   {
     id: "7",
@@ -163,7 +169,7 @@ const DETECTION_ROWS: DetectionRow[] = [
     severity: "Critical",
     lastRun: "7 hours ago",
     recurrence: "Every Tue 12:00 AM",
-    findings: 1,
+    findings: 319,
   },
   {
     id: "8",
@@ -174,7 +180,7 @@ const DETECTION_ROWS: DetectionRow[] = [
     severity: "Low",
     lastRun: "8 hours ago",
     recurrence: "Every Tue 12:00 AM",
-    findings: 1,
+    findings: "error",
   },
   {
     id: "9",
@@ -185,7 +191,7 @@ const DETECTION_ROWS: DetectionRow[] = [
     severity: "Medium",
     lastRun: "10 hours ago",
     recurrence: "Every Tue 12:00 AM",
-    findings: 2,
+    findings: "error",
   },
   {
     id: "10",
@@ -196,7 +202,7 @@ const DETECTION_ROWS: DetectionRow[] = [
     severity: "High",
     lastRun: "18 hours ago",
     recurrence: "Every Tue 12:00 AM",
-    findings: 3,
+    findings: "error",
   },
   {
     id: "11",
@@ -207,7 +213,7 @@ const DETECTION_ROWS: DetectionRow[] = [
     severity: "Critical",
     lastRun: "20 hours ago",
     recurrence: "Every Tue 12:00 AM",
-    findings: 4,
+    findings: 42,
   },
   {
     id: "12",
@@ -218,7 +224,7 @@ const DETECTION_ROWS: DetectionRow[] = [
     severity: "High",
     lastRun: "1 day ago",
     recurrence: "Every Tue 12:00 AM",
-    findings: 7,
+    findings: "error",
   },
   {
     id: "13",
@@ -240,7 +246,7 @@ const DETECTION_ROWS: DetectionRow[] = [
     severity: "High",
     lastRun: "2 days ago",
     recurrence: "Every Tue 12:00 AM",
-    findings: 2,
+    findings: "error",
   },
   {
     id: "15",
@@ -251,7 +257,7 @@ const DETECTION_ROWS: DetectionRow[] = [
     severity: "Fatal",
     lastRun: "2 days ago",
     recurrence: "Every Tue 12:00 AM",
-    findings: "error",
+    findings: 18,
   },
   {
     id: "16",
@@ -262,9 +268,11 @@ const DETECTION_ROWS: DetectionRow[] = [
     severity: "Low",
     lastRun: "3 days ago",
     recurrence: "Every Tue 12:00 AM",
-    findings: 1,
+    findings: "error",
   },
 ];
+
+const NEED_ATTENTION_COUNT = DETECTION_ROWS.filter(detectionNeedsAttention).length;
 
 function HubCard({
   title,
@@ -328,7 +336,13 @@ function HubTabs({ active, onChange }: { active: HubTab; onChange: (tab: HubTab)
 }
 
 /** Figma `7671:8909` — System Health widget. */
-function SystemHealthCard() {
+function SystemHealthCard({
+  needAttentionCount,
+  onViewNeedAttention,
+}: {
+  needAttentionCount: number;
+  onViewNeedAttention: () => void;
+}) {
   return (
     <HubCard
       className="h-full"
@@ -339,7 +353,7 @@ function SystemHealthCard() {
         <Icon
           name="action-check"
           size={20}
-          className="inline-flex h-5 w-[27px] shrink-0 self-center text-text-primary [&>svg]:!h-5 [&>svg]:!w-[27px]"
+          className="inline-flex h-5 w-[27px] shrink-0 self-center text-feedback-positive [&>svg]:!h-5 [&>svg]:!w-[27px]"
           aria-hidden
         />
         <span className="text-2xl font-bold tracking-wide text-text-primary">System Healthy</span>
@@ -350,8 +364,8 @@ function SystemHealthCard() {
           </li>
           <li className="flex items-baseline gap-3">
             <span className="flex w-16 shrink-0 items-center gap-1">
-              <span className="text-2xl font-bold tabular-nums text-text-primary">9</span>
-              <Icon name="warning" size={18} className="text-feedback-negative" aria-hidden />
+              <span className="text-2xl font-bold tabular-nums text-text-primary">{needAttentionCount}</span>
+              <Icon name="error-outline" size={18} className="shrink-0 text-feedback-negative" aria-hidden />
             </span>
             <span className="text-sm font-semibold text-text-primary">Detections need attention</span>
           </li>
@@ -361,7 +375,7 @@ function SystemHealthCard() {
           </li>
         </ul>
         <div className="col-start-2 flex justify-end pt-1">
-          <Button type="button" variant="secondary" size="small">
+          <Button type="button" variant="secondary" size="small" onClick={onViewNeedAttention}>
             View detections need attentions
           </Button>
         </div>
@@ -387,7 +401,7 @@ const TOP_FINDINGS_SEGMENTS: TopFindingSegment[] = [
   { label: "Credential Dumping Activity", color: "#5fd3f8", value: 209 },
 ];
 
-const TOP_FINDINGS_TOTAL = TOP_FINDINGS_SEGMENTS.reduce((sum, segment) => sum + segment.value, 0);
+const TOP_FINDINGS_TOTAL = OVERALL_FINDINGS_COUNT;
 
 function polarToCartesian(cx: number, cy: number, radius: number, angleDeg: number) {
   const rad = ((angleDeg - 90) * Math.PI) / 180;
@@ -587,7 +601,7 @@ function SeverityBreakdownCard({
   const filterActive = selectedSeverity != null;
 
   return (
-    <HubCard className="h-full" title="Severity Breakdown (Overall 1389 Findings)">
+    <HubCard className="h-full" title={`Severity Breakdown (Overall ${OVERALL_FINDINGS_COUNT.toLocaleString()} Findings)`}>
       <div
         className="flex flex-1 flex-col justify-between"
         style={{ minHeight: TOP_FINDINGS_DONUT_OUTER_PX - 24 }}
@@ -782,8 +796,11 @@ function DetectionsTable({
   onEnabledChange,
   detectionNameFilter,
   severityFilter,
+  needsAttentionFilter,
   searchQuery,
   onSearchQueryChange,
+  showOnlyActive,
+  onShowOnlyActiveChange,
   totalCount,
   onClearFilters,
 }: {
@@ -798,8 +815,11 @@ function DetectionsTable({
   onEnabledChange: (id: string, enabled: boolean) => void;
   detectionNameFilter: string | null;
   severityFilter: BreakdownSeverity | null;
+  needsAttentionFilter: boolean;
   searchQuery: string;
   onSearchQueryChange: (query: string) => void;
+  showOnlyActive: boolean;
+  onShowOnlyActiveChange: (checked: boolean) => void;
   totalCount: number;
   onClearFilters: () => void;
 }) {
@@ -823,7 +843,10 @@ function DetectionsTable({
     "relative h-10 border-r border-datavis-gridlines px-2 py-0 align-middle text-xs font-bold uppercase tracking-wide text-text-primary";
   const tdClass = "h-10 px-2 py-0 align-middle text-sm text-text-secondary";
   const hasActiveFilters =
-    detectionNameFilter != null || severityFilter != null || searchQuery.trim().length > 0;
+    detectionNameFilter != null ||
+    severityFilter != null ||
+    needsAttentionFilter ||
+    searchQuery.trim().length > 0;
   const allExpanded = rows.length > 0 && rows.every((row) => expandedIds.has(row.id));
 
   return (
@@ -836,15 +859,24 @@ function DetectionsTable({
             {detectionNameFilter ? ` · ${detectionNameFilter}` : ""}
             {searchQuery.trim() ? ` · “${searchQuery.trim()}”` : ""}
             {severityFilter ? ` · ${severityFilter}` : ""}
+            {needsAttentionFilter ? " · Need attention" : ""}
           </p>
-          <div className="w-[300px] shrink-0">
-            <Input
-              variant="search"
-              placeholder="Search"
-              value={searchQuery}
-              onChange={(event) => onSearchQueryChange(event.target.value)}
-              className="h-7 !bg-datavis-card-bg"
-              aria-label="Search detections"
+          <div className="flex shrink-0 flex-wrap items-center gap-3">
+            <div className="w-[300px] shrink-0">
+              <Input
+                variant="search"
+                placeholder="Search"
+                value={searchQuery}
+                onChange={(event) => onSearchQueryChange(event.target.value)}
+                className="h-7 !bg-datavis-card-bg"
+                aria-label="Search detections"
+              />
+            </div>
+            <Checkbox
+              checked={showOnlyActive}
+              onCheckedChange={onShowOnlyActiveChange}
+              label="Show only Active Detections"
+              className="shrink-0"
             />
           </div>
           {hasActiveFilters ? (
@@ -941,9 +973,15 @@ function DetectionsTable({
             <tbody>
               {rows.map((row) => {
                 const expanded = expandedIds.has(row.id);
+                const enabled = enabledById[row.id] ?? row.enabled;
                 return (
                   <Fragment key={row.id}>
-                    <tr className="h-10 border-b border-datavis-gridlines hover:bg-overlay-subtle">
+                    <tr
+                      className={cx(
+                        "h-10 border-b border-datavis-gridlines hover:bg-overlay-subtle",
+                        !enabled && "opacity-70",
+                      )}
+                    >
                       <td style={colStyle(0)} className="h-10 px-0 py-0 align-middle">
                         <div className="flex justify-center">
                           <button
@@ -998,7 +1036,12 @@ function DetectionsTable({
                       </td>
                     </tr>
                     {expanded ? (
-                      <tr className="border-b border-datavis-gridlines bg-surface-table-row-header">
+                      <tr
+                        className={cx(
+                          "border-b border-datavis-gridlines bg-surface-table-row-header",
+                          !enabled && "opacity-70",
+                        )}
+                      >
                         <td colSpan={DETECTION_COLUMN_COUNT} className="px-4 py-3 align-top">
                           <p className="text-sm leading-relaxed text-text-secondary">{row.description}</p>
                         </td>
@@ -1025,17 +1068,21 @@ function ManageDetectionsContent() {
   const [enabledById, setEnabledById] = useState<Record<string, boolean>>(() =>
     Object.fromEntries(DETECTION_ROWS.map((r) => [r.id, r.enabled])),
   );
+  const [showOnlyActive, setShowOnlyActive] = useState(false);
+  const [needsAttentionFilter, setNeedsAttentionFilter] = useState(false);
 
   const filteredRows = useMemo(
     () =>
       DETECTION_ROWS.filter((row) => {
         if (detectionNameFilter && row.name !== detectionNameFilter) return false;
         if (severityFilter && !rowMatchesSeverityFilter(row.severity, severityFilter)) return false;
+        if (needsAttentionFilter && !detectionNeedsAttention(row)) return false;
         const enabled = enabledById[row.id] ?? row.enabled;
+        if (showOnlyActive && !enabled) return false;
         if (!detectionMatchesSearch(row, searchQuery, enabled)) return false;
         return true;
       }),
-    [detectionNameFilter, severityFilter, searchQuery, enabledById],
+    [detectionNameFilter, severityFilter, needsAttentionFilter, searchQuery, enabledById, showOnlyActive],
   );
 
   const drawerRow = useMemo(
@@ -1070,16 +1117,27 @@ function ManageDetectionsContent() {
 
   const handleSegmentClick = (label: string) => {
     setDetectionNameFilter((current) => (current === label ? null : label));
+    setNeedsAttentionFilter(false);
   };
 
   const handleSeverityClick = (severity: BreakdownSeverity) => {
     setSeverityFilter((current) => (current === severity ? null : severity));
+    setNeedsAttentionFilter(false);
+  };
+
+  const handleViewNeedAttention = () => {
+    setNeedsAttentionFilter(true);
+    setDetectionNameFilter(null);
+    setSeverityFilter(null);
   };
 
   return (
     <>
       <div className="grid shrink-0 grid-cols-1 items-stretch gap-4 xl:grid-cols-3">
-        <SystemHealthCard />
+        <SystemHealthCard
+          needAttentionCount={NEED_ATTENTION_COUNT}
+          onViewNeedAttention={handleViewNeedAttention}
+        />
         <TopFindingsCard selectedLabel={detectionNameFilter} onSegmentClick={handleSegmentClick} />
         <SeverityBreakdownCard selectedSeverity={severityFilter} onSeverityClick={handleSeverityClick} />
       </div>
@@ -1095,12 +1153,16 @@ function ManageDetectionsContent() {
         onEnabledChange={(id, enabled) => setEnabledById((current) => ({ ...current, [id]: enabled }))}
         detectionNameFilter={detectionNameFilter}
         severityFilter={severityFilter}
+        needsAttentionFilter={needsAttentionFilter}
         searchQuery={searchQuery}
         onSearchQueryChange={setSearchQuery}
+        showOnlyActive={showOnlyActive}
+        onShowOnlyActiveChange={setShowOnlyActive}
         totalCount={DETECTION_ROWS.length}
         onClearFilters={() => {
           setDetectionNameFilter(null);
           setSeverityFilter(null);
+          setNeedsAttentionFilter(false);
           setSearchQuery("");
         }}
       />
