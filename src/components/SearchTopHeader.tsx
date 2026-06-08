@@ -8,7 +8,9 @@ const cx = (...c: (string | false | undefined)[]) => c.filter(Boolean).join(" ")
 export type SearchTopHeaderProps = {
   /** Page title (defaults to Federated Search). */
   title?: string;
-  /** Content rendered to the right of the title (e.g. search field). */
+  /** Search field rendered 32px right of the page title. */
+  headerSearch?: ReactNode;
+  /** Page actions rendered 32px left of the theme toggle (e.g. primary buttons). */
   titleTrailing?: ReactNode;
   className?: string;
   /** Header + focus ring offset surface — `page` matches Figma Page BG. */
@@ -17,10 +19,11 @@ export type SearchTopHeaderProps = {
 
 /**
  * Search workspace chrome — Figma Config-Schema-v2 node `7876-102758`.
- * Left: page title; right: theme, help, alerts, divider, account.
+ * Left: page title + optional search; right: actions, theme, help, alerts, divider, account.
  */
 export function SearchTopHeader({
   title = "Federated Search",
+  headerSearch,
   titleTrailing,
   className,
   chromeSurface = "container",
@@ -32,12 +35,13 @@ export function SearchTopHeader({
   return (
     <header className={cx("shrink-0", bg, className)}>
       <div className="flex min-h-12 items-center justify-between gap-3 px-5 py-2 sm:gap-4">
-        <div className="flex min-w-0 flex-1 items-center gap-6">
+        <div className="flex min-w-0 flex-1 items-center">
           <h1 className="shrink-0 truncate text-page-title text-text-primary">{title}</h1>
-          {titleTrailing ? <div className="min-w-0 shrink-0">{titleTrailing}</div> : null}
+          {headerSearch ? <div className="ml-8 shrink-0">{headerSearch}</div> : null}
         </div>
 
         <div className="flex shrink-0 items-center gap-2 sm:gap-3">
+          {titleTrailing ? <div className="mr-8 flex shrink-0 items-center">{titleTrailing}</div> : null}
           <ThemeToggle />
           <div className="flex items-center gap-0 sm:gap-1">
             <Button

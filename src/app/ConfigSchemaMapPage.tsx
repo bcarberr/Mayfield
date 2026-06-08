@@ -749,20 +749,22 @@ export function ConnectorSetupPanel({ onClose }: ConnectorSetupPanelProps) {
               DYNAMIC SCHEMA
             </span>
           </div>
-          <div className="flex shrink-0 items-center gap-2">
-            <ThemeToggle />
-            <div className="flex items-center gap-1 text-base leading-6 tracking-[0.5px] text-text-primary">
-              <Button variant="ghost" className="p-1" aria-label="Previous step">
-                <Icon name="chevron-down" size={20} className="rotate-90 text-text-primary" />
-              </Button>
-              <span className="min-w-[96px] text-center text-base font-normal leading-6">Step 3 of 3</span>
-              <Button variant="ghost" className="p-1" aria-label="Next step">
-                <Icon name="chevron-down" size={20} className="-rotate-90 text-text-primary" />
+          <div className="flex shrink-0 items-center">
+            <div className="mr-8 flex items-center gap-2">
+              <div className="flex items-center gap-1 text-base leading-6 tracking-[0.5px] text-text-primary">
+                <Button variant="ghost" className="p-1" aria-label="Previous step">
+                  <Icon name="chevron-down" size={20} className="rotate-90 text-text-primary" />
+                </Button>
+                <span className="min-w-[96px] text-center text-base font-normal leading-6">Step 3 of 3</span>
+                <Button variant="ghost" className="p-1" aria-label="Next step">
+                  <Icon name="chevron-down" size={20} className="-rotate-90 text-text-primary" />
+                </Button>
+              </div>
+              <Button variant="ghost" className="rounded-2xl p-1" aria-label="Close" title="Close" onClick={onClose}>
+                <Icon name="close" size={24} />
               </Button>
             </div>
-            <Button variant="ghost" className="rounded-2xl p-1" aria-label="Close" title="Close" onClick={onClose}>
-              <Icon name="close" size={24} />
-            </Button>
+            <ThemeToggle />
           </div>
         </div>
 

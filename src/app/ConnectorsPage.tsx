@@ -48,17 +48,19 @@ export function ConnectorsPage() {
         <SearchTopHeader
           title="Connectors"
           chromeSurface="page"
+          headerSearch={
+            <div className="w-[240px] shrink-0">
+              <Input
+                variant="search"
+                placeholder="Search"
+                className="h-8 !bg-surface-container"
+                startAdornment={<Icon name="search" size={18} aria-hidden />}
+                aria-label="Search connectors"
+              />
+            </div>
+          }
           titleTrailing={
             <div className="flex items-center gap-4" role="toolbar" aria-label="Connector actions">
-              <div className="w-[240px] shrink-0">
-                <Input
-                  variant="search"
-                  placeholder="Search"
-                  className="h-8 !bg-surface-container"
-                  startAdornment={<Icon name="search" size={18} aria-hidden />}
-                  aria-label="Search connectors"
-                />
-              </div>
               <Button
                 type="button"
                 variant="secondary"

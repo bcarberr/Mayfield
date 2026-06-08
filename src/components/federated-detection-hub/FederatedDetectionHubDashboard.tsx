@@ -7,6 +7,8 @@ import { Input } from "../ui/Input";
 import { SeverityTableIcon } from "../ui/SeverityTableIcon";
 import { SlideOver } from "../ui/SlideOver";
 import { useResizableColumns } from "../ui/useResizableColumns";
+import { DetectionLibraryContent } from "./DetectionLibraryContent";
+import { QueuedForReviewContent } from "./QueuedForReviewContent";
 
 const cx = (...c: (string | false | undefined)[]) => c.filter(Boolean).join(" ");
 
@@ -1130,6 +1132,10 @@ export function FederatedDetectionHubDashboard() {
       <div className="flex min-h-0 flex-1 flex-col gap-4 overflow-y-auto px-6 py-4 sm:py-5">
         {activeTab === "Manage Detections" ? (
           <ManageDetectionsContent />
+        ) : activeTab === "Detection Library" ? (
+          <DetectionLibraryContent />
+        ) : activeTab === "Queued For Review" ? (
+          <QueuedForReviewContent />
         ) : (
           <div className="flex flex-1 items-center justify-center rounded-[4px] border border-border-container bg-datavis-card-bg p-12 text-center shadow-datavis-card">
             <p className="text-sm text-text-tertiary">{activeTab} — content coming soon.</p>
