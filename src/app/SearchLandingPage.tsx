@@ -1,5 +1,8 @@
-import { useState } from "react";
+import { useEffect, useId, useRef, useState } from "react";
+import { createPortal } from "react-dom";
 import { Icon } from "../design-system";
+import { FsqlSearchTextarea } from "../components/FsqlSearchTextarea";
+import { type CopilotSubmitRequest, SearchCopilotAside } from "../components/SearchCopilotPanel";
 import { SearchEntityEventSelect } from "../components/SearchEntityEventSelect";
 import { SearchHeaderFilters } from "../components/SearchHeaderFilters";
 import { SearchTopHeader } from "../components/SearchTopHeader";
@@ -10,8 +13,141 @@ import { NAV_RAIL_TARGETS } from "./navRailTargets";
 
 const toolbarBtnRing = "ring-offset-surface-container";
 
-function SearchToolbarActions() {
-  const [criteriaOpen, setCriteriaOpen] = useState(true);
+export type SearchCriteriaMode = "query-builder" | "fsql";
+
+const SEARCH_CRITERIA_MODE_OPTIONS: readonly {
+  id: SearchCriteriaMode;
+  label: string;
+  tooltip?: string;
+}[] = [
+  { id: "query-builder", label: "Query Builder" },
+  { id: "fsql", label: "FSQL", tooltip: "Federated Search Query Language" },
+];
+
+function SearchCriteriaRadioOption({
+  groupName,
+  option,
+  checked,
+  onSelect,
+}: {
+  groupName: string;
+  option: (typeof SEARCH_CRITERIA_MODE_OPTIONS)[number];
+  checked: boolean;
+  onSelect: () => void;
+}) {
+  const labelRef = useRef<HTMLLabelElement>(null);
+  const [isHovered, setIsHovered] = useState(false);
+  const [popoverStyle, setPopoverStyle] = useState<{ top: number; left: number } | null>(null);
+
+  useEffect(() => {
+    if (!isHovered || !option.tooltip || !labelRef.current) {
+      setPopoverStyle(null);
+      return;
+    }
+
+    const updatePosition = () => {
+      const rect = labelRef.current?.getBoundingClientRect();
+      if (!rect) return;
+      setPopoverStyle({
+        top: rect.top - 8,
+        left: rect.left,
+      });
+    };
+
+    updatePosition();
+    window.addEventListener("scroll", updatePosition, true);
+    window.addEventListener("resize", updatePosition);
+    return () => {
+      window.removeEventListener("scroll", updatePosition, true);
+      window.removeEventListener("resize", updatePosition);
+    };
+  }, [isHovered, option.tooltip]);
+
+  const showPopover = Boolean(option.tooltip && isHovered && popoverStyle);
+
+  return (
+    <>
+      <label
+        ref={labelRef}
+        className="inline-flex cursor-pointer items-center gap-2 text-sm font-semibold leading-5 tracking-[0.4px] text-text-primary"
+        onMouseEnter={() => setIsHovered(true)}
+        onMouseLeave={() => setIsHovered(false)}
+        onFocus={() => setIsHovered(true)}
+        onBlur={() => setIsHovered(false)}
+      >
+        <input
+          type="radio"
+          name={groupName}
+          value={option.id}
+          checked={checked}
+          onChange={onSelect}
+          className="size-4 shrink-0 accent-interactive-active"
+          aria-describedby={option.tooltip ? `${groupName}-${option.id}-tooltip` : undefined}
+        />
+        {option.label}
+      </label>
+      {showPopover
+        ? createPortal(
+            <div
+              id={`${groupName}-${option.id}-tooltip`}
+              role="tooltip"
+              className="pointer-events-none fixed z-[100] max-w-xs -translate-y-full rounded bg-[#424242] px-2 py-1.5 text-xs font-semibold leading-snug text-[#f5f5f5] shadow-[0_2px_8px_rgba(0,0,0,0.35)]"
+              style={{ top: popoverStyle!.top, left: popoverStyle!.left }}
+            >
+              {option.tooltip}
+            </div>,
+            document.body,
+          )
+        : null}
+    </>
+  );
+}
+
+function SearchCriteriaModeRadios({
+  value,
+  onChange,
+}: {
+  value: SearchCriteriaMode;
+  onChange: (next: SearchCriteriaMode) => void;
+}) {
+  const groupName = useId();
+
+  return (
+    <div role="radiogroup" aria-label="Search criteria mode" className="flex flex-wrap items-center gap-4">
+      {SEARCH_CRITERIA_MODE_OPTIONS.map((option) => (
+        <SearchCriteriaRadioOption
+          key={option.id}
+          groupName={groupName}
+          option={option}
+          checked={value === option.id}
+          onSelect={() => onChange(option.id)}
+        />
+      ))}
+    </div>
+  );
+}
+
+function SearchToolbarActions({
+  criteriaMode,
+  onCriteriaModeChange,
+  criteriaOpen,
+  onCriteriaOpenChange,
+  fsqlQuery,
+  onFsqlQueryChange,
+  onClearSearch,
+  onFsqlActivateCopilot,
+}: {
+  criteriaMode: SearchCriteriaMode;
+  onCriteriaModeChange: (mode: SearchCriteriaMode) => void;
+  criteriaOpen: boolean;
+  onCriteriaOpenChange: (open: boolean) => void;
+  fsqlQuery: string;
+  onFsqlQueryChange: (query: string) => void;
+  onClearSearch: () => void;
+  onFsqlActivateCopilot: () => void;
+}) {
+  const isFsql = criteriaMode === "fsql";
+  const hasFsqlQuery = fsqlQuery.trim().length > 0;
 
   return (
     <div className="flex shrink-0 flex-col bg-surface-container">
@@ -20,35 +156,66 @@ function SearchToolbarActions() {
         role="toolbar"
         aria-label="Search actions"
       >
-        <button
-          type="button"
-          aria-expanded={criteriaOpen}
-          aria-controls="search-criteria-panel"
-          className="flex items-center gap-2 rounded py-1 pr-1 text-left text-sm font-semibold leading-5 tracking-[0.4px] text-text-primary transition-colors hover:bg-overlay-subtle focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-interactive-active focus-visible:ring-offset-2 focus-visible:ring-offset-surface-container"
-          onClick={() => setCriteriaOpen((o) => !o)}
-        >
-          <Icon
-            name="chevron-down"
-            size={18}
-            className={`shrink-0 text-text-primary transition-transform duration-150 ease-out ${criteriaOpen ? "" : "-rotate-90"}`}
-            aria-hidden
-          />
-          Search Criteria
-        </button>
+        <div className="flex flex-wrap items-center gap-4">
+          <button
+            type="button"
+            aria-expanded={criteriaOpen}
+            aria-controls="search-criteria-panel"
+            className="flex items-center gap-2 rounded py-1 pr-1 text-left text-sm font-semibold leading-5 tracking-[0.4px] text-text-primary transition-colors hover:bg-overlay-subtle focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-interactive-active focus-visible:ring-offset-2 focus-visible:ring-offset-surface-container"
+            onClick={() => onCriteriaOpenChange(!criteriaOpen)}
+          >
+            <Icon
+              name="chevron-down"
+              size={18}
+              className={`shrink-0 text-text-primary transition-transform duration-150 ease-out ${criteriaOpen ? "" : "-rotate-90"}`}
+              aria-hidden
+            />
+            Search Criteria
+          </button>
+          <SearchCriteriaModeRadios value={criteriaMode} onChange={onCriteriaModeChange} />
+        </div>
 
         <div className="flex flex-wrap justify-end gap-3">
-          <Button type="button" variant="secondary" className={toolbarBtnRing} disabled>
-            <Icon name="action-time" className="shrink-0 text-current" aria-hidden />
-            Schedule Search
-          </Button>
-          <Button type="button" variant="secondary" className={toolbarBtnRing} disabled>
-            <Icon name="action-saved-search" className="shrink-0 text-current" aria-hidden />
-            Save Search
-          </Button>
-          <Button type="button" variant="secondary" className={toolbarBtnRing} disabled>
-            <Icon name="action-cancel-clear" className="shrink-0 text-current" aria-hidden />
-            Clear Search
-          </Button>
+          {isFsql ? (
+            <>
+              <Button
+                type="button"
+                variant="secondary"
+                className={toolbarBtnRing}
+                disabled={!hasFsqlQuery}
+                onClick={onClearSearch}
+              >
+                <Icon name="action-cancel-clear" className="shrink-0 text-current" aria-hidden />
+                Clear Search
+              </Button>
+              <Button type="button" variant="secondary" className={toolbarBtnRing} disabled>
+                Create New Detection
+              </Button>
+              <Button type="button" variant="secondary" className={toolbarBtnRing} disabled={!hasFsqlQuery}>
+                <Icon name="action-saved-search" className="shrink-0 text-current" aria-hidden />
+                Save Search
+              </Button>
+              <Button type="button" variant="primary" className={toolbarBtnRing} disabled={!hasFsqlQuery}>
+                <Icon name="action-search" className="shrink-0 text-current" aria-hidden />
+                Search
+              </Button>
+            </>
+          ) : (
+            <>
+              <Button type="button" variant="secondary" className={toolbarBtnRing} disabled>
+                <Icon name="action-time" className="shrink-0 text-current" aria-hidden />
+                Schedule Search
+              </Button>
+              <Button type="button" variant="secondary" className={toolbarBtnRing} disabled>
+                <Icon name="action-saved-search" className="shrink-0 text-current" aria-hidden />
+                Save Search
+              </Button>
+              <Button type="button" variant="secondary" className={toolbarBtnRing} disabled>
+                <Icon name="action-cancel-clear" className="shrink-0 text-current" aria-hidden />
+                Clear Search
+              </Button>
+            </>
+          )}
         </div>
       </div>
 
@@ -59,7 +226,15 @@ function SearchToolbarActions() {
           aria-label="Search criteria options"
           className="px-5 py-4"
         >
-          <SearchEntityEventSelect aria-label="Select Entity or Event" className="max-w-[360px]" />
+          {isFsql ? (
+            <FsqlSearchTextarea
+              value={fsqlQuery}
+              onChange={onFsqlQueryChange}
+              onSubmit={onFsqlActivateCopilot}
+            />
+          ) : (
+            <SearchEntityEventSelect aria-label="Select Entity or Event" />
+          )}
         </div>
       ) : null}
       <div className="mx-[20px] h-px shrink-0 bg-border-rule" aria-hidden />
@@ -71,70 +246,117 @@ function SearchToolbarActions() {
  * Federated search entry screen — welcome hero and guidance copy.
  */
 export function SearchLandingPage() {
+  const [criteriaMode, setCriteriaMode] = useState<SearchCriteriaMode>("query-builder");
+  const [criteriaOpen, setCriteriaOpen] = useState(true);
+  const [fsqlQuery, setFsqlQuery] = useState("");
+  const [copilotOpen, setCopilotOpen] = useState(false);
+  const [copilotSubmitRequest, setCopilotSubmitRequest] = useState<CopilotSubmitRequest | null>(null);
+  const isFsql = criteriaMode === "fsql";
+
+  const activateCopilotFromFsql = () => {
+    if (!fsqlQuery.trim()) return;
+    setCopilotOpen(true);
+    setCopilotSubmitRequest({
+      id: Date.now(),
+      prompt: "Explain my current FSQL query",
+    });
+  };
+
+  const handleSendToFsqlSearch = (query: string) => {
+    setFsqlQuery(query);
+    setCriteriaMode("fsql");
+    setCriteriaOpen(true);
+  };
+
+  const handleCriteriaModeChange = (mode: SearchCriteriaMode) => {
+    setCriteriaMode(mode);
+    setCriteriaOpen(true);
+    setCopilotOpen(mode === "fsql");
+  };
+
   return (
     <div className="flex h-full min-h-0 bg-surface-container text-text-primary">
-      <V4NavThinner
-        variant="federated-search"
-        activeSection="search"
-        navTargets={NAV_RAIL_TARGETS}
-      />
+      <V4NavThinner variant="federated-search" activeSection="search" navTargets={NAV_RAIL_TARGETS} />
 
       <div className="relative flex min-h-0 min-w-0 flex-1 flex-col overflow-hidden">
         <SearchTopHeader headerAfterTitle={<SearchHeaderFilters />} />
-        <SearchToolbarActions />
+        <SearchToolbarActions
+          criteriaMode={criteriaMode}
+          onCriteriaModeChange={handleCriteriaModeChange}
+          criteriaOpen={criteriaOpen}
+          onCriteriaOpenChange={setCriteriaOpen}
+          fsqlQuery={fsqlQuery}
+          onFsqlQueryChange={setFsqlQuery}
+          onClearSearch={() => setFsqlQuery("")}
+          onFsqlActivateCopilot={activateCopilotFromFsql}
+        />
 
-        <div className="relative min-h-0 flex-1 overflow-hidden">
-          <div
-            className="pointer-events-none absolute inset-0 z-0 select-none overflow-hidden [html[data-theme=light]_&]:opacity-50"
-            aria-hidden
-          >
-            <img
-              src={connectionAbstractUrl}
-              alt=""
-              className="h-full w-full object-cover object-bottom"
-              draggable={false}
-            />
-          </div>
-
-          <main className="relative z-[1] flex min-h-0 flex-1 flex-col items-center overflow-y-auto px-6 py-12 sm:py-16 md:py-20">
-            <div className="mt-[60px] flex w-full max-w-[720px] flex-col items-stretch">
-              <h1 className="text-center text-3xl font-bold leading-9 tracking-[0.5px] text-text-primary sm:text-4xl sm:leading-tight">
-                Welcome Bonnie Carberry!
-              </h1>
-              <p className="mx-auto mt-4 max-w-[560px] text-center text-base leading-6 text-text-secondary">
-                Query every connected source from a single field. Combine field paths, identifiers, and plain-language
-                terms in one search.
-              </p>
-
-              <section
-                className="mt-14 pt-10 text-text-tertiary"
-                aria-labelledby="search-tips-heading"
+        <div className="relative flex min-h-0 flex-1 overflow-hidden">
+          {isFsql ? (
+            <>
+              <div className="min-h-0 min-w-0 flex-1 bg-surface-container" aria-label="FSQL search workspace" />
+              <SearchCopilotAside
+                open={copilotOpen}
+                onOpenChange={setCopilotOpen}
+                fsqlQuery={fsqlQuery}
+                submitRequest={copilotSubmitRequest}
+                onSendToFsqlSearch={handleSendToFsqlSearch}
+              />
+            </>
+          ) : (
+            <>
+              <div
+                className="pointer-events-none absolute inset-0 z-0 select-none overflow-hidden [html[data-theme=light]_&]:opacity-50"
+                aria-hidden
               >
-                <h2 id="search-tips-heading" className="text-base-semibold text-text-primary">
-                  Search tips
-                </h2>
-                <ul className="mt-4 space-y-3 text-base-small">
-                  <li className="flex gap-3">
-                    <span className="mt-0.5 shrink-0 font-semibold">•</span>
-                    <span>
-                      Narrow by connector or dataset name — matching behaves like the mapping workspace quick filters.
-                    </span>
-                  </li>
-                  <li className="flex gap-3">
-                    <span className="mt-0.5 shrink-0 font-semibold">•</span>
-                    <span>
-                      Use field paths (for example{" "}
-                      <span className="font-mono text-text-tertiary">event.action</span>) to jump to schema-aligned results.
-                    </span>
-                  </li>
-                  <li className="flex gap-3">
-                    <span className="mt-0.5 shrink-0 font-semibold">•</span>
-                    <span>Combine plain-language phrases with identifiers from your normalized model.</span>
-                  </li>
-                </ul>
-              </section>
-            </div>
-          </main>
+                <img
+                  src={connectionAbstractUrl}
+                  alt=""
+                  className="h-full w-full object-cover object-bottom"
+                  draggable={false}
+                />
+              </div>
+
+              <main className="relative z-[1] flex min-h-0 flex-1 flex-col items-center overflow-y-auto px-6 py-12 sm:py-16 md:py-20">
+                <div className="mt-[60px] flex w-full max-w-[720px] flex-col items-stretch">
+                  <h1 className="text-center text-3xl font-bold leading-9 tracking-[0.5px] text-text-primary sm:text-4xl sm:leading-tight">
+                    Welcome Bonnie Carberry!
+                  </h1>
+                  <p className="mx-auto mt-4 max-w-[560px] text-center text-base leading-6 text-text-secondary">
+                    Query every connected source from a single field. Combine field paths, identifiers, and
+                    plain-language terms in one search.
+                  </p>
+
+                  <section className="mt-14 pt-10 text-text-tertiary" aria-labelledby="search-tips-heading">
+                    <h2 id="search-tips-heading" className="text-base-semibold text-text-primary">
+                      Search tips
+                    </h2>
+                    <ul className="mt-4 space-y-3 text-base-small">
+                      <li className="flex gap-3">
+                        <span className="mt-0.5 shrink-0 font-semibold">•</span>
+                        <span>
+                          Narrow by connector or dataset name — matching behaves like the mapping workspace quick
+                          filters.
+                        </span>
+                      </li>
+                      <li className="flex gap-3">
+                        <span className="mt-0.5 shrink-0 font-semibold">•</span>
+                        <span>
+                          Use field paths (for example{" "}
+                          <span className="font-mono text-text-tertiary">event.action</span>) to jump to schema-aligned
+                          results.
+                        </span>
+                      </li>
+                      <li className="flex gap-3">
+                        <span className="mt-0.5 shrink-0 font-semibold">•</span>
+                        <span>Combine plain-language phrases with identifiers from your normalized model.</span>
+                      </li>
+                    </ul>
+                  </section>
+                </div>
+              </main>
+            </>
+          )}
         </div>
       </div>
     </div>

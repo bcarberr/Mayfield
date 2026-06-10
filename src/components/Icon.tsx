@@ -199,6 +199,14 @@ function withDisplaySize(svg: string, size: number): string {
   });
 }
 
+/** Fit non-square viewBoxes inside a square slot without stretching (Query observable icons). */
+function withContainedDisplaySize(svg: string, size: number): string {
+  return svg.replace(/<svg\b([^>]*)>/, (_match, attrs: string) => {
+    const next = stripSvgDimensions(attrs).replace(/\spreserveAspectRatio="[^"]*"/, "");
+    return `<svg${next} width="${size}" height="${size}" preserveAspectRatio="xMidYMid meet">`;
+  });
+}
+
 /** Severity shapes use non-square viewBoxes — size is rendered height; width follows aspect ratio. */
 function withDisplayHeight(svg: string, height: number): string {
   return svg.replace(/<svg\b([^>]*)>/, (_match, attrs: string) => {
@@ -210,6 +218,11 @@ function withDisplayHeight(svg: string, height: number): string {
     }
     return `<svg${next} width="${height}" height="${height}">`;
   });
+}
+
+/** Figma observable exports use `var(--fill-0, #1E1E1E)` — normalize so `color` / `currentColor` applies. */
+function normalizeObservableEntitySvg(svg: string): string {
+  return svg.replace(/fill="var\(--fill-0,\s*[^"]*\)"/gi, 'fill="currentColor"');
 }
 
 export type IconProps = {
@@ -239,12 +252,20 @@ export function Icon({ name, size = 18, title, className, style, ...rest }: Icon
   }
 
   if (isObservableEntityIcon(name)) {
-    const markup = withDisplaySize(OBSERVABLE_ENTITY_RAW_BY_NAME[name], size);
+    const markup = normalizeObservableEntitySvg(
+      withContainedDisplaySize(OBSERVABLE_ENTITY_RAW_BY_NAME[name], size),
+    );
     return (
       <span
         {...rest}
         className={spanClass}
-        style={{ lineHeight: 0, ...style }}
+        style={{
+          lineHeight: 0,
+          width: size,
+          height: size,
+          ["--fill-0" as string]: "currentColor",
+          ...style,
+        }}
         dangerouslySetInnerHTML={{ __html: markup }}
         role={title ? "img" : undefined}
         aria-label={title}
