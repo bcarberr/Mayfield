@@ -251,9 +251,11 @@ const QUEUED_SEVERITY_ORDER: Record<DetectionSeverity, number> = {
 
 type QueuedSortColumn = "name" | "state" | "queuedBy" | "queuedDate" | "severity" | "findings";
 
+const REVIEW_SELECT_COL_WIDTH = 40;
 const REVIEW_EXPAND_COL_WIDTH = 40;
-const REVIEW_COLUMN_COUNT = 8;
+const REVIEW_COLUMN_COUNT = 9;
 const REVIEW_COL_DEFAULTS: readonly number[] = [
+  REVIEW_SELECT_COL_WIDTH,
   REVIEW_EXPAND_COL_WIDTH,
   280,
   72,
@@ -264,6 +266,7 @@ const REVIEW_COL_DEFAULTS: readonly number[] = [
   100,
 ];
 const REVIEW_COL_MINS: readonly number[] = [
+  REVIEW_SELECT_COL_WIDTH,
   REVIEW_EXPAND_COL_WIDTH,
   160,
   56,
@@ -307,6 +310,7 @@ function QueuedReviewTable({
   totalCount: number;
   onClearFilters: () => void;
 }) {
+  const [selected, setSelected] = useState<Set<string>>(() => new Set());
   const {
     containerRef,
     colStyle,
@@ -317,11 +321,30 @@ function QueuedReviewTable({
     displayWidths,
     minTableWidth,
   } = useResizableColumns({
-    selectColWidth: REVIEW_EXPAND_COL_WIDTH,
+    selectColWidth: REVIEW_SELECT_COL_WIDTH,
     colDefaults: REVIEW_COL_DEFAULTS,
     colMins: REVIEW_COL_MINS,
     minTableWidth: 960,
   });
+
+  const allIds = useMemo(() => rows.map((r) => r.id), [rows]);
+  const total = allIds.length;
+  const selectedOnPage = useMemo(() => allIds.filter((id) => selected.has(id)).length, [allIds, selected]);
+  const allSelected = total > 0 && selectedOnPage === total;
+  const someSelected = selectedOnPage > 0 && !allSelected;
+
+  const toggleAll = (checked: boolean) => {
+    setSelected(checked ? new Set(allIds) : new Set());
+  };
+
+  const toggleRow = (id: string, checked: boolean) => {
+    setSelected((prev) => {
+      const next = new Set(prev);
+      if (checked) next.add(id);
+      else next.delete(id);
+      return next;
+    });
+  };
 
   const thClass =
     "relative h-10 border-r border-datavis-gridlines px-2 py-0 align-middle text-xs font-bold uppercase tracking-wide text-text-primary";
@@ -409,7 +432,18 @@ function QueuedReviewTable({
             </colgroup>
             <thead>
               <tr className="h-10 border-b border-datavis-gridlines bg-surface-table-row-header">
-                <th scope="col" style={colStyle(0)} className={cx(thClass, "px-0")}>
+                <th scope="col" style={colStyle(0)} className="relative h-10 border-r border-datavis-gridlines px-0 py-0 align-middle">
+                  <div className="flex items-center justify-center">
+                    <Checkbox
+                      checked={allSelected}
+                      indeterminate={someSelected}
+                      onCheckedChange={toggleAll}
+                      aria-label="Select all rows"
+                    />
+                  </div>
+                  {resizeHandle(0)}
+                </th>
+                <th scope="col" style={colStyle(1)} className={cx(thClass, "px-0")}>
                   <div className="flex justify-center">
                     <button
                       type="button"
@@ -429,51 +463,51 @@ function QueuedReviewTable({
                       <Icon name="navi-chevron-right" size={20} className="-ml-4 block shrink-0" aria-hidden />
                     </button>
                   </div>
-                  {resizeHandle(0)}
+                  {resizeHandle(1)}
                 </th>
-                <th scope="col" style={colStyle(1)} className={thClass}>
+                <th scope="col" style={colStyle(2)} className={thClass}>
                   <ColumnHeaderMenu
                     label="Detections"
                     menuLabel="Detections column options"
                     {...getSortProps("name")}
                   />
-                  {resizeHandle(1)}
-                </th>
-                <th scope="col" style={colStyle(2)} className={thClass}>
-                  <ColumnHeaderMenu label="State" menuLabel="State column options" {...getSortProps("state")} />
                   {resizeHandle(2)}
                 </th>
                 <th scope="col" style={colStyle(3)} className={thClass}>
-                  <ColumnHeaderMenu label="Queued By" menuLabel="Queued By column options" {...getSortProps("queuedBy")} />
+                  <ColumnHeaderMenu label="State" menuLabel="State column options" {...getSortProps("state")} />
                   {resizeHandle(3)}
                 </th>
                 <th scope="col" style={colStyle(4)} className={thClass}>
+                  <ColumnHeaderMenu label="Queued By" menuLabel="Queued By column options" {...getSortProps("queuedBy")} />
+                  {resizeHandle(4)}
+                </th>
+                <th scope="col" style={colStyle(5)} className={thClass}>
                   <ColumnHeaderMenu
                     label="Queued Date"
                     menuLabel="Queued Date column options"
                     {...getSortProps("queuedDate")}
                   />
-                  {resizeHandle(4)}
+                  {resizeHandle(5)}
                 </th>
-                <th scope="col" style={colStyle(5)} className={thClass}>
+                <th scope="col" style={colStyle(6)} className={thClass}>
                   <ColumnHeaderMenu
                     label="Severity"
                     menuLabel="Severity column options"
                     {...getSortProps("severity")}
                   />
-                  {resizeHandle(5)}
+                  {resizeHandle(6)}
                 </th>
-                <th scope="col" style={colStyle(6)} className={thClass}>
+                <th scope="col" style={colStyle(7)} className={thClass}>
                   <ColumnHeaderMenu
                     label="Detection Findings"
                     menuLabel="Detection Findings column options"
                     {...getSortProps("findings")}
                   />
-                  {resizeHandle(6)}
-                </th>
-                <th scope="col" style={colStyle(7)} className="relative h-10 px-2 py-0 align-middle text-xs font-bold uppercase tracking-wide text-text-primary">
-                  <span className="block translate-y-px truncate">Actions</span>
                   {resizeHandle(7)}
+                </th>
+                <th scope="col" style={colStyle(8)} className="relative h-10 px-2 py-0 align-middle text-xs font-bold uppercase tracking-wide text-text-primary">
+                  <span className="block translate-y-px truncate">Actions</span>
+                  {resizeHandle(8)}
                 </th>
               </tr>
             </thead>
@@ -490,6 +524,15 @@ function QueuedReviewTable({
                       )}
                     >
                       <td style={colStyle(0)} className="h-10 px-0 py-0 align-middle">
+                        <div className="flex items-center justify-center">
+                          <Checkbox
+                            checked={selected.has(row.id)}
+                            onCheckedChange={(checked) => toggleRow(row.id, checked)}
+                            aria-label={`Select ${row.name}`}
+                          />
+                        </div>
+                      </td>
+                      <td style={colStyle(1)} className="h-10 px-0 py-0 align-middle">
                         <div className="flex justify-center">
                           <button
                             type="button"
@@ -509,7 +552,7 @@ function QueuedReviewTable({
                           </button>
                         </div>
                       </td>
-                      <td style={colStyle(1)} className={cx(tdClass, "min-w-0")}>
+                      <td style={colStyle(2)} className={cx(tdClass, "min-w-0")}>
                         <TruncatedText
                           as="button"
                           className="w-full text-left font-semibold text-interactive-active hover:underline focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-interactive-active"
@@ -518,29 +561,29 @@ function QueuedReviewTable({
                           {row.name}
                         </TruncatedText>
                       </td>
-                      <td style={colStyle(2)} className={tdClass}>
+                      <td style={colStyle(3)} className={tdClass}>
                         <Switch
                           checked={enabledById[row.id] ?? row.enabled}
                           onCheckedChange={(checked) => onEnabledChange(row.id, checked)}
                           aria-label={`Toggle ${row.name}`}
                         />
                       </td>
-                      <td style={colStyle(3)} className={tdClass}>
+                      <td style={colStyle(4)} className={tdClass}>
                         {row.queuedBy}
                       </td>
-                      <td style={colStyle(4)} className={cx(tdClass, "tabular-nums")}>
+                      <td style={colStyle(5)} className={cx(tdClass, "tabular-nums")}>
                         {row.queuedDate}
                       </td>
-                      <td style={colStyle(5)} className={tdClass}>
+                      <td style={colStyle(6)} className={tdClass}>
                         <span className="inline-flex items-center gap-2">
                           <SeverityTableIcon name={SEV_ICONS[row.severity]} color={SEV_COLORS[row.severity]} />
                           <span>{row.severity}</span>
                         </span>
                       </td>
-                      <td style={colStyle(6)} className={tdClass}>
+                      <td style={colStyle(7)} className={tdClass}>
                         <ReviewFindingsCell findings={row.findings} />
                       </td>
-                      <td style={colStyle(7)} className={tdClass}>
+                      <td style={colStyle(8)} className={tdClass}>
                         <ReviewActions name={row.name} />
                       </td>
                     </tr>

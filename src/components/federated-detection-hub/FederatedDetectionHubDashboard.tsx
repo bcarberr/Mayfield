@@ -98,7 +98,7 @@ type DetectionRow = {
   findings: number | "error" | "none";
 };
 
-const DETECTION_COLUMN_COUNT = 8;
+const DETECTION_COLUMN_COUNT = 9;
 
 const SEV_COLORS: Record<DetectionSeverity, string> = {
   Critical: "#ff604a",
@@ -499,8 +499,17 @@ function TopFindingsCard({
   const [hoveredLabel, setHoveredLabel] = useState<string | null>(null);
   const [tooltipPos, setTooltipPos] = useState<{ x: number; y: number } | null>(null);
 
-  const isDimmed = (label: string) =>
-    (hoveredLabel != null && hoveredLabel !== label) || (selectedLabel != null && selectedLabel !== label);
+  const isChartSegmentDimmed = (label: string) => {
+    if (hoveredLabel != null) return hoveredLabel !== label;
+    if (selectedLabel != null) return selectedLabel !== label;
+    return false;
+  };
+
+  const linkClass = (label: string) =>
+    cx(
+      "flex w-full items-start gap-2.5 rounded-[4px] text-left text-sm font-semibold transition-colors hover:text-interactive-active hover:underline",
+      selectedLabel === label ? "text-interactive-active underline" : "text-text-primary",
+    );
 
   const updateTooltipPos = (event: React.MouseEvent) => {
     const rect = chartRef.current?.getBoundingClientRect();
@@ -572,26 +581,29 @@ function TopFindingsCard({
             aria-label="Top findings by detection"
             onMouseLeave={clearHover}
           >
-            {arcs.map((segment) => (
-              <path
-                key={segment.label}
-                d={segment.path}
-                fill={segment.color}
-                className={cx(
-                  "cursor-pointer transition-opacity",
-                  isDimmed(segment.label) ? "opacity-60" : "opacity-100",
-                  selectedLabel === segment.label && "opacity-100",
-                )}
-                aria-label={`Filter by ${segment.label}`}
-                aria-pressed={selectedLabel === segment.label}
-                onMouseEnter={(event) => {
-                  setHoveredLabel(segment.label);
-                  updateTooltipPos(event);
-                }}
-                onMouseMove={updateTooltipPos}
-                onClick={() => onSegmentClick(segment.label)}
-              />
-            ))}
+            {arcs.map((segment) => {
+              const selected = selectedLabel === segment.label;
+
+              return (
+                <path
+                  key={segment.label}
+                  d={segment.path}
+                  fill={segment.color}
+                  className={cx(
+                    "cursor-pointer transition-opacity duration-150",
+                    isChartSegmentDimmed(segment.label) ? "opacity-60" : "opacity-100",
+                  )}
+                  aria-label={`Filter by ${segment.label}`}
+                  aria-pressed={selected}
+                  onMouseEnter={(event) => {
+                    setHoveredLabel(segment.label);
+                    updateTooltipPos(event);
+                  }}
+                  onMouseMove={updateTooltipPos}
+                  onClick={() => onSegmentClick(segment.label)}
+                />
+              );
+            })}
           </svg>
           <div
             className="pointer-events-none absolute flex flex-col items-center justify-center rounded-full bg-datavis-card-bg text-center text-text-primary"
@@ -607,13 +619,7 @@ function TopFindingsCard({
             <li key={segment.label}>
               <button
                 type="button"
-                className={cx(
-                  "flex w-full items-start gap-2.5 rounded-[4px] text-left text-sm font-semibold transition-colors",
-                  selectedLabel === segment.label
-                    ? "text-text-primary"
-                    : "text-text-primary hover:text-interactive-active",
-                  isDimmed(segment.label) && selectedLabel !== segment.label && "opacity-60",
-                )}
+                className={linkClass(segment.label)}
                 aria-pressed={selectedLabel === segment.label}
                 onClick={() => onSegmentClick(segment.label)}
               >
@@ -814,7 +820,7 @@ function DetectionDetailPanel({
   );
 }
 
-/** px widths: expand, detections, state, severity, last run, recurrence, findings, actions */
+/** px widths: select, expand, detections, state, severity, last run, recurrence, findings, actions */
 const DETECTION_SEVERITY_ORDER: Record<DetectionSeverity, number> = {
   Critical: 0,
   High: 1,
@@ -824,8 +830,10 @@ const DETECTION_SEVERITY_ORDER: Record<DetectionSeverity, number> = {
 
 type DetectionSortColumn = "name" | "state" | "severity" | "lastRun" | "recurrence" | "findings";
 
+const DETECTION_SELECT_COL_WIDTH = 40;
 const DETECTION_EXPAND_COL_WIDTH = 40;
 const DETECTION_COL_DEFAULTS: readonly number[] = [
+  DETECTION_SELECT_COL_WIDTH,
   DETECTION_EXPAND_COL_WIDTH,
   250,
   80,
@@ -836,6 +844,7 @@ const DETECTION_COL_DEFAULTS: readonly number[] = [
   135,
 ];
 const DETECTION_COL_MINS: readonly number[] = [
+  DETECTION_SELECT_COL_WIDTH,
   DETECTION_EXPAND_COL_WIDTH,
   120,
   56,
@@ -885,6 +894,7 @@ function DetectionsTable({
   totalCount: number;
   onClearFilters: () => void;
 }) {
+  const [selected, setSelected] = useState<Set<string>>(() => new Set());
   const {
     containerRef,
     colStyle,
@@ -895,11 +905,30 @@ function DetectionsTable({
     displayWidths,
     minTableWidth,
   } = useResizableColumns({
-    selectColWidth: DETECTION_EXPAND_COL_WIDTH,
+    selectColWidth: DETECTION_SELECT_COL_WIDTH,
     colDefaults: DETECTION_COL_DEFAULTS,
     colMins: DETECTION_COL_MINS,
     minTableWidth: 960,
   });
+
+  const allIds = useMemo(() => rows.map((r) => r.id), [rows]);
+  const total = allIds.length;
+  const selectedOnPage = useMemo(() => allIds.filter((id) => selected.has(id)).length, [allIds, selected]);
+  const allSelected = total > 0 && selectedOnPage === total;
+  const someSelected = selectedOnPage > 0 && !allSelected;
+
+  const toggleAll = (checked: boolean) => {
+    setSelected(checked ? new Set(allIds) : new Set());
+  };
+
+  const toggleRow = (id: string, checked: boolean) => {
+    setSelected((prev) => {
+      const next = new Set(prev);
+      if (checked) next.add(id);
+      else next.delete(id);
+      return next;
+    });
+  };
 
   const thClass =
     "relative h-10 border-r border-datavis-gridlines px-2 py-0 align-middle text-xs font-bold uppercase tracking-wide text-text-primary";
@@ -996,7 +1025,18 @@ function DetectionsTable({
             </colgroup>
             <thead>
               <tr className="h-10 border-b border-datavis-gridlines bg-surface-table-row-header">
-                <th scope="col" style={colStyle(0)} className={cx(thClass, "px-0")}>
+                <th scope="col" style={colStyle(0)} className="relative h-10 border-r border-datavis-gridlines px-0 py-0 align-middle">
+                  <div className="flex items-center justify-center">
+                    <Checkbox
+                      checked={allSelected}
+                      indeterminate={someSelected}
+                      onCheckedChange={toggleAll}
+                      aria-label="Select all rows"
+                    />
+                  </div>
+                  {resizeHandle(0)}
+                </th>
+                <th scope="col" style={colStyle(1)} className={cx(thClass, "px-0")}>
                   <div className="flex justify-center">
                     <button
                       type="button"
@@ -1016,51 +1056,51 @@ function DetectionsTable({
                       <Icon name="navi-chevron-right" size={20} className="-ml-4 block shrink-0" aria-hidden />
                     </button>
                   </div>
-                  {resizeHandle(0)}
+                  {resizeHandle(1)}
                 </th>
-                <th scope="col" style={colStyle(1)} className={thClass}>
+                <th scope="col" style={colStyle(2)} className={thClass}>
                   <ColumnHeaderMenu
                     label="Detections"
                     menuLabel="Detections column options"
                     {...getSortProps("name")}
                   />
-                  {resizeHandle(1)}
-                </th>
-                <th scope="col" style={colStyle(2)} className={thClass}>
-                  <ColumnHeaderMenu label="State" menuLabel="State column options" {...getSortProps("state")} />
                   {resizeHandle(2)}
                 </th>
                 <th scope="col" style={colStyle(3)} className={thClass}>
+                  <ColumnHeaderMenu label="State" menuLabel="State column options" {...getSortProps("state")} />
+                  {resizeHandle(3)}
+                </th>
+                <th scope="col" style={colStyle(4)} className={thClass}>
                   <ColumnHeaderMenu
                     label="Severity"
                     menuLabel="Severity column options"
                     {...getSortProps("severity")}
                   />
-                  {resizeHandle(3)}
-                </th>
-                <th scope="col" style={colStyle(4)} className={thClass}>
-                  <ColumnHeaderMenu label="Last Run" menuLabel="Last Run column options" {...getSortProps("lastRun")} />
                   {resizeHandle(4)}
                 </th>
                 <th scope="col" style={colStyle(5)} className={thClass}>
+                  <ColumnHeaderMenu label="Last Run" menuLabel="Last Run column options" {...getSortProps("lastRun")} />
+                  {resizeHandle(5)}
+                </th>
+                <th scope="col" style={colStyle(6)} className={thClass}>
                   <ColumnHeaderMenu
                     label="Recurrence"
                     menuLabel="Recurrence column options"
                     {...getSortProps("recurrence")}
                   />
-                  {resizeHandle(5)}
+                  {resizeHandle(6)}
                 </th>
-                <th scope="col" style={colStyle(6)} className={thClass}>
+                <th scope="col" style={colStyle(7)} className={thClass}>
                   <ColumnHeaderMenu
                     label="Detection Findings"
                     menuLabel="Detection Findings column options"
                     {...getSortProps("findings")}
                   />
-                  {resizeHandle(6)}
-                </th>
-                <th scope="col" style={colStyle(7)} className="relative h-10 px-2 py-0 align-middle text-xs font-bold uppercase tracking-wide text-text-primary">
-                  <span className="block translate-y-px truncate">Actions</span>
                   {resizeHandle(7)}
+                </th>
+                <th scope="col" style={colStyle(8)} className="relative h-10 px-2 py-0 align-middle text-xs font-bold uppercase tracking-wide text-text-primary">
+                  <span className="block translate-y-px truncate">Actions</span>
+                  {resizeHandle(8)}
                 </th>
               </tr>
             </thead>
@@ -1077,6 +1117,15 @@ function DetectionsTable({
                       )}
                     >
                       <td style={colStyle(0)} className="h-10 px-0 py-0 align-middle">
+                        <div className="flex items-center justify-center">
+                          <Checkbox
+                            checked={selected.has(row.id)}
+                            onCheckedChange={(checked) => toggleRow(row.id, checked)}
+                            aria-label={`Select ${row.name}`}
+                          />
+                        </div>
+                      </td>
+                      <td style={colStyle(1)} className="h-10 px-0 py-0 align-middle">
                         <div className="flex justify-center">
                           <button
                             type="button"
@@ -1094,7 +1143,7 @@ function DetectionsTable({
                           </button>
                         </div>
                       </td>
-                      <td style={colStyle(1)} className={cx(tdClass, "min-w-0")}>
+                      <td style={colStyle(2)} className={cx(tdClass, "min-w-0")}>
                         <TruncatedText
                           as="button"
                           className="w-full text-left font-semibold text-interactive-active hover:underline focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-interactive-active"
@@ -1103,29 +1152,29 @@ function DetectionsTable({
                           {row.name}
                         </TruncatedText>
                       </td>
-                      <td style={colStyle(2)} className={tdClass}>
+                      <td style={colStyle(3)} className={tdClass}>
                         <Switch
                           checked={enabledById[row.id] ?? row.enabled}
                           onCheckedChange={(checked) => onEnabledChange(row.id, checked)}
                           aria-label={`Toggle ${row.name}`}
                         />
                       </td>
-                      <td style={colStyle(3)} className={tdClass}>
+                      <td style={colStyle(4)} className={tdClass}>
                         <span className="inline-flex items-center gap-2">
                           <SeverityTableIcon name={SEV_ICONS[row.severity]} color={SEV_COLORS[row.severity]} />
                           <span>{row.severity}</span>
                         </span>
                       </td>
-                      <td style={colStyle(4)} className={cx(tdClass, "tabular-nums")}>
+                      <td style={colStyle(5)} className={cx(tdClass, "tabular-nums")}>
                         {row.lastRun}
                       </td>
-                      <td style={colStyle(5)} className={tdClass}>
+                      <td style={colStyle(6)} className={tdClass}>
                         {row.recurrence}
                       </td>
-                      <td style={colStyle(6)} className={tdClass}>
+                      <td style={colStyle(7)} className={tdClass}>
                         <FindingsCell findings={row.findings} />
                       </td>
-                      <td style={colStyle(7)} className={tdClass}>
+                      <td style={colStyle(8)} className={tdClass}>
                         <DetectionActions name={row.name} />
                       </td>
                     </tr>

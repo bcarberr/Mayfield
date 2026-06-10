@@ -432,9 +432,11 @@ type LibrarySortColumn =
   | "findings"
   | "connectors";
 
+const LIBRARY_SELECT_COL_WIDTH = 40;
 const LIBRARY_EXPAND_COL_WIDTH = 40;
-const LIBRARY_COLUMN_COUNT = 10;
+const LIBRARY_COLUMN_COUNT = 11;
 const LIBRARY_COL_DEFAULTS: readonly number[] = [
+  LIBRARY_SELECT_COL_WIDTH,
   LIBRARY_EXPAND_COL_WIDTH,
   280,
   72,
@@ -447,6 +449,7 @@ const LIBRARY_COL_DEFAULTS: readonly number[] = [
   72,
 ];
 const LIBRARY_COL_MINS: readonly number[] = [
+  LIBRARY_SELECT_COL_WIDTH,
   LIBRARY_EXPAND_COL_WIDTH,
   160,
   56,
@@ -492,6 +495,7 @@ function LibraryDetectionsTable({
   totalCount: number;
   onClearFilters: () => void;
 }) {
+  const [selected, setSelected] = useState<Set<string>>(() => new Set());
   const {
     containerRef,
     colStyle,
@@ -502,11 +506,30 @@ function LibraryDetectionsTable({
     displayWidths,
     minTableWidth,
   } = useResizableColumns({
-    selectColWidth: LIBRARY_EXPAND_COL_WIDTH,
+    selectColWidth: LIBRARY_SELECT_COL_WIDTH,
     colDefaults: LIBRARY_COL_DEFAULTS,
     colMins: LIBRARY_COL_MINS,
     minTableWidth: 1100,
   });
+
+  const allIds = useMemo(() => rows.map((r) => r.id), [rows]);
+  const total = allIds.length;
+  const selectedOnPage = useMemo(() => allIds.filter((id) => selected.has(id)).length, [allIds, selected]);
+  const allSelected = total > 0 && selectedOnPage === total;
+  const someSelected = selectedOnPage > 0 && !allSelected;
+
+  const toggleAll = (checked: boolean) => {
+    setSelected(checked ? new Set(allIds) : new Set());
+  };
+
+  const toggleRow = (id: string, checked: boolean) => {
+    setSelected((prev) => {
+      const next = new Set(prev);
+      if (checked) next.add(id);
+      else next.delete(id);
+      return next;
+    });
+  };
 
   const thClass =
     "relative h-10 border-r border-datavis-gridlines px-2 py-0 align-middle text-xs font-bold uppercase tracking-wide text-text-primary";
@@ -596,7 +619,18 @@ function LibraryDetectionsTable({
             </colgroup>
             <thead>
               <tr className="h-10 border-b border-datavis-gridlines bg-surface-table-row-header">
-                <th scope="col" style={colStyle(0)} className={cx(thClass, "px-0")}>
+                <th scope="col" style={colStyle(0)} className="relative h-10 border-r border-datavis-gridlines px-0 py-0 align-middle">
+                  <div className="flex items-center justify-center">
+                    <Checkbox
+                      checked={allSelected}
+                      indeterminate={someSelected}
+                      onCheckedChange={toggleAll}
+                      aria-label="Select all rows"
+                    />
+                  </div>
+                  {resizeHandle(0)}
+                </th>
+                <th scope="col" style={colStyle(1)} className={cx(thClass, "px-0")}>
                   <div className="flex justify-center">
                     <button
                       type="button"
@@ -616,63 +650,63 @@ function LibraryDetectionsTable({
                       <Icon name="navi-chevron-right" size={20} className="-ml-4 block shrink-0" aria-hidden />
                     </button>
                   </div>
-                  {resizeHandle(0)}
+                  {resizeHandle(1)}
                 </th>
-                <th scope="col" style={colStyle(1)} className={thClass}>
+                <th scope="col" style={colStyle(2)} className={thClass}>
                   <ColumnHeaderMenu
                     label="Detections"
                     menuLabel="Detections column options"
                     {...getSortProps("name")}
                   />
-                  {resizeHandle(1)}
-                </th>
-                <th scope="col" style={colStyle(2)} className={thClass}>
-                  <ColumnHeaderMenu label="State" menuLabel="State column options" {...getSortProps("state")} />
                   {resizeHandle(2)}
                 </th>
                 <th scope="col" style={colStyle(3)} className={thClass}>
-                  <ColumnHeaderMenu label="Category" menuLabel="Category column options" {...getSortProps("category")} />
+                  <ColumnHeaderMenu label="State" menuLabel="State column options" {...getSortProps("state")} />
                   {resizeHandle(3)}
                 </th>
                 <th scope="col" style={colStyle(4)} className={thClass}>
+                  <ColumnHeaderMenu label="Category" menuLabel="Category column options" {...getSortProps("category")} />
+                  {resizeHandle(4)}
+                </th>
+                <th scope="col" style={colStyle(5)} className={thClass}>
                   <ColumnHeaderMenu
                     label="Severity"
                     menuLabel="Severity column options"
                     {...getSortProps("severity")}
                   />
-                  {resizeHandle(4)}
-                </th>
-                <th scope="col" style={colStyle(5)} className={thClass}>
-                  <ColumnHeaderMenu label="Last Run" menuLabel="Last Run column options" {...getSortProps("lastRun")} />
                   {resizeHandle(5)}
                 </th>
                 <th scope="col" style={colStyle(6)} className={thClass}>
+                  <ColumnHeaderMenu label="Last Run" menuLabel="Last Run column options" {...getSortProps("lastRun")} />
+                  {resizeHandle(6)}
+                </th>
+                <th scope="col" style={colStyle(7)} className={thClass}>
                   <ColumnHeaderMenu
                     label="Recurrence"
                     menuLabel="Recurrence column options"
                     {...getSortProps("recurrence")}
                   />
-                  {resizeHandle(6)}
+                  {resizeHandle(7)}
                 </th>
-                <th scope="col" style={colStyle(7)} className={thClass}>
+                <th scope="col" style={colStyle(8)} className={thClass}>
                   <ColumnHeaderMenu
                     label="Detection Findings"
                     menuLabel="Detection Findings column options"
                     {...getSortProps("findings")}
                   />
-                  {resizeHandle(7)}
+                  {resizeHandle(8)}
                 </th>
-                <th scope="col" style={colStyle(8)} className={thClass}>
+                <th scope="col" style={colStyle(9)} className={thClass}>
                   <ColumnHeaderMenu
                     label="Connectors"
                     menuLabel="Connectors column options"
                     {...getSortProps("connectors")}
                   />
-                  {resizeHandle(8)}
-                </th>
-                <th scope="col" style={colStyle(9)} className="relative h-10 px-2 py-0 align-middle text-xs font-bold uppercase tracking-wide text-text-primary">
-                  <span className="block translate-y-px truncate">Actions</span>
                   {resizeHandle(9)}
+                </th>
+                <th scope="col" style={colStyle(10)} className="relative h-10 px-2 py-0 align-middle text-xs font-bold uppercase tracking-wide text-text-primary">
+                  <span className="block translate-y-px truncate">Actions</span>
+                  {resizeHandle(10)}
                 </th>
               </tr>
             </thead>
@@ -689,6 +723,15 @@ function LibraryDetectionsTable({
                       )}
                     >
                       <td style={colStyle(0)} className="h-10 px-0 py-0 align-middle">
+                        <div className="flex items-center justify-center">
+                          <Checkbox
+                            checked={selected.has(row.id)}
+                            onCheckedChange={(checked) => toggleRow(row.id, checked)}
+                            aria-label={`Select ${row.name}`}
+                          />
+                        </div>
+                      </td>
+                      <td style={colStyle(1)} className="h-10 px-0 py-0 align-middle">
                         <div className="flex justify-center">
                           <button
                             type="button"
@@ -708,7 +751,7 @@ function LibraryDetectionsTable({
                           </button>
                         </div>
                       </td>
-                      <td style={colStyle(1)} className={cx(tdClass, "min-w-0")}>
+                      <td style={colStyle(2)} className={cx(tdClass, "min-w-0")}>
                         <div className="flex min-w-0 items-center gap-2">
                           <Icon
                             name="nav-detections"
@@ -726,35 +769,35 @@ function LibraryDetectionsTable({
                           </TruncatedText>
                         </div>
                       </td>
-                      <td style={colStyle(2)} className={tdClass}>
+                      <td style={colStyle(3)} className={tdClass}>
                         <Switch
                           checked={enabledById[row.id] ?? row.enabled}
                           onCheckedChange={(checked) => onEnabledChange(row.id, checked)}
                           aria-label={`Toggle ${row.name}`}
                         />
                       </td>
-                      <td style={colStyle(3)} className={tdClass}>
+                      <td style={colStyle(4)} className={tdClass}>
                         {row.category}
                       </td>
-                      <td style={colStyle(4)} className={tdClass}>
+                      <td style={colStyle(5)} className={tdClass}>
                         <span className="inline-flex items-center gap-2">
                           <SeverityTableIcon name={SEV_ICONS[row.severity]} color={SEV_COLORS[row.severity]} />
                           <span>{row.severity}</span>
                         </span>
                       </td>
-                      <td style={colStyle(5)} className={cx(tdClass, "tabular-nums")}>
+                      <td style={colStyle(6)} className={cx(tdClass, "tabular-nums")}>
                         {row.lastRun}
                       </td>
-                      <td style={colStyle(6)} className={tdClass}>
+                      <td style={colStyle(7)} className={tdClass}>
                         {row.recurrence}
                       </td>
-                      <td style={colStyle(7)} className={tdClass}>
+                      <td style={colStyle(8)} className={tdClass}>
                         <LibraryFindingsCell findings={row.findings} />
                       </td>
-                      <td style={colStyle(8)} className={tdClass}>
+                      <td style={colStyle(9)} className={tdClass}>
                         <ConnectorsCell active={row.connectorsActive} total={row.connectorsTotal} />
                       </td>
-                      <td style={colStyle(9)} className={tdClass}>
+                      <td style={colStyle(10)} className={tdClass}>
                         <LibraryCopyAction name={row.name} />
                       </td>
                     </tr>
