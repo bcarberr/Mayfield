@@ -53,7 +53,7 @@ export function ConnectorsPage() {
               <Input
                 variant="search"
                 placeholder="Search"
-                className="h-8 !bg-surface-container"
+                className="!bg-surface-container"
                 startAdornment={<Icon name="search" size={18} aria-hidden />}
                 aria-label="Search connectors"
               />

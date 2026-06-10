@@ -417,7 +417,7 @@ function MapSchemaOverviewCard() {
               tabIndex={-1}
               startAdornment={<Icon name="search" />}
               placeholder="Search"
-              className="h-7 w-full border-border-rule px-1.5 py-0"
+              className="w-full border-border-rule px-1.5"
             />
           </div>
           <div className="mt-3 flex flex-wrap items-center gap-2 text-base-small">
@@ -638,7 +638,7 @@ function FieldMappingBar({
               tabIndex={-1}
               startAdornment={<Icon name="search" />}
               placeholder="Search source fields"
-              className="h-7 w-full min-w-0 py-0"
+              className="w-full min-w-0"
             />
             <Switch checked={false} disabled label="Show Hidden Fields" />
           </div>
