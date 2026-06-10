@@ -9,6 +9,7 @@ import {
   type SearchEventOption,
   type SearchScopeKind,
   type SearchScopeSelection,
+  selectionEventIconClassName,
   selectionIcon,
   selectionLabel,
 } from "../data/searchEntityOptions";
@@ -120,19 +121,21 @@ function EventCategoryItem({
 
 function EventPickerItem({
   option,
+  iconClassName,
   onSelect,
 }: {
   option: SearchEventOption;
+  iconClassName: string;
   onSelect: (option: SearchEventOption) => void;
 }) {
   return (
     <button
       type="button"
-      className="flex h-8 w-full min-w-0 items-center gap-2 rounded px-3 text-left transition-colors hover:bg-interactive-secondary-hover focus-visible:bg-interactive-secondary-hover focus-visible:outline-none"
+      className="flex h-8 w-full min-w-0 items-center gap-2 rounded px-1 text-left transition-colors hover:bg-interactive-secondary-hover focus-visible:bg-interactive-secondary-hover focus-visible:outline-none"
       onClick={() => onSelect(option)}
     >
-      <Icon name={option.icon} size={PICKER_ICON_SIZE} className="shrink-0 text-accent-enum" aria-hidden />
-      <span className="min-w-0 truncate text-sm font-semibold leading-8 tracking-[0.4px] text-text-secondary">
+      <Icon name={option.icon} size={PICKER_ICON_SIZE} className={cx("shrink-0", iconClassName)} aria-hidden />
+      <span className="min-w-0 text-sm font-semibold leading-8 tracking-[0.4px] text-text-secondary">
         {option.label}
       </span>
     </button>
@@ -153,7 +156,7 @@ function EventsPickerPanel({
     SEARCH_EVENT_CATEGORIES.find((category) => category.id === DEFAULT_EVENT_CATEGORY_ID)!;
 
   return (
-    <div className="flex min-h-[330px]">
+    <div className="flex items-stretch">
       <div className="w-48 shrink-0 border-r border-border-rule">
         <p className="px-4 pt-3 text-xs font-bold uppercase leading-[14px] tracking-[0.4px] text-text-tertiary">
           Event categories:
@@ -169,10 +172,22 @@ function EventsPickerPanel({
           ))}
         </div>
       </div>
-      <div className="min-w-0 flex-1 py-3">
-        {activeCategory.events.map((option) => (
-          <EventPickerItem key={option.id} option={option} onSelect={onSelectEvent} />
-        ))}
+      <div className="min-w-0 flex-1 px-3 py-3">
+        <div
+          className={cx(
+            "grid gap-x-3",
+            activeCategory.events.length > 6 ? "grid-cols-2" : "grid-cols-1",
+          )}
+        >
+          {activeCategory.events.map((option) => (
+            <EventPickerItem
+              key={option.id}
+              option={option}
+              iconClassName={activeCategory.iconClassName}
+              onSelect={onSelectEvent}
+            />
+          ))}
+        </div>
       </div>
     </div>
   );
@@ -198,7 +213,7 @@ function SearchScopePickerPanel({
 
   return (
     <div
-      className="absolute left-0 top-[calc(100%+4px)] z-50 overflow-hidden rounded-[4px] border border-border-rule bg-surface-modal shadow-[0px_5px_5px_-3px_rgba(0,0,0,0.2),0px_8px_10px_1px_rgba(0,0,0,0.14),0px_3px_14px_2px_rgba(0,0,0,0.12)]"
+      className="absolute left-0 top-[calc(100%+4px)] z-50 max-h-[calc(100vh-96px)] overflow-y-auto rounded-[4px] border border-border-rule bg-surface-modal shadow-[0px_5px_5px_-3px_rgba(0,0,0,0.2),0px_8px_10px_1px_rgba(0,0,0,0.14),0px_3px_14px_2px_rgba(0,0,0,0.12)]"
       style={{ width: panelWidth, maxWidth: `min(${panelWidth}px, calc(100vw - 80px))` }}
       role="dialog"
       aria-label="Search scope picker"
@@ -250,6 +265,7 @@ export function SearchEntityEventSelect({
 
   const displayValue = selectionLabel(selection);
   const selectedIcon = selectionIcon(selection);
+  const selectedEventIconClassName = selectionEventIconClassName(selection);
 
   const openPicker = () => {
     setSearchBy(selection?.kind === "events" ? "events" : "entities");
@@ -318,7 +334,7 @@ export function SearchEntityEventSelect({
           <Icon
             name={selectedIcon}
             size={PICKER_ICON_SIZE}
-            className="shrink-0 text-accent-enum"
+            className={cx("shrink-0", selectedEventIconClassName ?? "text-accent-enum")}
             aria-hidden
           />
         ) : (
