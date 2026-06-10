@@ -11,6 +11,7 @@ import {
 import { FilterColumnPanel, type FilterColumnPanelTool } from "../ui/FilterColumnPanel";
 import { Input } from "../ui/Input";
 import { SeverityTableIcon } from "../ui/SeverityTableIcon";
+import { Modal } from "../ui/Modal";
 import { SlideOver } from "../ui/SlideOver";
 import { TruncatedText } from "../ui/TruncatedText";
 import { useResizableColumns } from "../ui/useResizableColumns";
@@ -719,7 +720,71 @@ function SeverityBreakdownCard({
   );
 }
 
-function DetectionActions({ name }: { name: string }) {
+function defaultCopyDetectionName(name: string): string {
+  return `${name} copy`;
+}
+
+function nextDetectionId(rows: DetectionRow[]): string {
+  const numericIds = rows.map((row) => Number.parseInt(row.id, 10)).filter((id) => !Number.isNaN(id));
+  const maxId = numericIds.length > 0 ? Math.max(...numericIds) : 0;
+  return String(maxId + 1);
+}
+
+function DuplicateDetectionModal({
+  open,
+  name,
+  onNameChange,
+  onClose,
+  onConfirm,
+}: {
+  open: boolean;
+  name: string;
+  onNameChange: (name: string) => void;
+  onClose: () => void;
+  onConfirm: () => void;
+}) {
+  const trimmedName = name.trim();
+
+  return (
+    <Modal
+      open={open}
+      title="Duplicate detection"
+      onClose={onClose}
+      footer={
+        <div className="flex justify-end gap-2">
+          <Button type="button" variant="secondary" onClick={onClose}>
+            Cancel
+          </Button>
+          <Button type="button" variant="primary" disabled={!trimmedName} onClick={onConfirm}>
+            Duplicate
+          </Button>
+        </div>
+      }
+    >
+      <label className="block">
+        <span className="text-sm font-semibold text-text-primary">Detection name</span>
+        <Input
+          value={name}
+          onChange={(event) => onNameChange(event.target.value)}
+          className="mt-2"
+          autoFocus
+        />
+      </label>
+    </Modal>
+  );
+}
+
+function DetectionActions({
+  name,
+  onEdit,
+  onCopy,
+  onDelete,
+}: {
+  name: string;
+  onEdit: () => void;
+  onCopy: () => void;
+  onDelete: () => void;
+}) {
   const actionBtn =
     "size-7 shrink-0 p-0 text-text-tertiary hover:text-text-primary [&_svg]:!size-3 [&_svg]:!h-3 [&_svg]:!w-3";
   const moreBtn =
@@ -727,13 +792,13 @@ function DetectionActions({ name }: { name: string }) {
 
   return (
     <div className="flex items-center justify-start gap-0.5">
-      <Button type="button" variant="ghost" className={actionBtn} aria-label={`Edit ${name}`}>
+      <Button type="button" variant="ghost" className={actionBtn} aria-label={`Edit ${name}`} onClick={onEdit}>
         <Icon name="action-edit" size={12} />
       </Button>
-      <Button type="button" variant="ghost" className={actionBtn} aria-label={`Copy ${name}`}>
+      <Button type="button" variant="ghost" className={actionBtn} aria-label={`Copy ${name}`} onClick={onCopy}>
         <Icon name="action-content-copy" size={12} />
       </Button>
-      <Button type="button" variant="ghost" className={actionBtn} aria-label={`Delete ${name}`}>
+      <Button type="button" variant="ghost" className={actionBtn} aria-label={`Delete ${name}`} onClick={onDelete}>
         <Icon name="action-delete" size={12} />
       </Button>
       <Button type="button" variant="ghost" className={moreBtn} aria-label={`More actions for ${name}`}>
@@ -766,17 +831,21 @@ function FindingsCell({ findings }: { findings: DetectionRow["findings"] }) {
 function DetectionDetailPanel({
   row,
   enabled,
+  mode,
   onClose,
 }: {
   row: DetectionRow;
   enabled: boolean;
+  mode: "view" | "edit";
   onClose: () => void;
 }) {
   return (
     <div className="flex h-full min-h-0 flex-col text-text-primary">
       <header className="flex shrink-0 items-start justify-between gap-3 border-b border-border-rule px-5 py-4">
         <div className="min-w-0">
-          <p className="text-xs font-bold uppercase tracking-wide text-text-tertiary">Detection</p>
+          <p className="text-xs font-bold uppercase tracking-wide text-text-tertiary">
+            {mode === "edit" ? "Edit detection" : "Detection"}
+          </p>
           <h2 className="mt-1 text-page-title text-text-primary">{row.name}</h2>
         </div>
         <Button type="button" variant="ghost" className="shrink-0 p-1 text-text-tertiary hover:text-text-primary" aria-label="Close detection details" onClick={onClose}>
@@ -863,6 +932,9 @@ function DetectionsTable({
   onToggleExpand,
   onToggleExpandAll,
   onOpenDetection,
+  onEditDetection,
+  onCopyDetection,
+  onDeleteDetection,
   enabledById,
   onEnabledChange,
   detectionNameFilter,
@@ -882,6 +954,9 @@ function DetectionsTable({
   onToggleExpand: (id: string) => void;
   onToggleExpandAll: () => void;
   onOpenDetection: (id: string) => void;
+  onEditDetection: (id: string) => void;
+  onCopyDetection: (id: string) => void;
+  onDeleteDetection: (id: string) => void;
   enabledById: Record<string, boolean>;
   onEnabledChange: (id: string, enabled: boolean) => void;
   detectionNameFilter: string | null;
@@ -1175,7 +1250,12 @@ function DetectionsTable({
                         <FindingsCell findings={row.findings} />
                       </td>
                       <td style={colStyle(8)} className={tdClass}>
-                        <DetectionActions name={row.name} />
+                        <DetectionActions
+                          name={row.name}
+                          onEdit={() => onEditDetection(row.id)}
+                          onCopy={() => onCopyDetection(row.id)}
+                          onDelete={() => onDeleteDetection(row.id)}
+                        />
                       </td>
                     </tr>
                     {expanded ? (
@@ -1205,7 +1285,9 @@ function ManageDetectionsContent() {
   const [tableTool, setTableTool] = useState<FilterColumnPanelTool | null>("filter");
   const [searchQuery, setSearchQuery] = useState("");
   const [expandedIds, setExpandedIds] = useState<Set<string>>(() => new Set());
+  const [detectionRows, setDetectionRows] = useState<DetectionRow[]>(() => [...DETECTION_ROWS]);
   const [drawerDetectionId, setDrawerDetectionId] = useState<string | null>(null);
+  const [drawerMode, setDrawerMode] = useState<"view" | "edit">("view");
   const [detectionNameFilter, setDetectionNameFilter] = useState<string | null>(null);
   const [severityFilter, setSeverityFilter] = useState<BreakdownSeverity | null>(null);
   const [enabledById, setEnabledById] = useState<Record<string, boolean>>(() =>
@@ -1213,22 +1295,82 @@ function ManageDetectionsContent() {
   );
   const [showOnlyActive, setShowOnlyActive] = useState(false);
   const [systemHealthFilter, setSystemHealthFilter] = useState<SystemHealthFilter | null>(null);
+  const [copySourceId, setCopySourceId] = useState<string | null>(null);
+  const [copyName, setCopyName] = useState("");
+
+  const openDetectionPanel = (id: string, mode: "view" | "edit") => {
+    setDrawerDetectionId(id);
+    setDrawerMode(mode);
+  };
+
+  const handleDeleteDetection = (id: string) => {
+    setDetectionRows((rows) => rows.filter((row) => row.id !== id));
+    setDrawerDetectionId((current) => (current === id ? null : current));
+    setExpandedIds((current) => {
+      const next = new Set(current);
+      next.delete(id);
+      return next;
+    });
+  };
+
+  const handleOpenCopyDetection = (id: string) => {
+    const source = detectionRows.find((row) => row.id === id);
+    if (!source) return;
+    setCopySourceId(id);
+    setCopyName(defaultCopyDetectionName(source.name));
+  };
+
+  const handleCloseCopyDetection = () => {
+    setCopySourceId(null);
+    setCopyName("");
+  };
+
+  const handleConfirmCopyDetection = () => {
+    const trimmedName = copyName.trim();
+    if (!copySourceId || !trimmedName) return;
+
+    const source = detectionRows.find((row) => row.id === copySourceId);
+    if (!source) {
+      handleCloseCopyDetection();
+      return;
+    }
+
+    const newId = nextDetectionId(detectionRows);
+    const duplicate: DetectionRow = {
+      ...source,
+      id: newId,
+      name: trimmedName,
+    };
+
+    setDetectionRows((rows) => {
+      const sourceIndex = rows.findIndex((row) => row.id === copySourceId);
+      if (sourceIndex === -1) return [...rows, duplicate];
+      const next = [...rows];
+      next.splice(sourceIndex + 1, 0, duplicate);
+      return next;
+    });
+    setEnabledById((current) => ({
+      ...current,
+      [newId]: source.enabled,
+    }));
+    handleCloseCopyDetection();
+  };
 
   const systemHealthCounts = useMemo(() => {
-    const inactive = DETECTION_ROWS.filter((row) => detectionIsInactive(row, enabledById)).length;
-    const needAttention = DETECTION_ROWS.filter(detectionNeedsAttention).length;
-    const runningNormally = DETECTION_ROWS.filter((row) => detectionRunsNormally(row, enabledById)).length;
+    const inactive = detectionRows.filter((row) => detectionIsInactive(row, enabledById)).length;
+    const needAttention = detectionRows.filter(detectionNeedsAttention).length;
+    const runningNormally = detectionRows.filter((row) => detectionRunsNormally(row, enabledById)).length;
     return {
       inactive,
       needAttention,
       runningNormally,
-      total: DETECTION_ROWS.length,
+      total: detectionRows.length,
     };
-  }, [enabledById]);
+  }, [detectionRows, enabledById]);
 
   const filteredRows = useMemo(
     () =>
-      DETECTION_ROWS.filter((row) => {
+      detectionRows.filter((row) => {
         if (detectionNameFilter && row.name !== detectionNameFilter) return false;
         if (severityFilter && !rowMatchesSeverityFilter(row.severity, severityFilter)) return false;
         if (systemHealthFilter === "need-attention" && !detectionNeedsAttention(row)) return false;
@@ -1239,12 +1381,12 @@ function ManageDetectionsContent() {
         if (!detectionMatchesSearch(row, searchQuery, enabled)) return false;
         return true;
       }),
-    [detectionNameFilter, severityFilter, systemHealthFilter, searchQuery, enabledById, showOnlyActive],
+    [detectionRows, detectionNameFilter, severityFilter, systemHealthFilter, searchQuery, enabledById, showOnlyActive],
   );
 
   const drawerRow = useMemo(
-    () => (drawerDetectionId ? DETECTION_ROWS.find((r) => r.id === drawerDetectionId) : undefined),
-    [drawerDetectionId],
+    () => (drawerDetectionId ? detectionRows.find((r) => r.id === drawerDetectionId) : undefined),
+    [detectionRows, drawerDetectionId],
   );
 
   const toggleExpand = (id: string) => {
@@ -1309,7 +1451,10 @@ function ManageDetectionsContent() {
         expandedIds={expandedIds}
         onToggleExpand={toggleExpand}
         onToggleExpandAll={toggleExpandAll}
-        onOpenDetection={setDrawerDetectionId}
+        onOpenDetection={(id) => openDetectionPanel(id, "view")}
+        onEditDetection={(id) => openDetectionPanel(id, "edit")}
+        onCopyDetection={handleOpenCopyDetection}
+        onDeleteDetection={handleDeleteDetection}
         enabledById={enabledById}
         onEnabledChange={(id, enabled) => setEnabledById((current) => ({ ...current, [id]: enabled }))}
         detectionNameFilter={detectionNameFilter}
@@ -1319,7 +1464,7 @@ function ManageDetectionsContent() {
         onSearchQueryChange={setSearchQuery}
         showOnlyActive={showOnlyActive}
         onShowOnlyActiveChange={setShowOnlyActive}
-        totalCount={DETECTION_ROWS.length}
+        totalCount={detectionRows.length}
         onClearFilters={() => {
           setDetectionNameFilter(null);
           setSeverityFilter(null);
@@ -1327,6 +1472,13 @@ function ManageDetectionsContent() {
           setShowOnlyActive(false);
           setSearchQuery("");
         }}
+      />
+      <DuplicateDetectionModal
+        open={copySourceId != null}
+        name={copyName}
+        onNameChange={setCopyName}
+        onClose={handleCloseCopyDetection}
+        onConfirm={handleConfirmCopyDetection}
       />
       {drawerRow ? (
         <SlideOver
@@ -1338,6 +1490,7 @@ function ManageDetectionsContent() {
           <DetectionDetailPanel
             row={drawerRow}
             enabled={enabledById[drawerRow.id] ?? drawerRow.enabled}
+            mode={drawerMode}
             onClose={() => setDrawerDetectionId(null)}
           />
         </SlideOver>

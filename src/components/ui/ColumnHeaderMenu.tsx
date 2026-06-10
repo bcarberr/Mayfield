@@ -1,4 +1,4 @@
-import { Icon } from "../../design-system";
+import { Icon, type IconName } from "../../design-system";
 import { Button } from "./Button";
 import type { ColumnSortDirection } from "./useColumnSort";
 
@@ -13,12 +13,15 @@ function sortToggleLabel(label: string, direction: ColumnSortDirection | null): 
 export function ColumnHeaderMenu({
   label,
   menuLabel,
+  leadingIcon,
   sortable,
   sortDirection = null,
   onSortToggle,
 }: {
   label: string;
   menuLabel: string;
+  /** Renders before the label; inherits header text color via currentColor. */
+  leadingIcon?: IconName;
   sortable?: boolean;
   sortDirection?: ColumnSortDirection | null;
   onSortToggle?: () => void;
@@ -28,6 +31,7 @@ export function ColumnHeaderMenu({
   return (
     <div className="flex w-full min-w-0 translate-y-px items-center justify-between gap-1">
       <div className="flex min-w-0 flex-1 items-center gap-1">
+        {leadingIcon ? <Icon name={leadingIcon} size={14} className="shrink-0" aria-hidden /> : null}
         <span className="truncate">{label}</span>
         {sortable ? (
           <button

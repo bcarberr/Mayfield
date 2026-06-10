@@ -11,6 +11,7 @@ import {
 import { FilterColumnPanel, type FilterColumnPanelTool } from "../ui/FilterColumnPanel";
 import { Input } from "../ui/Input";
 import { SeverityTableIcon } from "../ui/SeverityTableIcon";
+import { Modal } from "../ui/Modal";
 import { SlideOver } from "../ui/SlideOver";
 import { TruncatedText } from "../ui/TruncatedText";
 import { useResizableColumns } from "../ui/useResizableColumns";
@@ -158,7 +159,76 @@ function ReviewFindingsCell({ findings }: { findings: QueuedDetectionRow["findin
   );
 }
 
-function ReviewActions({ name }: { name: string }) {
+function defaultCopyDetectionName(name: string): string {
+  return `${name} copy`;
+}
+
+function nextQueuedDetectionId(rows: QueuedDetectionRow[]): string {
+  const numericIds = rows
+    .map((row) => {
+      const match = /^review-(\d+)$/.exec(row.id);
+      return match ? Number.parseInt(match[1], 10) : Number.NaN;
+    })
+    .filter((id) => !Number.isNaN(id));
+  const maxId = numericIds.length > 0 ? Math.max(...numericIds) : 0;
+  return `review-${maxId + 1}`;
+}
+
+function DuplicateQueuedDetectionModal({
+  open,
+  name,
+  onNameChange,
+  onClose,
+  onConfirm,
+}: {
+  open: boolean;
+  name: string;
+  onNameChange: (name: string) => void;
+  onClose: () => void;
+  onConfirm: () => void;
+}) {
+  const trimmedName = name.trim();
+
+  return (
+    <Modal
+      open={open}
+      title="Duplicate detection"
+      onClose={onClose}
+      footer={
+        <div className="flex justify-end gap-2">
+          <Button type="button" variant="secondary" onClick={onClose}>
+            Cancel
+          </Button>
+          <Button type="button" variant="primary" disabled={!trimmedName} onClick={onConfirm}>
+            Duplicate
+          </Button>
+        </div>
+      }
+    >
+      <label className="block">
+        <span className="text-sm font-semibold text-text-primary">Detection name</span>
+        <Input
+          value={name}
+          onChange={(event) => onNameChange(event.target.value)}
+          className="mt-2"
+          autoFocus
+        />
+      </label>
+    </Modal>
+  );
+}
+
+function ReviewActions({
+  name,
+  onEdit,
+  onCopy,
+  onDelete,
+}: {
+  name: string;
+  onEdit: () => void;
+  onCopy: () => void;
+  onDelete: () => void;
+}) {
   const actionBtn =
     "size-7 shrink-0 p-0 text-text-tertiary hover:text-text-primary [&_svg]:!size-3 [&_svg]:!h-3 [&_svg]:!w-3";
   const moreBtn =
@@ -166,10 +236,13 @@ function ReviewActions({ name }: { name: string }) {
 
   return (
     <div className="flex items-center justify-start gap-0.5">
-      <Button type="button" variant="ghost" className={actionBtn} aria-label={`Edit ${name}`}>
+      <Button type="button" variant="ghost" className={actionBtn} aria-label={`Edit ${name}`} onClick={onEdit}>
         <Icon name="action-edit" size={12} />
       </Button>
-      <Button type="button" variant="ghost" className={actionBtn} aria-label={`Delete ${name}`}>
+      <Button type="button" variant="ghost" className={actionBtn} aria-label={`Copy ${name}`} onClick={onCopy}>
+        <Icon name="action-content-copy" size={12} />
+      </Button>
+      <Button type="button" variant="ghost" className={actionBtn} aria-label={`Delete ${name}`} onClick={onDelete}>
         <Icon name="action-delete" size={12} />
       </Button>
       <Button type="button" variant="ghost" className={moreBtn} aria-label={`More actions for ${name}`}>
@@ -182,17 +255,21 @@ function ReviewActions({ name }: { name: string }) {
 function QueuedDetectionDetailPanel({
   row,
   enabled,
+  mode,
   onClose,
 }: {
   row: QueuedDetectionRow;
   enabled: boolean;
+  mode: "view" | "edit";
   onClose: () => void;
 }) {
   return (
     <div className="flex h-full min-h-0 flex-col text-text-primary">
       <header className="flex shrink-0 items-start justify-between gap-3 border-b border-border-rule px-5 py-4">
         <div className="min-w-0">
-          <p className="text-xs font-bold uppercase tracking-wide text-text-tertiary">Queued For Review</p>
+          <p className="text-xs font-bold uppercase tracking-wide text-text-tertiary">
+            {mode === "edit" ? "Edit detection" : "Detection"}
+          </p>
           <h2 className="mt-1 text-page-title text-text-primary">{row.name}</h2>
         </div>
         <Button
@@ -285,6 +362,9 @@ function QueuedReviewTable({
   onToggleExpand,
   onToggleExpandAll,
   onOpenDetection,
+  onEditDetection,
+  onCopyDetection,
+  onDeleteDetection,
   enabledById,
   onEnabledChange,
   searchQuery,
@@ -301,6 +381,9 @@ function QueuedReviewTable({
   onToggleExpand: (id: string) => void;
   onToggleExpandAll: () => void;
   onOpenDetection: (id: string) => void;
+  onEditDetection: (id: string) => void;
+  onCopyDetection: (id: string) => void;
+  onDeleteDetection: (id: string) => void;
   enabledById: Record<string, boolean>;
   onEnabledChange: (id: string, enabled: boolean) => void;
   searchQuery: string;
@@ -584,7 +667,12 @@ function QueuedReviewTable({
                         <ReviewFindingsCell findings={row.findings} />
                       </td>
                       <td style={colStyle(8)} className={tdClass}>
-                        <ReviewActions name={row.name} />
+                        <ReviewActions
+                          name={row.name}
+                          onEdit={() => onEditDetection(row.id)}
+                          onCopy={() => onCopyDetection(row.id)}
+                          onDelete={() => onDeleteDetection(row.id)}
+                        />
                       </td>
                     </tr>
                     {expanded ? (
@@ -614,32 +702,94 @@ export function QueuedForReviewContent() {
   const [tableTool, setTableTool] = useState<FilterColumnPanelTool | null>("filter");
   const [searchQuery, setSearchQuery] = useState("");
   const [expandedIds, setExpandedIds] = useState<Set<string>>(() => new Set());
+  const [queuedRows, setQueuedRows] = useState<QueuedDetectionRow[]>(() => [...QUEUED_DETECTION_ROWS]);
   const [drawerDetectionId, setDrawerDetectionId] = useState<string | null>(null);
+  const [drawerMode, setDrawerMode] = useState<"view" | "edit">("view");
+  const [copySourceId, setCopySourceId] = useState<string | null>(null);
+  const [copyName, setCopyName] = useState("");
   const [enabledById, setEnabledById] = useState<Record<string, boolean>>(() =>
     Object.fromEntries(QUEUED_DETECTION_ROWS.map((r) => [r.id, r.enabled])),
   );
   const [showOnlyActive, setShowOnlyActive] = useState(false);
 
+  const openDetectionPanel = (id: string, mode: "view" | "edit") => {
+    setDrawerDetectionId(id);
+    setDrawerMode(mode);
+  };
+
+  const handleDeleteDetection = (id: string) => {
+    setQueuedRows((rows) => rows.filter((row) => row.id !== id));
+    setDrawerDetectionId((current) => (current === id ? null : current));
+    setExpandedIds((current) => {
+      const next = new Set(current);
+      next.delete(id);
+      return next;
+    });
+  };
+
+  const handleOpenCopyDetection = (id: string) => {
+    const source = queuedRows.find((row) => row.id === id);
+    if (!source) return;
+    setCopySourceId(id);
+    setCopyName(defaultCopyDetectionName(source.name));
+  };
+
+  const handleCloseCopyDetection = () => {
+    setCopySourceId(null);
+    setCopyName("");
+  };
+
+  const handleConfirmCopyDetection = () => {
+    const trimmedName = copyName.trim();
+    if (!copySourceId || !trimmedName) return;
+
+    const source = queuedRows.find((row) => row.id === copySourceId);
+    if (!source) {
+      handleCloseCopyDetection();
+      return;
+    }
+
+    const newId = nextQueuedDetectionId(queuedRows);
+    const duplicate: QueuedDetectionRow = {
+      ...source,
+      id: newId,
+      name: trimmedName,
+    };
+
+    setQueuedRows((rows) => {
+      const sourceIndex = rows.findIndex((row) => row.id === copySourceId);
+      if (sourceIndex === -1) return [...rows, duplicate];
+      const next = [...rows];
+      next.splice(sourceIndex + 1, 0, duplicate);
+      return next;
+    });
+    setEnabledById((current) => ({
+      ...current,
+      [newId]: source.enabled,
+    }));
+    handleCloseCopyDetection();
+  };
+
   const filteredRows = useMemo(() => {
-    return QUEUED_DETECTION_ROWS.filter((row) => {
+    return queuedRows.filter((row) => {
       const enabled = enabledById[row.id] ?? row.enabled;
       if (showOnlyActive && !enabled) return false;
       return queuedMatchesSearch(row, searchQuery, enabled);
     });
-  }, [searchQuery, enabledById, showOnlyActive]);
+  }, [queuedRows, searchQuery, enabledById, showOnlyActive]);
 
   const summaryStats = useMemo(() => {
-    const pending = QUEUED_DETECTION_ROWS.length;
-    const active = QUEUED_DETECTION_ROWS.filter((row) => enabledById[row.id] ?? row.enabled).length;
-    const highFindings = QUEUED_DETECTION_ROWS.filter((row) => row.severity === "High").reduce((sum, row) => {
+    const pending = queuedRows.length;
+    const active = queuedRows.filter((row) => enabledById[row.id] ?? row.enabled).length;
+    const highFindings = queuedRows.filter((row) => row.severity === "High").reduce((sum, row) => {
       return sum + (typeof row.findings === "number" ? row.findings : 0);
     }, 0);
-    const criticalSeverity = QUEUED_DETECTION_ROWS.filter((row) => row.severity === "Critical").length;
+    const criticalSeverity = queuedRows.filter((row) => row.severity === "Critical").length;
     return { pending, active, highFindings, criticalSeverity };
-  }, [enabledById]);
+  }, [queuedRows, enabledById]);
 
   const drawerRow = drawerDetectionId
-    ? QUEUED_DETECTION_ROWS.find((row) => row.id === drawerDetectionId) ?? null
+    ? queuedRows.find((row) => row.id === drawerDetectionId) ?? null
     : null;
 
   const toggleExpand = (id: string) => {
@@ -675,17 +825,27 @@ export function QueuedForReviewContent() {
         expandedIds={expandedIds}
         onToggleExpand={toggleExpand}
         onToggleExpandAll={toggleExpandAll}
-        onOpenDetection={setDrawerDetectionId}
+        onOpenDetection={(id) => openDetectionPanel(id, "view")}
+        onEditDetection={(id) => openDetectionPanel(id, "edit")}
+        onCopyDetection={handleOpenCopyDetection}
+        onDeleteDetection={handleDeleteDetection}
         enabledById={enabledById}
         onEnabledChange={(id, enabled) => setEnabledById((prev) => ({ ...prev, [id]: enabled }))}
         searchQuery={searchQuery}
         onSearchQueryChange={setSearchQuery}
         showOnlyActive={showOnlyActive}
         onShowOnlyActiveChange={setShowOnlyActive}
-        totalCount={QUEUED_DETECTION_ROWS.length}
+        totalCount={queuedRows.length}
         onClearFilters={() => setSearchQuery("")}
       />
 
+      <DuplicateQueuedDetectionModal
+        open={copySourceId != null}
+        name={copyName}
+        onNameChange={setCopyName}
+        onClose={handleCloseCopyDetection}
+        onConfirm={handleConfirmCopyDetection}
+      />
       {drawerRow ? (
         <SlideOver
           open
@@ -696,6 +856,7 @@ export function QueuedForReviewContent() {
           <QueuedDetectionDetailPanel
             row={drawerRow}
             enabled={enabledById[drawerRow.id] ?? drawerRow.enabled}
+            mode={drawerMode}
             onClose={() => setDrawerDetectionId(null)}
           />
         </SlideOver>

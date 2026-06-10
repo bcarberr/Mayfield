@@ -322,11 +322,8 @@ function LibraryFindingsCell({ findings }: { findings: LibraryDetectionRow["find
 
 function ConnectorsCell({ active, total }: { active: number; total: number }) {
   return (
-    <span className="inline-flex items-center gap-1.5 text-sm text-text-secondary">
-      <Icon name="nav-federated-joins" size={14} className="text-text-tertiary" aria-hidden />
-      <span className="tabular-nums">
-        {active} of {total}
-      </span>
+    <span className="text-sm tabular-nums text-text-secondary">
+      {active} of {total}
     </span>
   );
 }
@@ -655,6 +652,7 @@ function LibraryDetectionsTable({
                 <th scope="col" style={colStyle(2)} className={thClass}>
                   <ColumnHeaderMenu
                     label="Detections"
+                    leadingIcon="nav-detections"
                     menuLabel="Detections column options"
                     {...getSortProps("name")}
                   />
