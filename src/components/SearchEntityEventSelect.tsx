@@ -319,7 +319,7 @@ export function SearchEntityEventSelect({
     <div ref={containerRef} className={cx("relative min-w-0", className)}>
       <div
         className={cx(
-          "flex h-8 w-full max-w-[360px] items-center gap-2 rounded-[4px] border border-border-rule bg-surface-container px-3 transition-colors",
+          "flex h-8 w-[240px] max-w-[240px] items-center gap-2 rounded-[4px] border border-border-rule bg-surface-container px-3 transition-colors",
           open ? "ring-1 ring-interactive-active" : "hover:bg-overlay-subtle",
         )}
       >
