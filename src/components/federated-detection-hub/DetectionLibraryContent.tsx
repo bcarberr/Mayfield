@@ -13,6 +13,7 @@ import { FilterColumnPanel, type FilterColumnPanelTool } from "../ui/FilterColum
 import { Input } from "../ui/Input";
 import { SeverityTableIcon } from "../ui/SeverityTableIcon";
 import { SlideOver } from "../ui/SlideOver";
+import { TruncatedText } from "../ui/TruncatedText";
 import { useResizableColumns } from "../ui/useResizableColumns";
 
 const cx = (...c: (string | false | undefined)[]) => c.filter(Boolean).join(" ");
@@ -545,7 +546,7 @@ function LibraryDetectionsTable({
                 placeholder="Search"
                 value={searchQuery}
                 onChange={(event) => onSearchQueryChange(event.target.value)}
-                className="h-7 !bg-datavis-card-bg"
+                className="!bg-datavis-card-bg"
                 aria-label="Search detection library"
               />
             </div>
@@ -560,7 +561,7 @@ function LibraryDetectionsTable({
             <Button
               type="button"
               variant="ghost"
-              className="h-7 shrink-0 gap-1.5 px-2 text-base-small text-text-tertiary hover:text-text-primary [&_svg]:!h-2 [&_svg]:!w-3"
+              className="h-8 shrink-0 gap-1.5 px-2 text-base-small text-text-tertiary hover:text-text-primary [&_svg]:!h-2 [&_svg]:!w-3"
               onClick={onClearFilters}
             >
               <Icon name="action-filter-list" size={12} aria-hidden />
@@ -715,13 +716,14 @@ function LibraryDetectionsTable({
                             className="shrink-0 text-text-tertiary"
                             aria-hidden
                           />
-                          <button
-                            type="button"
-                            className="min-w-0 truncate text-left font-semibold text-interactive-active hover:underline focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-interactive-active"
+                          <TruncatedText
+                            as="button"
+                            className="text-left font-semibold text-interactive-active hover:underline focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-interactive-active"
+                            wrapperClassName="min-w-0 flex-1"
                             onClick={() => onOpenDetection(row.id)}
                           >
                             {row.name}
-                          </button>
+                          </TruncatedText>
                         </div>
                       </td>
                       <td style={colStyle(2)} className={tdClass}>

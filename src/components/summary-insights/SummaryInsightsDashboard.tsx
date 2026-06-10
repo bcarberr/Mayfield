@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useRef, useState, type CSSProperties, type ReactNode } from "react";
+import { useEffect, useMemo, useRef, useState, type CSSProperties } from "react";
 import { createPortal } from "react-dom";
 import { useNavigate } from "react-router-dom";
 import { Icon } from "../../design-system";
@@ -9,10 +9,20 @@ import { Button } from "../ui/Button";
 import { ColumnHeaderMenu } from "../ui/ColumnHeaderMenu";
 import { compareStrings, useColumnSort } from "../ui/useColumnSort";
 import { Input } from "../ui/Input";
+import { TruncatedText } from "../ui/TruncatedText";
 import { useResizableColumns } from "../ui/useResizableColumns";
 import { Checkbox } from "../uiCheckbox";
 import { ROUTES } from "../../app/routes";
-import { FederatedAnalyticsBreadcrumb } from "./FederatedAnalyticsBreadcrumb";
+import { EntitiesOverviewContent } from "./EntitiesOverviewContent";
+import { NetworkActivityContent } from "./NetworkActivityContent";
+import { cx, DatavisGridlineRule, InsightCard } from "./datavisCard";
+import {
+  FederatedAnalyticsBreadcrumb,
+  federatedViewLabel,
+  isComingSoonFederatedView,
+  readDefaultFederatedView,
+  type FederatedViewId,
+} from "./FederatedAnalyticsBreadcrumb";
 
 /** Figma Framework-Keyframes `4524:35393` — horizontal bar fills (dark datavis). */
 const CHART_CATEGORY_FILL = "#6dc6a1";
@@ -32,13 +42,6 @@ function isSeverityLevel(label: string): label is SeverityLevel {
 
 const X_MAX = 500;
 const X_TICKS = [0, 100, 200, 300, 400, 500] as const;
-
-const cx = (...c: (string | false | undefined)[]) => c.filter(Boolean).join(" ");
-
-/** Horizontal rule using Datavis/Gridlines; inset 20px per side by default. */
-function DatavisGridlineRule({ inset = true }: { inset?: boolean }) {
-  return <div className={cx("h-px shrink-0 bg-datavis-gridlines", inset && "mx-[20px]")} aria-hidden />;
-}
 
 type BarRow = { label: string; value: number; color?: string };
 
@@ -182,32 +185,6 @@ function HorizontalBarPanel({
       </div>
       <p className="mt-1 shrink-0 text-center text-base-semibold text-text-primary">Findings</p>
     </div>
-  );
-}
-
-function InsightCard({
-  title,
-  children,
-}: {
-  title: string;
-  children: ReactNode;
-}) {
-  return (
-    <section
-      className={cx(
-        "flex min-h-0 min-w-0 flex-1 flex-col overflow-hidden rounded-[4px] border border-border-container lg:h-full",
-        "bg-datavis-card-bg shadow-[0_1px_5px_rgba(0,0,0,0.2),0_2px_2px_rgba(0,0,0,0.14)]",
-      )}
-    >
-      <header className="flex shrink-0 items-center justify-between gap-3 bg-datavis-card-bg px-4 py-3 sm:px-5">
-        <h2 className="min-w-0 truncate text-base-semibold text-text-primary">{title}</h2>
-        <Button variant="ghost" className="shrink-0 p-1 text-text-tertiary hover:text-text-primary" aria-label="Chart options">
-          <Icon name="navi-more-vert" />
-        </Button>
-      </header>
-      <DatavisGridlineRule />
-      <div className="flex min-h-0 flex-1 flex-col bg-datavis-card-bg px-3 pb-4 pt-3 sm:px-4">{children}</div>
-    </section>
   );
 }
 
@@ -646,24 +623,24 @@ function FindingEventsTable({
                 </span>
               </td>
               <td style={colStyle(2)} className="h-10 min-w-0 px-2 py-0 align-middle">
-                <button
-                  type="button"
-                  className="block w-full truncate text-left text-sm font-semibold text-interactive-active hover:underline focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-interactive-active"
+                <TruncatedText
+                  as="button"
+                  className="w-full text-left text-sm font-semibold text-interactive-active hover:underline focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-interactive-active"
                   onClick={() => onOpenFinding(row.id)}
                 >
                   {row.title}
-                </button>
+                </TruncatedText>
               </td>
-              <td style={colStyle(3)} className="h-10 px-2 py-0 align-middle tabular-nums">
-                <span className="text-sm text-text-secondary">{row.time}</span>
+              <td style={colStyle(3)} className="h-10 min-w-0 px-2 py-0 align-middle tabular-nums">
+                <TruncatedText className="text-sm text-text-secondary">{row.time}</TruncatedText>
               </td>
-              <td style={colStyle(4)} className="h-10 px-2 py-0 align-middle">
-                <span className="text-sm text-text-secondary">{row.activity}</span>
+              <td style={colStyle(4)} className="h-10 min-w-0 px-2 py-0 align-middle">
+                <TruncatedText className="text-sm text-text-secondary">{row.activity}</TruncatedText>
               </td>
-              <td style={colStyle(5)} className="h-10 px-2 py-0 align-middle">
-                <span className="text-sm text-text-secondary">{row.status}</span>
+              <td style={colStyle(5)} className="h-10 min-w-0 px-2 py-0 align-middle">
+                <TruncatedText className="text-sm text-text-secondary">{row.status}</TruncatedText>
               </td>
-              <td style={colStyle(6)} className="h-10 px-2 py-0 align-middle">
+              <td style={colStyle(6)} className="h-10 min-w-0 px-2 py-0 align-middle">
                 <span className="inline-flex min-w-0 items-center gap-2">
                   <Icon
                     name={et.name}
@@ -671,16 +648,20 @@ function FindingEventsTable({
                     className={cx("size-4 shrink-0 [&_svg]:!size-4", et.className)}
                     aria-hidden
                   />
-                  <span className="truncate text-sm text-text-secondary">{row.eventType}</span>
+                  <TruncatedText className="text-sm text-text-secondary" wrapperClassName="min-w-0 flex-1">
+                    {row.eventType}
+                  </TruncatedText>
                 </span>
               </td>
-              <td style={colStyle(7)} className="h-10 px-2 py-0 align-middle">
+              <td style={colStyle(7)} className="h-10 min-w-0 px-2 py-0 align-middle">
                 <span className="inline-flex min-w-0 items-center gap-2">
                   <span
                     className={cx("size-2.5 shrink-0 rounded-sm", connectorSwatch(row.connector))}
                     aria-hidden
                   />
-                  <span className="truncate text-sm text-text-secondary">{row.connector}</span>
+                  <TruncatedText className="text-sm text-text-secondary" wrapperClassName="min-w-0 flex-1">
+                    {row.connector}
+                  </TruncatedText>
                 </span>
               </td>
               <td style={colStyle(8)} className="h-10 px-2 py-0 align-middle">
@@ -695,8 +676,18 @@ function FindingEventsTable({
   );
 }
 
+function FederatedAnalyticsComingSoon({ view }: { view: FederatedViewId }) {
+  return (
+    <main className="flex min-h-[320px] shrink-0 flex-col items-center justify-center gap-1 px-6 py-16">
+      <p className="text-base-semibold text-text-primary">{federatedViewLabel(view)}</p>
+      <p className="text-sm text-text-tertiary">Coming soon</p>
+    </main>
+  );
+}
+
 export function SummaryInsightsDashboard() {
   const navigate = useNavigate();
+  const [activeView, setActiveView] = useState<FederatedViewId>(readDefaultFederatedView);
   const [severityFilter, setSeverityFilter] = useState<SeverityLevel | null>(null);
   const [categoryFilter, setCategoryFilter] = useState<FindingCategory | null>(null);
   const [searchQuery, setSearchQuery] = useState("");
@@ -946,7 +937,7 @@ export function SummaryInsightsDashboard() {
     <div className="relative flex min-h-0 flex-1 flex-col overflow-hidden">
       <div className="flex min-h-0 flex-1 flex-col overflow-y-auto bg-surface-page">
       <div className="flex shrink-0 flex-wrap items-center justify-between gap-3 px-4 py-2.5 sm:px-5">
-        <FederatedAnalyticsBreadcrumb />
+        <FederatedAnalyticsBreadcrumb activeView={activeView} onViewChange={setActiveView} />
         <Button
           type="button"
           variant="secondary"
@@ -958,15 +949,23 @@ export function SummaryInsightsDashboard() {
       </div>
       <DatavisGridlineRule />
 
+      {activeView === "entities-overview" ? (
+        <EntitiesOverviewContent />
+      ) : activeView === "network-activity" ? (
+        <NetworkActivityContent />
+      ) : isComingSoonFederatedView(activeView) ? (
+        <FederatedAnalyticsComingSoon view={activeView} />
+      ) : (
+        <>
       <div className="grid min-h-0 shrink-0 grid-cols-1 items-stretch gap-4 p-4 sm:p-5 lg:grid-cols-2 lg:grid-rows-1">
-        <InsightCard title="Categories of Finding Events">
+        <InsightCard title="Categories of Finding Events" fillHeight>
           <HorizontalBarPanel
             rows={categoryRows}
             selectedLabel={categoryFilter}
             onBarClick={handleCategoryBarClick}
           />
         </InsightCard>
-        <InsightCard title="Findings Severity ID">
+        <InsightCard title="Findings Severity ID" fillHeight>
           <HorizontalBarPanel
             rows={severityRows}
             selectedLabel={severityFilter}
@@ -992,7 +991,7 @@ export function SummaryInsightsDashboard() {
                 placeholder="Search"
                 value={searchQuery}
                 onChange={(event) => setSearchQuery(event.target.value)}
-                className="h-7 !bg-datavis-card-bg"
+                className="!bg-datavis-card-bg"
                 aria-label="Search findings"
               />
             </div>
@@ -1000,7 +999,7 @@ export function SummaryInsightsDashboard() {
               <Button
                 type="button"
                 variant="ghost"
-                className="h-7 shrink-0 gap-1.5 px-2 text-base-small text-text-tertiary hover:text-text-primary [&_svg]:!h-2 [&_svg]:!w-3"
+                className="h-8 shrink-0 gap-1.5 px-2 text-base-small text-text-tertiary hover:text-text-primary [&_svg]:!h-2 [&_svg]:!w-3"
                 onClick={() => {
                   setCategoryFilter(null);
                   setSeverityFilter(null);
@@ -1025,8 +1024,10 @@ export function SummaryInsightsDashboard() {
           </div>
         </div>
       </section>
+        </>
+      )}
       </div>
-      {drawerRow ? (
+      {activeView === "findings" && drawerRow ? (
         <SlideOver
           open
           onClose={() => setDrawerFindingId(null)}

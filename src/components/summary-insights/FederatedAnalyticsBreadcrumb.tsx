@@ -13,7 +13,7 @@ type EventCategoryId =
   | "application-activity"
   | "remediation";
 
-type FederatedViewId = "entities-overview" | EventCategoryId;
+export type FederatedViewId = "entities-overview" | EventCategoryId;
 
 type MenuItem = {
   id: FederatedViewId;
@@ -74,7 +74,51 @@ const EVENT_CATEGORIES: readonly MenuItem[] = [
   },
 ] as const;
 
-function viewLabel(view: FederatedViewId): string {
+const FEDERATED_DEFAULT_VIEW_STORAGE_KEY = "mayfield:federated-analytics-default-view";
+const FALLBACK_DEFAULT_VIEW: FederatedViewId = "findings";
+
+const ALL_FEDERATED_VIEW_IDS: readonly FederatedViewId[] = [
+  "entities-overview",
+  ...EVENT_CATEGORIES.map((item) => item.id),
+];
+
+function isFederatedViewId(value: string): value is FederatedViewId {
+  return (ALL_FEDERATED_VIEW_IDS as readonly string[]).includes(value);
+}
+
+/** Last view marked “Set as default” in the Federated Analytics menu. */
+export function readDefaultFederatedView(): FederatedViewId {
+  if (typeof window === "undefined") return FALLBACK_DEFAULT_VIEW;
+  try {
+    const stored = window.localStorage.getItem(FEDERATED_DEFAULT_VIEW_STORAGE_KEY);
+    if (stored && isFederatedViewId(stored)) return stored;
+  } catch {
+    /* ignore storage failures (private mode, etc.) */
+  }
+  return FALLBACK_DEFAULT_VIEW;
+}
+
+function persistDefaultFederatedView(view: FederatedViewId) {
+  try {
+    window.localStorage.setItem(FEDERATED_DEFAULT_VIEW_STORAGE_KEY, view);
+  } catch {
+    /* ignore storage failures (private mode, etc.) */
+  }
+}
+
+const COMING_SOON_FEDERATED_VIEWS: ReadonlySet<FederatedViewId> = new Set([
+  "system-activity",
+  "identity-access",
+  "discovery",
+  "application-activity",
+  "remediation",
+]);
+
+export function isComingSoonFederatedView(view: FederatedViewId): boolean {
+  return COMING_SOON_FEDERATED_VIEWS.has(view);
+}
+
+export function federatedViewLabel(view: FederatedViewId): string {
   if (view === "entities-overview") return ENTITIES_OVERVIEW.label;
   return EVENT_CATEGORIES.find((item) => item.id === view)?.label ?? "Findings";
 }
@@ -82,12 +126,16 @@ function viewLabel(view: FederatedViewId): string {
 /**
  * Federated Analytics breadcrumb + event category menu — Figma `9320:25841` Search Events dropdown.
  */
-export function FederatedAnalyticsBreadcrumb() {
+type FederatedAnalyticsBreadcrumbProps = {
+  activeView: FederatedViewId;
+  onViewChange: (view: FederatedViewId) => void;
+};
+
+export function FederatedAnalyticsBreadcrumb({ activeView, onViewChange }: FederatedAnalyticsBreadcrumbProps) {
   const menuId = useId();
   const containerRef = useRef<HTMLDivElement>(null);
   const [open, setOpen] = useState(false);
-  const [activeView, setActiveView] = useState<FederatedViewId>("findings");
-  const [defaultViewId, setDefaultViewId] = useState<FederatedViewId>("findings");
+  const [defaultViewId, setDefaultViewId] = useState<FederatedViewId>(readDefaultFederatedView);
 
   const defaultCheckbox = (viewId: FederatedViewId) => {
     const isDefault = defaultViewId === viewId;
@@ -103,7 +151,9 @@ export function FederatedAnalyticsBreadcrumb() {
         <Checkbox
           checked={isDefault}
           onCheckedChange={(checked) => {
-            if (checked) setDefaultViewId(viewId);
+            if (!checked) return;
+            setDefaultViewId(viewId);
+            persistDefaultFederatedView(viewId);
           }}
           label="Set as default"
           labelClassName="text-xs font-normal text-text-primary"
@@ -130,7 +180,7 @@ export function FederatedAnalyticsBreadcrumb() {
   }, [open]);
 
   const selectView = (view: FederatedViewId) => {
-    setActiveView(view);
+    onViewChange(view);
     setOpen(false);
   };
 
@@ -153,7 +203,7 @@ export function FederatedAnalyticsBreadcrumb() {
             aria-hidden
           />
         </span>
-        <span className="ml-1.5 truncate">{viewLabel(activeView)}</span>
+        <span className="ml-1.5 truncate">{federatedViewLabel(activeView)}</span>
       </button>
 
       {open ? (
