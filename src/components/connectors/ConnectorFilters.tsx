@@ -131,7 +131,7 @@ function FilterTag({
       className={cx(
         "inline-flex h-[26px] max-w-full items-center gap-1 rounded-[14px] border py-1 pl-2 pr-2 transition-[opacity,box-shadow,border-color]",
         enabled
-          ? "border-interactive-active bg-[#14333d]"
+          ? "border-interactive-active bg-interactive-selected"
           : "border-border-container bg-surface-container opacity-80",
         isDragging && "opacity-50",
         isDragOver && !isDragging && "ring-1 ring-interactive-active ring-offset-1 ring-offset-surface-page",
