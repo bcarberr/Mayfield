@@ -2,8 +2,8 @@ import { useEffect, useId, useRef, useState } from "react";
 import { createPortal } from "react-dom";
 import { Icon } from "../design-system";
 import { FsqlSearchTextarea } from "../components/FsqlSearchTextarea";
+import { SearchQueryBuilder } from "../components/SearchQueryBuilder";
 import { type CopilotSubmitRequest, SearchCopilotAside } from "../components/SearchCopilotPanel";
-import { SearchEntityEventSelect } from "../components/SearchEntityEventSelect";
 import { SearchHeaderFilters } from "../components/SearchHeaderFilters";
 import { SearchTopHeader } from "../components/SearchTopHeader";
 import { V4NavThinner } from "../components/V4NavThinner";
@@ -134,8 +134,12 @@ function SearchToolbarActions({
   onCriteriaOpenChange,
   fsqlQuery,
   onFsqlQueryChange,
+  queryBuilderKey,
+  queryBuilderValid,
+  onQueryBuilderValidChange,
   onClearSearch,
   onFsqlActivateCopilot,
+  onConvertToFsql,
 }: {
   criteriaMode: SearchCriteriaMode;
   onCriteriaModeChange: (mode: SearchCriteriaMode) => void;
@@ -143,11 +147,16 @@ function SearchToolbarActions({
   onCriteriaOpenChange: (open: boolean) => void;
   fsqlQuery: string;
   onFsqlQueryChange: (query: string) => void;
+  queryBuilderKey: number;
+  queryBuilderValid: boolean;
+  onQueryBuilderValidChange: (valid: boolean) => void;
   onClearSearch: () => void;
   onFsqlActivateCopilot: () => void;
+  onConvertToFsql: (query: string) => void;
 }) {
   const isFsql = criteriaMode === "fsql";
   const hasFsqlQuery = fsqlQuery.trim().length > 0;
+  const canSearch = isFsql ? hasFsqlQuery : queryBuilderValid;
 
   return (
     <div className="flex shrink-0 flex-col bg-surface-container">
@@ -202,17 +211,23 @@ function SearchToolbarActions({
             </>
           ) : (
             <>
-              <Button type="button" variant="secondary" className={toolbarBtnRing} disabled>
-                <Icon name="action-time" className="shrink-0 text-current" aria-hidden />
-                Schedule Search
+              <Button
+                type="button"
+                variant="secondary"
+                className={toolbarBtnRing}
+                disabled={!queryBuilderValid}
+                onClick={onClearSearch}
+              >
+                <Icon name="action-cancel-clear" className="shrink-0 text-current" aria-hidden />
+                Clear Search
               </Button>
-              <Button type="button" variant="secondary" className={toolbarBtnRing} disabled>
+              <Button type="button" variant="secondary" className={toolbarBtnRing} disabled={!queryBuilderValid}>
                 <Icon name="action-saved-search" className="shrink-0 text-current" aria-hidden />
                 Save Search
               </Button>
-              <Button type="button" variant="secondary" className={toolbarBtnRing} disabled>
-                <Icon name="action-cancel-clear" className="shrink-0 text-current" aria-hidden />
-                Clear Search
+              <Button type="button" variant="primary" className={toolbarBtnRing} disabled={!canSearch}>
+                <Icon name="action-search" className="shrink-0 text-current" aria-hidden />
+                Search
               </Button>
             </>
           )}
@@ -233,7 +248,11 @@ function SearchToolbarActions({
               onSubmit={onFsqlActivateCopilot}
             />
           ) : (
-            <SearchEntityEventSelect aria-label="Select Entity or Event" />
+            <SearchQueryBuilder
+              key={queryBuilderKey}
+              onValidityChange={onQueryBuilderValidChange}
+              onConvertToFsql={onConvertToFsql}
+            />
           )}
         </div>
       ) : null}
@@ -243,15 +262,16 @@ function SearchToolbarActions({
 }
 
 /**
- * Federated search entry screen — welcome hero and guidance copy.
+ * Federated search entry screen — query builder, FSQL, and Copilot assistant.
  */
 export function SearchLandingPage() {
   const [criteriaMode, setCriteriaMode] = useState<SearchCriteriaMode>("query-builder");
   const [criteriaOpen, setCriteriaOpen] = useState(true);
   const [fsqlQuery, setFsqlQuery] = useState("");
+  const [queryBuilderKey, setQueryBuilderKey] = useState(0);
+  const [queryBuilderValid, setQueryBuilderValid] = useState(false);
   const [copilotOpen, setCopilotOpen] = useState(false);
   const [copilotSubmitRequest, setCopilotSubmitRequest] = useState<CopilotSubmitRequest | null>(null);
-  const isFsql = criteriaMode === "fsql";
 
   const activateCopilotFromFsql = () => {
     if (!fsqlQuery.trim()) return;
@@ -266,6 +286,23 @@ export function SearchLandingPage() {
     setFsqlQuery(query);
     setCriteriaMode("fsql");
     setCriteriaOpen(true);
+    setCopilotOpen(true);
+  };
+
+  const handleConvertToFsql = (query: string) => {
+    setFsqlQuery(query);
+    setCriteriaMode("fsql");
+    setCriteriaOpen(true);
+    setCopilotOpen(true);
+  };
+
+  const handleClearSearch = () => {
+    if (criteriaMode === "fsql") {
+      setFsqlQuery("");
+      return;
+    }
+    setQueryBuilderKey((key) => key + 1);
+    setQueryBuilderValid(false);
   };
 
   const handleCriteriaModeChange = (mode: SearchCriteriaMode) => {
@@ -287,24 +324,19 @@ export function SearchLandingPage() {
           onCriteriaOpenChange={setCriteriaOpen}
           fsqlQuery={fsqlQuery}
           onFsqlQueryChange={setFsqlQuery}
-          onClearSearch={() => setFsqlQuery("")}
+          queryBuilderKey={queryBuilderKey}
+          queryBuilderValid={queryBuilderValid}
+          onQueryBuilderValidChange={setQueryBuilderValid}
+          onClearSearch={handleClearSearch}
           onFsqlActivateCopilot={activateCopilotFromFsql}
+          onConvertToFsql={handleConvertToFsql}
         />
 
         <div className="relative flex min-h-0 flex-1 overflow-hidden">
-          {isFsql ? (
-            <>
-              <div className="min-h-0 min-w-0 flex-1 bg-surface-container" aria-label="FSQL search workspace" />
-              <SearchCopilotAside
-                open={copilotOpen}
-                onOpenChange={setCopilotOpen}
-                fsqlQuery={fsqlQuery}
-                submitRequest={copilotSubmitRequest}
-                onSendToFsqlSearch={handleSendToFsqlSearch}
-              />
-            </>
+          {criteriaMode === "fsql" ? (
+            <div className="min-h-0 min-w-0 flex-1 bg-surface-container" aria-label="FSQL search workspace" />
           ) : (
-            <>
+            <div className="relative min-h-0 min-w-0 flex-1 overflow-hidden">
               <div
                 className="pointer-events-none absolute inset-0 z-0 select-none overflow-hidden [html[data-theme=light]_&]:opacity-50"
                 aria-hidden
@@ -317,7 +349,10 @@ export function SearchLandingPage() {
                 />
               </div>
 
-              <main className="relative z-[1] flex min-h-0 flex-1 flex-col items-center overflow-y-auto px-6 py-12 sm:py-16 md:py-20">
+              <main
+                className="relative z-[1] flex min-h-0 flex-1 flex-col items-center overflow-y-auto px-6 py-12 sm:py-16 md:py-20"
+                aria-label="Query builder search workspace"
+              >
                 <div className="mt-[60px] flex w-full max-w-[720px] flex-col items-stretch">
                   <h1 className="text-center text-3xl font-bold leading-9 tracking-[0.5px] text-text-primary sm:text-4xl sm:leading-tight">
                     Welcome Bonnie Carberry!
@@ -355,8 +390,15 @@ export function SearchLandingPage() {
                   </section>
                 </div>
               </main>
-            </>
+            </div>
           )}
+          <SearchCopilotAside
+            open={copilotOpen}
+            onOpenChange={setCopilotOpen}
+            fsqlQuery={fsqlQuery}
+            submitRequest={copilotSubmitRequest}
+            onSendToFsqlSearch={handleSendToFsqlSearch}
+          />
         </div>
       </div>
     </div>

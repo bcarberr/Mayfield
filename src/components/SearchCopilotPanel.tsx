@@ -379,7 +379,7 @@ export function SearchCopilotAside({
   return (
     <aside
       className={cx(
-        "relative mr-6 shrink-0 overflow-hidden border-l border-border-rule bg-surface-modal transition-[width] duration-[280ms] ease-[cubic-bezier(0.32,0.72,0,1)]",
+        "relative mr-[20px] h-full shrink-0 overflow-hidden border-l border-r border-border-rule bg-surface-modal transition-[width] duration-[280ms] ease-[cubic-bezier(0.32,0.72,0,1)]",
         open ? "w-[min(100%,360px)]" : "w-12",
       )}
       aria-label="Search assistant copilot"

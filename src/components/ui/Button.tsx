@@ -22,7 +22,7 @@ const secondarySizes = {
   default:
     "min-h-8 border-interactive-secondary-pressed py-[7px] hover:text-text-primary active:text-text-primary",
   small:
-    "h-6 min-h-6 border-interactive-secondary-pressed py-[3px] hover:text-text-primary active:text-text-primary",
+    "h-7 min-h-7 border-interactive-secondary-pressed px-[14px] py-[5px] hover:text-text-primary active:text-text-primary",
 } as const;
 
 export type ButtonVariant = keyof typeof variants | "secondary";

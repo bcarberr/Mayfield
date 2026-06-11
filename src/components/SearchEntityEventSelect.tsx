@@ -29,6 +29,9 @@ export type SearchEntityEventSelectProps = {
   className?: string;
   /** Accessible name for the search field. */
   "aria-label"?: string;
+  placeholder?: string;
+  value?: SearchScopeSelection | null;
+  onChange?: (selection: SearchScopeSelection | null) => void;
 };
 
 function SearchByRadios({
@@ -255,13 +258,22 @@ function SearchScopePickerPanel({
 export function SearchEntityEventSelect({
   className = "",
   "aria-label": ariaLabel = "Select Entity or Event",
+  placeholder = "Select an Entity or an Event",
+  value,
+  onChange,
 }: SearchEntityEventSelectProps) {
   const containerRef = useRef<HTMLDivElement>(null);
   const inputRef = useRef<HTMLInputElement>(null);
   const [open, setOpen] = useState(false);
   const [searchBy, setSearchBy] = useState<SearchScopeKind>("entities");
   const [selectedEventCategoryId, setSelectedEventCategoryId] = useState(DEFAULT_EVENT_CATEGORY_ID);
-  const [selection, setSelection] = useState<SearchScopeSelection | null>(null);
+  const [internalSelection, setInternalSelection] = useState<SearchScopeSelection | null>(null);
+  const selection = value !== undefined ? value : internalSelection;
+
+  const setSelection = (next: SearchScopeSelection | null) => {
+    if (value === undefined) setInternalSelection(next);
+    onChange?.(next);
+  };
 
   const displayValue = selectionLabel(selection);
   const selectedIcon = selectionIcon(selection);
@@ -319,7 +331,7 @@ export function SearchEntityEventSelect({
     <div ref={containerRef} className={cx("relative min-w-0", className)}>
       <div
         className={cx(
-          "flex h-8 w-[240px] max-w-[240px] items-center gap-2 rounded-[4px] border border-border-rule bg-surface-container px-3 transition-colors",
+          "flex h-8 w-full max-w-[240px] items-center gap-2 rounded-[4px] border border-border-rule bg-surface-container px-3 transition-colors",
           open ? "ring-1 ring-interactive-active" : "hover:bg-overlay-subtle",
         )}
       >
@@ -347,7 +359,7 @@ export function SearchEntityEventSelect({
           aria-label={ariaLabel}
           aria-expanded={open}
           aria-haspopup="dialog"
-          placeholder="Select an Entity or an Event"
+          placeholder={placeholder}
           value={displayValue}
           className={cx(
             "min-w-0 flex-1 cursor-text bg-transparent text-sm leading-5 outline-none placeholder:font-normal placeholder:italic placeholder:text-text-secondary",
