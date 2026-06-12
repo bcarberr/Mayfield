@@ -9,6 +9,7 @@ import { SearchTopHeader } from "../components/SearchTopHeader";
 import { V4NavThinner } from "../components/V4NavThinner";
 import { Button } from "../components/ui/Button";
 import connectionAbstractUrl from "../assets/connection-abstract.svg";
+import { TimeframeProvider } from "../context/TimeframeContext";
 import { NAV_RAIL_TARGETS } from "./navRailTargets";
 
 const toolbarBtnRing = "ring-offset-surface-container";
@@ -315,6 +316,7 @@ export function SearchLandingPage() {
     <div className="flex h-full min-h-0 bg-surface-container text-text-primary">
       <V4NavThinner variant="federated-search" activeSection="search" navTargets={NAV_RAIL_TARGETS} />
 
+      <TimeframeProvider>
       <div className="relative flex min-h-0 min-w-0 flex-1 flex-col overflow-hidden">
         <SearchTopHeader headerAfterTitle={<SearchHeaderFilters />} />
         <SearchToolbarActions
@@ -401,6 +403,7 @@ export function SearchLandingPage() {
           />
         </div>
       </div>
+      </TimeframeProvider>
     </div>
   );
 }

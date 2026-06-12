@@ -69,7 +69,7 @@ function NavSlot({
     "rounded-sm transition-[color,background-color] duration-150 ease-out",
     !active && "text-nav-icon hover:bg-nav-overlay-subtle hover:text-nav-icon-hover",
     active && "text-nav-icon-active hover:text-nav-icon-active",
-    "focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-nav-icon-active focus-visible:ring-offset-0 focus-visible:ring-offset-nav-bg",
+    "focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-nav-icon-active",
     to && "no-underline",
     className,
   );

@@ -1,158 +1,911 @@
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useId, useRef, useState } from "react";
 import { Checkbox, Icon } from "../design-system";
 import {
-  selectionLabel,
-  type SearchScopeSelection,
+  SEARCH_ENTITY_COLUMNS,
+  SEARCH_EVENT_CATEGORIES,
+  eventCategoryById,
+  type SearchEntityOption,
+  type SearchEventOption,
 } from "../data/searchEntityOptions";
+import { getFieldsForCategory } from "../data/ocsfEventFields";
 import { SearchCriteriaSelect } from "./SearchCriteriaSelect";
-import { SearchEntityEventSelect } from "./SearchEntityEventSelect";
-import { SearchMatchLogicSelect, type SearchMatchLogic } from "./SearchMatchLogicSelect";
 import { Button } from "./ui/Button";
-import { Input } from "./ui/Input";
+
+const cx = (...c: (string | false | undefined)[]) => c.filter(Boolean).join(" ");
+
+// ─── Types ────────────────────────────────────────────────────────────────────
 
 type ConditionOperator =
+  | "contains"
   | "equals"
   | "not-equals"
-  | "contains"
   | "not-contains"
   | "starts-with"
   | "ends-with";
+type MatchType = "any-of" | "all-of";
+type GroupLogic = "or" | "and";
 
-type QueryCondition = {
+type EventConditionRow = {
   id: string;
-  selection: SearchScopeSelection | null;
+  fieldId: string;
   operator: ConditionOperator;
-  value: string;
+  matchType: MatchType;
+  values: string[];
   caseSensitive: boolean;
 };
 
-const CONDITION_OPERATOR_OPTIONS: readonly { id: ConditionOperator; label: string }[] = [
+type EventConditionGroup = {
+  id: string;
+  logic: GroupLogic;
+  conditions: EventConditionRow[];
+};
+
+type EventBlock = {
+  id: string;
+  eventOption: SearchEventOption;
+  groups: EventConditionGroup[];
+};
+
+// Entity blocks — simpler: no OCSF field selector, entity IS the field
+type EntityConditionRow = {
+  id: string;
+  operator: ConditionOperator;
+  matchType: MatchType;
+  values: string[];
+  caseSensitive: boolean;
+};
+
+type EntityConditionGroup = {
+  id: string;
+  logic: GroupLogic;
+  conditions: EntityConditionRow[];
+};
+
+type EntityBlock = {
+  id: string;
+  entityOption: SearchEntityOption;
+  groups: EntityConditionGroup[];
+};
+
+// ─── Constants ────────────────────────────────────────────────────────────────
+
+const OPERATOR_OPTIONS: readonly { id: ConditionOperator; label: string }[] = [
+  { id: "contains", label: "contains" },
   { id: "equals", label: "equals" },
   { id: "not-equals", label: "not equals" },
-  { id: "contains", label: "contains" },
   { id: "not-contains", label: "does not contain" },
   { id: "starts-with", label: "starts with" },
   { id: "ends-with", label: "ends with" },
 ];
 
-function createEmptyCondition(id: string): QueryCondition {
-  return {
-    id,
-    selection: null,
-    operator: "equals",
-    value: "",
-    caseSensitive: false,
+const MATCH_TYPE_OPTIONS: readonly { id: MatchType; label: string }[] = [
+  { id: "any-of", label: "any of" },
+  { id: "all-of", label: "all of" },
+];
+
+// ─── Helpers ─────────────────────────────────────────────────────────────────
+
+let _idCounter = 0;
+const uid = (prefix: string) => `${prefix}-${++_idCounter}`;
+
+const makeEmptyRow = (): EventConditionRow => ({
+  id: uid("row"),
+  fieldId: "",
+  operator: "contains",
+  matchType: "any-of",
+  values: [],
+  caseSensitive: false,
+});
+
+const makeEmptyGroup = (): EventConditionGroup => ({
+  id: uid("group"),
+  logic: "or",
+  conditions: [makeEmptyRow()],
+});
+
+const makeEventBlock = (eventOption: SearchEventOption): EventBlock => ({
+  id: uid("block"),
+  eventOption,
+  groups: [makeEmptyGroup()],
+});
+
+const makeEmptyEntityRow = (): EntityConditionRow => ({
+  id: uid("erow"),
+  operator: "contains",
+  matchType: "any-of",
+  values: [],
+  caseSensitive: false,
+});
+
+const makeEmptyEntityGroup = (): EntityConditionGroup => ({
+  id: uid("egroup"),
+  logic: "or",
+  conditions: [makeEmptyEntityRow()],
+});
+
+const makeEntityBlock = (entityOption: SearchEntityOption): EntityBlock => ({
+  id: uid("eblock"),
+  entityOption,
+  groups: [makeEmptyEntityGroup()],
+});
+
+// ─── ValueChipInput ───────────────────────────────────────────────────────────
+
+function ValueChipInput({
+  values,
+  onValuesChange,
+}: {
+  values: string[];
+  onValuesChange: (values: string[]) => void;
+}) {
+  const [draft, setDraft] = useState("");
+  const inputRef = useRef<HTMLInputElement>(null);
+
+  const commit = (text: string) => {
+    const trimmed = text.trim();
+    if (trimmed) onValuesChange([...values, trimmed]);
+    setDraft("");
   };
+
+  return (
+    <div
+      className="flex min-h-8 flex-1 flex-wrap items-center gap-1.5 rounded-[4px] border border-border-rule bg-surface-container px-2 py-1 cursor-text"
+      onClick={() => inputRef.current?.focus()}
+    >
+      {values.map((value, i) => (
+        <span
+          key={i}
+          className="flex shrink-0 items-center gap-1 rounded bg-surface-modal px-2 py-0.5 text-xs font-semibold text-text-primary"
+        >
+          {value}
+          <button
+            type="button"
+            className="shrink-0 text-text-secondary transition-colors hover:text-text-primary focus-visible:outline-none"
+            onClick={(e) => {
+              e.stopPropagation();
+              onValuesChange(values.filter((_, j) => j !== i));
+            }}
+            aria-label={`Remove ${value}`}
+          >
+            <Icon name="action-clear" size={12} aria-hidden />
+          </button>
+        </span>
+      ))}
+      <input
+        ref={inputRef}
+        type="text"
+        value={draft}
+        onChange={(e) => setDraft(e.target.value)}
+        onKeyDown={(e) => {
+          if (e.key === "Enter") {
+            e.preventDefault();
+            commit(draft);
+          } else if (e.key === "Backspace" && !draft && values.length > 0) {
+            onValuesChange(values.slice(0, -1));
+          }
+        }}
+        onBlur={() => draft.trim() && commit(draft)}
+        placeholder={values.length === 0 ? "Type and press Enter…" : ""}
+        className="min-w-[80px] flex-1 bg-transparent text-sm leading-5 text-text-primary outline-none placeholder:font-normal placeholder:italic placeholder:text-text-tertiary"
+      />
+    </div>
+  );
 }
 
-function QueryBuilderConditionRow({
-  condition,
-  showMatchLogic,
-  matchLogic,
-  onMatchLogicChange,
+// ─── OrAndToggle ──────────────────────────────────────────────────────────────
+
+function OrAndToggle({
+  value,
   onChange,
 }: {
-  condition: QueryCondition;
-  showMatchLogic: boolean;
-  matchLogic: SearchMatchLogic;
-  onMatchLogicChange: (next: SearchMatchLogic) => void;
-  onChange: (next: QueryCondition) => void;
+  value: GroupLogic;
+  onChange: (v: GroupLogic) => void;
 }) {
   return (
-    <div className="flex flex-col gap-3">
-      {showMatchLogic ? (
-        <SearchMatchLogicSelect value={matchLogic} onChange={onMatchLogicChange} />
-      ) : null}
+    <div className="flex overflow-hidden rounded border border-border-rule">
+      {(["or", "and"] as const).map((opt, i) => (
+        <button
+          key={opt}
+          type="button"
+          className={cx(
+            "px-3 py-1 text-xs font-bold tracking-[0.4px] transition-colors focus-visible:outline-none",
+            i > 0 && "border-l border-border-rule",
+            value === opt
+              ? "bg-interactive-active text-text-on-primary"
+              : "bg-surface-container text-text-secondary hover:bg-overlay-subtle",
+          )}
+          onClick={() => onChange(opt)}
+        >
+          {opt.toUpperCase()}
+        </button>
+      ))}
+    </div>
+  );
+}
 
-      <div className="flex flex-wrap items-start gap-3">
-        <SearchEntityEventSelect
-          className="w-[240px] shrink-0"
-          placeholder="Select an Entity"
-          aria-label="Select an Entity"
-          value={condition.selection}
-          onChange={(selection) => onChange({ ...condition, selection })}
+// ─── ConditionRow ─────────────────────────────────────────────────────────────
+
+function ConditionRow({
+  condition,
+  categoryId,
+  canDelete,
+  onUpdate,
+  onDelete,
+  onAddBelow,
+}: {
+  condition: EventConditionRow;
+  categoryId: string;
+  canDelete: boolean;
+  onUpdate: (updated: EventConditionRow) => void;
+  onDelete: () => void;
+  onAddBelow: () => void;
+}) {
+  const fields = getFieldsForCategory(categoryId);
+  const fieldOptions = [
+    { id: "", label: "Select field…" },
+    ...fields.map((f) => ({ id: f.id, label: f.label })),
+  ];
+
+  return (
+    <div className="flex flex-wrap items-start gap-2">
+      {/* Field path */}
+      <SearchCriteriaSelect
+        value={condition.fieldId}
+        onChange={(fieldId) => onUpdate({ ...condition, fieldId })}
+        options={fieldOptions}
+        className="w-[200px] shrink-0"
+        aria-label="OCSF field"
+        valueClassName={
+          condition.fieldId
+            ? "text-text-primary"
+            : "font-normal italic text-text-tertiary"
+        }
+      />
+
+      {/* Operator — italic orange to match Figma */}
+      <SearchCriteriaSelect
+        value={condition.operator}
+        onChange={(operator) => onUpdate({ ...condition, operator })}
+        options={OPERATOR_OPTIONS}
+        className="w-[140px] shrink-0"
+        aria-label="Operator"
+        valueClassName="italic text-datavis-data-peanut-orange"
+        selectedOptionClassName="text-interactive-active"
+      />
+
+      {/* Match type */}
+      <SearchCriteriaSelect
+        value={condition.matchType}
+        onChange={(matchType) => onUpdate({ ...condition, matchType })}
+        options={MATCH_TYPE_OPTIONS}
+        className="w-[88px] shrink-0"
+        aria-label="Match type"
+        valueClassName="text-text-secondary"
+      />
+
+      {/* Multi-value chip input */}
+      <ValueChipInput
+        values={condition.values}
+        onValuesChange={(values) => onUpdate({ ...condition, values })}
+      />
+
+      {/* Case-sensitive + actions */}
+      <div className="flex shrink-0 items-center gap-1.5 pt-1">
+        <Checkbox
+          checked={condition.caseSensitive}
+          onCheckedChange={(caseSensitive) => onUpdate({ ...condition, caseSensitive })}
+          label="Case-sensitive"
+          labelClassName="text-xs font-semibold text-text-secondary whitespace-nowrap"
         />
-
-        <SearchCriteriaSelect
-          value={condition.operator}
-          onChange={(operator) => onChange({ ...condition, operator })}
-          options={CONDITION_OPERATOR_OPTIONS}
-          className="w-[120px] shrink-0"
-          aria-label="Condition operator"
-          valueClassName="text-datavis-data-peanut-orange"
-          selectedOptionClassName="text-datavis-data-peanut-orange"
-        />
-
-        <div className="min-w-[200px] flex-1">
-          <Input
-            value={condition.value}
-            onChange={(event) => onChange({ ...condition, value: event.target.value })}
-            placeholder="Value"
-            aria-label="Condition value"
-            className="h-8 min-h-8 bg-surface-container [&_input]:placeholder:font-normal [&_input]:placeholder:italic [&_input]:placeholder:text-text-tertiary"
-          />
-          <Checkbox
-            checked={condition.caseSensitive}
-            onCheckedChange={(caseSensitive) => onChange({ ...condition, caseSensitive })}
-            label="Case-sensitive"
-            className="mt-2"
-          />
+        <button
+          type="button"
+          className="rounded p-1 text-text-tertiary transition-colors hover:bg-overlay-subtle hover:text-text-primary focus-visible:outline-none disabled:pointer-events-none disabled:opacity-40"
+          disabled={!canDelete}
+          onClick={onDelete}
+          aria-label="Remove condition"
+        >
+          <Icon name="action-delete" size={18} aria-hidden />
+        </button>
+        {/* Add row below — split-button style */}
+        <div className="flex overflow-hidden rounded border border-interactive-secondary-pressed">
+          <button
+            type="button"
+            className="flex items-center gap-1 px-2 py-1 text-xs font-semibold text-interactive-active transition-colors hover:bg-interactive-secondary-hover focus-visible:outline-none"
+            onClick={onAddBelow}
+            aria-label="Add condition"
+          >
+            <Icon name="action-add" size={12} aria-hidden />
+          </button>
+          <button
+            type="button"
+            className="border-l border-interactive-secondary-pressed px-1 py-1 text-interactive-active transition-colors hover:bg-interactive-secondary-hover focus-visible:outline-none"
+            aria-label="More add options"
+          >
+            <Icon name="chevron-down" size={12} aria-hidden />
+          </button>
         </div>
       </div>
     </div>
   );
 }
 
-function conditionToFsqlFragment(condition: QueryCondition): string | null {
-  const label = selectionLabel(condition.selection)?.trim();
-  const value = condition.value.trim();
-  if (!label || !value) return null;
+// ─── ConditionGroup ───────────────────────────────────────────────────────────
 
-  const operatorToken: Record<ConditionOperator, string> = {
-    equals: "=",
-    "not-equals": "!=",
-    contains: "CONTAINS",
-    "not-contains": "NOT CONTAINS",
-    "starts-with": "STARTS WITH",
-    "ends-with": "ENDS WITH",
+function ConditionGroup({
+  group,
+  categoryId,
+  canDelete,
+  onUpdate,
+  onDelete,
+}: {
+  group: EventConditionGroup;
+  categoryId: string;
+  canDelete: boolean;
+  onUpdate: (updated: EventConditionGroup) => void;
+  onDelete: () => void;
+}) {
+  const updateCondition = (id: string, updated: EventConditionRow) =>
+    onUpdate({
+      ...group,
+      conditions: group.conditions.map((c) => (c.id === id ? updated : c)),
+    });
+
+  const addConditionAfter = (afterId: string) => {
+    const idx = group.conditions.findIndex((c) => c.id === afterId);
+    const next = [...group.conditions];
+    next.splice(idx + 1, 0, makeEmptyRow());
+    onUpdate({ ...group, conditions: next });
   };
 
-  const quotedValue = `"${value.replace(/"/g, '\\"')}"`;
-  const sensitivity = condition.caseSensitive ? " CASE_SENSITIVE" : "";
-  return `${label} ${operatorToken[condition.operator]} ${quotedValue}${sensitivity}`;
-}
-
-export function buildFsqlFromQueryBuilder(
-  matchLogic: SearchMatchLogic,
-  conditions: QueryCondition[],
-): string {
-  const fragments = conditions
-    .map(conditionToFsqlFragment)
-    .filter((fragment): fragment is string => Boolean(fragment));
-
-  if (fragments.length === 0) return "";
-  if (fragments.length === 1) return fragments[0]!;
-
-  const joiner = matchLogic === "or" ? " OR " : " AND ";
-  return fragments.map((fragment) => `(${fragment})`).join(joiner);
-}
-
-function isQueryBuilderValid(conditions: QueryCondition[]): boolean {
-  return conditions.some((condition) => {
-    const label = selectionLabel(condition.selection)?.trim();
-    return Boolean(label && condition.value.trim());
-  });
-}
-
-function useConditionIdCounter(start = 0) {
-  const ref = useRef(start);
-  return {
-    next() {
-      ref.current += 1;
-      return `condition-${ref.current}`;
-    },
+  const deleteCondition = (id: string) => {
+    if (group.conditions.length <= 1) return;
+    onUpdate({ ...group, conditions: group.conditions.filter((c) => c.id !== id) });
   };
+
+  return (
+    <div className="rounded-[4px] border border-border-rule bg-surface-container">
+      {/* Group header */}
+      <div className="flex items-center gap-2 px-3 py-2">
+        <OrAndToggle value={group.logic} onChange={(logic) => onUpdate({ ...group, logic })} />
+        <div className="flex-1" />
+        <button
+          type="button"
+          className="rounded p-1 text-text-tertiary transition-colors hover:bg-overlay-subtle hover:text-text-primary focus-visible:outline-none disabled:pointer-events-none disabled:opacity-40"
+          disabled={!canDelete}
+          onClick={onDelete}
+          aria-label="Remove group"
+        >
+          <Icon name="action-delete" size={18} aria-hidden />
+        </button>
+        <span className="cursor-grab p-1 text-text-tertiary">
+          <Icon name="action-drag-indicator" size={18} aria-hidden />
+        </span>
+      </div>
+
+      {/* Conditions with tree-connector lines */}
+      <div className="relative ml-5 border-l border-border-rule pb-3 pl-4 pr-3">
+        {group.conditions.map((condition) => (
+          <div key={condition.id} className="relative mt-2 first:mt-0">
+            {/* Horizontal connector to the vertical border-l */}
+            <div
+              className="absolute bg-border-rule"
+              style={{ left: -16, top: 16, width: 16, height: 1 }}
+              aria-hidden
+            />
+            <ConditionRow
+              condition={condition}
+              categoryId={categoryId}
+              canDelete={group.conditions.length > 1}
+              onUpdate={(updated) => updateCondition(condition.id, updated)}
+              onDelete={() => deleteCondition(condition.id)}
+              onAddBelow={() => addConditionAfter(condition.id)}
+            />
+          </div>
+        ))}
+      </div>
+    </div>
+  );
 }
+
+// ─── EventBlock ───────────────────────────────────────────────────────────────
+
+function EventBlockComp({
+  block,
+  onUpdate,
+  onDelete,
+}: {
+  block: EventBlock;
+  onUpdate: (updated: EventBlock) => void;
+  onDelete: () => void;
+}) {
+  const category = eventCategoryById(block.eventOption.categoryId);
+
+  const updateGroup = (id: string, updated: EventConditionGroup) =>
+    onUpdate({ ...block, groups: block.groups.map((g) => (g.id === id ? updated : g)) });
+
+  const deleteGroup = (id: string) => {
+    if (block.groups.length <= 1) return;
+    onUpdate({ ...block, groups: block.groups.filter((g) => g.id !== id) });
+  };
+
+  return (
+    <div className="rounded-[4px] border border-border-rule">
+      {/* Event header */}
+      <div className="flex items-center gap-2 rounded-t-[4px] border-b border-border-rule bg-overlay-subtle px-4 py-2.5">
+        <Icon
+          name={block.eventOption.icon}
+          size={18}
+          className={cx("shrink-0", category?.iconClassName)}
+          aria-hidden
+        />
+        <span className="text-sm font-semibold text-text-primary">{block.eventOption.label}</span>
+        <Icon name="chevron-down" size={16} className="shrink-0 text-text-secondary" aria-hidden />
+        <div className="flex-1" />
+        <button
+          type="button"
+          className="rounded p-1 text-text-tertiary transition-colors hover:bg-overlay-subtle hover:text-text-primary focus-visible:outline-none"
+          onClick={onDelete}
+          aria-label={`Remove ${block.eventOption.label}`}
+        >
+          <Icon name="action-delete" size={18} aria-hidden />
+        </button>
+      </div>
+
+      {/* Condition groups */}
+      <div className="space-y-3 p-4">
+        {block.groups.map((group) => (
+          <ConditionGroup
+            key={group.id}
+            group={group}
+            categoryId={block.eventOption.categoryId}
+            canDelete={block.groups.length > 1}
+            onUpdate={(updated) => updateGroup(group.id, updated)}
+            onDelete={() => deleteGroup(group.id)}
+          />
+        ))}
+
+        {/* Add Condition (adds a new group) */}
+        <div className="flex overflow-hidden self-start rounded-[4px] border border-interactive-secondary-pressed">
+          <button
+            type="button"
+            className="flex items-center gap-1.5 px-3 py-1.5 text-sm font-semibold text-interactive-active transition-colors hover:bg-interactive-secondary-hover focus-visible:outline-none"
+            onClick={() => onUpdate({ ...block, groups: [...block.groups, makeEmptyGroup()] })}
+          >
+            <Icon name="action-add" size={14} aria-hidden />
+            Add Condition
+          </button>
+          <button
+            type="button"
+            className="border-l border-interactive-secondary-pressed px-2 py-1.5 text-interactive-active transition-colors hover:bg-interactive-secondary-hover focus-visible:outline-none"
+            aria-label="More condition options"
+          >
+            <Icon name="chevron-down" size={14} aria-hidden />
+          </button>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+// ─── EventPickerPopover ───────────────────────────────────────────────────────
+
+function EventPickerPopover({
+  onSelect,
+  onClose,
+}: {
+  onSelect: (option: SearchEventOption) => void;
+  onClose: () => void;
+}) {
+  const containerRef = useRef<HTMLDivElement>(null);
+  const [activeCategoryId, setActiveCategoryId] = useState(SEARCH_EVENT_CATEGORIES[0]!.id);
+
+  useEffect(() => {
+    const onPointerDown = (e: PointerEvent) => {
+      if (!containerRef.current?.contains(e.target as Node)) onClose();
+    };
+    const onKey = (e: KeyboardEvent) => {
+      if (e.key === "Escape") onClose();
+    };
+    document.addEventListener("pointerdown", onPointerDown);
+    document.addEventListener("keydown", onKey);
+    return () => {
+      document.removeEventListener("pointerdown", onPointerDown);
+      document.removeEventListener("keydown", onKey);
+    };
+  }, [onClose]);
+
+  const activeCategory =
+    SEARCH_EVENT_CATEGORIES.find((c) => c.id === activeCategoryId) ?? SEARCH_EVENT_CATEGORIES[0]!;
+
+  return (
+    <div
+      ref={containerRef}
+      className="absolute left-0 top-[calc(100%+4px)] z-50 flex overflow-hidden rounded-[4px] border border-border-rule bg-surface-modal shadow-[0px_5px_5px_-3px_rgba(0,0,0,0.2),0px_8px_10px_1px_rgba(0,0,0,0.14),0px_3px_14px_2px_rgba(0,0,0,0.12)]"
+      style={{ width: 560, maxHeight: 400 }}
+      role="dialog"
+      aria-label="Pick an event"
+    >
+      {/* Left: categories */}
+      <div className="w-44 shrink-0 overflow-y-auto border-r border-border-rule">
+        <p className="px-4 pt-3 text-xs font-bold uppercase leading-[14px] tracking-[0.4px] text-text-tertiary">
+          Event categories
+        </p>
+        <div className="pb-2 pt-1">
+          {SEARCH_EVENT_CATEGORIES.map((cat) => (
+            <button
+              key={cat.id}
+              type="button"
+              className={cx(
+                "flex h-9 w-full items-center gap-2 px-4 text-left text-sm font-semibold text-text-primary transition-colors focus-visible:outline-none",
+                cat.id === activeCategoryId
+                  ? "bg-interactive-secondary-hover"
+                  : "hover:bg-interactive-secondary-hover",
+              )}
+              onMouseEnter={() => setActiveCategoryId(cat.id)}
+              onClick={() => setActiveCategoryId(cat.id)}
+            >
+              <Icon name={cat.icon} size={16} className={cx("shrink-0", cat.iconClassName)} aria-hidden />
+              <span className="min-w-0 truncate">{cat.label}</span>
+            </button>
+          ))}
+        </div>
+      </div>
+
+      {/* Right: events in active category */}
+      <div className="flex-1 overflow-y-auto px-3 py-3">
+        <div
+          className={cx(
+            "grid gap-x-3",
+            activeCategory.events.length > 6 ? "grid-cols-2" : "grid-cols-1",
+          )}
+        >
+          {activeCategory.events.map((event) => (
+            <button
+              key={event.id}
+              type="button"
+              className="flex h-8 w-full min-w-0 items-center gap-2 rounded px-1 text-left transition-colors hover:bg-interactive-secondary-hover focus-visible:outline-none"
+              onClick={() => {
+                onSelect(event);
+                onClose();
+              }}
+            >
+              <Icon
+                name={event.icon}
+                size={16}
+                className={cx("shrink-0", activeCategory.iconClassName)}
+                aria-hidden
+              />
+              <span className="min-w-0 truncate text-sm font-semibold text-text-secondary">
+                {event.label}
+              </span>
+            </button>
+          ))}
+        </div>
+      </div>
+    </div>
+  );
+}
+
+// ─── EntityPickerPopover ─────────────────────────────────────────────────────
+
+function EntityPickerPopover({
+  onSelect,
+  onClose,
+}: {
+  onSelect: (option: SearchEntityOption) => void;
+  onClose: () => void;
+}) {
+  const containerRef = useRef<HTMLDivElement>(null);
+
+  useEffect(() => {
+    const onPointerDown = (e: PointerEvent) => {
+      if (!containerRef.current?.contains(e.target as Node)) onClose();
+    };
+    const onKey = (e: KeyboardEvent) => {
+      if (e.key === "Escape") onClose();
+    };
+    document.addEventListener("pointerdown", onPointerDown);
+    document.addEventListener("keydown", onKey);
+    return () => {
+      document.removeEventListener("pointerdown", onPointerDown);
+      document.removeEventListener("keydown", onKey);
+    };
+  }, [onClose]);
+
+  return (
+    <div
+      ref={containerRef}
+      className="absolute left-0 top-[calc(100%+4px)] z-50 overflow-hidden rounded-[4px] border border-border-rule bg-surface-modal shadow-[0px_5px_5px_-3px_rgba(0,0,0,0.2),0px_8px_10px_1px_rgba(0,0,0,0.14),0px_3px_14px_2px_rgba(0,0,0,0.12)]"
+      style={{ width: 680, maxHeight: 400, overflowY: "auto" }}
+      role="dialog"
+      aria-label="Pick an entity"
+    >
+      <p className="px-4 pt-3 text-xs font-bold uppercase leading-[14px] tracking-[0.4px] text-text-tertiary">
+        Observable entities
+      </p>
+      <div className="grid grid-cols-4 gap-x-3 px-4 py-3">
+        {SEARCH_ENTITY_COLUMNS.map((column, colIdx) => (
+          <div key={colIdx} className="min-w-0">
+            {column.map((option) => (
+              <button
+                key={option.id}
+                type="button"
+                className="flex h-8 w-full min-w-0 items-center gap-2 rounded px-1 text-left transition-colors hover:bg-interactive-secondary-hover focus-visible:outline-none"
+                onClick={() => {
+                  onSelect(option);
+                  onClose();
+                }}
+              >
+                <Icon
+                  name={option.icon}
+                  size={18}
+                  className="shrink-0 text-datavis-data-pop-teal-20"
+                  aria-hidden
+                />
+                <span className="min-w-0 truncate text-sm font-semibold leading-8 tracking-[0.4px] text-text-secondary">
+                  {option.label}
+                </span>
+              </button>
+            ))}
+          </div>
+        ))}
+      </div>
+    </div>
+  );
+}
+
+// ─── EntityConditionRow ───────────────────────────────────────────────────────
+
+function EntityConditionRowComp({
+  condition,
+  canDelete,
+  onUpdate,
+  onDelete,
+  onAddBelow,
+}: {
+  condition: EntityConditionRow;
+  canDelete: boolean;
+  onUpdate: (updated: EntityConditionRow) => void;
+  onDelete: () => void;
+  onAddBelow: () => void;
+}) {
+  return (
+    <div className="flex flex-wrap items-start gap-2">
+      <SearchCriteriaSelect
+        value={condition.operator}
+        onChange={(operator) => onUpdate({ ...condition, operator })}
+        options={OPERATOR_OPTIONS}
+        className="w-[140px] shrink-0"
+        aria-label="Operator"
+        valueClassName="italic text-datavis-data-peanut-orange"
+        selectedOptionClassName="text-interactive-active"
+      />
+      <SearchCriteriaSelect
+        value={condition.matchType}
+        onChange={(matchType) => onUpdate({ ...condition, matchType })}
+        options={MATCH_TYPE_OPTIONS}
+        className="w-[88px] shrink-0"
+        aria-label="Match type"
+        valueClassName="text-text-secondary"
+      />
+      <ValueChipInput
+        values={condition.values}
+        onValuesChange={(values) => onUpdate({ ...condition, values })}
+      />
+      <div className="flex shrink-0 items-center gap-1.5 pt-1">
+        <Checkbox
+          checked={condition.caseSensitive}
+          onCheckedChange={(caseSensitive) => onUpdate({ ...condition, caseSensitive })}
+          label="Case-sensitive"
+          labelClassName="text-xs font-semibold text-text-secondary whitespace-nowrap"
+        />
+        <button
+          type="button"
+          className="rounded p-1 text-text-tertiary transition-colors hover:bg-overlay-subtle hover:text-text-primary focus-visible:outline-none disabled:pointer-events-none disabled:opacity-40"
+          disabled={!canDelete}
+          onClick={onDelete}
+          aria-label="Remove condition"
+        >
+          <Icon name="action-delete" size={18} aria-hidden />
+        </button>
+        <div className="flex overflow-hidden rounded border border-interactive-secondary-pressed">
+          <button
+            type="button"
+            className="flex items-center gap-1 px-2 py-1 text-xs font-semibold text-interactive-active transition-colors hover:bg-interactive-secondary-hover focus-visible:outline-none"
+            onClick={onAddBelow}
+            aria-label="Add condition"
+          >
+            <Icon name="action-add" size={12} aria-hidden />
+          </button>
+          <button
+            type="button"
+            className="border-l border-interactive-secondary-pressed px-1 py-1 text-interactive-active transition-colors hover:bg-interactive-secondary-hover focus-visible:outline-none"
+            aria-label="More add options"
+          >
+            <Icon name="chevron-down" size={12} aria-hidden />
+          </button>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+// ─── EntityConditionGroup ─────────────────────────────────────────────────────
+
+function EntityConditionGroup({
+  group,
+  canDelete,
+  onUpdate,
+  onDelete,
+}: {
+  group: EntityConditionGroup;
+  canDelete: boolean;
+  onUpdate: (updated: EntityConditionGroup) => void;
+  onDelete: () => void;
+}) {
+  const updateCondition = (id: string, updated: EntityConditionRow) =>
+    onUpdate({
+      ...group,
+      conditions: group.conditions.map((c) => (c.id === id ? updated : c)),
+    });
+
+  const addConditionAfter = (afterId: string) => {
+    const idx = group.conditions.findIndex((c) => c.id === afterId);
+    const next = [...group.conditions];
+    next.splice(idx + 1, 0, makeEmptyEntityRow());
+    onUpdate({ ...group, conditions: next });
+  };
+
+  const deleteCondition = (id: string) => {
+    if (group.conditions.length <= 1) return;
+    onUpdate({ ...group, conditions: group.conditions.filter((c) => c.id !== id) });
+  };
+
+  return (
+    <div className="rounded-[4px] border border-border-rule bg-surface-container">
+      <div className="flex items-center gap-2 px-3 py-2">
+        <OrAndToggle value={group.logic} onChange={(logic) => onUpdate({ ...group, logic })} />
+        <div className="flex-1" />
+        <button
+          type="button"
+          className="rounded p-1 text-text-tertiary transition-colors hover:bg-overlay-subtle hover:text-text-primary focus-visible:outline-none disabled:pointer-events-none disabled:opacity-40"
+          disabled={!canDelete}
+          onClick={onDelete}
+          aria-label="Remove group"
+        >
+          <Icon name="action-delete" size={18} aria-hidden />
+        </button>
+        <span className="cursor-grab p-1 text-text-tertiary">
+          <Icon name="action-drag-indicator" size={18} aria-hidden />
+        </span>
+      </div>
+      <div className="relative ml-5 border-l border-border-rule pb-3 pl-4 pr-3">
+        {group.conditions.map((condition) => (
+          <div key={condition.id} className="relative mt-2 first:mt-0">
+            <div
+              className="absolute bg-border-rule"
+              style={{ left: -16, top: 16, width: 16, height: 1 }}
+              aria-hidden
+            />
+            <EntityConditionRowComp
+              condition={condition}
+              canDelete={group.conditions.length > 1}
+              onUpdate={(updated) => updateCondition(condition.id, updated)}
+              onDelete={() => deleteCondition(condition.id)}
+              onAddBelow={() => addConditionAfter(condition.id)}
+            />
+          </div>
+        ))}
+      </div>
+    </div>
+  );
+}
+
+// ─── EntityBlockComp ─────────────────────────────────────────────────────────
+
+function EntityBlockComp({
+  block,
+  onUpdate,
+  onDelete,
+}: {
+  block: EntityBlock;
+  onUpdate: (updated: EntityBlock) => void;
+  onDelete: () => void;
+}) {
+  const updateGroup = (id: string, updated: EntityConditionGroup) =>
+    onUpdate({ ...block, groups: block.groups.map((g) => (g.id === id ? updated : g)) });
+
+  const deleteGroup = (id: string) => {
+    if (block.groups.length <= 1) return;
+    onUpdate({ ...block, groups: block.groups.filter((g) => g.id !== id) });
+  };
+
+  return (
+    <div className="rounded-[4px] border border-border-rule">
+      <div className="flex items-center gap-2 rounded-t-[4px] border-b border-border-rule bg-overlay-subtle px-4 py-2.5">
+        <Icon
+          name={block.entityOption.icon}
+          size={18}
+          className="shrink-0 text-datavis-data-pop-teal-20"
+          aria-hidden
+        />
+        <span className="text-sm font-semibold text-text-primary">{block.entityOption.label}</span>
+        <Icon name="chevron-down" size={16} className="shrink-0 text-text-secondary" aria-hidden />
+        <div className="flex-1" />
+        <button
+          type="button"
+          className="rounded p-1 text-text-tertiary transition-colors hover:bg-overlay-subtle hover:text-text-primary focus-visible:outline-none"
+          onClick={onDelete}
+          aria-label={`Remove ${block.entityOption.label}`}
+        >
+          <Icon name="action-delete" size={18} aria-hidden />
+        </button>
+      </div>
+      <div className="space-y-3 p-4">
+        {block.groups.map((group) => (
+          <EntityConditionGroup
+            key={group.id}
+            group={group}
+            canDelete={block.groups.length > 1}
+            onUpdate={(updated) => updateGroup(group.id, updated)}
+            onDelete={() => deleteGroup(group.id)}
+          />
+        ))}
+        <div className="flex overflow-hidden self-start rounded-[4px] border border-interactive-secondary-pressed">
+          <button
+            type="button"
+            className="flex items-center gap-1.5 px-3 py-1.5 text-sm font-semibold text-interactive-active transition-colors hover:bg-interactive-secondary-hover focus-visible:outline-none"
+            onClick={() => onUpdate({ ...block, groups: [...block.groups, makeEmptyEntityGroup()] })}
+          >
+            <Icon name="action-add" size={14} aria-hidden />
+            Add Condition
+          </button>
+          <button
+            type="button"
+            className="border-l border-interactive-secondary-pressed px-2 py-1.5 text-interactive-active transition-colors hover:bg-interactive-secondary-hover focus-visible:outline-none"
+            aria-label="More condition options"
+          >
+            <Icon name="chevron-down" size={14} aria-hidden />
+          </button>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+// ─── AdvancedOptions ──────────────────────────────────────────────────────────
+
+function AdvancedOptions() {
+  const [open, setOpen] = useState(false);
+
+  return (
+    <div className="border-t border-border-rule pt-3">
+      <button
+        type="button"
+        className="flex items-center gap-1.5 text-sm font-semibold text-text-secondary transition-colors hover:text-text-primary focus-visible:outline-none"
+        onClick={() => setOpen((v) => !v)}
+        aria-expanded={open}
+      >
+        <Icon
+          name="chevron-down"
+          size={16}
+          className={cx("shrink-0 transition-transform duration-150", open ? "" : "-rotate-90")}
+          aria-hidden
+        />
+        Advanced Options
+        <Icon name="action-info" size={16} className="text-text-tertiary" aria-hidden />
+      </button>
+
+      {open && (
+        <div className="mt-3 rounded-[4px] border border-border-rule bg-surface-container p-4 text-sm text-text-secondary">
+          Advanced search options will appear here.
+        </div>
+      )}
+    </div>
+  );
+}
+
+// ─── SearchQueryBuilder ───────────────────────────────────────────────────────
 
 export function SearchQueryBuilder({
   onValidityChange,
@@ -161,56 +914,208 @@ export function SearchQueryBuilder({
   onValidityChange?: (valid: boolean) => void;
   onConvertToFsql?: (query: string) => void;
 }) {
-  const conditionIdRef = useConditionIdCounter();
-  const [matchLogic, setMatchLogic] = useState<SearchMatchLogic>("or");
-  const [conditions, setConditions] = useState<QueryCondition[]>(() => [
-    createEmptyCondition(conditionIdRef.next()),
-  ]);
+  const matchLogicGroupName = useId();
+  const [matchLogic, setMatchLogic] = useState<"any" | "all">("any");
+  const [eventBlocks, setEventBlocks] = useState<EventBlock[]>([]);
+  const [entityBlocks, setEntityBlocks] = useState<EntityBlock[]>([]);
+  const [showEventPicker, setShowEventPicker] = useState(false);
+  const [showEntityPicker, setShowEntityPicker] = useState(false);
 
-  const valid = isQueryBuilderValid(conditions);
+  const isValid =
+    eventBlocks.some((block) =>
+      block.groups.some((group) =>
+        group.conditions.some((c) => c.fieldId !== "" && c.values.length > 0),
+      ),
+    ) ||
+    entityBlocks.some((block) =>
+      block.groups.some((group) =>
+        group.conditions.some((c) => c.values.length > 0),
+      ),
+    );
 
   useEffect(() => {
-    onValidityChange?.(valid);
-  }, [valid, onValidityChange]);
+    onValidityChange?.(isValid);
+  }, [isValid, onValidityChange]);
 
-  const updateCondition = (id: string, next: QueryCondition) => {
-    setConditions((current) => current.map((condition) => (condition.id === id ? next : condition)));
-  };
+  const updateEventBlock = (id: string, updated: EventBlock) =>
+    setEventBlocks((prev) => prev.map((b) => (b.id === id ? updated : b)));
+  const deleteEventBlock = (id: string) =>
+    setEventBlocks((prev) => prev.filter((b) => b.id !== id));
 
-  const addCondition = () => {
-    setConditions((current) => [...current, createEmptyCondition(conditionIdRef.next())]);
+  const updateEntityBlock = (id: string, updated: EntityBlock) =>
+    setEntityBlocks((prev) => prev.map((b) => (b.id === id ? updated : b)));
+  const deleteEntityBlock = (id: string) =>
+    setEntityBlocks((prev) => prev.filter((b) => b.id !== id));
+
+  const OP_FSQL: Record<ConditionOperator, string> = {
+    contains: "CONTAINS",
+    equals: "=",
+    "not-equals": "!=",
+    "not-contains": "NOT CONTAINS",
+    "starts-with": "STARTS WITH",
+    "ends-with": "ENDS WITH",
   };
 
   const handleConvertToFsql = () => {
-    const query = buildFsqlFromQueryBuilder(matchLogic, conditions);
-    if (!query) return;
-    onConvertToFsql?.(query);
+    const eventParts = eventBlocks.flatMap((block) =>
+      block.groups.flatMap((group) =>
+        group.conditions
+          .filter((c) => c.fieldId && c.values.length > 0)
+          .map((c) => {
+            const fieldLabel =
+              getFieldsForCategory(block.eventOption.categoryId).find((f) => f.id === c.fieldId)
+                ?.label ?? c.fieldId;
+            const vals = c.values.map((v) => `"${v.replace(/"/g, '\\"')}"`).join(", ");
+            return `${fieldLabel} ${OP_FSQL[c.operator]} (${vals})`;
+          }),
+      ),
+    );
+    const entityParts = entityBlocks.flatMap((block) =>
+      block.groups.flatMap((group) =>
+        group.conditions
+          .filter((c) => c.values.length > 0)
+          .map((c) => {
+            const vals = c.values.map((v) => `"${v.replace(/"/g, '\\"')}"`).join(", ");
+            return `${block.entityOption.label} ${OP_FSQL[c.operator]} (${vals})`;
+          }),
+      ),
+    );
+    const joiner = matchLogic === "any" ? " OR " : " AND ";
+    onConvertToFsql?.([...entityParts, ...eventParts].join(joiner));
   };
 
   return (
-    <div className="space-y-4">
-      <div className="space-y-3">
-        {conditions.map((condition, index) => (
-          <QueryBuilderConditionRow
-            key={condition.id}
-            condition={condition}
-            showMatchLogic={index === 0}
-            matchLogic={matchLogic}
-            onMatchLogicChange={setMatchLogic}
-            onChange={(next) => updateCondition(condition.id, next)}
-          />
+    <div className="space-y-5">
+      {/* Top-level match logic */}
+      <div
+        role="radiogroup"
+        aria-label="Top-level match logic"
+        className="flex flex-wrap items-center gap-6"
+      >
+        {(
+          [
+            { id: "any" as const, label: "Match ANY of the conditions below" },
+            { id: "all" as const, label: "Match ALL of the conditions below" },
+          ] as const
+        ).map((opt) => (
+          <label
+            key={opt.id}
+            className="inline-flex cursor-pointer items-center gap-2 text-sm font-semibold leading-5 tracking-[0.4px] text-text-primary"
+          >
+            <input
+              type="radio"
+              name={matchLogicGroupName}
+              value={opt.id}
+              checked={matchLogic === opt.id}
+              onChange={() => setMatchLogic(opt.id)}
+              className="size-4 shrink-0 accent-interactive-active"
+            />
+            {opt.label}
+          </label>
         ))}
       </div>
 
+      {/* Entity + Event blocks */}
+      {(entityBlocks.length > 0 || eventBlocks.length > 0) && (
+        <div className="space-y-4">
+          {entityBlocks.map((block) => (
+            <EntityBlockComp
+              key={block.id}
+              block={block}
+              onUpdate={(updated) => updateEntityBlock(block.id, updated)}
+              onDelete={() => deleteEntityBlock(block.id)}
+            />
+          ))}
+          {eventBlocks.map((block) => (
+            <EventBlockComp
+              key={block.id}
+              block={block}
+              onUpdate={(updated) => updateEventBlock(block.id, updated)}
+              onDelete={() => deleteEventBlock(block.id)}
+            />
+          ))}
+        </div>
+      )}
+
+      {/* Footer: Add Entity / Add Event */}
       <div className="flex flex-wrap items-center gap-3">
-        <Button type="button" variant="secondary" size="small" onClick={addCondition}>
-          <Icon name="action-add" size={12} className="size-3 shrink-0 text-current [&>svg]:!size-[12px]" aria-hidden />
-          Add Condition
-        </Button>
-        <Button type="button" variant="secondary" size="small" disabled={!valid} onClick={handleConvertToFsql}>
-          Convert to FSQL
-        </Button>
+        {/* Add Entity */}
+        <div className="relative">
+          <div className="flex overflow-hidden rounded-[4px] border border-interactive-secondary-pressed">
+            <button
+              type="button"
+              className="flex items-center gap-1.5 px-3 py-1.5 text-sm font-semibold text-interactive-active transition-colors hover:bg-interactive-secondary-hover focus-visible:outline-none"
+              onClick={() => setShowEntityPicker((v) => !v)}
+            >
+              <Icon name="action-add" size={14} aria-hidden />
+              Add Entity
+            </button>
+            <button
+              type="button"
+              className="border-l border-interactive-secondary-pressed px-2 py-1.5 text-interactive-active transition-colors hover:bg-interactive-secondary-hover focus-visible:outline-none"
+              aria-label="More entity options"
+              onClick={() => setShowEntityPicker((v) => !v)}
+            >
+              <Icon name="chevron-down" size={14} aria-hidden />
+            </button>
+          </div>
+          {showEntityPicker && (
+            <EntityPickerPopover
+              onSelect={(option) => {
+                setEntityBlocks((prev) => [...prev, makeEntityBlock(option)]);
+              }}
+              onClose={() => setShowEntityPicker(false)}
+            />
+          )}
+        </div>
+
+        {/* Add Event */}
+        <div className="relative">
+          <div className="flex overflow-hidden rounded-[4px] border border-interactive-secondary-pressed">
+            <button
+              type="button"
+              className="flex items-center gap-1.5 px-3 py-1.5 text-sm font-semibold text-interactive-active transition-colors hover:bg-interactive-secondary-hover focus-visible:outline-none"
+              onClick={() => setShowEventPicker((v) => !v)}
+            >
+              <Icon name="action-add" size={14} aria-hidden />
+              Add Event
+            </button>
+            <button
+              type="button"
+              className="border-l border-interactive-secondary-pressed px-2 py-1.5 text-interactive-active transition-colors hover:bg-interactive-secondary-hover focus-visible:outline-none"
+              aria-label="More event options"
+              onClick={() => setShowEventPicker((v) => !v)}
+            >
+              <Icon name="chevron-down" size={14} aria-hidden />
+            </button>
+          </div>
+
+          {showEventPicker && (
+            <EventPickerPopover
+              onSelect={(option) => {
+                setEventBlocks((prev) => [...prev, makeEventBlock(option)]);
+              }}
+              onClose={() => setShowEventPicker(false)}
+            />
+          )}
+        </div>
+
+        {/* Convert to FSQL — only shown when there's something to convert */}
+        {isValid && onConvertToFsql && (
+          <Button
+            type="button"
+            variant="tertiary"
+            size="small"
+            className="ml-auto"
+            onClick={handleConvertToFsql}
+          >
+            Convert to FSQL
+          </Button>
+        )}
       </div>
+
+      {/* Advanced Options */}
+      <AdvancedOptions />
     </div>
   );
 }

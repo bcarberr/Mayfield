@@ -130,14 +130,48 @@ function queuedMatchesSearch(row: QueuedDetectionRow, query: string, enabled: bo
   return haystack.includes(q);
 }
 
-function ReviewStatCard({ label, value }: { label: string; value: number }) {
+function ReviewStatCard({
+  label,
+  value,
+  selected,
+  onClick,
+}: {
+  label: string;
+  value: number;
+  selected: boolean;
+  onClick: () => void;
+}) {
   return (
-    <div className="rounded-[4px] border border-border-container bg-datavis-card-bg px-6 py-5 shadow-datavis-card">
-      <p className="text-xs font-bold uppercase tracking-wide text-text-tertiary">{label}</p>
+    <button
+      type="button"
+      aria-pressed={selected}
+      aria-label={`Filter by ${label}`}
+      onClick={onClick}
+      className={cx(
+        "rounded-[4px] border bg-datavis-card-bg px-6 py-5 text-left shadow-datavis-card transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-interactive-active",
+        selected ? "border-interactive-active" : "border-border-container",
+      )}
+    >
+      <p
+        className={cx(
+          "text-xs font-bold uppercase tracking-wide",
+          selected ? "text-interactive-active" : "text-text-tertiary",
+        )}
+      >
+        {label}
+      </p>
       <p className="mt-2 text-3xl font-bold tabular-nums text-text-primary">{value}</p>
-    </div>
+    </button>
   );
 }
+
+type ReviewStatFilter = "active" | "high-findings" | "critical";
+
+const REVIEW_STAT_FILTER_LABELS: Record<ReviewStatFilter, string> = {
+  active: "Active",
+  "high-findings": "High Findings",
+  critical: "Critical Severity",
+};
 
 function ReviewFindingsCell({ findings }: { findings: QueuedDetectionRow["findings"] }) {
   if (findings === "error") {
@@ -369,10 +403,9 @@ function QueuedReviewTable({
   onEnabledChange,
   searchQuery,
   onSearchQueryChange,
-  showOnlyActive,
-  onShowOnlyActiveChange,
   totalCount,
   onClearFilters,
+  statFilterLabel,
 }: {
   rows: QueuedDetectionRow[];
   tableTool: FilterColumnPanelTool | null;
@@ -388,10 +421,9 @@ function QueuedReviewTable({
   onEnabledChange: (id: string, enabled: boolean) => void;
   searchQuery: string;
   onSearchQueryChange: (query: string) => void;
-  showOnlyActive: boolean;
-  onShowOnlyActiveChange: (checked: boolean) => void;
   totalCount: number;
   onClearFilters: () => void;
+  statFilterLabel: string | null;
 }) {
   const [selected, setSelected] = useState<Set<string>>(() => new Set());
   const {
@@ -432,7 +464,7 @@ function QueuedReviewTable({
   const thClass =
     "relative h-10 border-r border-datavis-gridlines px-2 py-0 align-middle text-xs font-bold uppercase tracking-wide text-text-primary";
   const tdClass = "h-10 px-2 py-0 align-middle text-sm text-text-secondary";
-  const hasActiveFilters = searchQuery.trim().length > 0;
+  const hasActiveFilters = searchQuery.trim().length > 0 || statFilterLabel != null;
   const allExpanded = rows.length > 0 && rows.every((row) => expandedIds.has(row.id));
   const sortComparators = useMemo(
     (): Record<QueuedSortColumn, (a: QueuedDetectionRow, b: QueuedDetectionRow) => number> => ({
@@ -456,6 +488,7 @@ function QueuedReviewTable({
         <div className="mt-2 flex flex-wrap items-center gap-3">
           <p className="shrink-0 text-base-small text-text-secondary">
             {rows.length} of {totalCount} Results
+            {statFilterLabel ? ` · ${statFilterLabel}` : ""}
             {searchQuery.trim() ? ` · “${searchQuery.trim()}”` : ""}
           </p>
           <div className="flex shrink-0 flex-wrap items-center gap-3">
@@ -469,12 +502,6 @@ function QueuedReviewTable({
                 aria-label="Search queued detections"
               />
             </div>
-            <Checkbox
-              checked={showOnlyActive}
-              onCheckedChange={onShowOnlyActiveChange}
-              label="Show only Active Detections"
-              className="shrink-0"
-            />
           </div>
           {hasActiveFilters ? (
             <Button
@@ -484,7 +511,7 @@ function QueuedReviewTable({
               onClick={onClearFilters}
             >
               <Icon name="action-filter-list" size={12} aria-hidden />
-              Clear All Filters
+              Clear all filters
             </Button>
           ) : null}
         </div>
@@ -710,7 +737,11 @@ export function QueuedForReviewContent() {
   const [enabledById, setEnabledById] = useState<Record<string, boolean>>(() =>
     Object.fromEntries(QUEUED_DETECTION_ROWS.map((r) => [r.id, r.enabled])),
   );
-  const [showOnlyActive, setShowOnlyActive] = useState(false);
+  const [statFilter, setStatFilter] = useState<ReviewStatFilter | null>(null);
+
+  const handleStatFilterClick = (filter: ReviewStatFilter) => {
+    setStatFilter((current) => (current === filter ? null : filter));
+  };
 
   const openDetectionPanel = (id: string, mode: "view" | "edit") => {
     setDrawerDetectionId(id);
@@ -773,10 +804,12 @@ export function QueuedForReviewContent() {
   const filteredRows = useMemo(() => {
     return queuedRows.filter((row) => {
       const enabled = enabledById[row.id] ?? row.enabled;
-      if (showOnlyActive && !enabled) return false;
+      if (statFilter === "active" && !enabled) return false;
+      if (statFilter === "high-findings" && row.severity !== "High") return false;
+      if (statFilter === "critical" && row.severity !== "Critical") return false;
       return queuedMatchesSearch(row, searchQuery, enabled);
     });
-  }, [queuedRows, searchQuery, enabledById, showOnlyActive]);
+  }, [queuedRows, searchQuery, enabledById, statFilter]);
 
   const summaryStats = useMemo(() => {
     const pending = queuedRows.length;
@@ -812,10 +845,30 @@ export function QueuedForReviewContent() {
   return (
     <>
       <div className="grid shrink-0 grid-cols-1 gap-4 sm:grid-cols-2 xl:grid-cols-4">
-        <ReviewStatCard label="Pending Review" value={summaryStats.pending} />
-        <ReviewStatCard label="Active" value={summaryStats.active} />
-        <ReviewStatCard label="High Findings" value={summaryStats.highFindings} />
-        <ReviewStatCard label="Critical Severity" value={summaryStats.criticalSeverity} />
+        <ReviewStatCard
+          label="Pending Review"
+          value={summaryStats.pending}
+          selected={statFilter == null}
+          onClick={() => setStatFilter(null)}
+        />
+        <ReviewStatCard
+          label="Active"
+          value={summaryStats.active}
+          selected={statFilter === "active"}
+          onClick={() => handleStatFilterClick("active")}
+        />
+        <ReviewStatCard
+          label="High Findings"
+          value={summaryStats.highFindings}
+          selected={statFilter === "high-findings"}
+          onClick={() => handleStatFilterClick("high-findings")}
+        />
+        <ReviewStatCard
+          label="Critical Severity"
+          value={summaryStats.criticalSeverity}
+          selected={statFilter === "critical"}
+          onClick={() => handleStatFilterClick("critical")}
+        />
       </div>
 
       <QueuedReviewTable
@@ -833,10 +886,12 @@ export function QueuedForReviewContent() {
         onEnabledChange={(id, enabled) => setEnabledById((prev) => ({ ...prev, [id]: enabled }))}
         searchQuery={searchQuery}
         onSearchQueryChange={setSearchQuery}
-        showOnlyActive={showOnlyActive}
-        onShowOnlyActiveChange={setShowOnlyActive}
         totalCount={queuedRows.length}
-        onClearFilters={() => setSearchQuery("")}
+        statFilterLabel={statFilter ? REVIEW_STAT_FILTER_LABELS[statFilter] : null}
+        onClearFilters={() => {
+          setSearchQuery("");
+          setStatFilter(null);
+        }}
       />
 
       <DuplicateQueuedDetectionModal

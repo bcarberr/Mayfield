@@ -687,7 +687,7 @@ export function NetworkActivityContent() {
                 onClick={() => setSearchQuery("")}
               >
                 <Icon name="action-filter-list" size={12} aria-hidden />
-                Clear All Filters
+                Clear all filters
               </Button>
             ) : null}
             <Button type="button" variant="secondary" className="ml-auto shrink-0 gap-1.5 px-3">

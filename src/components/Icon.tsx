@@ -47,7 +47,7 @@ import checkCircleOutline from "../assets/icons/check-circle-outline.svg?raw";
 import chevronDown from "../assets/icons/chevron-down.svg?raw";
 import circle from "../assets/icons/circle.svg?raw";
 import close from "../assets/icons/close.svg?raw";
-import connectors from "../assets/icons/connectors.svg?raw";
+import connectors from "../assets/icons/connectors2.svg?raw";
 import cyclone from "../assets/icons/cyclone.svg?raw";
 import awsAthena from "../assets/icons/aws-athena.svg?raw";
 import error from "../assets/icons/error.svg?raw";

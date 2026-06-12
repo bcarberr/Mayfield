@@ -13,6 +13,7 @@ import { TruncatedText } from "../ui/TruncatedText";
 import { useResizableColumns } from "../ui/useResizableColumns";
 import { Checkbox } from "../uiCheckbox";
 import { ROUTES } from "../../app/routes";
+import { useTimeframe } from "../../context/TimeframeContext";
 import { EntitiesOverviewContent } from "./EntitiesOverviewContent";
 import { NetworkActivityContent } from "./NetworkActivityContent";
 import { cx, DatavisGridlineRule, InsightCard } from "./datavisCard";
@@ -23,9 +24,19 @@ import {
   readDefaultFederatedView,
   type FederatedViewId,
 } from "./FederatedAnalyticsBreadcrumb";
+import { HorizontalBarPanel } from "./horizontalBarPanel";
+import { IdentityAccessContent } from "./IdentityAccessContent";
+import { SystemActivityContent } from "./SystemActivityContent";
+import { TimeSeriesAreaChart } from "./timeSeriesAreaChart";
+import {
+  buildHourlyAxisTicks,
+  buildHourlyBuckets,
+  findSpikeBucketIndex,
+  formatBucketTimeLabel,
+  hourlySeverityValues,
+  SPIKE_CLOCK_HOUR,
+} from "./timeframeChartUtils";
 
-/** Figma Framework-Keyframes `4524:35393` — horizontal bar fills (dark datavis). */
-const CHART_CATEGORY_FILL = "#6dc6a1";
 const SEV_BAR: Record<"Critical" | "High" | "Medium" | "Low" | "Informational", string> = {
   Critical: "#ff604a",
   High: "#f28830",
@@ -38,30 +49,6 @@ type SeverityLevel = keyof typeof SEV_BAR;
 
 function isSeverityLevel(label: string): label is SeverityLevel {
   return label in SEV_BAR;
-}
-
-const X_MAX = 500;
-const X_TICKS = [0, 100, 200, 300, 400, 500] as const;
-
-type BarRow = { label: string; value: number; color?: string };
-
-function ChartGridLines() {
-  return (
-    <div
-      className="pointer-events-none absolute inset-y-0 left-[20px] right-[20px] flex justify-between"
-      aria-hidden
-    >
-      {X_TICKS.map((t) => (
-        <div
-          key={t}
-          className="flex h-full w-0 justify-center"
-          style={{ marginLeft: t === 0 ? 0 : undefined }}
-        >
-          <div className="h-full w-px bg-datavis-gridlines" />
-        </div>
-      ))}
-    </div>
-  );
 }
 
 type FindingCategory =
@@ -80,111 +67,6 @@ function isFindingCategory(label: string): label is FindingCategory {
     label === "Incidents" ||
     label === "Security" ||
     label === "Data Security"
-  );
-}
-
-function HorizontalBarPanel({
-  rows,
-  selectedLabel,
-  onBarClick,
-  filterAriaLabel = (label) => `Filter findings by ${label}`,
-}: {
-  rows: BarRow[];
-  selectedLabel?: string | null;
-  onBarClick?: (label: string) => void;
-  filterAriaLabel?: (label: string) => string;
-}) {
-  return (
-    <div className="flex min-h-0 min-w-0 flex-1 flex-col lg:h-full">
-      <div className="relative flex min-h-[200px] flex-1 flex-col">
-        <ChartGridLines />
-        <div className="relative flex h-full min-h-0 flex-col justify-between">
-          {rows.map((row) => {
-            const pct = Math.min(100, Math.max((row.value / X_MAX) * 100, row.value > 0 ? 6 : 0));
-            const fill = row.color ?? CHART_CATEGORY_FILL;
-            const interactive = Boolean(onBarClick);
-            const selected = interactive && selectedLabel === row.label;
-            const filterActive = interactive && selectedLabel != null;
-            const dimmed = filterActive && !selected;
-
-            const rowBody = (
-              <>
-                <span
-                  className={cx(
-                    "w-[5.5rem] shrink-0 text-right text-base-small transition-colors sm:w-28",
-                    "group-hover:font-semibold group-hover:text-text-primary",
-                    selected
-                      ? "font-semibold text-text-primary"
-                      : dimmed
-                        ? "text-text-disabled"
-                        : "text-text-tertiary",
-                  )}
-                >
-                  {row.label}
-                </span>
-                <div className="flex min-h-5 min-w-0 flex-1 items-center gap-[8px]">
-                  <div
-                    className={cx(
-                      "h-5 shrink-0 rounded-sm transition-opacity duration-150",
-                      dimmed ? "opacity-35 group-hover:opacity-55" : interactive && !selected && "opacity-90 group-hover:opacity-100",
-                    )}
-                    style={{
-                      width: `min(${pct}%, calc(100% - 3.25rem))`,
-                      backgroundColor: fill,
-                    }}
-                  />
-                  <span
-                    className={cx(
-                      "shrink-0 text-xs font-bold tabular-nums transition-colors",
-                      "group-hover:text-text-primary",
-                      dimmed ? "text-text-disabled" : "text-text-primary",
-                    )}
-                  >
-                    {row.value}
-                  </span>
-                </div>
-              </>
-            );
-
-            if (interactive) {
-              return (
-                <button
-                  key={row.label}
-                  type="button"
-                  aria-pressed={selected}
-                  aria-label={filterAriaLabel(row.label)}
-                  className={cx(
-                    "group flex min-h-6 w-full shrink-0 items-center gap-2 rounded-sm text-left sm:gap-3",
-                    "cursor-pointer transition-colors",
-                    "focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-interactive-active focus-visible:ring-offset-2 focus-visible:ring-offset-datavis-card-bg",
-                  )}
-                  onClick={() => onBarClick!(row.label)}
-                >
-                  {rowBody}
-                </button>
-              );
-            }
-
-            return (
-              <div key={row.label} className="flex min-h-6 shrink-0 items-center gap-2 sm:gap-3">
-                {rowBody}
-              </div>
-            );
-          })}
-        </div>
-      </div>
-      <div className="mt-4 shrink-0 px-[20px]">
-        <div className="h-px shrink-0 bg-datavis-gridlines" aria-hidden />
-      </div>
-      <div className="flex shrink-0 justify-between px-[20px] pt-2 text-base-small text-text-tertiary">
-        {X_TICKS.map((t) => (
-          <span key={t} className="w-8 shrink-0 text-center tabular-nums first:w-6 first:text-left last:text-right">
-            {t}
-          </span>
-        ))}
-      </div>
-      <p className="mt-1 shrink-0 text-center text-base-semibold text-text-primary">Findings</p>
-    </div>
   );
 }
 
@@ -687,13 +569,14 @@ function FederatedAnalyticsComingSoon({ view }: { view: FederatedViewId }) {
 
 export function SummaryInsightsDashboard() {
   const navigate = useNavigate();
+  const { range: timeframe } = useTimeframe();
   const [activeView, setActiveView] = useState<FederatedViewId>(readDefaultFederatedView);
   const [severityFilter, setSeverityFilter] = useState<SeverityLevel | null>(null);
   const [categoryFilter, setCategoryFilter] = useState<FindingCategory | null>(null);
   const [searchQuery, setSearchQuery] = useState("");
   const [tableTool, setTableTool] = useState<FilterColumnPanelTool | null>(null);
   const [drawerFindingId, setDrawerFindingId] = useState<string | null>(null);
-  const categoryRows: BarRow[] = useMemo(
+  const categoryRows = useMemo(
     () => [
       { label: "Vulnerabilities", value: 408 },
       { label: "Compliance", value: 321 },
@@ -705,7 +588,7 @@ export function SummaryInsightsDashboard() {
     [],
   );
 
-  const severityRows: BarRow[] = useMemo(
+  const severityRows = useMemo(
     () => [
       { label: "Critical", value: 125, color: SEV_BAR.Critical },
       { label: "High", value: 203, color: SEV_BAR.High },
@@ -933,6 +816,45 @@ export function SummaryInsightsDashboard() {
     setSeverityFilter((current) => (current === label ? null : label));
   };
 
+  const eventsPerHourChart = useMemo(() => {
+    const buckets = buildHourlyBuckets(timeframe);
+    const spikeIndex = findSpikeBucketIndex(buckets, timeframe.to);
+    const includeDate = timeframe.to.getTime() - timeframe.from.getTime() > 36 * 3_600_000;
+    const xLabels = buckets.map((bucket) => formatBucketTimeLabel(bucket.start, includeDate));
+    const { indices: xTickIndices, labels: xTickLabels } = buildHourlyAxisTicks(buckets, timeframe);
+
+    const series = [
+      {
+        id: "Medium",
+        label: "Medium",
+        color: SEV_BAR.Medium,
+        icon: SEVERITY_ICON.Medium,
+        values: hourlySeverityValues(11, buckets, spikeIndex),
+      },
+      {
+        id: "High",
+        label: "High",
+        color: SEV_BAR.High,
+        icon: SEVERITY_ICON.High,
+        values: hourlySeverityValues(9, buckets, spikeIndex),
+      },
+      {
+        id: "Critical",
+        label: "Critical",
+        color: SEV_BAR.Critical,
+        icon: SEVERITY_ICON.Critical,
+        values: hourlySeverityValues(3, buckets, spikeIndex),
+      },
+    ] as const;
+
+    const spikeHighlight =
+      spikeIndex != null
+        ? { index: spikeIndex, label: `spike ~${SPIKE_CLOCK_HOUR}:00` }
+        : undefined;
+
+    return { series, xLabels, xTickIndices, xTickLabels, spikeHighlight };
+  }, [timeframe]);
+
   return (
     <div className="relative flex min-h-0 flex-1 flex-col overflow-hidden">
       <div className="flex min-h-0 flex-1 flex-col overflow-y-auto bg-surface-page">
@@ -951,18 +873,37 @@ export function SummaryInsightsDashboard() {
 
       {activeView === "entities-overview" ? (
         <EntitiesOverviewContent />
+      ) : activeView === "system-activity" ? (
+        <SystemActivityContent />
+      ) : activeView === "identity-access" ? (
+        <IdentityAccessContent />
       ) : activeView === "network-activity" ? (
         <NetworkActivityContent />
       ) : isComingSoonFederatedView(activeView) ? (
         <FederatedAnalyticsComingSoon view={activeView} />
       ) : (
-        <>
-      <div className="grid min-h-0 shrink-0 grid-cols-1 items-stretch gap-4 p-4 sm:p-5 lg:grid-cols-2 lg:grid-rows-1">
-        <InsightCard title="Categories of Finding Events" fillHeight>
+        <div className="flex shrink-0 flex-col gap-4 p-4 sm:p-5">
+      <InsightCard title="Events Per Hour By Severity">
+        <TimeSeriesAreaChart
+          series={eventsPerHourChart.series}
+          xLabels={eventsPerHourChart.xLabels}
+          xTickIndices={eventsPerHourChart.xTickIndices}
+          xTickLabels={eventsPerHourChart.xTickLabels}
+          spikeHighlight={eventsPerHourChart.spikeHighlight}
+          ariaLabel="Finding events per hour by severity"
+          selectedSeriesId={severityFilter}
+          onSeriesClick={handleSeverityBarClick}
+        />
+      </InsightCard>
+
+      <div className="grid min-h-0 shrink-0 grid-cols-1 items-stretch gap-4 lg:grid-cols-2 lg:grid-rows-1">
+        <InsightCard title="Finding Event Classes" fillHeight>
           <HorizontalBarPanel
             rows={categoryRows}
             selectedLabel={categoryFilter}
             onBarClick={handleCategoryBarClick}
+            filterAriaLabel={(label) => `Filter findings by ${label}`}
+            axisLabel="Findings"
           />
         </InsightCard>
         <InsightCard title="Findings Severity ID" fillHeight>
@@ -971,11 +912,12 @@ export function SummaryInsightsDashboard() {
             selectedLabel={severityFilter}
             onBarClick={handleSeverityBarClick}
             filterAriaLabel={(label) => `Filter findings by ${label} severity`}
+            axisLabel="Findings"
           />
         </InsightCard>
       </div>
 
-      <section className="mx-4 mb-5 flex min-h-0 min-w-0 flex-1 flex-col overflow-hidden rounded-[4px] border border-border-container bg-datavis-card-bg shadow-[0_1px_5px_rgba(0,0,0,0.2)] sm:mx-5">
+      <section className="mx-0 mb-0 flex min-h-0 min-w-0 flex-1 flex-col overflow-hidden rounded-[4px] border border-border-container bg-datavis-card-bg shadow-[0_1px_5px_rgba(0,0,0,0.2)]">
         <div className="shrink-0 bg-datavis-card-bg pb-3 pl-4 pr-[20px] pt-3 sm:pl-5">
           <h2 className="text-base-semibold text-text-primary">Finding Events</h2>
           <div className="mt-2 flex flex-wrap items-center gap-3">
@@ -1007,7 +949,7 @@ export function SummaryInsightsDashboard() {
                 }}
               >
                 <Icon name="action-filter-list" size={12} aria-hidden />
-                Clear All Filters
+                Clear all filters
               </Button>
             ) : null}
           </div>
@@ -1024,7 +966,7 @@ export function SummaryInsightsDashboard() {
           </div>
         </div>
       </section>
-        </>
+        </div>
       )}
       </div>
       {activeView === "findings" && drawerRow ? (

@@ -1,5 +1,6 @@
 @import "tailwindcss";
 @import "./styles/tokens.css";
+@source not "../dist";
 
 /* Figma “Base/Semibold”: Lato 14px semibold (not Tailwind `text-base` / 16px). */
 @utility text-base-semibold {

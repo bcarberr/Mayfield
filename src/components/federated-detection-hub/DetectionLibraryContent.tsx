@@ -291,14 +291,50 @@ function libraryMatchesSearch(row: LibraryDetectionRow, query: string, enabled: 
   return haystack.includes(q);
 }
 
-function LibraryStatCard({ label, value }: { label: string; value: number }) {
+function LibraryStatCard({
+  label,
+  value,
+  selected,
+  onClick,
+}: {
+  label: string;
+  value: number;
+  selected: boolean;
+  onClick: () => void;
+}) {
   return (
-    <div className="rounded-[4px] border border-border-container bg-datavis-card-bg px-6 py-5 shadow-datavis-card">
-      <p className="text-xs font-bold uppercase tracking-wide text-text-tertiary">{label}</p>
+    <button
+      type="button"
+      aria-pressed={selected}
+      aria-label={`Filter by ${label}`}
+      onClick={onClick}
+      className={cx(
+        "rounded-[4px] border bg-datavis-card-bg px-6 py-5 text-left shadow-datavis-card transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-interactive-active",
+        selected
+          ? "border-interactive-active hover:bg-overlay-subtle"
+          : "border-border-container hover:border-border-rule hover:bg-overlay-subtle",
+      )}
+    >
+      <p
+        className={cx(
+          "text-xs font-bold uppercase tracking-wide",
+          selected ? "text-interactive-active" : "text-text-tertiary",
+        )}
+      >
+        {label}
+      </p>
       <p className="mt-2 text-3xl font-bold tabular-nums text-text-primary">{value}</p>
-    </div>
+    </button>
   );
 }
+
+type LibraryStatFilter = "enabled" | "critical" | "high";
+
+const LIBRARY_STAT_FILTER_LABELS: Record<LibraryStatFilter, string> = {
+  enabled: "Enabled",
+  critical: "Critical Severity",
+  high: "High Severity",
+};
 
 function LibraryFindingsCell({ findings }: { findings: LibraryDetectionRow["findings"] }) {
   if (findings === "error") {
@@ -471,10 +507,9 @@ function LibraryDetectionsTable({
   onEnabledChange,
   searchQuery,
   onSearchQueryChange,
-  showOnlyActive,
-  onShowOnlyActiveChange,
   totalCount,
   onClearFilters,
+  statFilterLabel,
 }: {
   rows: LibraryDetectionRow[];
   tableTool: FilterColumnPanelTool | null;
@@ -487,10 +522,9 @@ function LibraryDetectionsTable({
   onEnabledChange: (id: string, enabled: boolean) => void;
   searchQuery: string;
   onSearchQueryChange: (query: string) => void;
-  showOnlyActive: boolean;
-  onShowOnlyActiveChange: (checked: boolean) => void;
   totalCount: number;
   onClearFilters: () => void;
+  statFilterLabel: string | null;
 }) {
   const [selected, setSelected] = useState<Set<string>>(() => new Set());
   const {
@@ -531,7 +565,7 @@ function LibraryDetectionsTable({
   const thClass =
     "relative h-10 border-r border-datavis-gridlines px-2 py-0 align-middle text-xs font-bold uppercase tracking-wide text-text-primary";
   const tdClass = "h-10 px-2 py-0 align-middle text-sm text-text-secondary";
-  const hasActiveFilters = searchQuery.trim().length > 0;
+  const hasActiveFilters = searchQuery.trim().length > 0 || statFilterLabel != null;
   const allExpanded = rows.length > 0 && rows.every((row) => expandedIds.has(row.id));
   const sortComparators = useMemo(
     (): Record<LibrarySortColumn, (a: LibraryDetectionRow, b: LibraryDetectionRow) => number> => ({
@@ -557,6 +591,7 @@ function LibraryDetectionsTable({
         <div className="mt-2 flex flex-wrap items-center gap-3">
           <p className="shrink-0 text-base-small text-text-secondary">
             {rows.length} of {totalCount} Results
+            {statFilterLabel ? ` · ${statFilterLabel}` : ""}
             {searchQuery.trim() ? ` · “${searchQuery.trim()}”` : ""}
           </p>
           <div className="flex shrink-0 flex-wrap items-center gap-3">
@@ -570,12 +605,6 @@ function LibraryDetectionsTable({
                 aria-label="Search detection library"
               />
             </div>
-            <Checkbox
-              checked={showOnlyActive}
-              onCheckedChange={onShowOnlyActiveChange}
-              label="Show only Active Detections"
-              className="shrink-0"
-            />
           </div>
           {hasActiveFilters ? (
             <Button
@@ -585,7 +614,7 @@ function LibraryDetectionsTable({
               onClick={onClearFilters}
             >
               <Icon name="action-filter-list" size={12} aria-hidden />
-              Clear All Filters
+              Clear all filters
             </Button>
           ) : null}
         </div>
@@ -830,15 +859,21 @@ export function DetectionLibraryContent() {
   const [enabledById, setEnabledById] = useState<Record<string, boolean>>(() =>
     Object.fromEntries(LIBRARY_DETECTION_ROWS.map((r) => [r.id, r.enabled])),
   );
-  const [showOnlyActive, setShowOnlyActive] = useState(false);
+  const [statFilter, setStatFilter] = useState<LibraryStatFilter | null>(null);
+
+  const handleStatFilterClick = (filter: LibraryStatFilter) => {
+    setStatFilter((current) => (current === filter ? null : filter));
+  };
 
   const filteredRows = useMemo(() => {
     return LIBRARY_DETECTION_ROWS.filter((row) => {
       const enabled = enabledById[row.id] ?? row.enabled;
-      if (showOnlyActive && !enabled) return false;
+      if (statFilter === "enabled" && !enabled) return false;
+      if (statFilter === "critical" && row.severity !== "Critical") return false;
+      if (statFilter === "high" && row.severity !== "High") return false;
       return libraryMatchesSearch(row, searchQuery, enabled);
     });
-  }, [searchQuery, enabledById, showOnlyActive]);
+  }, [searchQuery, enabledById, statFilter]);
 
   const summaryStats = useMemo(() => {
     const total = LIBRARY_DETECTION_ROWS.length;
@@ -872,10 +907,30 @@ export function DetectionLibraryContent() {
   return (
     <>
       <div className="grid shrink-0 grid-cols-1 gap-4 sm:grid-cols-2 xl:grid-cols-4">
-        <LibraryStatCard label="Total Detections" value={summaryStats.total} />
-        <LibraryStatCard label="Enabled" value={summaryStats.enabled} />
-        <LibraryStatCard label="Critical Severity" value={summaryStats.critical} />
-        <LibraryStatCard label="High Severity" value={summaryStats.high} />
+        <LibraryStatCard
+          label="Total Detections"
+          value={summaryStats.total}
+          selected={statFilter == null}
+          onClick={() => setStatFilter(null)}
+        />
+        <LibraryStatCard
+          label="Enabled"
+          value={summaryStats.enabled}
+          selected={statFilter === "enabled"}
+          onClick={() => handleStatFilterClick("enabled")}
+        />
+        <LibraryStatCard
+          label="Critical Severity"
+          value={summaryStats.critical}
+          selected={statFilter === "critical"}
+          onClick={() => handleStatFilterClick("critical")}
+        />
+        <LibraryStatCard
+          label="High Severity"
+          value={summaryStats.high}
+          selected={statFilter === "high"}
+          onClick={() => handleStatFilterClick("high")}
+        />
       </div>
 
       <LibraryDetectionsTable
@@ -890,10 +945,12 @@ export function DetectionLibraryContent() {
         onEnabledChange={(id, enabled) => setEnabledById((prev) => ({ ...prev, [id]: enabled }))}
         searchQuery={searchQuery}
         onSearchQueryChange={setSearchQuery}
-        showOnlyActive={showOnlyActive}
-        onShowOnlyActiveChange={setShowOnlyActive}
         totalCount={LIBRARY_DETECTION_ROWS.length}
-        onClearFilters={() => setSearchQuery("")}
+        statFilterLabel={statFilter ? LIBRARY_STAT_FILTER_LABELS[statFilter] : null}
+        onClearFilters={() => {
+          setSearchQuery("");
+          setStatFilter(null);
+        }}
       />
 
       {drawerRow ? (
