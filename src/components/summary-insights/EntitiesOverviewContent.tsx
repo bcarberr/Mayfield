@@ -311,7 +311,7 @@ function EntityCategoryCard({ data }: { data: EntityCategoryCardData }) {
 export function EntitiesOverviewContent() {
   return (
     <div className="flex shrink-0 flex-col gap-4 p-4 sm:p-5">
-      <InsightCard title="Top Entities by type">
+      <InsightCard title="Top Entities By Type">
         <div className="-mx-3 -mt-3 -mb-4 sm:-mx-4">
           <EntitiesBubbleChart />
         </div>

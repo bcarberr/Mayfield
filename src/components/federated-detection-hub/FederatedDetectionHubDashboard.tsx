@@ -575,7 +575,7 @@ function DuplicateDetectionModal({
   return (
     <Modal
       open={open}
-      title="Duplicate detection"
+      title="Duplicate Detection"
       onClose={onClose}
       footer={
         <div className="flex justify-end gap-2">

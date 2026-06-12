@@ -25,6 +25,7 @@ import {
   type FederatedViewId,
 } from "./FederatedAnalyticsBreadcrumb";
 import { HorizontalBarPanel } from "./horizontalBarPanel";
+import { DiscoveryContent } from "./DiscoveryContent";
 import { IdentityAccessContent } from "./IdentityAccessContent";
 import { SystemActivityContent } from "./SystemActivityContent";
 import { TimeSeriesAreaChart } from "./timeSeriesAreaChart";
@@ -879,6 +880,8 @@ export function SummaryInsightsDashboard() {
         <IdentityAccessContent />
       ) : activeView === "network-activity" ? (
         <NetworkActivityContent />
+      ) : activeView === "discovery" ? (
+        <DiscoveryContent />
       ) : isComingSoonFederatedView(activeView) ? (
         <FederatedAnalyticsComingSoon view={activeView} />
       ) : (
