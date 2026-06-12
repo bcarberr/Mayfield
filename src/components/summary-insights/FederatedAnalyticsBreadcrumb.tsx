@@ -107,8 +107,6 @@ function persistDefaultFederatedView(view: FederatedViewId) {
 }
 
 const COMING_SOON_FEDERATED_VIEWS: ReadonlySet<FederatedViewId> = new Set([
-  "system-activity",
-  "identity-access",
   "discovery",
   "application-activity",
   "remediation",

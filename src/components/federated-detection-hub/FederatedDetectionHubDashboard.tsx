@@ -1,4 +1,4 @@
-import { Fragment, useMemo, useRef, useState, type ReactNode } from "react";
+import { Fragment, useMemo, useState, type ReactNode } from "react";
 import { Checkbox, Icon, Switch, type SeverityShapeIconName } from "../../design-system";
 import { Button } from "../ui/Button";
 import { ColumnHeaderMenu } from "../ui/ColumnHeaderMenu";
@@ -14,6 +14,7 @@ import { SeverityTableIcon } from "../ui/SeverityTableIcon";
 import { Modal } from "../ui/Modal";
 import { SlideOver } from "../ui/SlideOver";
 import { TruncatedText } from "../ui/TruncatedText";
+import { DONUT_CHART_OUTER_PX, DonutChartPanel } from "../ui/DonutChartPanel";
 import { useResizableColumns } from "../ui/useResizableColumns";
 import { DetectionLibraryContent } from "./DetectionLibraryContent";
 import { QueuedForReviewContent } from "./QueuedForReviewContent";
@@ -438,56 +439,11 @@ function SystemHealthCard({
   );
 }
 
-/** Figma `7671:8959` / donut `7671:9014` — 188px ring, 137px hole. */
-const TOP_FINDINGS_DONUT_OUTER_PX = 188;
-const TOP_FINDINGS_DONUT_INNER_PX = 137;
-const TOP_FINDINGS_DONUT_INSET_PX = (TOP_FINDINGS_DONUT_OUTER_PX - TOP_FINDINGS_DONUT_INNER_PX) / 2;
-
-type TopFindingSegment = {
-  label: string;
-  color: string;
-  value: number;
-};
-
-const TOP_FINDINGS_SEGMENTS: TopFindingSegment[] = [
+const TOP_FINDINGS_SEGMENTS = [
   { label: "Suspicious PowerShell Execution", color: "#b4549a", value: 861 },
   { label: "Privilege Escalation Attempts", color: "#817cf6", value: 319 },
   { label: "Credential Dumping Activity", color: "#5fd3f8", value: 209 },
-];
-
-const TOP_FINDINGS_TOTAL = OVERALL_FINDINGS_COUNT;
-
-function polarToCartesian(cx: number, cy: number, radius: number, angleDeg: number) {
-  const rad = ((angleDeg - 90) * Math.PI) / 180;
-  return { x: cx + radius * Math.cos(rad), y: cy + radius * Math.sin(rad) };
-}
-
-function donutSegmentPath(
-  cx: number,
-  cy: number,
-  innerR: number,
-  outerR: number,
-  startAngle: number,
-  endAngle: number,
-) {
-  const largeArc = endAngle - startAngle > 180 ? 1 : 0;
-  const outerStart = polarToCartesian(cx, cy, outerR, startAngle);
-  const outerEnd = polarToCartesian(cx, cy, outerR, endAngle);
-  const innerStart = polarToCartesian(cx, cy, innerR, endAngle);
-  const innerEnd = polarToCartesian(cx, cy, innerR, startAngle);
-
-  return [
-    `M ${outerStart.x} ${outerStart.y}`,
-    `A ${outerR} ${outerR} 0 ${largeArc} 1 ${outerEnd.x} ${outerEnd.y}`,
-    `L ${innerStart.x} ${innerStart.y}`,
-    `A ${innerR} ${innerR} 0 ${largeArc} 0 ${innerEnd.x} ${innerEnd.y}`,
-    "Z",
-  ].join(" ");
-}
-
-function topFindingPercent(value: number) {
-  return Math.round((value / TOP_FINDINGS_TOTAL) * 100);
-}
+] as const;
 
 function TopFindingsCard({
   selectedLabel,
@@ -496,145 +452,16 @@ function TopFindingsCard({
   selectedLabel: string | null;
   onSegmentClick: (label: string) => void;
 }) {
-  const chartRef = useRef<HTMLDivElement>(null);
-  const [hoveredLabel, setHoveredLabel] = useState<string | null>(null);
-  const [tooltipPos, setTooltipPos] = useState<{ x: number; y: number } | null>(null);
-
-  const isChartSegmentDimmed = (label: string) => {
-    if (hoveredLabel != null) return hoveredLabel !== label;
-    if (selectedLabel != null) return selectedLabel !== label;
-    return false;
-  };
-
-  const linkClass = (label: string) =>
-    cx(
-      "flex w-full items-start gap-2.5 rounded-[4px] text-left text-sm font-semibold transition-colors hover:text-interactive-active hover:underline",
-      selectedLabel === label ? "text-interactive-active underline" : "text-text-primary",
-    );
-
-  const updateTooltipPos = (event: React.MouseEvent) => {
-    const rect = chartRef.current?.getBoundingClientRect();
-    if (!rect) return;
-    setTooltipPos({
-      x: event.clientX - rect.left,
-      y: event.clientY - rect.top,
-    });
-  };
-
-  const clearHover = () => {
-    setHoveredLabel(null);
-    setTooltipPos(null);
-  };
-
-  const segments = useMemo(
-    () => [...TOP_FINDINGS_SEGMENTS].sort((a, b) => b.value - a.value),
-    [],
-  );
-
-  const arcs = useMemo(() => {
-    const cx = TOP_FINDINGS_DONUT_OUTER_PX / 2;
-    const cy = TOP_FINDINGS_DONUT_OUTER_PX / 2;
-    const outerR = TOP_FINDINGS_DONUT_OUTER_PX / 2;
-    const innerR = TOP_FINDINGS_DONUT_INNER_PX / 2;
-    let angle = 0;
-
-    return segments.map((segment) => {
-      const sweep = (segment.value / TOP_FINDINGS_TOTAL) * 360;
-      const startAngle = angle;
-      const endAngle = angle + sweep;
-      angle = endAngle;
-
-      return {
-        ...segment,
-        percent: topFindingPercent(segment.value),
-        path: donutSegmentPath(cx, cy, innerR, outerR, startAngle, endAngle),
-      };
-    });
-  }, [segments]);
-
-  const hovered = arcs.find((segment) => segment.label === hoveredLabel);
-
   return (
     <HubCard className="h-full" title="Top Findings Detection">
-      <div className="flex flex-1 flex-col items-center gap-6 sm:flex-row sm:items-start">
-        <div
-          ref={chartRef}
-          className="relative shrink-0"
-          style={{ width: TOP_FINDINGS_DONUT_OUTER_PX, height: TOP_FINDINGS_DONUT_OUTER_PX }}
-        >
-          {hovered && tooltipPos ? (
-            <div
-              className="pointer-events-none absolute z-10 whitespace-nowrap rounded bg-[#424242] px-2 py-1 text-xs font-semibold text-[#f5f5f5] shadow-[0_2px_8px_rgba(0,0,0,0.35)]"
-              style={{
-                left: tooltipPos.x + 12,
-                top: tooltipPos.y,
-                transform: "translateY(calc(-100% - 8px))",
-              }}
-            >
-              {hovered.percent}% {hovered.label}
-            </div>
-          ) : null}
-          <svg
-            width={TOP_FINDINGS_DONUT_OUTER_PX}
-            height={TOP_FINDINGS_DONUT_OUTER_PX}
-            viewBox={`0 0 ${TOP_FINDINGS_DONUT_OUTER_PX} ${TOP_FINDINGS_DONUT_OUTER_PX}`}
-            role="img"
-            aria-label="Top findings by detection"
-            onMouseLeave={clearHover}
-          >
-            {arcs.map((segment) => {
-              const selected = selectedLabel === segment.label;
-
-              return (
-                <path
-                  key={segment.label}
-                  d={segment.path}
-                  fill={segment.color}
-                  className={cx(
-                    "cursor-pointer transition-opacity duration-150",
-                    isChartSegmentDimmed(segment.label) ? "opacity-60" : "opacity-100",
-                  )}
-                  aria-label={`Filter by ${segment.label}`}
-                  aria-pressed={selected}
-                  onMouseEnter={(event) => {
-                    setHoveredLabel(segment.label);
-                    updateTooltipPos(event);
-                  }}
-                  onMouseMove={updateTooltipPos}
-                  onClick={() => onSegmentClick(segment.label)}
-                />
-              );
-            })}
-          </svg>
-          <div
-            className="pointer-events-none absolute flex flex-col items-center justify-center rounded-full bg-datavis-card-bg text-center text-text-primary"
-            style={{ inset: TOP_FINDINGS_DONUT_INSET_PX }}
-          >
-            {/* Figma `7671:9022` — markdown-h1: Lato 24 / 32, tracking 0.7px, regular. */}
-            <span className="text-2xl font-normal leading-8 tracking-[0.7px] tabular-nums">{TOP_FINDINGS_TOTAL}</span>
-            <span className="text-2xl font-normal leading-8 tracking-[0.7px]">Findings</span>
-          </div>
-        </div>
-        <ul className="min-w-0 flex-1 space-y-3">
-          {arcs.map((segment) => (
-            <li key={segment.label}>
-              <button
-                type="button"
-                className={linkClass(segment.label)}
-                aria-pressed={selectedLabel === segment.label}
-                onClick={() => onSegmentClick(segment.label)}
-              >
-                <span
-                  className="mt-1 size-3.5 shrink-0 rounded-sm"
-                  style={{ backgroundColor: segment.color }}
-                  aria-hidden
-                />
-                <span>{segment.label}</span>
-              </button>
-            </li>
-          ))}
-        </ul>
-      </div>
+      <DonutChartPanel
+        segments={TOP_FINDINGS_SEGMENTS}
+        total={OVERALL_FINDINGS_COUNT}
+        centerLabel="Findings"
+        selectedLabel={selectedLabel}
+        onSegmentClick={onSegmentClick}
+        ariaLabel="Top findings by detection"
+      />
     </HubCard>
   );
 }
@@ -664,7 +491,7 @@ function SeverityBreakdownCard({
     <HubCard className="h-full" title={`Severity Breakdown (Overall ${OVERALL_FINDINGS_COUNT.toLocaleString()} Findings)`}>
       <div
         className="flex flex-1 flex-col justify-between"
-        style={{ minHeight: TOP_FINDINGS_DONUT_OUTER_PX - 24 }}
+        style={{ minHeight: DONUT_CHART_OUTER_PX - 24 }}
       >
         {rows.map((row) => {
           const selected = selectedSeverity === row.label;
@@ -1041,7 +868,7 @@ function DetectionsTable({
             {searchQuery.trim() ? ` · “${searchQuery.trim()}”` : ""}
             {severityFilter ? ` · ${severityFilter}` : ""}
             {systemHealthFilter ? ` · ${SYSTEM_HEALTH_FILTER_LABELS[systemHealthFilter]}` : ""}
-            {showOnlyActive ? " · Active only" : ""}
+            {showOnlyActive ? " · Enabled only" : ""}
           </p>
           <div className="flex shrink-0 flex-wrap items-center gap-3">
             <div className="w-[300px] shrink-0">
@@ -1057,7 +884,7 @@ function DetectionsTable({
             <Checkbox
               checked={showOnlyActive}
               onCheckedChange={onShowOnlyActiveChange}
-              label="Show only Active Detections"
+              label="Show only enabled detections"
               className="shrink-0"
             />
           </div>
@@ -1069,7 +896,7 @@ function DetectionsTable({
               onClick={onClearFilters}
             >
               <Icon name="action-filter-list" size={12} aria-hidden />
-              Clear All Filters
+              Clear all filters
             </Button>
           ) : null}
         </div>

@@ -1,9 +1,19 @@
 import { useEffect, useId, useRef, useState } from "react";
 import { Icon } from "../design-system";
+import {
+  DEFAULT_TIMEFRAME_FROM,
+  DEFAULT_TIMEFRAME_TO,
+  formatTimeframeLabel,
+  normalizeTimeframeRange,
+  useTimeframe,
+} from "../context/TimeframeContext";
 import { Button } from "./ui/Button";
 import { Input } from "./ui/Input";
 
 const cx = (...c: (string | false | undefined)[]) => c.filter(Boolean).join(" ");
+
+const HEADER_FILTER_INTERACTIVE =
+  "text-interactive-active transition-colors group-hover:text-[var(--color-primary-hover)] group-active:text-[var(--color-primary-pressed)]";
 
 function pad2(value: number): string {
   return String(value).padStart(2, "0");
@@ -19,41 +29,14 @@ function fromDatetimeLocalValue(value: string): Date | null {
   return Number.isNaN(parsed.getTime()) ? null : parsed;
 }
 
-function formatTimeframeLabel(from: Date, to: Date): string {
-  const formatter = new Intl.DateTimeFormat("en-US", {
-    month: "short",
-    day: "numeric",
-    year: "numeric",
-    hour: "numeric",
-    minute: "2-digit",
-    hour12: true,
-  });
-  return `${formatter.format(from)} to ${formatter.format(to)}`;
-}
-
-const DEFAULT_FROM = new Date(2025, 9, 27, 15, 29);
-const DEFAULT_TO = new Date(2025, 9, 28, 15, 29);
-
-type TimeframeRange = {
-  from: Date;
-  to: Date;
-};
-
-function normalizeRange(from: Date, to: Date): TimeframeRange {
-  if (from.getTime() <= to.getTime()) return { from, to };
-  return { from: to, to: from };
-}
-
 /** Federated Search header control — choose a from/to datetime range. */
 export function TimeframeFilterDropdown() {
+  const { range, setRange } = useTimeframe();
   const panelId = useId();
   const containerRef = useRef<HTMLDivElement>(null);
   const [open, setOpen] = useState(false);
-  const [committed, setCommitted] = useState<TimeframeRange>(() =>
-    normalizeRange(DEFAULT_FROM, DEFAULT_TO),
-  );
-  const [draftFrom, setDraftFrom] = useState(() => toDatetimeLocalValue(DEFAULT_FROM));
-  const [draftTo, setDraftTo] = useState(() => toDatetimeLocalValue(DEFAULT_TO));
+  const [draftFrom, setDraftFrom] = useState(() => toDatetimeLocalValue(DEFAULT_TIMEFRAME_FROM));
+  const [draftTo, setDraftTo] = useState(() => toDatetimeLocalValue(DEFAULT_TIMEFRAME_TO));
 
   useEffect(() => {
     function onPointerDown(event: PointerEvent) {
@@ -73,8 +56,8 @@ export function TimeframeFilterDropdown() {
   }, [open]);
 
   const openPanel = () => {
-    setDraftFrom(toDatetimeLocalValue(committed.from));
-    setDraftTo(toDatetimeLocalValue(committed.to));
+    setDraftFrom(toDatetimeLocalValue(range.from));
+    setDraftTo(toDatetimeLocalValue(range.to));
     setOpen(true);
   };
 
@@ -82,7 +65,7 @@ export function TimeframeFilterDropdown() {
     const from = fromDatetimeLocalValue(draftFrom);
     const to = fromDatetimeLocalValue(draftTo);
     if (!from || !to) return;
-    setCommitted(normalizeRange(from, to));
+    setRange(normalizeTimeframeRange(from, to));
     setOpen(false);
   };
 
@@ -98,21 +81,21 @@ export function TimeframeFilterDropdown() {
         aria-expanded={open}
         aria-controls={panelId}
         aria-label="Timeframe filter"
-        className="inline-flex max-w-full items-center gap-1.5 rounded py-0.5 text-left transition-colors hover:opacity-90 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-interactive-active focus-visible:ring-offset-2 focus-visible:ring-offset-surface-container"
+        className="group inline-flex max-w-full items-center gap-1.5 rounded py-0.5 text-left transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-interactive-active focus-visible:ring-offset-2 focus-visible:ring-offset-surface-container"
         onClick={() => (open ? setOpen(false) : openPanel())}
       >
-        <Icon name="action-time" size={16} className="shrink-0 text-interactive-active" aria-hidden />
-        <span className="inline-flex shrink-0 items-center gap-1 text-sm font-semibold text-interactive-active">
+        <Icon name="action-time" size={16} className={cx("shrink-0", HEADER_FILTER_INTERACTIVE)} aria-hidden />
+        <span className={cx("inline-flex shrink-0 items-center gap-1 text-sm font-semibold", HEADER_FILTER_INTERACTIVE)}>
           Timeframe
           <Icon
             name="chevron-down"
             size={16}
-            className={cx("shrink-0 text-interactive-active transition-transform duration-150", open && "rotate-180")}
+            className={cx("shrink-0 transition-transform duration-150", HEADER_FILTER_INTERACTIVE, open && "rotate-180")}
             aria-hidden
           />
         </span>
         <span className="ml-0.5 shrink-0 rounded bg-surface-container px-2 py-1 text-sm font-normal text-text-primary">
-          {formatTimeframeLabel(committed.from, committed.to)}
+          {formatTimeframeLabel(range.from, range.to)}
         </span>
       </button>
 
