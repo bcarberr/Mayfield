@@ -4,6 +4,9 @@ import { TimeframeFilterDropdown } from "./TimeframeFilterDropdown";
 
 const cx = (...c: (string | false | undefined)[]) => c.filter(Boolean).join(" ");
 
+const HEADER_FILTER_INTERACTIVE =
+  "text-interactive-active transition-colors group-hover:text-[var(--color-primary-hover)] group-active:text-[var(--color-primary-pressed)]";
+
 type SearchHeaderFilterDropdownProps = {
   icon: IconName;
   label: string;
@@ -28,17 +31,17 @@ function SearchHeaderFilterDropdown({
       aria-haspopup="menu"
       aria-expanded={open}
       aria-label={`${menuLabel} filter`}
-      className="inline-flex max-w-full items-center gap-1.5 rounded py-0.5 text-left transition-colors hover:opacity-90 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-interactive-active focus-visible:ring-offset-2 focus-visible:ring-offset-surface-container"
+      className="group inline-flex max-w-full items-center gap-1.5 rounded py-0.5 text-left transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-interactive-active focus-visible:ring-offset-2 focus-visible:ring-offset-surface-container"
       onClick={() => setOpen((current) => !current)}
     >
-      <Icon name={icon} size={16} className="shrink-0 text-interactive-active" aria-hidden />
-      <span className="inline-flex shrink-0 items-center gap-1 text-sm font-semibold text-interactive-active">
+      <Icon name={icon} size={16} className={cx("shrink-0", HEADER_FILTER_INTERACTIVE)} aria-hidden />
+      <span className={cx("inline-flex shrink-0 items-center gap-1 text-sm font-semibold", HEADER_FILTER_INTERACTIVE)}>
         {label}
         {showChevron ? (
           <Icon
             name="chevron-down"
             size={16}
-            className={cx("shrink-0 text-interactive-active transition-transform duration-150", open && "rotate-180")}
+            className={cx("shrink-0 transition-transform duration-150", HEADER_FILTER_INTERACTIVE, open && "rotate-180")}
             aria-hidden
           />
         ) : null}
