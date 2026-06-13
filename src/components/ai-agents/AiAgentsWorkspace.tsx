@@ -66,7 +66,7 @@ function AgentIntroPanel({
   return (
     <div className="mx-auto flex w-full max-w-3xl flex-col gap-5">
       <div className="flex items-center gap-2">
-        <AgentAvatar agentId={agent.id} color={agent.accent} size={24} />
+        <AgentAvatar agentId={agent.id} size={24} />
         <h2 className="text-page-title text-text-primary">{agent.name}</h2>
       </div>
 
@@ -137,7 +137,7 @@ function AgentsSidebar({
               title={agent.name}
               onClick={() => onSwitchAgent(agent.id)}
             >
-              <AgentAvatar agentId={agent.id} color={agent.accent} size={20} />
+              <AgentAvatar agentId={agent.id} size={20} />
             </button>
           ))}
         </div>
@@ -182,7 +182,7 @@ function AgentsSidebar({
             >
               <div className="mb-2 flex items-start justify-between gap-2">
                 <div className="flex min-w-0 items-center gap-2">
-                  <AgentAvatar agentId={agent.id} color={agent.accent} size={20} />
+                  <AgentAvatar agentId={agent.id} size={20} />
                   <p className="truncate text-sm font-semibold text-text-primary">{agent.name}</p>
                 </div>
                 {isActive ? (
@@ -223,7 +223,7 @@ function ChatMessageBubble({ message }: { message: ChatMessage }) {
       >
         {!isUser ? (
           <div className="mb-2 flex items-center gap-2">
-            <AgentAvatar agentId={agent.id} color={agent.accent} size={18} />
+            <AgentAvatar agentId={agent.id} size={18} />
             <span className="text-xs font-semibold uppercase tracking-[0.4px] text-text-tertiary">
               {agent.name}
             </span>
@@ -307,7 +307,7 @@ export function AiAgentsWorkspace() {
       <section className="relative flex min-h-0 min-w-0 flex-1 flex-col overflow-hidden bg-surface-page">
         {hasMessages ? (
           <div className="flex shrink-0 items-center gap-2 border-b border-border-rule px-6 py-3">
-            <AgentAvatar agentId={activeAgent.id} color={activeAgent.accent} size={22} />
+            <AgentAvatar agentId={activeAgent.id} size={22} />
             <span className="text-base-semibold text-text-primary">{activeAgent.name}</span>
           </div>
         ) : null}

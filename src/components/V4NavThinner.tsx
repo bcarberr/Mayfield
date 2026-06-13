@@ -1,5 +1,6 @@
 import type { ImgHTMLAttributes, ReactNode } from "react";
 import { Link } from "react-router-dom";
+import { SHOW_ADDONS_NAV } from "../app/navRailConfig";
 
 import logomarkA from "../assets/nav-v4/logomark-a.svg?url";
 import logomarkB from "../assets/nav-v4/logomark-b.svg?url";
@@ -182,9 +183,11 @@ export function V4NavThinner({
         <NavSvgInline svg={aiAgentsSvg} className="h-6 w-[18px]" />
       </NavSlot>
 
-      <NavSlot title="Addons" active={resolvedActive === "addons"} to={navTargets?.addons}>
-        <NavSvgInline svg={addonsSvg} className="h-[23px] w-[25px]" />
-      </NavSlot>
+      {SHOW_ADDONS_NAV ? (
+        <NavSlot title="Addons" active={resolvedActive === "addons"} to={navTargets?.addons}>
+          <NavSvgInline svg={addonsSvg} className="h-[23px] w-[25px]" />
+        </NavSlot>
+      ) : null}
 
       <NavSlot title="Admin Settings" active={resolvedActive === "adminSettings"} to={navTargets?.adminSettings}>
         <NavSvgInline svg={adminSettingsSvg} className="size-[25px]" />

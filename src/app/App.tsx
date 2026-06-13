@@ -31,25 +31,26 @@ function RouteFallback() {
 export function App() {
   return (
     <TimeframeProvider>
-    <div className="h-full min-h-screen min-h-0">
-      <Suspense fallback={<RouteFallback />}>
-        <Routes>
-          <Route path="/" element={<SummaryInsightsPage />} />
-          <Route path={ROUTES.connectors} element={<ConnectorsPage />} />
-          <Route path={ROUTES.addons} element={<WorkspacePlaceholderPage activeSection="addons" title="Addons" />} />
-          <Route path={ROUTES.search} element={<SearchLandingPage />} />
-          <Route path={ROUTES.federatedDetectionHub} element={<FederatedDetectionHubPage />} />
-          <Route path={ROUTES.summaryInsights} element={<SummaryInsightsPage />} />
-          <Route path={ROUTES.dataPipelines} element={<DataPipelinesPage />} />
-          <Route path={ROUTES.aiAgents} element={<AiAgentsPage />} />
-          <Route path={ROUTES.settings} element={<SettingsPage />} />
-          <Route
-            path={ROUTES.adminSettings}
-            element={<WorkspacePlaceholderPage activeSection="adminSettings" title="Admin Settings" />}
-          />
-        </Routes>
-      </Suspense>
-    </div>
+      <div className="h-full min-h-screen min-h-0">
+        <Suspense fallback={<RouteFallback />}>
+          <Routes>
+            <Route path="/" element={<SummaryInsightsPage />} />
+            <Route path={ROUTES.connectors} element={<ConnectorsPage />} />
+            {/* Hidden from nav when SHOW_ADDONS_NAV is false — see navRailConfig.ts */}
+            <Route path={ROUTES.addons} element={<WorkspacePlaceholderPage activeSection="addons" title="Addons" />} />
+            <Route path={ROUTES.search} element={<SearchLandingPage />} />
+            <Route path={ROUTES.federatedDetectionHub} element={<FederatedDetectionHubPage />} />
+            <Route path={ROUTES.summaryInsights} element={<SummaryInsightsPage />} />
+            <Route path={ROUTES.dataPipelines} element={<DataPipelinesPage />} />
+            <Route path={ROUTES.aiAgents} element={<AiAgentsPage />} />
+            <Route path={ROUTES.settings} element={<SettingsPage />} />
+            <Route
+              path={ROUTES.adminSettings}
+              element={<WorkspacePlaceholderPage activeSection="adminSettings" title="Admin Settings" />}
+            />
+          </Routes>
+        </Suspense>
+      </div>
     </TimeframeProvider>
   );
 }
