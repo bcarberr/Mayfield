@@ -2,6 +2,7 @@ import { useEffect, useId, useRef, useState } from "react";
 import { createPortal } from "react-dom";
 import { Icon } from "../design-system";
 import { FsqlSearchTextarea } from "../components/FsqlSearchTextarea";
+import { FsqlSearchResultsView } from "../components/search/FsqlSearchResultsView";
 import { SearchQueryBuilder } from "../components/SearchQueryBuilder";
 import { type CopilotSubmitRequest, SearchCopilotAside } from "../components/SearchCopilotPanel";
 import { SearchHeaderFilters } from "../components/SearchHeaderFilters";
@@ -9,9 +10,12 @@ import { SearchTopHeader } from "../components/SearchTopHeader";
 import { V4NavThinner } from "../components/V4NavThinner";
 import { Button } from "../components/ui/Button";
 import connectionAbstractUrl from "../assets/connection-abstract.svg";
+import { useTimeframe } from "../context/TimeframeContext";
+import { parseFsqlTimeframe } from "../lib/fsqlTimeframeParser";
 import { NAV_RAIL_TARGETS } from "./navRailTargets";
 
 const toolbarBtnRing = "ring-offset-surface-container";
+const cx = (...c: (string | false | undefined)[]) => c.filter(Boolean).join(" ");
 
 export type SearchCriteriaMode = "query-builder" | "fsql";
 
@@ -138,7 +142,7 @@ function SearchToolbarActions({
   queryBuilderValid,
   onQueryBuilderValidChange,
   onClearSearch,
-  onFsqlActivateCopilot,
+  onFsqlSearch,
   onConvertToFsql,
 }: {
   criteriaMode: SearchCriteriaMode;
@@ -151,7 +155,7 @@ function SearchToolbarActions({
   queryBuilderValid: boolean;
   onQueryBuilderValidChange: (valid: boolean) => void;
   onClearSearch: () => void;
-  onFsqlActivateCopilot: () => void;
+  onFsqlSearch: () => void;
   onConvertToFsql: (query: string) => void;
 }) {
   const isFsql = criteriaMode === "fsql";
@@ -173,6 +177,12 @@ function SearchToolbarActions({
             className="flex items-center gap-2 rounded py-1 pr-1 text-left text-sm font-semibold leading-5 tracking-[0.4px] text-text-primary transition-colors hover:bg-overlay-subtle focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-interactive-active focus-visible:ring-offset-2 focus-visible:ring-offset-surface-container"
             onClick={() => onCriteriaOpenChange(!criteriaOpen)}
           >
+            <Icon
+              name="chevron-down"
+              size={18}
+              className={cx("shrink-0 transition-transform duration-200", criteriaOpen ? "rotate-0" : "-rotate-90")}
+              aria-hidden
+            />
             Search Criteria
           </button>
           <SearchCriteriaModeRadios value={criteriaMode} onChange={onCriteriaModeChange} />
@@ -198,7 +208,13 @@ function SearchToolbarActions({
                 <Icon name="action-saved-search" className="shrink-0 text-current" aria-hidden />
                 Save Search
               </Button>
-              <Button type="button" variant="primary" className={toolbarBtnRing} disabled={!hasFsqlQuery}>
+              <Button
+                type="button"
+                variant="primary"
+                className={toolbarBtnRing}
+                disabled={!hasFsqlQuery}
+                onClick={onFsqlSearch}
+              >
                 <Icon name="action-search" className="shrink-0 text-current" aria-hidden />
                 Search
               </Button>
@@ -236,11 +252,7 @@ function SearchToolbarActions({
           className="px-5 py-4"
         >
           {isFsql ? (
-            <FsqlSearchTextarea
-              value={fsqlQuery}
-              onChange={onFsqlQueryChange}
-              onSubmit={onFsqlActivateCopilot}
-            />
+            <FsqlSearchTextarea value={fsqlQuery} onChange={onFsqlQueryChange} onSearch={onFsqlSearch} />
           ) : (
             <SearchQueryBuilder
               key={queryBuilderKey}
@@ -259,40 +271,70 @@ function SearchToolbarActions({
  * Federated search entry screen — query builder, FSQL, and Copilot assistant.
  */
 export function SearchLandingPage() {
+  const { setRange: setTimeframeRange } = useTimeframe();
   const [criteriaMode, setCriteriaMode] = useState<SearchCriteriaMode>("query-builder");
   const [criteriaOpen, setCriteriaOpen] = useState(true);
   const [fsqlQuery, setFsqlQuery] = useState("");
   const [queryBuilderKey, setQueryBuilderKey] = useState(0);
   const [queryBuilderValid, setQueryBuilderValid] = useState(false);
   const [copilotOpen, setCopilotOpen] = useState(false);
-  const [copilotSubmitRequest, setCopilotSubmitRequest] = useState<CopilotSubmitRequest | null>(null);
+  const [copilotSubmitRequest] = useState<CopilotSubmitRequest | null>(null);
+  const [fsqlSearchExecuted, setFsqlSearchExecuted] = useState(false);
+  const [fsqlSearching, setFsqlSearching] = useState(false);
+  const searchTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
-  const activateCopilotFromFsql = () => {
+  useEffect(() => {
+    return () => {
+      if (searchTimerRef.current) clearTimeout(searchTimerRef.current);
+    };
+  }, []);
+
+  const executeFsqlSearch = () => {
     if (!fsqlQuery.trim()) return;
-    setCopilotOpen(true);
-    setCopilotSubmitRequest({
-      id: Date.now(),
-      prompt: "Explain my current FSQL query",
-    });
+    const parsedTimeframe = parseFsqlTimeframe(fsqlQuery);
+    if (parsedTimeframe) setTimeframeRange(parsedTimeframe);
+    if (searchTimerRef.current) clearTimeout(searchTimerRef.current);
+    setFsqlSearchExecuted(true);
+    setFsqlSearching(true);
+    searchTimerRef.current = setTimeout(() => {
+      setFsqlSearching(false);
+      setCopilotOpen(false);
+      setCriteriaOpen(false);
+      searchTimerRef.current = null;
+    }, 450);
+  };
+
+  const handleFsqlQueryChange = (query: string) => {
+    setFsqlQuery(query);
+    const parsedTimeframe = parseFsqlTimeframe(query);
+    if (parsedTimeframe) setTimeframeRange(parsedTimeframe);
   };
 
   const handleSendToFsqlSearch = (query: string) => {
     setFsqlQuery(query);
+    const parsedTimeframe = parseFsqlTimeframe(query);
+    if (parsedTimeframe) setTimeframeRange(parsedTimeframe);
     setCriteriaMode("fsql");
-    setCriteriaOpen(true);
     setCopilotOpen(true);
   };
 
   const handleConvertToFsql = (query: string) => {
     setFsqlQuery(query);
+    const parsedTimeframe = parseFsqlTimeframe(query);
+    if (parsedTimeframe) setTimeframeRange(parsedTimeframe);
     setCriteriaMode("fsql");
-    setCriteriaOpen(true);
     setCopilotOpen(true);
   };
 
   const handleClearSearch = () => {
     if (criteriaMode === "fsql") {
       setFsqlQuery("");
+      setFsqlSearchExecuted(false);
+      setFsqlSearching(false);
+      if (searchTimerRef.current) {
+        clearTimeout(searchTimerRef.current);
+        searchTimerRef.current = null;
+      }
       return;
     }
     setQueryBuilderKey((key) => key + 1);
@@ -301,7 +343,6 @@ export function SearchLandingPage() {
 
   const handleCriteriaModeChange = (mode: SearchCriteriaMode) => {
     setCriteriaMode(mode);
-    setCriteriaOpen(true);
     setCopilotOpen(mode === "fsql");
   };
 
@@ -317,18 +358,22 @@ export function SearchLandingPage() {
           criteriaOpen={criteriaOpen}
           onCriteriaOpenChange={setCriteriaOpen}
           fsqlQuery={fsqlQuery}
-          onFsqlQueryChange={setFsqlQuery}
+          onFsqlQueryChange={handleFsqlQueryChange}
           queryBuilderKey={queryBuilderKey}
           queryBuilderValid={queryBuilderValid}
           onQueryBuilderValidChange={setQueryBuilderValid}
           onClearSearch={handleClearSearch}
-          onFsqlActivateCopilot={activateCopilotFromFsql}
+          onFsqlSearch={executeFsqlSearch}
           onConvertToFsql={handleConvertToFsql}
         />
 
         <div className="relative flex min-h-0 flex-1 overflow-hidden">
           {criteriaMode === "fsql" ? (
-            <div className="min-h-0 min-w-0 flex-1 bg-surface-container" aria-label="FSQL search workspace" />
+            fsqlSearchExecuted ? (
+              <FsqlSearchResultsView isSearching={fsqlSearching} />
+            ) : (
+              <div className="min-h-0 min-w-0 flex-1 bg-surface-container" aria-label="FSQL search workspace" />
+            )
           ) : (
             <div className="relative min-h-0 min-w-0 flex-1 overflow-hidden">
               <div

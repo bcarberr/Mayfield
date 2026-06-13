@@ -10,6 +10,7 @@ import {
 } from "../ui/useColumnSort";
 import { FilterColumnPanel, type FilterColumnPanelTool } from "../ui/FilterColumnPanel";
 import { Input } from "../ui/Input";
+import { DataGridExportButton } from "../ui/DataGridExportButton";
 import { SeverityTableIcon } from "../ui/SeverityTableIcon";
 import { Modal } from "../ui/Modal";
 import { type ContentAreaSlideOverState } from "../ui/SlideOver";
@@ -834,6 +835,7 @@ function DetectionsTable({
               Clear all filters
             </Button>
           ) : null}
+          <DataGridExportButton />
         </div>
       </div>
       <DatavisGridlineRule inset={false} />

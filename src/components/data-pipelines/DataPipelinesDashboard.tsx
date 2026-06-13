@@ -4,6 +4,7 @@ import { Button } from "../ui/Button";
 import { ColumnHeaderMenu } from "../ui/ColumnHeaderMenu";
 import { compareNumbers, compareStrings, useColumnSort } from "../ui/useColumnSort";
 import { FilterColumnPanel, type FilterColumnPanelTool } from "../ui/FilterColumnPanel";
+import { DataGridExportButton } from "../ui/DataGridExportButton";
 import { TruncatedText } from "../ui/TruncatedText";
 import { useResizableColumns } from "../ui/useResizableColumns";
 import { DatavisGridlineRule } from "../summary-insights/datavisCard";
@@ -242,6 +243,7 @@ function PipelinesTable({
               Clear All Filters
             </Button>
           ) : null}
+          <DataGridExportButton />
         </div>
       </div>
       <DatavisGridlineRule inset={false} />

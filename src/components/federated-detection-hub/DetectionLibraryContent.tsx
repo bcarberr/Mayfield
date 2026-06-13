@@ -11,6 +11,7 @@ import {
 } from "../ui/useColumnSort";
 import { FilterColumnPanel, type FilterColumnPanelTool } from "../ui/FilterColumnPanel";
 import { Input } from "../ui/Input";
+import { DataGridExportButton } from "../ui/DataGridExportButton";
 import { SeverityTableIcon } from "../ui/SeverityTableIcon";
 import { type ContentAreaSlideOverState } from "../ui/SlideOver";
 import { TruncatedText } from "../ui/TruncatedText";
@@ -617,6 +618,7 @@ function LibraryDetectionsTable({
               Clear all filters
             </Button>
           ) : null}
+          <DataGridExportButton />
         </div>
       </div>
       <DatavisGridlineRule inset={false} />

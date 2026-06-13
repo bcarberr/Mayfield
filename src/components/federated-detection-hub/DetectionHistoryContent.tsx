@@ -5,6 +5,7 @@ import { ColumnHeaderMenu } from "../ui/ColumnHeaderMenu";
 import { compareStrings, useColumnSort } from "../ui/useColumnSort";
 import { FilterColumnPanel, type FilterColumnPanelTool } from "../ui/FilterColumnPanel";
 import { Input } from "../ui/Input";
+import { DataGridExportButton } from "../ui/DataGridExportButton";
 import { DonutChartPanel } from "../ui/DonutChartPanel";
 import { SeverityTableIcon } from "../ui/SeverityTableIcon";
 import { TruncatedText } from "../ui/TruncatedText";
@@ -839,6 +840,7 @@ export function DetectionHistoryContent() {
                 Clear all filters
               </Button>
             ) : null}
+            <DataGridExportButton />
           </div>
         </div>
         <DatavisGridlineRule inset={false} />

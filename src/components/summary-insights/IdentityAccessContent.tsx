@@ -5,6 +5,7 @@ import { Button } from "../ui/Button";
 import { ColumnHeaderMenu } from "../ui/ColumnHeaderMenu";
 import { FilterColumnPanel, type FilterColumnPanelTool } from "../ui/FilterColumnPanel";
 import { Input } from "../ui/Input";
+import { DataGridExportButton } from "../ui/DataGridExportButton";
 import { SeverityTableIcon } from "../ui/SeverityTableIcon";
 import { compareStrings, useColumnSort } from "../ui/useColumnSort";
 import { useResizableColumns } from "../ui/useResizableColumns";
@@ -648,10 +649,7 @@ export function IdentityAccessContent() {
                 Clear all filters
               </Button>
             ) : null}
-            <Button type="button" variant="secondary" className="ml-auto shrink-0 gap-1.5 px-3">
-              <Icon name="action-file-download" size={18} aria-hidden />
-              Export All
-            </Button>
+            <DataGridExportButton />
           </div>
         </div>
         <DatavisGridlineRule inset={false} />

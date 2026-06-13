@@ -17,11 +17,11 @@ function syncTextareaHeight(textarea: HTMLTextAreaElement) {
 export function FsqlSearchTextarea({
   value,
   onChange,
-  onSubmit,
+  onSearch,
 }: {
   value: string;
   onChange: (value: string) => void;
-  onSubmit: () => void;
+  onSearch: () => void;
 }) {
   const textareaRef = useRef<HTMLTextAreaElement>(null);
   const hasValue = value.trim().length > 0;
@@ -50,12 +50,12 @@ export function FsqlSearchTextarea({
         onKeyDown={(event: KeyboardEvent<HTMLTextAreaElement>) => {
           if (event.key === "Enter" && !event.shiftKey) {
             event.preventDefault();
-            onSubmit();
+            if (hasValue) onSearch();
           }
         }}
         rows={1}
         placeholder="Search using our FSQL"
-        className="min-h-10 w-full resize-none rounded border border-border-rule bg-surface-modal px-3 py-2.5 pr-12 text-sm leading-relaxed text-text-primary outline-none transition-[box-shadow] placeholder:italic placeholder:text-text-tertiary focus-visible:ring-1 focus-visible:ring-interactive-active"
+        className="min-h-10 w-full resize-none rounded border border-border-rule bg-surface-modal px-3 py-2.5 pr-12 text-sm leading-relaxed text-text-primary outline-none transition-[border-color,box-shadow] placeholder:italic placeholder:text-text-tertiary focus:border-interactive-active focus:ring-1 focus:ring-interactive-active"
       />
       <Button
         type="button"
@@ -66,9 +66,9 @@ export function FsqlSearchTextarea({
             ? "text-interactive-active hover:text-interactive-active"
             : "text-text-tertiary hover:text-text-tertiary",
         )}
-        aria-label="Send FSQL to copilot"
+        aria-label="Run FSQL search"
         disabled={!hasValue}
-        onClick={onSubmit}
+        onClick={onSearch}
       >
         <Icon name="action-prompt-arrow" size={16} />
       </Button>

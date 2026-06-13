@@ -3,6 +3,9 @@ import { cx } from "./datavisCard";
 /** Figma Framework-Keyframes `4524:35393` — horizontal bar fills (dark datavis). */
 export const CHART_CATEGORY_FILL = "#6dc6a1";
 
+/** Alias for vertical `TimeSeriesBarChart` bar fill. */
+export const TIME_SERIES_BAR_FILL = CHART_CATEGORY_FILL;
+
 export type BarRow = { label: string; value: number; color?: string };
 
 const DEFAULT_X_MAX = 500;

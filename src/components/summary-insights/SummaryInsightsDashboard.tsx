@@ -10,6 +10,7 @@ import { Button } from "../ui/Button";
 import { ColumnHeaderMenu } from "../ui/ColumnHeaderMenu";
 import { compareStrings, useColumnSort } from "../ui/useColumnSort";
 import { Input } from "../ui/Input";
+import { DataGridExportButton } from "../ui/DataGridExportButton";
 import { TruncatedText } from "../ui/TruncatedText";
 import { useResizableColumns } from "../ui/useResizableColumns";
 import { Checkbox } from "../uiCheckbox";
@@ -1013,6 +1014,7 @@ export function SummaryInsightsDashboard() {
                 Clear all filters
               </Button>
             ) : null}
+            <DataGridExportButton />
           </div>
         </div>
         <DatavisGridlineRule inset={false} />
