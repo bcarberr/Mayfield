@@ -40,13 +40,17 @@ export function buildHourlyBuckets({ from, to }: TimeframeRange): HourBucket[] {
   return buckets;
 }
 
-export function findSpikeBucketIndex(buckets: readonly HourBucket[], to: Date): number | null {
+export function findSpikeBucketIndex(
+  buckets: readonly HourBucket[],
+  to: Date,
+  spikeClockHour: number = SPIKE_CLOCK_HOUR,
+): number | null {
   const idx = buckets.findIndex(
     (bucket) =>
       bucket.start.getFullYear() === to.getFullYear() &&
       bucket.start.getMonth() === to.getMonth() &&
       bucket.start.getDate() === to.getDate() &&
-      bucket.start.getHours() === SPIKE_CLOCK_HOUR,
+      bucket.start.getHours() === spikeClockHour,
   );
   return idx >= 0 ? idx : null;
 }

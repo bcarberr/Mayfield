@@ -11,7 +11,7 @@ import { useResizableColumns } from "../ui/useResizableColumns";
 import { TruncatedText } from "../ui/TruncatedText";
 import { Checkbox } from "../uiCheckbox";
 import { cx, DatavisGridlineRule, InsightCard } from "./datavisCard";
-import { HorizontalBarPanel } from "./horizontalBarPanel";
+import { CHART_CATEGORY_FILL, HorizontalBarPanel } from "./horizontalBarPanel";
 import { TimeSeriesAreaChart } from "./timeSeriesAreaChart";
 import {
   buildHourlyAxisTicks,
@@ -19,12 +19,13 @@ import {
   findSpikeBucketIndex,
   formatBucketTimeLabel,
   hourlySeverityValues,
-  SPIKE_CLOCK_HOUR,
 } from "./timeframeChartUtils";
 
-type IdentitySeverity = "Critical" | "High" | "Medium" | "Low" | "Informational";
+const APPLICATION_SPIKE_HOUR = 10;
 
-const SEV_BAR: Record<IdentitySeverity, string> = {
+type ApplicationSeverity = "Critical" | "High" | "Medium" | "Low" | "Informational";
+
+const SEV_BAR: Record<ApplicationSeverity, string> = {
   Critical: "#ff604a",
   High: "#f28830",
   Medium: "#fac354",
@@ -32,7 +33,7 @@ const SEV_BAR: Record<IdentitySeverity, string> = {
   Informational: "#9b6bac",
 };
 
-const SEV_ICONS: Record<IdentitySeverity, SeverityShapeIconName> = {
+const SEV_ICONS: Record<ApplicationSeverity, SeverityShapeIconName> = {
   Critical: "severity-critical",
   High: "severity-high",
   Medium: "severity-medium",
@@ -40,7 +41,7 @@ const SEV_ICONS: Record<IdentitySeverity, SeverityShapeIconName> = {
   Informational: "severity-info",
 };
 
-const SEVERITY_ORDER: Record<IdentitySeverity, number> = {
+const SEVERITY_ORDER: Record<ApplicationSeverity, number> = {
   Critical: 0,
   High: 1,
   Medium: 2,
@@ -48,30 +49,35 @@ const SEVERITY_ORDER: Record<IdentitySeverity, number> = {
   Informational: 4,
 };
 
-type AuthOutcome = "Success" | "Failure" | "Unknown";
+const APP_BAR_FILL = "#4a9eff";
 
-type AccountChangeActivity = "Password reset" | "Enable" | "Disable" | "Lock" | "Delete";
+type ActivityClass =
+  | "API Activity"
+  | "Web Resource Access"
+  | "Datastore Activity"
+  | "File Hosting"
+  | "App Lifecycle"
+  | "App Error";
 
-type IdentityEventClass =
-  | "Authentication"
-  | "Account Change"
-  | "Authorize Session"
-  | "Group Management"
-  | "Entity Management"
-  | "User Access Management";
+type ApplicationEventClass =
+  | "API Activity"
+  | "Web Resource Access Activity"
+  | "Datastore Activity"
+  | "File Hosting Activity"
+  | "Application Lifecycle"
+  | "Application Error";
 
-type IdentityAccessRow = {
+type ApplicationActivityRow = {
   id: string;
-  severity: IdentitySeverity;
+  severity: ApplicationSeverity;
   title: string;
   time: string;
   activity: string;
-  eventClass: IdentityEventClass;
-  authOutcome: AuthOutcome;
-  accountChangeActivity?: AccountChangeActivity;
-  connector: string;
+  eventClass: ApplicationEventClass;
+  activityClass: ActivityClass;
+  app: string;
   user: string;
-  sourceIp: string;
+  connector: string;
 };
 
 function connectorSwatch(connector: string) {
@@ -80,190 +86,203 @@ function connectorSwatch(connector: string) {
   return "bg-feedback-negative";
 }
 
-function isIdentityEventClass(label: string): label is IdentityEventClass {
-  return (
-    label === "Account Change" ||
-    label === "Authentication" ||
-    label === "Authorize Session" ||
-    label === "Entity Management" ||
-    label === "User Access Management" ||
-    label === "Group Management"
-  );
-}
-
-function isIdentitySeverity(label: string): label is IdentitySeverity {
-  return label in SEV_BAR;
-}
-
-/** OCSF Identity & Access Management classes — https://schema.ocsf.io/ category [3]. */
-const IAM_MANAGEMENT_CLASS_ROWS = [
-  { label: "Account Change", value: 756 },
-  { label: "Authentication", value: 1842 },
-  { label: "Authorize Session", value: 245 },
-  { label: "Entity Management", value: 178 },
-  { label: "User Access Management", value: 512 },
-  { label: "Group Management", value: 389 },
+const ACTIVITY_CLASS_ROWS = [
+  { label: "API Activity", value: 4180, color: CHART_CATEGORY_FILL },
+  { label: "Web Resource Access", value: 3210, color: CHART_CATEGORY_FILL },
+  { label: "Datastore Activity", value: 1840, color: CHART_CATEGORY_FILL },
+  { label: "File Hosting", value: 1260, color: CHART_CATEGORY_FILL },
+  { label: "App Lifecycle", value: 890, color: CHART_CATEGORY_FILL },
+  { label: "App Error", value: 620, color: CHART_CATEGORY_FILL },
 ] as const;
 
 const SEVERITY_ROWS = [
-  { label: "Critical", value: 38, color: SEV_BAR.Critical },
-  { label: "High", value: 196, color: SEV_BAR.High },
-  { label: "Medium", value: 512, color: SEV_BAR.Medium },
-  { label: "Low", value: 401, color: SEV_BAR.Low },
-  { label: "Informational", value: 623, color: SEV_BAR.Informational },
+  { label: "Critical", value: 24, color: SEV_BAR.Critical },
+  { label: "High", value: 156, color: SEV_BAR.High },
+  { label: "Medium", value: 340, color: SEV_BAR.Medium },
+  { label: "Low", value: 462, color: SEV_BAR.Low },
+  { label: "Info", value: 7215, color: SEV_BAR.Informational },
 ] as const;
 
-const TOP_USERS_BAR = "#4a9eff";
-
-const TOP_USERS_ROWS = [
-  { label: "svc-backup", value: 214, color: TOP_USERS_BAR },
-  { label: "j.alvarez", value: 112, color: TOP_USERS_BAR },
-  { label: "admin", value: 81, color: TOP_USERS_BAR },
-  { label: "t.nguyen", value: 42, color: TOP_USERS_BAR },
+const TOP_APP_ROWS = [
+  { label: "Salesforce", value: 2310, color: APP_BAR_FILL },
+  { label: "M365", value: 1740, color: APP_BAR_FILL },
+  { label: "Snowflake", value: 980, color: APP_BAR_FILL },
+  { label: "GitHub", value: 640, color: APP_BAR_FILL },
 ] as const;
 
-const IDENTITY_ACCESS_ROWS: IdentityAccessRow[] = [
+const APPLICATION_ACTIVITY_ROWS: ApplicationActivityRow[] = [
   {
     id: "1",
     severity: "Critical",
-    title: "Impossible travel: login from two countries within 5 min…",
-    time: "14:22:08",
-    activity: "Logon",
-    eventClass: "Authentication",
-    authOutcome: "Failure",
+    title: "Bulk export of customer records via API exceeded baseline volume…",
+    time: "10:22:08",
+    activity: "Query",
+    eventClass: "Datastore Activity",
+    activityClass: "Datastore Activity",
+    app: "Snowflake",
+    user: "svc-etl",
     connector: "BCs1",
-    user: "j.alvarez",
-    sourceIp: "203.0.113.5",
   },
   {
     id: "2",
     severity: "High",
-    title: "Repeated failed logons for privileged service account…",
-    time: "13:05:41",
-    activity: "Logon",
-    eventClass: "Authentication",
-    authOutcome: "Failure",
+    title: "External share link created for restricted document library…",
+    time: "09:58:41",
+    activity: "Share",
+    eventClass: "File Hosting Activity",
+    activityClass: "File Hosting",
+    app: "M365",
+    user: "k.patel",
     connector: "BC-CS-Athena",
-    user: "svc-backup",
-    sourceIp: "198.51.100.22",
   },
   {
     id: "3",
     severity: "High",
-    title: "Admin account password reset outside change window…",
-    time: "11:40:12",
-    activity: "Update",
-    eventClass: "Account Change",
-    authOutcome: "Success",
-    accountChangeActivity: "Password reset",
+    title: "OAuth token refresh storm from unattended integration account…",
+    time: "09:40:12",
+    activity: "Read",
+    eventClass: "API Activity",
+    activityClass: "API Activity",
+    app: "Salesforce",
+    user: "integration-bot",
     connector: "BC-CS",
-    user: "admin",
-    sourceIp: "10.0.2.18",
   },
   {
     id: "4",
     severity: "Medium",
-    title: "New user added to Domain Admins group…",
-    time: "09:12:00",
-    activity: "Add",
-    eventClass: "Group Management",
-    authOutcome: "Success",
+    title: "Repository workflow dispatch from new IP geolocation…",
+    time: "08:12:00",
+    activity: "Update",
+    eventClass: "Web Resource Access Activity",
+    activityClass: "Web Resource Access",
+    app: "GitHub",
+    user: "devops-ci",
     connector: "BCs1",
-    user: "t.nguyen",
-    sourceIp: "10.0.3.55",
   },
   {
     id: "5",
     severity: "Low",
-    title: "Session privilege elevation for standard user context…",
+    title: "Application install event on managed endpoint outside change window…",
     time: "22:18:55",
-    activity: "Assign Privileges",
-    eventClass: "Authorize Session",
-    authOutcome: "Success",
+    activity: "Install",
+    eventClass: "Application Lifecycle",
+    activityClass: "App Lifecycle",
+    app: "M365",
+    user: "a.nguyen",
     connector: "BC-CS-Athena",
-    user: "m.chen",
-    sourceIp: "10.0.1.44",
   },
   {
     id: "6",
     severity: "Informational",
-    title: "MFA enrollment completed for contractor account…",
+    title: "Scheduled API health check completed with elevated latency…",
     time: "18:00:03",
-    activity: "Update",
-    eventClass: "Entity Management",
-    authOutcome: "Success",
-    connector: "BCs1",
-    user: "k.patel",
-    sourceIp: "172.16.4.90",
+    activity: "Read",
+    eventClass: "API Activity",
+    activityClass: "API Activity",
+    app: "Salesforce",
+    user: "monitor-svc",
+    connector: "BC-CS",
   },
   {
     id: "7",
     severity: "Critical",
-    title: "Disabled account re-enabled without approval ticket…",
+    title: "Unhandled application error exposed stack trace in API response…",
     time: "16:44:19",
-    activity: "Enable",
-    eventClass: "Account Change",
-    authOutcome: "Success",
-    accountChangeActivity: "Enable",
-    connector: "BC-CS",
-    user: "legacy.ops",
-    sourceIp: "192.0.2.77",
+    activity: "Error",
+    eventClass: "Application Error",
+    activityClass: "App Error",
+    app: "Snowflake",
+    user: "svc-analytics",
+    connector: "BCs1",
   },
   {
     id: "8",
     severity: "High",
-    title: "OAuth consent grant to unverified third-party app…",
+    title: "Mass file download from shared drive during off-hours session…",
     time: "12:01:47",
-    activity: "Authorize",
-    eventClass: "User Access Management",
-    authOutcome: "Unknown",
+    activity: "Read",
+    eventClass: "File Hosting Activity",
+    activityClass: "File Hosting",
+    app: "M365",
+    user: "contractor-07",
     connector: "BC-CS-Athena",
-    user: "j.alvarez",
-    sourceIp: "203.0.113.5",
+  },
+  {
+    id: "9",
+    severity: "Medium",
+    title: "Datastore query returned unusually wide result set to service account…",
+    time: "09:33:22",
+    activity: "Query",
+    eventClass: "Datastore Activity",
+    activityClass: "Datastore Activity",
+    app: "Snowflake",
+    user: "svc-reporting",
+    connector: "BCs1",
+  },
+  {
+    id: "10",
+    severity: "Low",
+    title: "Web resource access denied for deprecated API version…",
+    time: "21:15:08",
+    activity: "Read",
+    eventClass: "Web Resource Access Activity",
+    activityClass: "Web Resource Access",
+    app: "GitHub",
+    user: "release-bot",
+    connector: "BC-CS",
   },
 ];
 
-const TOTAL_IDENTITY_RESULTS = 6566;
+const TOTAL_APPLICATION_RESULTS = 8197;
 
-function identityMatchesSearch(row: IdentityAccessRow, query: string): boolean {
+function isActivityClass(label: string): label is ActivityClass {
+  return ACTIVITY_CLASS_ROWS.some((row) => row.label === label);
+}
+
+function isApplicationSeverity(label: string): label is ApplicationSeverity {
+  return label in SEV_BAR;
+}
+
+function severityMatchesFilter(rowSeverity: ApplicationSeverity, filter: string): boolean {
+  if (filter === "Info") return rowSeverity === "Informational";
+  return rowSeverity === filter;
+}
+
+function applicationMatchesSearch(row: ApplicationActivityRow, query: string): boolean {
   const q = query.trim().toLowerCase();
   if (!q) return true;
 
-  const haystack = [
+  return [
     row.severity,
     row.title,
     row.time,
     row.activity,
     row.eventClass,
-    row.authOutcome,
-    row.accountChangeActivity,
-    row.connector,
+    row.activityClass,
+    row.app,
     row.user,
-    row.sourceIp,
+    row.connector,
   ]
-    .filter(Boolean)
     .join(" ")
-    .toLowerCase();
-
-  return haystack.includes(q);
+    .toLowerCase()
+    .includes(q);
 }
 
-type IdentitySortColumn =
+type ApplicationSortColumn =
   | "severity"
   | "title"
   | "time"
   | "activity"
   | "eventClass"
-  | "connector"
+  | "app"
   | "user"
-  | "sourceIp";
+  | "connector";
 
-/** px widths: select, severity, title, time, activity, class, user, source IP, connector */
 const SELECT_COL_WIDTH = 40;
-const COL_DEFAULTS: readonly number[] = [SELECT_COL_WIDTH, 108, 280, 96, 100, 148, 112, 120, 120];
-const COL_MINS: readonly number[] = [SELECT_COL_WIDTH, 72, 120, 72, 56, 96, 80, 88, 80];
+const COL_DEFAULTS: readonly number[] = [SELECT_COL_WIDTH, 108, 280, 96, 88, 160, 100, 120, 120];
+const COL_MINS: readonly number[] = [SELECT_COL_WIDTH, 72, 120, 72, 56, 96, 72, 80, 80];
 
-function IdentityAccessTable({ rows }: { rows: IdentityAccessRow[] }) {
+function ApplicationActivityTable({ rows }: { rows: ApplicationActivityRow[] }) {
   const [selected, setSelected] = useState<Set<string>>(() => new Set());
   const {
     containerRef,
@@ -300,15 +319,15 @@ function IdentityAccessTable({ rows }: { rows: IdentityAccessRow[] }) {
   };
 
   const sortComparators = useMemo(
-    (): Record<IdentitySortColumn, (a: IdentityAccessRow, b: IdentityAccessRow) => number> => ({
+    (): Record<ApplicationSortColumn, (a: ApplicationActivityRow, b: ApplicationActivityRow) => number> => ({
       severity: (a, b) => SEVERITY_ORDER[a.severity] - SEVERITY_ORDER[b.severity],
       title: (a, b) => compareStrings(a.title, b.title),
       time: (a, b) => compareStrings(a.time, b.time),
       activity: (a, b) => compareStrings(a.activity, b.activity),
       eventClass: (a, b) => compareStrings(a.eventClass, b.eventClass),
-      connector: (a, b) => compareStrings(a.connector, b.connector),
+      app: (a, b) => compareStrings(a.app, b.app),
       user: (a, b) => compareStrings(a.user, b.user),
-      sourceIp: (a, b) => compareStrings(a.sourceIp, b.sourceIp),
+      connector: (a, b) => compareStrings(a.connector, b.connector),
     }),
     [],
   );
@@ -324,7 +343,7 @@ function IdentityAccessTable({ rows }: { rows: IdentityAccessRow[] }) {
           minWidth: Math.max(minTableWidth, baseTotal),
         }}
       >
-        <caption className="sr-only">Identity and access events</caption>
+        <caption className="sr-only">Application activity events</caption>
         <colgroup>
           {displayWidths.map((w, i) => (
             <col key={i} style={{ width: w }} />
@@ -348,11 +367,7 @@ function IdentityAccessTable({ rows }: { rows: IdentityAccessRow[] }) {
               style={colStyle(1)}
               className="relative h-10 border-r border-datavis-gridlines px-2 py-0 align-middle text-xs font-bold uppercase tracking-wide text-text-primary"
             >
-              <ColumnHeaderMenu
-                label="Severity"
-                menuLabel="Severity column options"
-                {...getSortProps("severity")}
-              />
+              <ColumnHeaderMenu label="Severity" menuLabel="Severity column options" {...getSortProps("severity")} />
               {resizeHandle(1)}
             </th>
             <th
@@ -392,7 +407,7 @@ function IdentityAccessTable({ rows }: { rows: IdentityAccessRow[] }) {
               style={colStyle(6)}
               className="relative h-10 border-r border-datavis-gridlines px-2 py-0 align-middle text-xs font-bold uppercase tracking-wide text-text-primary"
             >
-              <ColumnHeaderMenu label="User" menuLabel="User column options" {...getSortProps("user")} />
+              <ColumnHeaderMenu label="App" menuLabel="App column options" {...getSortProps("app")} />
               {resizeHandle(6)}
             </th>
             <th
@@ -400,7 +415,7 @@ function IdentityAccessTable({ rows }: { rows: IdentityAccessRow[] }) {
               style={colStyle(7)}
               className="relative h-10 border-r border-datavis-gridlines px-2 py-0 align-middle text-xs font-bold uppercase tracking-wide text-text-primary"
             >
-              <ColumnHeaderMenu label="Source IP" menuLabel="Source IP column options" {...getSortProps("sourceIp")} />
+              <ColumnHeaderMenu label="User" menuLabel="User column options" {...getSortProps("user")} />
               {resizeHandle(7)}
             </th>
             <th
@@ -421,7 +436,7 @@ function IdentityAccessTable({ rows }: { rows: IdentityAccessRow[] }) {
                   <Checkbox
                     checked={selected.has(row.id)}
                     onCheckedChange={(c) => toggleRow(row.id, c)}
-                    aria-label={`Select identity event ${row.id}`}
+                    aria-label={`Select application activity event ${row.id}`}
                   />
                 </div>
               </td>
@@ -448,9 +463,9 @@ function IdentityAccessTable({ rows }: { rows: IdentityAccessRow[] }) {
               <td style={colStyle(5)} className="h-10 min-w-0 overflow-hidden px-2 py-0 align-middle">
                 <span className="flex w-full min-w-0 items-center gap-2">
                   <Icon
-                    name="ocsf-identity-access"
+                    name="ocsf-application-activity"
                     size={16}
-                    className="size-4 shrink-0 text-interactive-active [&_svg]:!size-4"
+                    className="size-4 shrink-0 text-datavis-data-rouge-40 [&_svg]:!size-4"
                     aria-hidden
                   />
                   <TruncatedText className="w-full text-sm text-text-secondary" wrapperClassName="min-w-0 flex-1">
@@ -459,18 +474,18 @@ function IdentityAccessTable({ rows }: { rows: IdentityAccessRow[] }) {
                 </span>
               </td>
               <td style={colStyle(6)} className="h-10 min-w-0 px-2 py-0 align-middle">
+                <TruncatedText className="text-sm text-text-secondary">{row.app}</TruncatedText>
+              </td>
+              <td style={colStyle(7)} className="h-10 min-w-0 px-2 py-0 align-middle">
                 <TruncatedText className="text-sm text-text-secondary">{row.user}</TruncatedText>
               </td>
-              <td style={colStyle(7)} className="h-10 min-w-0 px-2 py-0 align-middle tabular-nums">
-                <TruncatedText className="text-sm text-text-secondary">{row.sourceIp}</TruncatedText>
-              </td>
-              <td style={colStyle(8)} className="h-10 min-w-0 overflow-hidden px-2 py-0 align-middle">
-                <span className="flex w-full min-w-0 items-center gap-2">
+              <td style={colStyle(8)} className="h-10 min-w-0 px-2 py-0 align-middle">
+                <span className="inline-flex min-w-0 items-center gap-2">
                   <span
                     className={cx("size-2.5 shrink-0 rounded-sm", connectorSwatch(row.connector))}
                     aria-hidden
                   />
-                  <TruncatedText className="w-full text-sm text-text-secondary" wrapperClassName="min-w-0 flex-1">
+                  <TruncatedText className="text-sm text-text-secondary" wrapperClassName="min-w-0 flex-1">
                     {row.connector}
                   </TruncatedText>
                 </span>
@@ -483,50 +498,55 @@ function IdentityAccessTable({ rows }: { rows: IdentityAccessRow[] }) {
   );
 }
 
-/** Figma concept — Identity & Access body for Federated Analytics. */
-export function IdentityAccessContent() {
+/** Figma concept — Application Activity body for Federated Analytics. */
+export function ApplicationActivityContent() {
   const { range: timeframe } = useTimeframe();
-  const [eventClassFilter, setEventClassFilter] = useState<IdentityEventClass | null>(null);
-  const [severityFilter, setSeverityFilter] = useState<IdentitySeverity | null>(null);
-  const [userFilter, setUserFilter] = useState<string | null>(null);
+  const [activityClassFilter, setActivityClassFilter] = useState<ActivityClass | null>(null);
+  const [severityFilter, setSeverityFilter] = useState<string | null>(null);
+  const [appFilter, setAppFilter] = useState<string | null>(null);
   const [searchQuery, setSearchQuery] = useState("");
   const [tableTool, setTableTool] = useState<FilterColumnPanelTool | null>(null);
 
   const filteredRows = useMemo(
     () =>
-      IDENTITY_ACCESS_ROWS.filter((row) => {
-        if (eventClassFilter && row.eventClass !== eventClassFilter) return false;
-        if (severityFilter && row.severity !== severityFilter) return false;
-        if (userFilter && row.user !== userFilter) return false;
-        if (!identityMatchesSearch(row, searchQuery)) return false;
+      APPLICATION_ACTIVITY_ROWS.filter((row) => {
+        if (activityClassFilter && row.activityClass !== activityClassFilter) return false;
+        if (severityFilter && !severityMatchesFilter(row.severity, severityFilter)) return false;
+        if (appFilter && row.app !== appFilter) return false;
+        if (!applicationMatchesSearch(row, searchQuery)) return false;
         return true;
       }),
-    [eventClassFilter, severityFilter, userFilter, searchQuery],
+    [activityClassFilter, severityFilter, appFilter, searchQuery],
   );
 
   const hasActiveFilters =
-    eventClassFilter != null ||
+    activityClassFilter != null ||
     severityFilter != null ||
-    userFilter != null ||
+    appFilter != null ||
     searchQuery.trim().length > 0;
 
-  const handleEventClassClick = (label: string) => {
-    if (!isIdentityEventClass(label)) return;
-    setEventClassFilter((current) => (current === label ? null : label));
+  const handleActivityClassClick = (label: string) => {
+    if (!isActivityClass(label)) return;
+    setActivityClassFilter((current) => (current === label ? null : label));
   };
 
   const handleSeverityClick = (label: string) => {
-    if (!isIdentitySeverity(label)) return;
+    if (label !== "Info" && !isApplicationSeverity(label)) return;
     setSeverityFilter((current) => (current === label ? null : label));
   };
 
-  const handleUserClick = (label: string) => {
-    setUserFilter((current) => (current === label ? null : label));
+  const handleChartSeverityClick = (seriesId: string) => {
+    if (!isApplicationSeverity(seriesId)) return;
+    setSeverityFilter((current) => (current === seriesId ? null : seriesId));
+  };
+
+  const handleAppClick = (label: string) => {
+    setAppFilter((current) => (current === label ? null : label));
   };
 
   const eventsPerHourChart = useMemo(() => {
     const buckets = buildHourlyBuckets(timeframe);
-    const spikeIndex = findSpikeBucketIndex(buckets, timeframe.to);
+    const spikeIndex = findSpikeBucketIndex(buckets, timeframe.to, APPLICATION_SPIKE_HOUR);
     const includeDate = timeframe.to.getTime() - timeframe.from.getTime() > 36 * 3_600_000;
     const xLabels = buckets.map((bucket) => formatBucketTimeLabel(bucket.start, includeDate));
     const { indices: xTickIndices, labels: xTickLabels } = buildHourlyAxisTicks(buckets, timeframe);
@@ -537,27 +557,27 @@ export function IdentityAccessContent() {
         label: "Medium",
         color: SEV_BAR.Medium,
         icon: SEV_ICONS.Medium,
-        values: hourlySeverityValues(12, buckets, spikeIndex),
+        values: hourlySeverityValues(14, buckets, spikeIndex),
       },
       {
         id: "High",
         label: "High",
         color: SEV_BAR.High,
         icon: SEV_ICONS.High,
-        values: hourlySeverityValues(8, buckets, spikeIndex),
+        values: hourlySeverityValues(10, buckets, spikeIndex),
       },
       {
         id: "Critical",
         label: "Critical",
         color: SEV_BAR.Critical,
         icon: SEV_ICONS.Critical,
-        values: hourlySeverityValues(3, buckets, spikeIndex),
+        values: hourlySeverityValues(4, buckets, spikeIndex),
       },
     ] as const;
 
     const spikeHighlight =
       spikeIndex != null
-        ? { index: spikeIndex, label: `spike ~${SPIKE_CLOCK_HOUR}:00` }
+        ? { index: spikeIndex, label: `spike ~${APPLICATION_SPIKE_HOUR}:00` }
         : undefined;
 
     return { series, xLabels, xTickIndices, xTickLabels, spikeHighlight };
@@ -565,28 +585,28 @@ export function IdentityAccessContent() {
 
   return (
     <div className="flex shrink-0 flex-col gap-4 p-4 sm:p-5">
-      <InsightCard title="Identity & Access Events Per Hour By Severity">
+      <InsightCard title="Application Activity Events Per Hour By Severity">
         <TimeSeriesAreaChart
           series={eventsPerHourChart.series}
           xLabels={eventsPerHourChart.xLabels}
           xTickIndices={eventsPerHourChart.xTickIndices}
           xTickLabels={eventsPerHourChart.xTickLabels}
           spikeHighlight={eventsPerHourChart.spikeHighlight}
-          ariaLabel="Identity and access events per hour by severity"
-          selectedSeriesId={severityFilter}
-          onSeriesClick={handleSeverityClick}
+          ariaLabel="Application activity events per hour by severity"
+          selectedSeriesId={severityFilter && isApplicationSeverity(severityFilter) ? severityFilter : null}
+          onSeriesClick={handleChartSeverityClick}
         />
       </InsightCard>
 
       <div className="grid min-h-0 shrink-0 grid-cols-1 items-stretch gap-4 lg:grid-cols-3">
-        <InsightCard title="Identity & Access Management Classes" fillHeight>
+        <InsightCard title="Application Activity Classes" fillHeight>
           <HorizontalBarPanel
-            rows={IAM_MANAGEMENT_CLASS_ROWS}
-            selectedLabel={eventClassFilter}
-            onBarClick={handleEventClassClick}
-            filterAriaLabel={(label) => `Filter identity events by ${label}`}
-            xMax={2000}
-            xTicks={[0, 500, 1000, 1500, 2000]}
+            rows={ACTIVITY_CLASS_ROWS}
+            selectedLabel={activityClassFilter}
+            onBarClick={handleActivityClassClick}
+            filterAriaLabel={(label) => `Filter application activity by ${label}`}
+            xMax={4500}
+            xTicks={[0, 1125, 2250, 3375, 4500]}
           />
         </InsightCard>
         <InsightCard title="Severity ID" fillHeight>
@@ -594,32 +614,32 @@ export function IdentityAccessContent() {
             rows={SEVERITY_ROWS}
             selectedLabel={severityFilter}
             onBarClick={handleSeverityClick}
-            filterAriaLabel={(label) => `Filter identity events by ${label} severity`}
-            xMax={700}
-            xTicks={[0, 175, 350, 525, 700]}
+            filterAriaLabel={(label) => `Filter application activity by ${label} severity`}
+            xMax={7500}
+            xTicks={[0, 1875, 3750, 5625, 7500]}
           />
         </InsightCard>
-        <InsightCard title="Top Users By Failed Logins" fillHeight>
+        <InsightCard title="Top Apps By API Call Volume" fillHeight>
           <HorizontalBarPanel
-            rows={TOP_USERS_ROWS}
-            selectedLabel={userFilter}
-            onBarClick={handleUserClick}
-            filterAriaLabel={(label) => `Filter identity events by user ${label}`}
-            xMax={250}
-            xTicks={[0, 50, 100, 150, 200]}
+            rows={TOP_APP_ROWS}
+            selectedLabel={appFilter}
+            onBarClick={handleAppClick}
+            filterAriaLabel={(label) => `Filter application activity by app ${label}`}
+            xMax={2500}
+            xTicks={[0, 625, 1250, 1875, 2500]}
           />
         </InsightCard>
       </div>
 
       <section className="mx-0 mb-0 flex min-h-0 min-w-0 flex-1 flex-col overflow-hidden rounded-[4px] border border-border-container bg-datavis-card-bg shadow-[0_1px_5px_rgba(0,0,0,0.2)]">
         <div className="shrink-0 bg-datavis-card-bg pb-3 pl-4 pr-6 pt-3 sm:pl-5">
-          <h2 className="text-base-semibold text-text-primary">Identity & Access Events</h2>
+          <h2 className="text-base-semibold text-text-primary">Application Activity Events</h2>
           <div className="mt-2 flex flex-wrap items-center gap-3">
             <p className="shrink-0 text-base-small text-text-secondary">
-              {filteredRows.length} of {TOTAL_IDENTITY_RESULTS} Results
-              {eventClassFilter ? ` · ${eventClassFilter}` : ""}
+              {filteredRows.length} of {TOTAL_APPLICATION_RESULTS} Results
+              {activityClassFilter ? ` · ${activityClassFilter}` : ""}
               {severityFilter ? ` · ${severityFilter}` : ""}
-              {userFilter ? ` · ${userFilter}` : ""}
+              {appFilter ? ` · ${appFilter}` : ""}
               {searchQuery.trim() ? ` · “${searchQuery.trim()}”` : ""}
             </p>
             <div className="w-[300px] shrink-0">
@@ -629,7 +649,7 @@ export function IdentityAccessContent() {
                 value={searchQuery}
                 onChange={(event) => setSearchQuery(event.target.value)}
                 className="!bg-datavis-card-bg"
-                aria-label="Search identity and access events"
+                aria-label="Search application activity events"
               />
             </div>
             {hasActiveFilters ? (
@@ -638,9 +658,9 @@ export function IdentityAccessContent() {
                 variant="ghost"
                 className="h-8 shrink-0 gap-1.5 px-2 text-base-small text-text-tertiary hover:text-text-primary [&_svg]:!h-2 [&_svg]:!w-3"
                 onClick={() => {
-                  setEventClassFilter(null);
+                  setActivityClassFilter(null);
                   setSeverityFilter(null);
-                  setUserFilter(null);
+                  setAppFilter(null);
                   setSearchQuery("");
                 }}
               >
@@ -662,7 +682,7 @@ export function IdentityAccessContent() {
             onColumnsClick={() => setTableTool(tableTool === "columns" ? null : "columns")}
           />
           <div className="min-h-0 min-w-0 flex-1 pb-3">
-            <IdentityAccessTable rows={filteredRows} />
+            <ApplicationActivityTable rows={filteredRows} />
           </div>
         </div>
       </section>

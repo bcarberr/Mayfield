@@ -705,7 +705,7 @@ function EntitiesAggregatedTable({ rows }: { rows: AggregatedEntityRow[] }) {
               style={colStyle(7)}
               className="relative h-10 px-2 py-0 align-middle text-xs font-bold uppercase tracking-wide text-text-primary"
             >
-              <ColumnHeaderMenu label="Connector" menuLabel="Connector column options" {...getSortProps("connector")} />
+              <ColumnHeaderMenu label="Connectors" menuLabel="Connectors column options" {...getSortProps("connector")} />
               {resizeHandle(7)}
             </th>
           </tr>

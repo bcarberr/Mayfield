@@ -65,7 +65,14 @@ type DiscoveryRow = {
   owner: string;
   platform: DevicePlatform;
   patchStatus: PatchStatus;
+  connector: string;
 };
+
+function connectorSwatch(connector: string) {
+  if (connector.startsWith("BCs")) return "bg-feedback-info";
+  if (connector.includes("Athena")) return "bg-interactive-active";
+  return "bg-feedback-negative";
+}
 
 const WEEKDAY_SHORT = ["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"] as const;
 
@@ -159,6 +166,7 @@ const DISCOVERY_ROWS: DiscoveryRow[] = [
     owner: "unassigned",
     platform: "Linux",
     patchStatus: "Missing critical",
+    connector: "BCs1",
   },
   {
     id: "2",
@@ -171,6 +179,7 @@ const DISCOVERY_ROWS: DiscoveryRow[] = [
     owner: "platform-team",
     platform: "Linux",
     patchStatus: "Missing non-crit",
+    connector: "BC-CS-Athena",
   },
   {
     id: "3",
@@ -183,6 +192,7 @@ const DISCOVERY_ROWS: DiscoveryRow[] = [
     owner: "j.alvarez",
     platform: "Cloud / SaaS",
     patchStatus: "Unknown",
+    connector: "BC-CS",
   },
   {
     id: "4",
@@ -195,6 +205,7 @@ const DISCOVERY_ROWS: DiscoveryRow[] = [
     owner: "it-ops",
     platform: "Cloud / SaaS",
     patchStatus: "Up to date",
+    connector: "BCs1",
   },
   {
     id: "5",
@@ -207,6 +218,7 @@ const DISCOVERY_ROWS: DiscoveryRow[] = [
     owner: "unassigned",
     platform: "Windows",
     patchStatus: "Missing non-crit",
+    connector: "BC-CS-Athena",
   },
   {
     id: "6",
@@ -219,6 +231,7 @@ const DISCOVERY_ROWS: DiscoveryRow[] = [
     owner: "design-team",
     platform: "macOS",
     patchStatus: "Up to date",
+    connector: "BC-CS",
   },
   {
     id: "7",
@@ -231,6 +244,7 @@ const DISCOVERY_ROWS: DiscoveryRow[] = [
     owner: "platform-team",
     platform: "Cloud / SaaS",
     patchStatus: "Up to date",
+    connector: "BCs1",
   },
   {
     id: "8",
@@ -243,6 +257,7 @@ const DISCOVERY_ROWS: DiscoveryRow[] = [
     owner: "it-ops",
     platform: "Windows",
     patchStatus: "Up to date",
+    connector: "BC-CS-Athena",
   },
   {
     id: "9",
@@ -255,6 +270,7 @@ const DISCOVERY_ROWS: DiscoveryRow[] = [
     owner: "unassigned",
     platform: "Unknown",
     patchStatus: "Unknown",
+    connector: "BC-CS-Athena",
   },
   {
     id: "10",
@@ -267,6 +283,7 @@ const DISCOVERY_ROWS: DiscoveryRow[] = [
     owner: "security-team",
     platform: "Windows",
     patchStatus: "Missing critical",
+    connector: "BC-CS",
   },
 ];
 
@@ -309,6 +326,7 @@ function discoveryMatchesSearch(row: DiscoveryRow, query: string): boolean {
     row.owner,
     row.platform,
     row.patchStatus,
+    row.connector,
   ]
     .join(" ")
     .toLowerCase();
@@ -323,11 +341,12 @@ type DiscoverySortColumn =
   | "activity"
   | "eventClass"
   | "asset"
-  | "owner";
+  | "owner"
+  | "connector";
 
 const SELECT_COL_WIDTH = 40;
-const COL_DEFAULTS: readonly number[] = [SELECT_COL_WIDTH, 108, 280, 96, 88, 168, 120, 112];
-const COL_MINS: readonly number[] = [SELECT_COL_WIDTH, 72, 120, 72, 56, 120, 80, 80];
+const COL_DEFAULTS: readonly number[] = [SELECT_COL_WIDTH, 108, 280, 96, 88, 168, 120, 112, 120];
+const COL_MINS: readonly number[] = [SELECT_COL_WIDTH, 72, 120, 72, 56, 120, 80, 80, 80];
 
 function DiscoveryEventsTable({ rows }: { rows: DiscoveryRow[] }) {
   const [selected, setSelected] = useState<Set<string>>(() => new Set());
@@ -374,6 +393,7 @@ function DiscoveryEventsTable({ rows }: { rows: DiscoveryRow[] }) {
       eventClass: (a, b) => compareStrings(a.eventClass, b.eventClass),
       asset: (a, b) => compareStrings(a.asset, b.asset),
       owner: (a, b) => compareStrings(a.owner, b.owner),
+      connector: (a, b) => compareStrings(a.connector, b.connector),
     }),
     [],
   );
@@ -459,10 +479,18 @@ function DiscoveryEventsTable({ rows }: { rows: DiscoveryRow[] }) {
             <th
               scope="col"
               style={colStyle(7)}
-              className="relative h-10 px-2 py-0 align-middle text-xs font-bold uppercase tracking-wide text-text-primary"
+              className="relative h-10 border-r border-datavis-gridlines px-2 py-0 align-middle text-xs font-bold uppercase tracking-wide text-text-primary"
             >
               <ColumnHeaderMenu label="Owner" menuLabel="Owner column options" {...getSortProps("owner")} />
               {resizeHandle(7)}
+            </th>
+            <th
+              scope="col"
+              style={colStyle(8)}
+              className="relative h-10 px-2 py-0 align-middle text-xs font-bold uppercase tracking-wide text-text-primary"
+            >
+              <ColumnHeaderMenu label="Connectors" menuLabel="Connectors column options" {...getSortProps("connector")} />
+              {resizeHandle(8)}
             </th>
           </tr>
         </thead>
@@ -516,6 +544,17 @@ function DiscoveryEventsTable({ rows }: { rows: DiscoveryRow[] }) {
               </td>
               <td style={colStyle(7)} className="h-10 min-w-0 px-2 py-0 align-middle">
                 <TruncatedText className="text-sm text-text-secondary">{row.owner}</TruncatedText>
+              </td>
+              <td style={colStyle(8)} className="h-10 min-w-0 px-2 py-0 align-middle">
+                <span className="inline-flex min-w-0 items-center gap-2">
+                  <span
+                    className={cx("size-2.5 shrink-0 rounded-sm", connectorSwatch(row.connector))}
+                    aria-hidden
+                  />
+                  <TruncatedText className="text-sm text-text-secondary" wrapperClassName="min-w-0 flex-1">
+                    {row.connector}
+                  </TruncatedText>
+                </span>
               </td>
             </tr>
           ))}

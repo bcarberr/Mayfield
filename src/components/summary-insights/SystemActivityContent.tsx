@@ -279,10 +279,10 @@ type SystemSortColumn =
   | "host"
   | "process";
 
-/** px widths: select, severity, title, time, activity, class, connector, host, process */
+/** px widths: select, severity, title, time, activity, class, host, process, connector */
 const SELECT_COL_WIDTH = 40;
-const COL_DEFAULTS: readonly number[] = [SELECT_COL_WIDTH, 108, 280, 96, 88, 140, 120, 120, 140];
-const COL_MINS: readonly number[] = [SELECT_COL_WIDTH, 72, 120, 72, 56, 96, 80, 80, 96];
+const COL_DEFAULTS: readonly number[] = [SELECT_COL_WIDTH, 108, 280, 96, 88, 140, 120, 140, 120];
+const COL_MINS: readonly number[] = [SELECT_COL_WIDTH, 72, 120, 72, 56, 96, 80, 96, 80];
 
 function SystemActivityTable({ rows }: { rows: SystemActivityRow[] }) {
   const [selected, setSelected] = useState<Set<string>>(() => new Set());
@@ -413,7 +413,7 @@ function SystemActivityTable({ rows }: { rows: SystemActivityRow[] }) {
               style={colStyle(6)}
               className="relative h-10 border-r border-datavis-gridlines px-2 py-0 align-middle text-xs font-bold uppercase tracking-wide text-text-primary"
             >
-              <ColumnHeaderMenu label="Connectors" menuLabel="Connectors column options" {...getSortProps("connector")} />
+              <ColumnHeaderMenu label="Host" menuLabel="Host column options" {...getSortProps("host")} />
               {resizeHandle(6)}
             </th>
             <th
@@ -421,7 +421,7 @@ function SystemActivityTable({ rows }: { rows: SystemActivityRow[] }) {
               style={colStyle(7)}
               className="relative h-10 border-r border-datavis-gridlines px-2 py-0 align-middle text-xs font-bold uppercase tracking-wide text-text-primary"
             >
-              <ColumnHeaderMenu label="Host" menuLabel="Host column options" {...getSortProps("host")} />
+              <ColumnHeaderMenu label="Process" menuLabel="Process column options" {...getSortProps("process")} />
               {resizeHandle(7)}
             </th>
             <th
@@ -429,7 +429,7 @@ function SystemActivityTable({ rows }: { rows: SystemActivityRow[] }) {
               style={colStyle(8)}
               className="relative h-10 px-2 py-0 align-middle text-xs font-bold uppercase tracking-wide text-text-primary"
             >
-              <ColumnHeaderMenu label="Process" menuLabel="Process column options" {...getSortProps("process")} />
+              <ColumnHeaderMenu label="Connectors" menuLabel="Connectors column options" {...getSortProps("connector")} />
               {resizeHandle(8)}
             </th>
           </tr>
@@ -480,6 +480,12 @@ function SystemActivityTable({ rows }: { rows: SystemActivityRow[] }) {
                 </span>
               </td>
               <td style={colStyle(6)} className="h-10 min-w-0 px-2 py-0 align-middle">
+                <TruncatedText className="text-sm text-text-secondary">{row.host}</TruncatedText>
+              </td>
+              <td style={colStyle(7)} className="h-10 min-w-0 px-2 py-0 align-middle">
+                <TruncatedText className="text-sm text-text-secondary">{row.process}</TruncatedText>
+              </td>
+              <td style={colStyle(8)} className="h-10 min-w-0 px-2 py-0 align-middle">
                 <span className="inline-flex min-w-0 items-center gap-2">
                   <span
                     className={cx("size-2.5 shrink-0 rounded-sm", connectorSwatch(row.connector))}
@@ -489,12 +495,6 @@ function SystemActivityTable({ rows }: { rows: SystemActivityRow[] }) {
                     {row.connector}
                   </TruncatedText>
                 </span>
-              </td>
-              <td style={colStyle(7)} className="h-10 min-w-0 px-2 py-0 align-middle">
-                <TruncatedText className="text-sm text-text-secondary">{row.host}</TruncatedText>
-              </td>
-              <td style={colStyle(8)} className="h-10 min-w-0 px-2 py-0 align-middle">
-                <TruncatedText className="text-sm text-text-secondary">{row.process}</TruncatedText>
               </td>
             </tr>
           ))}
@@ -583,7 +583,7 @@ export function SystemActivityContent() {
 
   return (
     <div className="flex shrink-0 flex-col gap-4 p-4 sm:p-5">
-      <InsightCard title="Events Per Hour By Severity">
+      <InsightCard title="System Events Per Hour By Severity">
         <TimeSeriesAreaChart
           series={eventsPerHourChart.series}
           xLabels={eventsPerHourChart.xLabels}

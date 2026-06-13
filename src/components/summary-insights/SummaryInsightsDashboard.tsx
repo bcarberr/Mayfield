@@ -2,6 +2,7 @@ import { useEffect, useMemo, useRef, useState, type CSSProperties } from "react"
 import { createPortal } from "react-dom";
 import { useNavigate } from "react-router-dom";
 import { Icon } from "../../design-system";
+import { DonutChartPanel } from "../ui/DonutChartPanel";
 import { FilterColumnPanel, type FilterColumnPanelTool } from "../ui/FilterColumnPanel";
 import { SeverityTableIcon } from "../ui/SeverityTableIcon";
 import { SlideOver } from "../ui/SlideOver";
@@ -24,9 +25,11 @@ import {
   readDefaultFederatedView,
   type FederatedViewId,
 } from "./FederatedAnalyticsBreadcrumb";
-import { HorizontalBarPanel } from "./horizontalBarPanel";
+import { CHART_CATEGORY_FILL, HorizontalBarPanel } from "./horizontalBarPanel";
+import { ApplicationActivityContent } from "./ApplicationActivityContent";
 import { DiscoveryContent } from "./DiscoveryContent";
 import { IdentityAccessContent } from "./IdentityAccessContent";
+import { RemediationContent } from "./RemediationContent";
 import { SystemActivityContent } from "./SystemActivityContent";
 import { TimeSeriesAreaChart } from "./timeSeriesAreaChart";
 import {
@@ -73,6 +76,23 @@ function isFindingCategory(label: string): label is FindingCategory {
 
 type FindingEventType = "HTTP Activity" | "Vulnerability";
 
+type FindingStatus = "New" | "In Progress" | "Resolved" | "Suppressed";
+
+const STATUS_UNKNOWN_FILL = "#717882";
+
+const FINDING_STATUS_SEGMENTS = [
+  { label: "New", color: SEV_BAR.Critical, value: 38 },
+  { label: "In Progress", color: SEV_BAR.High, value: 22 },
+  { label: "Resolved", color: CHART_CATEGORY_FILL, value: 32 },
+  { label: "Suppressed", color: STATUS_UNKNOWN_FILL, value: 8 },
+] as const;
+
+const FINDING_STATUS_TOTAL = 100;
+
+function isFindingStatus(label: string): label is FindingStatus {
+  return label === "New" || label === "In Progress" || label === "Resolved" || label === "Suppressed";
+}
+
 type FindingRow = {
   id: string;
   severity: keyof typeof SEV_BAR;
@@ -82,6 +102,7 @@ type FindingRow = {
   time: string;
   activity: string;
   status: string;
+  findingStatus: FindingStatus;
   eventType: FindingEventType;
   connector: string;
 };
@@ -145,7 +166,7 @@ const FINDING_SEVERITY_ORDER: Record<keyof typeof SEV_BAR, number> = {
 
 type FindingSortColumn = "severity" | "title" | "time" | "activity" | "status" | "eventType" | "connector";
 
-/** px widths: select, severity, title, time, activity, status, event type, connector, actions */
+/** px widths: select, severity, title, time, activity, status, event type, actions, connector */
 const FINDING_EVENTS_SELECT_COL_WIDTH = 40;
 const FINDING_EVENTS_COL_DEFAULTS: readonly number[] = [
   FINDING_EVENTS_SELECT_COL_WIDTH,
@@ -155,8 +176,8 @@ const FINDING_EVENTS_COL_DEFAULTS: readonly number[] = [
   88,
   112,
   120,
-  120,
   56,
+  120,
 ];
 const FINDING_EVENTS_COL_MINS: readonly number[] = [
   FINDING_EVENTS_SELECT_COL_WIDTH,
@@ -166,8 +187,8 @@ const FINDING_EVENTS_COL_MINS: readonly number[] = [
   56,
   72,
   80,
-  80,
   48,
+  80,
 ];
 
 const ROW_ACTION_ITEMS = ["Action one", "Action two", "Action three"] as const;
@@ -472,7 +493,7 @@ function FindingEventsTable({
             style={colStyle(7)}
             className="relative h-10 border-r border-datavis-gridlines px-2 py-0 align-middle text-xs font-bold uppercase tracking-wide text-text-primary"
           >
-            <ColumnHeaderMenu label="Connector" menuLabel="Connector column options" {...getSortProps("connector")} />
+            <span className="block translate-y-px truncate">Actions</span>
             {resizeHandle(7)}
           </th>
           <th
@@ -480,7 +501,7 @@ function FindingEventsTable({
             style={colStyle(8)}
             className="relative h-10 px-2 py-0 align-middle text-xs font-bold uppercase tracking-wide text-text-primary"
           >
-            <span className="block translate-y-px truncate">Actions</span>
+            <ColumnHeaderMenu label="Connectors" menuLabel="Connectors column options" {...getSortProps("connector")} />
             {resizeHandle(8)}
           </th>
         </tr>
@@ -536,7 +557,10 @@ function FindingEventsTable({
                   </TruncatedText>
                 </span>
               </td>
-              <td style={colStyle(7)} className="h-10 min-w-0 px-2 py-0 align-middle">
+              <td style={colStyle(7)} className="h-10 px-2 py-0 align-middle">
+                <RowActionsMenu rowId={row.id} />
+              </td>
+              <td style={colStyle(8)} className="h-10 min-w-0 px-2 py-0 align-middle">
                 <span className="inline-flex min-w-0 items-center gap-2">
                   <span
                     className={cx("size-2.5 shrink-0 rounded-sm", connectorSwatch(row.connector))}
@@ -546,9 +570,6 @@ function FindingEventsTable({
                     {row.connector}
                   </TruncatedText>
                 </span>
-              </td>
-              <td style={colStyle(8)} className="h-10 px-2 py-0 align-middle">
-                <RowActionsMenu rowId={row.id} />
               </td>
             </tr>
           );
@@ -574,6 +595,7 @@ export function SummaryInsightsDashboard() {
   const [activeView, setActiveView] = useState<FederatedViewId>(readDefaultFederatedView);
   const [severityFilter, setSeverityFilter] = useState<SeverityLevel | null>(null);
   const [categoryFilter, setCategoryFilter] = useState<FindingCategory | null>(null);
+  const [statusFilter, setStatusFilter] = useState<FindingStatus | null>(null);
   const [searchQuery, setSearchQuery] = useState("");
   const [tableTool, setTableTool] = useState<FilterColumnPanelTool | null>(null);
   const [drawerFindingId, setDrawerFindingId] = useState<string | null>(null);
@@ -612,6 +634,7 @@ export function SummaryInsightsDashboard() {
         time: "2024-07-31 14:22:08",
         activity: "Post",
         status: "Failure",
+        findingStatus: "New",
         eventType: "HTTP Activity",
         connector: "BCs1",
       },
@@ -625,6 +648,7 @@ export function SummaryInsightsDashboard() {
         time: "2024-07-31 13:05:41",
         activity: "Put",
         status: "Unknown",
+        findingStatus: "New",
         eventType: "HTTP Activity",
         connector: "BC-CS-Athena",
       },
@@ -638,6 +662,7 @@ export function SummaryInsightsDashboard() {
         time: "2024-07-31 11:40:12",
         activity: "Delete",
         status: "Other",
+        findingStatus: "In Progress",
         eventType: "Vulnerability",
         connector: "BC-CS",
       },
@@ -651,6 +676,7 @@ export function SummaryInsightsDashboard() {
         time: "2024-07-31 09:12:00",
         activity: "Connect",
         status: "New",
+        findingStatus: "New",
         eventType: "HTTP Activity",
         connector: "BCs1",
       },
@@ -664,6 +690,7 @@ export function SummaryInsightsDashboard() {
         time: "2024-07-30 22:18:55",
         activity: "Create",
         status: "In Progress",
+        findingStatus: "In Progress",
         eventType: "Vulnerability",
         connector: "BC-CS-Athena",
       },
@@ -677,6 +704,7 @@ export function SummaryInsightsDashboard() {
         time: "2024-07-30 18:00:03",
         activity: "Update",
         status: "Suppressed",
+        findingStatus: "Suppressed",
         eventType: "Vulnerability",
         connector: "BCs1",
       },
@@ -690,6 +718,7 @@ export function SummaryInsightsDashboard() {
         time: "2024-07-30 16:44:19",
         activity: "Post",
         status: "Failure",
+        findingStatus: "New",
         eventType: "HTTP Activity",
         connector: "BC-CS-Athena",
       },
@@ -703,6 +732,7 @@ export function SummaryInsightsDashboard() {
         time: "2024-07-30 12:01:47",
         activity: "Put",
         status: "Unknown",
+        findingStatus: "In Progress",
         eventType: "Vulnerability",
         connector: "BC-CS",
       },
@@ -716,6 +746,7 @@ export function SummaryInsightsDashboard() {
         time: "2024-07-30 09:33:22",
         activity: "Post",
         status: "New",
+        findingStatus: "New",
         eventType: "HTTP Activity",
         connector: "BCs1",
       },
@@ -729,6 +760,7 @@ export function SummaryInsightsDashboard() {
         time: "2024-07-29 21:15:08",
         activity: "Connect",
         status: "In Progress",
+        findingStatus: "In Progress",
         eventType: "Vulnerability",
         connector: "BC-CS-Athena",
       },
@@ -742,6 +774,7 @@ export function SummaryInsightsDashboard() {
         time: "2024-07-29 17:48:51",
         activity: "Delete",
         status: "Failure",
+        findingStatus: "New",
         eventType: "Vulnerability",
         connector: "BC-CS",
       },
@@ -755,6 +788,7 @@ export function SummaryInsightsDashboard() {
         time: "2024-07-29 14:00:00",
         activity: "Create",
         status: "Suppressed",
+        findingStatus: "Suppressed",
         eventType: "Vulnerability",
         connector: "BCs1",
       },
@@ -768,6 +802,7 @@ export function SummaryInsightsDashboard() {
         time: "2024-07-29 08:27:36",
         activity: "Post",
         status: "Unknown",
+        findingStatus: "New",
         eventType: "HTTP Activity",
         connector: "BC-CS-Athena",
       },
@@ -781,6 +816,7 @@ export function SummaryInsightsDashboard() {
         time: "2024-07-28 23:59:14",
         activity: "Update",
         status: "Other",
+        findingStatus: "Resolved",
         eventType: "HTTP Activity",
         connector: "BC-CS",
       },
@@ -793,14 +829,15 @@ export function SummaryInsightsDashboard() {
       tableRows.filter((row) => {
         if (categoryFilter && row.category !== categoryFilter) return false;
         if (severityFilter && row.severity !== severityFilter) return false;
+        if (statusFilter && row.findingStatus !== statusFilter) return false;
         if (!findingMatchesSearch(row, searchQuery)) return false;
         return true;
       }),
-    [tableRows, categoryFilter, severityFilter, searchQuery],
+    [tableRows, categoryFilter, severityFilter, statusFilter, searchQuery],
   );
 
   const hasActiveFilters =
-    categoryFilter != null || severityFilter != null || searchQuery.trim().length > 0;
+    categoryFilter != null || severityFilter != null || statusFilter != null || searchQuery.trim().length > 0;
 
   const drawerRow = useMemo(
     () => (drawerFindingId ? tableRows.find((row) => row.id === drawerFindingId) : undefined),
@@ -815,6 +852,11 @@ export function SummaryInsightsDashboard() {
   const handleSeverityBarClick = (label: string) => {
     if (!isSeverityLevel(label)) return;
     setSeverityFilter((current) => (current === label ? null : label));
+  };
+
+  const handleStatusClick = (label: string) => {
+    if (!isFindingStatus(label)) return;
+    setStatusFilter((current) => (current === label ? null : label));
   };
 
   const eventsPerHourChart = useMemo(() => {
@@ -882,11 +924,15 @@ export function SummaryInsightsDashboard() {
         <NetworkActivityContent />
       ) : activeView === "discovery" ? (
         <DiscoveryContent />
+      ) : activeView === "application-activity" ? (
+        <ApplicationActivityContent />
+      ) : activeView === "remediation" ? (
+        <RemediationContent />
       ) : isComingSoonFederatedView(activeView) ? (
         <FederatedAnalyticsComingSoon view={activeView} />
       ) : (
         <div className="flex shrink-0 flex-col gap-4 p-4 sm:p-5">
-      <InsightCard title="Events Per Hour By Severity">
+      <InsightCard title="Finding Events Per Hour By Severity">
         <TimeSeriesAreaChart
           series={eventsPerHourChart.series}
           xLabels={eventsPerHourChart.xLabels}
@@ -899,7 +945,7 @@ export function SummaryInsightsDashboard() {
         />
       </InsightCard>
 
-      <div className="grid min-h-0 shrink-0 grid-cols-1 items-stretch gap-4 lg:grid-cols-2 lg:grid-rows-1">
+      <div className="grid min-h-0 shrink-0 grid-cols-1 items-stretch gap-4 lg:grid-cols-3">
         <InsightCard title="Finding Event Classes" fillHeight>
           <HorizontalBarPanel
             rows={categoryRows}
@@ -918,6 +964,16 @@ export function SummaryInsightsDashboard() {
             axisLabel="Findings"
           />
         </InsightCard>
+        <InsightCard title="Findings By Status" fillHeight>
+          <DonutChartPanel
+            segments={FINDING_STATUS_SEGMENTS}
+            total={FINDING_STATUS_TOTAL}
+            centerLabel="findings"
+            selectedLabel={statusFilter}
+            onSegmentClick={handleStatusClick}
+            ariaLabel="Findings by status"
+          />
+        </InsightCard>
       </div>
 
       <section className="mx-0 mb-0 flex min-h-0 min-w-0 flex-1 flex-col overflow-hidden rounded-[4px] border border-border-container bg-datavis-card-bg shadow-[0_1px_5px_rgba(0,0,0,0.2)]">
@@ -928,6 +984,7 @@ export function SummaryInsightsDashboard() {
               {filteredTableRows.length} of {tableRows.length} Results
               {categoryFilter ? ` · ${categoryFilter}` : ""}
               {severityFilter ? ` · ${severityFilter}` : ""}
+              {statusFilter ? ` · ${statusFilter}` : ""}
               {searchQuery.trim() ? ` · “${searchQuery.trim()}”` : ""}
             </p>
             <div className="w-[300px] shrink-0">
@@ -948,6 +1005,7 @@ export function SummaryInsightsDashboard() {
                 onClick={() => {
                   setCategoryFilter(null);
                   setSeverityFilter(null);
+                  setStatusFilter(null);
                   setSearchQuery("");
                 }}
               >

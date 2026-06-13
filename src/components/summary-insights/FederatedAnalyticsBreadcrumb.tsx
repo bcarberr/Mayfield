@@ -106,10 +106,7 @@ function persistDefaultFederatedView(view: FederatedViewId) {
   }
 }
 
-const COMING_SOON_FEDERATED_VIEWS: ReadonlySet<FederatedViewId> = new Set([
-  "application-activity",
-  "remediation",
-]);
+const COMING_SOON_FEDERATED_VIEWS: ReadonlySet<FederatedViewId> = new Set([]);
 
 export function isComingSoonFederatedView(view: FederatedViewId): boolean {
   return COMING_SOON_FEDERATED_VIEWS.has(view);

@@ -1,5 +1,4 @@
 import { useEffect, useRef, useState } from "react";
-import { Icon } from "../design-system";
 
 const cx = (...c: (string | false | undefined)[]) => c.filter(Boolean).join(" ");
 
@@ -77,12 +76,6 @@ export function SearchCriteriaSelect<T extends string>({
         >
           {selected?.label}
         </span>
-        <Icon
-          name="chevron-down"
-          size={18}
-          className={cx("shrink-0 text-text-primary transition-transform duration-150", open && "rotate-180")}
-          aria-hidden
-        />
       </button>
 
       {open ? (

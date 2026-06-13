@@ -306,24 +306,15 @@ function ConditionRow({
         >
           <Icon name="action-delete" size={18} aria-hidden />
         </button>
-        {/* Add row below — split-button style */}
-        <div className="flex overflow-hidden rounded border border-interactive-secondary-pressed">
-          <button
-            type="button"
-            className="flex items-center gap-1 px-2 py-1 text-xs font-semibold text-interactive-active transition-colors hover:bg-interactive-secondary-hover focus-visible:outline-none"
-            onClick={onAddBelow}
-            aria-label="Add condition"
-          >
-            <Icon name="action-add" size={12} aria-hidden />
-          </button>
-          <button
-            type="button"
-            className="border-l border-interactive-secondary-pressed px-1 py-1 text-interactive-active transition-colors hover:bg-interactive-secondary-hover focus-visible:outline-none"
-            aria-label="More add options"
-          >
-            <Icon name="chevron-down" size={12} aria-hidden />
-          </button>
-        </div>
+        {/* Add row below */}
+        <button
+          type="button"
+          className="flex items-center gap-1 rounded border border-interactive-secondary-pressed px-2 py-1 text-xs font-semibold text-interactive-active transition-colors hover:bg-interactive-secondary-hover focus-visible:outline-none"
+          onClick={onAddBelow}
+          aria-label="Add condition"
+        >
+          <Icon name="action-add" size={12} aria-hidden />
+        </button>
       </div>
     </div>
   );
@@ -439,7 +430,6 @@ function EventBlockComp({
           aria-hidden
         />
         <span className="text-sm font-semibold text-text-primary">{block.eventOption.label}</span>
-        <Icon name="chevron-down" size={16} className="shrink-0 text-text-secondary" aria-hidden />
         <div className="flex-1" />
         <button
           type="button"
@@ -465,23 +455,14 @@ function EventBlockComp({
         ))}
 
         {/* Add Condition (adds a new group) */}
-        <div className="flex overflow-hidden self-start rounded-[4px] border border-interactive-secondary-pressed">
-          <button
-            type="button"
-            className="flex items-center gap-1.5 px-3 py-1.5 text-sm font-semibold text-interactive-active transition-colors hover:bg-interactive-secondary-hover focus-visible:outline-none"
-            onClick={() => onUpdate({ ...block, groups: [...block.groups, makeEmptyGroup()] })}
-          >
-            <Icon name="action-add" size={14} aria-hidden />
-            Add Condition
-          </button>
-          <button
-            type="button"
-            className="border-l border-interactive-secondary-pressed px-2 py-1.5 text-interactive-active transition-colors hover:bg-interactive-secondary-hover focus-visible:outline-none"
-            aria-label="More condition options"
-          >
-            <Icon name="chevron-down" size={14} aria-hidden />
-          </button>
-        </div>
+        <button
+          type="button"
+          className="flex items-center gap-1.5 self-start rounded-[4px] border border-interactive-secondary-pressed px-3 py-1.5 text-sm font-semibold text-interactive-active transition-colors hover:bg-interactive-secondary-hover focus-visible:outline-none"
+          onClick={() => onUpdate({ ...block, groups: [...block.groups, makeEmptyGroup()] })}
+        >
+          <Icon name="action-add" size={14} aria-hidden />
+          Add Condition
+        </button>
       </div>
     </div>
   );
@@ -708,23 +689,14 @@ function EntityConditionRowComp({
         >
           <Icon name="action-delete" size={18} aria-hidden />
         </button>
-        <div className="flex overflow-hidden rounded border border-interactive-secondary-pressed">
-          <button
-            type="button"
-            className="flex items-center gap-1 px-2 py-1 text-xs font-semibold text-interactive-active transition-colors hover:bg-interactive-secondary-hover focus-visible:outline-none"
-            onClick={onAddBelow}
-            aria-label="Add condition"
-          >
-            <Icon name="action-add" size={12} aria-hidden />
-          </button>
-          <button
-            type="button"
-            className="border-l border-interactive-secondary-pressed px-1 py-1 text-interactive-active transition-colors hover:bg-interactive-secondary-hover focus-visible:outline-none"
-            aria-label="More add options"
-          >
-            <Icon name="chevron-down" size={12} aria-hidden />
-          </button>
-        </div>
+        <button
+          type="button"
+          className="flex items-center gap-1 rounded border border-interactive-secondary-pressed px-2 py-1 text-xs font-semibold text-interactive-active transition-colors hover:bg-interactive-secondary-hover focus-visible:outline-none"
+          onClick={onAddBelow}
+          aria-label="Add condition"
+        >
+          <Icon name="action-add" size={12} aria-hidden />
+        </button>
       </div>
     </div>
   );
@@ -830,7 +802,6 @@ function EntityBlockComp({
           aria-hidden
         />
         <span className="text-sm font-semibold text-text-primary">{block.entityOption.label}</span>
-        <Icon name="chevron-down" size={16} className="shrink-0 text-text-secondary" aria-hidden />
         <div className="flex-1" />
         <button
           type="button"
@@ -851,23 +822,14 @@ function EntityBlockComp({
             onDelete={() => deleteGroup(group.id)}
           />
         ))}
-        <div className="flex overflow-hidden self-start rounded-[4px] border border-interactive-secondary-pressed">
-          <button
-            type="button"
-            className="flex items-center gap-1.5 px-3 py-1.5 text-sm font-semibold text-interactive-active transition-colors hover:bg-interactive-secondary-hover focus-visible:outline-none"
-            onClick={() => onUpdate({ ...block, groups: [...block.groups, makeEmptyEntityGroup()] })}
-          >
-            <Icon name="action-add" size={14} aria-hidden />
-            Add Condition
-          </button>
-          <button
-            type="button"
-            className="border-l border-interactive-secondary-pressed px-2 py-1.5 text-interactive-active transition-colors hover:bg-interactive-secondary-hover focus-visible:outline-none"
-            aria-label="More condition options"
-          >
-            <Icon name="chevron-down" size={14} aria-hidden />
-          </button>
-        </div>
+        <button
+          type="button"
+          className="flex items-center gap-1.5 self-start rounded-[4px] border border-interactive-secondary-pressed px-3 py-1.5 text-sm font-semibold text-interactive-active transition-colors hover:bg-interactive-secondary-hover focus-visible:outline-none"
+          onClick={() => onUpdate({ ...block, groups: [...block.groups, makeEmptyEntityGroup()] })}
+        >
+          <Icon name="action-add" size={14} aria-hidden />
+          Add Condition
+        </button>
       </div>
     </div>
   );
@@ -886,12 +848,6 @@ function AdvancedOptions() {
         onClick={() => setOpen((v) => !v)}
         aria-expanded={open}
       >
-        <Icon
-          name="chevron-down"
-          size={16}
-          className={cx("shrink-0 transition-transform duration-150", open ? "" : "-rotate-90")}
-          aria-hidden
-        />
         Advanced Options
         <Icon name="action-info" size={16} className="text-text-tertiary" aria-hidden />
       </button>
@@ -1041,24 +997,14 @@ export function SearchQueryBuilder({
       <div className="flex flex-wrap items-center gap-3">
         {/* Add Entity */}
         <div className="relative">
-          <div className="flex overflow-hidden rounded-[4px] border border-interactive-secondary-pressed">
-            <button
-              type="button"
-              className="flex items-center gap-1.5 px-3 py-1.5 text-sm font-semibold text-interactive-active transition-colors hover:bg-interactive-secondary-hover focus-visible:outline-none"
-              onClick={() => setShowEntityPicker((v) => !v)}
-            >
-              <Icon name="action-add" size={14} aria-hidden />
-              Add Entity
-            </button>
-            <button
-              type="button"
-              className="border-l border-interactive-secondary-pressed px-2 py-1.5 text-interactive-active transition-colors hover:bg-interactive-secondary-hover focus-visible:outline-none"
-              aria-label="More entity options"
-              onClick={() => setShowEntityPicker((v) => !v)}
-            >
-              <Icon name="chevron-down" size={14} aria-hidden />
-            </button>
-          </div>
+          <button
+            type="button"
+            className="flex items-center gap-1.5 rounded-[4px] border border-interactive-secondary-pressed px-3 py-1.5 text-sm font-semibold text-interactive-active transition-colors hover:bg-interactive-secondary-hover focus-visible:outline-none"
+            onClick={() => setShowEntityPicker((v) => !v)}
+          >
+            <Icon name="action-add" size={14} aria-hidden />
+            Add Entity
+          </button>
           {showEntityPicker && (
             <EntityPickerPopover
               onSelect={(option) => {
@@ -1071,24 +1017,14 @@ export function SearchQueryBuilder({
 
         {/* Add Event */}
         <div className="relative">
-          <div className="flex overflow-hidden rounded-[4px] border border-interactive-secondary-pressed">
-            <button
-              type="button"
-              className="flex items-center gap-1.5 px-3 py-1.5 text-sm font-semibold text-interactive-active transition-colors hover:bg-interactive-secondary-hover focus-visible:outline-none"
-              onClick={() => setShowEventPicker((v) => !v)}
-            >
-              <Icon name="action-add" size={14} aria-hidden />
-              Add Event
-            </button>
-            <button
-              type="button"
-              className="border-l border-interactive-secondary-pressed px-2 py-1.5 text-interactive-active transition-colors hover:bg-interactive-secondary-hover focus-visible:outline-none"
-              aria-label="More event options"
-              onClick={() => setShowEventPicker((v) => !v)}
-            >
-              <Icon name="chevron-down" size={14} aria-hidden />
-            </button>
-          </div>
+          <button
+            type="button"
+            className="flex items-center gap-1.5 rounded-[4px] border border-interactive-secondary-pressed px-3 py-1.5 text-sm font-semibold text-interactive-active transition-colors hover:bg-interactive-secondary-hover focus-visible:outline-none"
+            onClick={() => setShowEventPicker((v) => !v)}
+          >
+            <Icon name="action-add" size={14} aria-hidden />
+            Add Event
+          </button>
 
           {showEventPicker && (
             <EventPickerPopover

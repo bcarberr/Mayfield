@@ -368,26 +368,6 @@ export function SearchEntityEventSelect({
           onFocus={openPicker}
           onClick={openPicker}
         />
-        <button
-          type="button"
-          aria-label={open ? "Close search scope picker" : "Open search scope picker"}
-          className="shrink-0 rounded p-0.5 text-text-primary transition-colors hover:bg-overlay-subtle"
-          onClick={() => {
-            if (open) {
-              setOpen(false);
-            } else {
-              inputRef.current?.focus();
-              openPicker();
-            }
-          }}
-        >
-          <Icon
-            name="chevron-down"
-            size={18}
-            className={cx("transition-transform duration-150", open ? "rotate-180" : "")}
-            aria-hidden
-          />
-        </button>
       </div>
 
       {open ? (

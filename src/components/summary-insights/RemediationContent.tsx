@@ -3,6 +3,7 @@ import { Icon, type SeverityShapeIconName } from "../../design-system";
 import { useTimeframe } from "../../context/TimeframeContext";
 import { Button } from "../ui/Button";
 import { ColumnHeaderMenu } from "../ui/ColumnHeaderMenu";
+import { DonutChartPanel } from "../ui/DonutChartPanel";
 import { FilterColumnPanel, type FilterColumnPanelTool } from "../ui/FilterColumnPanel";
 import { Input } from "../ui/Input";
 import { SeverityTableIcon } from "../ui/SeverityTableIcon";
@@ -11,7 +12,7 @@ import { useResizableColumns } from "../ui/useResizableColumns";
 import { TruncatedText } from "../ui/TruncatedText";
 import { Checkbox } from "../uiCheckbox";
 import { cx, DatavisGridlineRule, InsightCard } from "./datavisCard";
-import { HorizontalBarPanel } from "./horizontalBarPanel";
+import { CHART_CATEGORY_FILL, HorizontalBarPanel } from "./horizontalBarPanel";
 import { TimeSeriesAreaChart } from "./timeSeriesAreaChart";
 import {
   buildHourlyAxisTicks,
@@ -19,12 +20,14 @@ import {
   findSpikeBucketIndex,
   formatBucketTimeLabel,
   hourlySeverityValues,
-  SPIKE_CLOCK_HOUR,
 } from "./timeframeChartUtils";
 
-type IdentitySeverity = "Critical" | "High" | "Medium" | "Low" | "Informational";
+const REMEDIATION_SPIKE_HOUR = 10;
+const STATUS_UNKNOWN_FILL = "#717882";
 
-const SEV_BAR: Record<IdentitySeverity, string> = {
+type RemediationSeverity = "Critical" | "High" | "Medium" | "Low" | "Informational";
+
+const SEV_BAR: Record<RemediationSeverity, string> = {
   Critical: "#ff604a",
   High: "#f28830",
   Medium: "#fac354",
@@ -32,7 +35,7 @@ const SEV_BAR: Record<IdentitySeverity, string> = {
   Informational: "#9b6bac",
 };
 
-const SEV_ICONS: Record<IdentitySeverity, SeverityShapeIconName> = {
+const SEV_ICONS: Record<RemediationSeverity, SeverityShapeIconName> = {
   Critical: "severity-critical",
   High: "severity-high",
   Medium: "severity-medium",
@@ -40,7 +43,7 @@ const SEV_ICONS: Record<IdentitySeverity, SeverityShapeIconName> = {
   Informational: "severity-info",
 };
 
-const SEVERITY_ORDER: Record<IdentitySeverity, number> = {
+const SEVERITY_ORDER: Record<RemediationSeverity, number> = {
   Critical: 0,
   High: 1,
   Medium: 2,
@@ -48,222 +51,245 @@ const SEVERITY_ORDER: Record<IdentitySeverity, number> = {
   Informational: 4,
 };
 
-type AuthOutcome = "Success" | "Failure" | "Unknown";
+type ActivityClass =
+  | "File Remediation"
+  | "Process Remediation"
+  | "Network Remediation"
+  | "Remediation Activity";
 
-type AccountChangeActivity = "Password reset" | "Enable" | "Disable" | "Lock" | "Delete";
+type RemediationEventClass =
+  | "File Remediation Activity"
+  | "Process Remediation Activity"
+  | "Network Remediation Activity"
+  | "Remediation Activity";
 
-type IdentityEventClass =
-  | "Authentication"
-  | "Account Change"
-  | "Authorize Session"
-  | "Group Management"
-  | "Entity Management"
-  | "User Access Management";
+type RemediationStatus = "Succeeded" | "Failed" | "Pending";
 
-type IdentityAccessRow = {
+type RemediationRow = {
   id: string;
-  severity: IdentitySeverity;
+  severity: RemediationSeverity;
   title: string;
   time: string;
   activity: string;
-  eventClass: IdentityEventClass;
-  authOutcome: AuthOutcome;
-  accountChangeActivity?: AccountChangeActivity;
+  eventClass: RemediationEventClass;
+  activityClass: ActivityClass;
+  entity: string;
+  status: RemediationStatus;
   connector: string;
-  user: string;
-  sourceIp: string;
 };
 
-function connectorSwatch(connector: string) {
-  if (connector.startsWith("BCs")) return "bg-feedback-info";
-  if (connector.includes("Athena")) return "bg-interactive-active";
-  return "bg-feedback-negative";
-}
-
-function isIdentityEventClass(label: string): label is IdentityEventClass {
-  return (
-    label === "Account Change" ||
-    label === "Authentication" ||
-    label === "Authorize Session" ||
-    label === "Entity Management" ||
-    label === "User Access Management" ||
-    label === "Group Management"
-  );
-}
-
-function isIdentitySeverity(label: string): label is IdentitySeverity {
-  return label in SEV_BAR;
-}
-
-/** OCSF Identity & Access Management classes — https://schema.ocsf.io/ category [3]. */
-const IAM_MANAGEMENT_CLASS_ROWS = [
-  { label: "Account Change", value: 756 },
-  { label: "Authentication", value: 1842 },
-  { label: "Authorize Session", value: 245 },
-  { label: "Entity Management", value: 178 },
-  { label: "User Access Management", value: 512 },
-  { label: "Group Management", value: 389 },
+const ACTIVITY_CLASS_ROWS = [
+  { label: "File Remediation", value: 1240, color: CHART_CATEGORY_FILL },
+  { label: "Process Remediation", value: 870, color: CHART_CATEGORY_FILL },
+  { label: "Network Remediation", value: 560, color: CHART_CATEGORY_FILL },
+  { label: "Remediation Activity", value: 198, color: CHART_CATEGORY_FILL },
 ] as const;
 
 const SEVERITY_ROWS = [
   { label: "Critical", value: 38, color: SEV_BAR.Critical },
-  { label: "High", value: 196, color: SEV_BAR.High },
-  { label: "Medium", value: 512, color: SEV_BAR.Medium },
-  { label: "Low", value: 401, color: SEV_BAR.Low },
-  { label: "Informational", value: 623, color: SEV_BAR.Informational },
+  { label: "High", value: 214, color: SEV_BAR.High },
+  { label: "Medium", value: 498, color: SEV_BAR.Medium },
+  { label: "Low", value: 612, color: SEV_BAR.Low },
+  { label: "Info", value: 361, color: SEV_BAR.Informational },
 ] as const;
 
-const TOP_USERS_BAR = "#4a9eff";
-
-const TOP_USERS_ROWS = [
-  { label: "svc-backup", value: 214, color: TOP_USERS_BAR },
-  { label: "j.alvarez", value: 112, color: TOP_USERS_BAR },
-  { label: "admin", value: 81, color: TOP_USERS_BAR },
-  { label: "t.nguyen", value: 42, color: TOP_USERS_BAR },
+const STATUS_SEGMENTS = [
+  { label: "Succeeded", color: CHART_CATEGORY_FILL, value: 1172 },
+  { label: "Failed", color: "#f28830", value: 310 },
+  { label: "Pending", color: STATUS_UNKNOWN_FILL, value: 241 },
 ] as const;
 
-const IDENTITY_ACCESS_ROWS: IdentityAccessRow[] = [
+const REMEDIATION_STATUS_TOTAL = 1723;
+const TOTAL_REMEDIATION_RESULTS = 1723;
+
+const REMEDIATION_ROWS: RemediationRow[] = [
   {
     id: "1",
     severity: "Critical",
-    title: "Impossible travel: login from two countries within 5 min…",
-    time: "14:22:08",
-    activity: "Logon",
-    eventClass: "Authentication",
-    authOutcome: "Failure",
-    connector: "BCs1",
-    user: "j.alvarez",
-    sourceIp: "203.0.113.5",
+    title: "Isolate host failed — endpoint unreachable during response window…",
+    time: "10:31:02",
+    activity: "Isolate",
+    eventClass: "Network Remediation Activity",
+    activityClass: "Network Remediation",
+    entity: "fin-ws-014",
+    status: "Failed",
+    connector: "CrowdStrike",
   },
   {
     id: "2",
     severity: "High",
-    title: "Repeated failed logons for privileged service account…",
-    time: "13:05:41",
-    activity: "Logon",
-    eventClass: "Authentication",
-    authOutcome: "Failure",
-    connector: "BC-CS-Athena",
-    user: "svc-backup",
-    sourceIp: "198.51.100.22",
+    title: "Quarantine malicious file blocked by policy on shared endpoint…",
+    time: "09:58:41",
+    activity: "Quarantine",
+    eventClass: "File Remediation Activity",
+    activityClass: "File Remediation",
+    entity: "C:\\Users\\Public\\update.exe",
+    status: "Succeeded",
+    connector: "Defender",
   },
   {
     id: "3",
     severity: "High",
-    title: "Admin account password reset outside change window…",
-    time: "11:40:12",
-    activity: "Update",
-    eventClass: "Account Change",
-    authOutcome: "Success",
-    accountChangeActivity: "Password reset",
-    connector: "BC-CS",
-    user: "admin",
-    sourceIp: "10.0.2.18",
+    title: "Kill process action completed for suspicious PowerShell child…",
+    time: "09:40:12",
+    activity: "Kill Process",
+    eventClass: "Process Remediation Activity",
+    activityClass: "Process Remediation",
+    entity: "powershell.exe (PID 8842)",
+    status: "Succeeded",
+    connector: "CrowdStrike",
   },
   {
     id: "4",
     severity: "Medium",
-    title: "New user added to Domain Admins group…",
-    time: "09:12:00",
-    activity: "Add",
-    eventClass: "Group Management",
-    authOutcome: "Success",
-    connector: "BCs1",
-    user: "t.nguyen",
-    sourceIp: "10.0.3.55",
+    title: "Block outbound connection to known C2 address pending approval…",
+    time: "08:12:00",
+    activity: "Block",
+    eventClass: "Network Remediation Activity",
+    activityClass: "Network Remediation",
+    entity: "203.0.113.44:443",
+    status: "Pending",
+    connector: "Panorama",
   },
   {
     id: "5",
     severity: "Low",
-    title: "Session privilege elevation for standard user context…",
+    title: "Remediation ticket updated with containment playbook reference…",
     time: "22:18:55",
-    activity: "Assign Privileges",
-    eventClass: "Authorize Session",
-    authOutcome: "Success",
-    connector: "BC-CS-Athena",
-    user: "m.chen",
-    sourceIp: "10.0.1.44",
+    activity: "Update",
+    eventClass: "Remediation Activity",
+    activityClass: "Remediation Activity",
+    entity: "INC-2024-8841",
+    status: "Succeeded",
+    connector: "Intune",
   },
   {
     id: "6",
     severity: "Informational",
-    title: "MFA enrollment completed for contractor account…",
+    title: "Automated file delete succeeded on staging share artifact…",
     time: "18:00:03",
     activity: "Update",
-    eventClass: "Entity Management",
-    authOutcome: "Success",
-    connector: "BCs1",
-    user: "k.patel",
-    sourceIp: "172.16.4.90",
+    eventClass: "File Remediation Activity",
+    activityClass: "File Remediation",
+    entity: "\\\\file-stg\\quarantine\\drop.zip",
+    status: "Succeeded",
+    connector: "Defender",
   },
   {
     id: "7",
     severity: "Critical",
-    title: "Disabled account re-enabled without approval ticket…",
+    title: "Network isolation rollback failed — host still routing externally…",
     time: "16:44:19",
-    activity: "Enable",
-    eventClass: "Account Change",
-    authOutcome: "Success",
-    accountChangeActivity: "Enable",
-    connector: "BC-CS",
-    user: "legacy.ops",
-    sourceIp: "192.0.2.77",
+    activity: "Isolate",
+    eventClass: "Network Remediation Activity",
+    activityClass: "Network Remediation",
+    entity: "ops-jump-03",
+    status: "Failed",
+    connector: "Panorama",
   },
   {
     id: "8",
     severity: "High",
-    title: "OAuth consent grant to unverified third-party app…",
+    title: "Process termination queued for unsigned service binary…",
     time: "12:01:47",
-    activity: "Authorize",
-    eventClass: "User Access Management",
-    authOutcome: "Unknown",
-    connector: "BC-CS-Athena",
-    user: "j.alvarez",
-    sourceIp: "203.0.113.5",
+    activity: "Kill Process",
+    eventClass: "Process Remediation Activity",
+    activityClass: "Process Remediation",
+    entity: "svc-host.exe",
+    status: "Pending",
+    connector: "CrowdStrike",
+  },
+  {
+    id: "9",
+    severity: "Medium",
+    title: "File hash block rule pushed to edge firewall policy set…",
+    time: "09:33:22",
+    activity: "Block",
+    eventClass: "File Remediation Activity",
+    activityClass: "File Remediation",
+    entity: "sha256:9f2c…a11b",
+    status: "Succeeded",
+    connector: "Panorama",
+  },
+  {
+    id: "10",
+    severity: "Low",
+    title: "Remediation workflow marked complete after host compliance check…",
+    time: "21:15:08",
+    activity: "Update",
+    eventClass: "Remediation Activity",
+    activityClass: "Remediation Activity",
+    entity: "hr-laptop-22",
+    status: "Succeeded",
+    connector: "Intune",
   },
 ];
 
-const TOTAL_IDENTITY_RESULTS = 6566;
+function connectorSwatch(connector: string) {
+  if (connector === "CrowdStrike") return "bg-feedback-negative";
+  if (connector === "Defender") return "bg-interactive-active";
+  if (connector === "Panorama") return "bg-datavis-data-peanut-orange";
+  return "bg-datavis-data-pop-teal-20";
+}
 
-function identityMatchesSearch(row: IdentityAccessRow, query: string): boolean {
+function statusClassName(status: RemediationStatus): string {
+  if (status === "Succeeded") return "text-feedback-positive";
+  if (status === "Failed") return "text-datavis-data-peanut-orange";
+  return "text-text-tertiary";
+}
+
+function isActivityClass(label: string): label is ActivityClass {
+  return ACTIVITY_CLASS_ROWS.some((row) => row.label === label);
+}
+
+function isRemediationSeverity(label: string): label is RemediationSeverity {
+  return label in SEV_BAR;
+}
+
+function isRemediationStatus(label: string): label is RemediationStatus {
+  return label === "Succeeded" || label === "Failed" || label === "Pending";
+}
+
+function severityMatchesFilter(rowSeverity: RemediationSeverity, filter: string): boolean {
+  if (filter === "Info") return rowSeverity === "Informational";
+  return rowSeverity === filter;
+}
+
+function remediationMatchesSearch(row: RemediationRow, query: string): boolean {
   const q = query.trim().toLowerCase();
   if (!q) return true;
 
-  const haystack = [
+  return [
     row.severity,
     row.title,
     row.time,
     row.activity,
     row.eventClass,
-    row.authOutcome,
-    row.accountChangeActivity,
+    row.activityClass,
+    row.entity,
+    row.status,
     row.connector,
-    row.user,
-    row.sourceIp,
   ]
-    .filter(Boolean)
     .join(" ")
-    .toLowerCase();
-
-  return haystack.includes(q);
+    .toLowerCase()
+    .includes(q);
 }
 
-type IdentitySortColumn =
+type RemediationSortColumn =
   | "severity"
   | "title"
   | "time"
   | "activity"
   | "eventClass"
-  | "connector"
-  | "user"
-  | "sourceIp";
+  | "entity"
+  | "status"
+  | "connector";
 
-/** px widths: select, severity, title, time, activity, class, user, source IP, connector */
 const SELECT_COL_WIDTH = 40;
-const COL_DEFAULTS: readonly number[] = [SELECT_COL_WIDTH, 108, 280, 96, 100, 148, 112, 120, 120];
-const COL_MINS: readonly number[] = [SELECT_COL_WIDTH, 72, 120, 72, 56, 96, 80, 88, 80];
+const COL_DEFAULTS: readonly number[] = [SELECT_COL_WIDTH, 108, 280, 96, 96, 168, 140, 96, 120];
+const COL_MINS: readonly number[] = [SELECT_COL_WIDTH, 72, 120, 72, 56, 96, 80, 72, 80];
 
-function IdentityAccessTable({ rows }: { rows: IdentityAccessRow[] }) {
+function RemediationEventsTable({ rows }: { rows: RemediationRow[] }) {
   const [selected, setSelected] = useState<Set<string>>(() => new Set());
   const {
     containerRef,
@@ -300,15 +326,15 @@ function IdentityAccessTable({ rows }: { rows: IdentityAccessRow[] }) {
   };
 
   const sortComparators = useMemo(
-    (): Record<IdentitySortColumn, (a: IdentityAccessRow, b: IdentityAccessRow) => number> => ({
+    (): Record<RemediationSortColumn, (a: RemediationRow, b: RemediationRow) => number> => ({
       severity: (a, b) => SEVERITY_ORDER[a.severity] - SEVERITY_ORDER[b.severity],
       title: (a, b) => compareStrings(a.title, b.title),
       time: (a, b) => compareStrings(a.time, b.time),
       activity: (a, b) => compareStrings(a.activity, b.activity),
       eventClass: (a, b) => compareStrings(a.eventClass, b.eventClass),
+      entity: (a, b) => compareStrings(a.entity, b.entity),
+      status: (a, b) => compareStrings(a.status, b.status),
       connector: (a, b) => compareStrings(a.connector, b.connector),
-      user: (a, b) => compareStrings(a.user, b.user),
-      sourceIp: (a, b) => compareStrings(a.sourceIp, b.sourceIp),
     }),
     [],
   );
@@ -324,7 +350,7 @@ function IdentityAccessTable({ rows }: { rows: IdentityAccessRow[] }) {
           minWidth: Math.max(minTableWidth, baseTotal),
         }}
       >
-        <caption className="sr-only">Identity and access events</caption>
+        <caption className="sr-only">Remediation activity events</caption>
         <colgroup>
           {displayWidths.map((w, i) => (
             <col key={i} style={{ width: w }} />
@@ -348,11 +374,7 @@ function IdentityAccessTable({ rows }: { rows: IdentityAccessRow[] }) {
               style={colStyle(1)}
               className="relative h-10 border-r border-datavis-gridlines px-2 py-0 align-middle text-xs font-bold uppercase tracking-wide text-text-primary"
             >
-              <ColumnHeaderMenu
-                label="Severity"
-                menuLabel="Severity column options"
-                {...getSortProps("severity")}
-              />
+              <ColumnHeaderMenu label="Severity" menuLabel="Severity column options" {...getSortProps("severity")} />
               {resizeHandle(1)}
             </th>
             <th
@@ -392,7 +414,7 @@ function IdentityAccessTable({ rows }: { rows: IdentityAccessRow[] }) {
               style={colStyle(6)}
               className="relative h-10 border-r border-datavis-gridlines px-2 py-0 align-middle text-xs font-bold uppercase tracking-wide text-text-primary"
             >
-              <ColumnHeaderMenu label="User" menuLabel="User column options" {...getSortProps("user")} />
+              <ColumnHeaderMenu label="Entity" menuLabel="Entity column options" {...getSortProps("entity")} />
               {resizeHandle(6)}
             </th>
             <th
@@ -400,7 +422,7 @@ function IdentityAccessTable({ rows }: { rows: IdentityAccessRow[] }) {
               style={colStyle(7)}
               className="relative h-10 border-r border-datavis-gridlines px-2 py-0 align-middle text-xs font-bold uppercase tracking-wide text-text-primary"
             >
-              <ColumnHeaderMenu label="Source IP" menuLabel="Source IP column options" {...getSortProps("sourceIp")} />
+              <ColumnHeaderMenu label="Status" menuLabel="Status column options" {...getSortProps("status")} />
               {resizeHandle(7)}
             </th>
             <th
@@ -421,7 +443,7 @@ function IdentityAccessTable({ rows }: { rows: IdentityAccessRow[] }) {
                   <Checkbox
                     checked={selected.has(row.id)}
                     onCheckedChange={(c) => toggleRow(row.id, c)}
-                    aria-label={`Select identity event ${row.id}`}
+                    aria-label={`Select remediation event ${row.id}`}
                   />
                 </div>
               </td>
@@ -448,9 +470,9 @@ function IdentityAccessTable({ rows }: { rows: IdentityAccessRow[] }) {
               <td style={colStyle(5)} className="h-10 min-w-0 overflow-hidden px-2 py-0 align-middle">
                 <span className="flex w-full min-w-0 items-center gap-2">
                   <Icon
-                    name="ocsf-identity-access"
+                    name="ocsf-remediation"
                     size={16}
-                    className="size-4 shrink-0 text-interactive-active [&_svg]:!size-4"
+                    className="size-4 shrink-0 text-datavis-data-pop-teal-20 [&_svg]:!size-4"
                     aria-hidden
                   />
                   <TruncatedText className="w-full text-sm text-text-secondary" wrapperClassName="min-w-0 flex-1">
@@ -459,18 +481,20 @@ function IdentityAccessTable({ rows }: { rows: IdentityAccessRow[] }) {
                 </span>
               </td>
               <td style={colStyle(6)} className="h-10 min-w-0 px-2 py-0 align-middle">
-                <TruncatedText className="text-sm text-text-secondary">{row.user}</TruncatedText>
+                <TruncatedText className="text-sm text-text-secondary">{row.entity}</TruncatedText>
               </td>
-              <td style={colStyle(7)} className="h-10 min-w-0 px-2 py-0 align-middle tabular-nums">
-                <TruncatedText className="text-sm text-text-secondary">{row.sourceIp}</TruncatedText>
+              <td style={colStyle(7)} className="h-10 min-w-0 px-2 py-0 align-middle">
+                <TruncatedText className={cx("text-sm font-semibold", statusClassName(row.status))}>
+                  {row.status}
+                </TruncatedText>
               </td>
-              <td style={colStyle(8)} className="h-10 min-w-0 overflow-hidden px-2 py-0 align-middle">
-                <span className="flex w-full min-w-0 items-center gap-2">
+              <td style={colStyle(8)} className="h-10 min-w-0 px-2 py-0 align-middle">
+                <span className="inline-flex min-w-0 items-center gap-2">
                   <span
                     className={cx("size-2.5 shrink-0 rounded-sm", connectorSwatch(row.connector))}
                     aria-hidden
                   />
-                  <TruncatedText className="w-full text-sm text-text-secondary" wrapperClassName="min-w-0 flex-1">
+                  <TruncatedText className="text-sm text-text-secondary" wrapperClassName="min-w-0 flex-1">
                     {row.connector}
                   </TruncatedText>
                 </span>
@@ -483,50 +507,56 @@ function IdentityAccessTable({ rows }: { rows: IdentityAccessRow[] }) {
   );
 }
 
-/** Figma concept — Identity & Access body for Federated Analytics. */
-export function IdentityAccessContent() {
+/** Figma concept — Remediation body for Federated Analytics. */
+export function RemediationContent() {
   const { range: timeframe } = useTimeframe();
-  const [eventClassFilter, setEventClassFilter] = useState<IdentityEventClass | null>(null);
-  const [severityFilter, setSeverityFilter] = useState<IdentitySeverity | null>(null);
-  const [userFilter, setUserFilter] = useState<string | null>(null);
+  const [activityClassFilter, setActivityClassFilter] = useState<ActivityClass | null>(null);
+  const [severityFilter, setSeverityFilter] = useState<string | null>(null);
+  const [statusFilter, setStatusFilter] = useState<RemediationStatus | null>(null);
   const [searchQuery, setSearchQuery] = useState("");
   const [tableTool, setTableTool] = useState<FilterColumnPanelTool | null>(null);
 
   const filteredRows = useMemo(
     () =>
-      IDENTITY_ACCESS_ROWS.filter((row) => {
-        if (eventClassFilter && row.eventClass !== eventClassFilter) return false;
-        if (severityFilter && row.severity !== severityFilter) return false;
-        if (userFilter && row.user !== userFilter) return false;
-        if (!identityMatchesSearch(row, searchQuery)) return false;
+      REMEDIATION_ROWS.filter((row) => {
+        if (activityClassFilter && row.activityClass !== activityClassFilter) return false;
+        if (severityFilter && !severityMatchesFilter(row.severity, severityFilter)) return false;
+        if (statusFilter && row.status !== statusFilter) return false;
+        if (!remediationMatchesSearch(row, searchQuery)) return false;
         return true;
       }),
-    [eventClassFilter, severityFilter, userFilter, searchQuery],
+    [activityClassFilter, severityFilter, statusFilter, searchQuery],
   );
 
   const hasActiveFilters =
-    eventClassFilter != null ||
+    activityClassFilter != null ||
     severityFilter != null ||
-    userFilter != null ||
+    statusFilter != null ||
     searchQuery.trim().length > 0;
 
-  const handleEventClassClick = (label: string) => {
-    if (!isIdentityEventClass(label)) return;
-    setEventClassFilter((current) => (current === label ? null : label));
+  const handleActivityClassClick = (label: string) => {
+    if (!isActivityClass(label)) return;
+    setActivityClassFilter((current) => (current === label ? null : label));
   };
 
   const handleSeverityClick = (label: string) => {
-    if (!isIdentitySeverity(label)) return;
+    if (label !== "Info" && !isRemediationSeverity(label)) return;
     setSeverityFilter((current) => (current === label ? null : label));
   };
 
-  const handleUserClick = (label: string) => {
-    setUserFilter((current) => (current === label ? null : label));
+  const handleChartSeverityClick = (seriesId: string) => {
+    if (!isRemediationSeverity(seriesId)) return;
+    setSeverityFilter((current) => (current === seriesId ? null : seriesId));
+  };
+
+  const handleStatusClick = (label: string) => {
+    if (!isRemediationStatus(label)) return;
+    setStatusFilter((current) => (current === label ? null : label));
   };
 
   const eventsPerHourChart = useMemo(() => {
     const buckets = buildHourlyBuckets(timeframe);
-    const spikeIndex = findSpikeBucketIndex(buckets, timeframe.to);
+    const spikeIndex = findSpikeBucketIndex(buckets, timeframe.to, REMEDIATION_SPIKE_HOUR);
     const includeDate = timeframe.to.getTime() - timeframe.from.getTime() > 36 * 3_600_000;
     const xLabels = buckets.map((bucket) => formatBucketTimeLabel(bucket.start, includeDate));
     const { indices: xTickIndices, labels: xTickLabels } = buildHourlyAxisTicks(buckets, timeframe);
@@ -537,27 +567,27 @@ export function IdentityAccessContent() {
         label: "Medium",
         color: SEV_BAR.Medium,
         icon: SEV_ICONS.Medium,
-        values: hourlySeverityValues(12, buckets, spikeIndex),
+        values: hourlySeverityValues(14, buckets, spikeIndex),
       },
       {
         id: "High",
         label: "High",
         color: SEV_BAR.High,
         icon: SEV_ICONS.High,
-        values: hourlySeverityValues(8, buckets, spikeIndex),
+        values: hourlySeverityValues(10, buckets, spikeIndex),
       },
       {
         id: "Critical",
         label: "Critical",
         color: SEV_BAR.Critical,
         icon: SEV_ICONS.Critical,
-        values: hourlySeverityValues(3, buckets, spikeIndex),
+        values: hourlySeverityValues(4, buckets, spikeIndex),
       },
     ] as const;
 
     const spikeHighlight =
       spikeIndex != null
-        ? { index: spikeIndex, label: `spike ~${SPIKE_CLOCK_HOUR}:00` }
+        ? { index: spikeIndex, label: "spike ~10:30" }
         : undefined;
 
     return { series, xLabels, xTickIndices, xTickLabels, spikeHighlight };
@@ -565,28 +595,28 @@ export function IdentityAccessContent() {
 
   return (
     <div className="flex shrink-0 flex-col gap-4 p-4 sm:p-5">
-      <InsightCard title="Identity & Access Events Per Hour By Severity">
+      <InsightCard title="Remediation Events Per Hour By Severity">
         <TimeSeriesAreaChart
           series={eventsPerHourChart.series}
           xLabels={eventsPerHourChart.xLabels}
           xTickIndices={eventsPerHourChart.xTickIndices}
           xTickLabels={eventsPerHourChart.xTickLabels}
           spikeHighlight={eventsPerHourChart.spikeHighlight}
-          ariaLabel="Identity and access events per hour by severity"
-          selectedSeriesId={severityFilter}
-          onSeriesClick={handleSeverityClick}
+          ariaLabel="Remediation events per hour by severity"
+          selectedSeriesId={severityFilter && isRemediationSeverity(severityFilter) ? severityFilter : null}
+          onSeriesClick={handleChartSeverityClick}
         />
       </InsightCard>
 
       <div className="grid min-h-0 shrink-0 grid-cols-1 items-stretch gap-4 lg:grid-cols-3">
-        <InsightCard title="Identity & Access Management Classes" fillHeight>
+        <InsightCard title="Remediation Activity Classes" fillHeight>
           <HorizontalBarPanel
-            rows={IAM_MANAGEMENT_CLASS_ROWS}
-            selectedLabel={eventClassFilter}
-            onBarClick={handleEventClassClick}
-            filterAriaLabel={(label) => `Filter identity events by ${label}`}
-            xMax={2000}
-            xTicks={[0, 500, 1000, 1500, 2000]}
+            rows={ACTIVITY_CLASS_ROWS}
+            selectedLabel={activityClassFilter}
+            onBarClick={handleActivityClassClick}
+            filterAriaLabel={(label) => `Filter remediation events by ${label}`}
+            xMax={1400}
+            xTicks={[0, 350, 700, 1050, 1400]}
           />
         </InsightCard>
         <InsightCard title="Severity ID" fillHeight>
@@ -594,32 +624,32 @@ export function IdentityAccessContent() {
             rows={SEVERITY_ROWS}
             selectedLabel={severityFilter}
             onBarClick={handleSeverityClick}
-            filterAriaLabel={(label) => `Filter identity events by ${label} severity`}
+            filterAriaLabel={(label) => `Filter remediation events by ${label} severity`}
             xMax={700}
             xTicks={[0, 175, 350, 525, 700]}
           />
         </InsightCard>
-        <InsightCard title="Top Users By Failed Logins" fillHeight>
-          <HorizontalBarPanel
-            rows={TOP_USERS_ROWS}
-            selectedLabel={userFilter}
-            onBarClick={handleUserClick}
-            filterAriaLabel={(label) => `Filter identity events by user ${label}`}
-            xMax={250}
-            xTicks={[0, 50, 100, 150, 200]}
+        <InsightCard title="Remediation Status" fillHeight>
+          <DonutChartPanel
+            segments={STATUS_SEGMENTS}
+            total={REMEDIATION_STATUS_TOTAL}
+            centerLabel="actions"
+            selectedLabel={statusFilter}
+            onSegmentClick={handleStatusClick}
+            ariaLabel="Remediation status breakdown"
           />
         </InsightCard>
       </div>
 
       <section className="mx-0 mb-0 flex min-h-0 min-w-0 flex-1 flex-col overflow-hidden rounded-[4px] border border-border-container bg-datavis-card-bg shadow-[0_1px_5px_rgba(0,0,0,0.2)]">
         <div className="shrink-0 bg-datavis-card-bg pb-3 pl-4 pr-6 pt-3 sm:pl-5">
-          <h2 className="text-base-semibold text-text-primary">Identity & Access Events</h2>
+          <h2 className="text-base-semibold text-text-primary">Remediation Activity Events</h2>
           <div className="mt-2 flex flex-wrap items-center gap-3">
             <p className="shrink-0 text-base-small text-text-secondary">
-              {filteredRows.length} of {TOTAL_IDENTITY_RESULTS} Results
-              {eventClassFilter ? ` · ${eventClassFilter}` : ""}
+              {filteredRows.length} of {TOTAL_REMEDIATION_RESULTS} Results
+              {activityClassFilter ? ` · ${activityClassFilter}` : ""}
               {severityFilter ? ` · ${severityFilter}` : ""}
-              {userFilter ? ` · ${userFilter}` : ""}
+              {statusFilter ? ` · ${statusFilter}` : ""}
               {searchQuery.trim() ? ` · “${searchQuery.trim()}”` : ""}
             </p>
             <div className="w-[300px] shrink-0">
@@ -629,7 +659,7 @@ export function IdentityAccessContent() {
                 value={searchQuery}
                 onChange={(event) => setSearchQuery(event.target.value)}
                 className="!bg-datavis-card-bg"
-                aria-label="Search identity and access events"
+                aria-label="Search remediation activity events"
               />
             </div>
             {hasActiveFilters ? (
@@ -638,9 +668,9 @@ export function IdentityAccessContent() {
                 variant="ghost"
                 className="h-8 shrink-0 gap-1.5 px-2 text-base-small text-text-tertiary hover:text-text-primary [&_svg]:!h-2 [&_svg]:!w-3"
                 onClick={() => {
-                  setEventClassFilter(null);
+                  setActivityClassFilter(null);
                   setSeverityFilter(null);
-                  setUserFilter(null);
+                  setStatusFilter(null);
                   setSearchQuery("");
                 }}
               >
@@ -662,7 +692,7 @@ export function IdentityAccessContent() {
             onColumnsClick={() => setTableTool(tableTool === "columns" ? null : "columns")}
           />
           <div className="min-h-0 min-w-0 flex-1 pb-3">
-            <IdentityAccessTable rows={filteredRows} />
+            <RemediationEventsTable rows={filteredRows} />
           </div>
         </div>
       </section>

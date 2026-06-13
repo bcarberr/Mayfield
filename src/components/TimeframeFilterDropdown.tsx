@@ -87,12 +87,6 @@ export function TimeframeFilterDropdown() {
         <Icon name="action-time" size={16} className={cx("shrink-0", HEADER_FILTER_INTERACTIVE)} aria-hidden />
         <span className={cx("inline-flex shrink-0 items-center gap-1 text-sm font-semibold", HEADER_FILTER_INTERACTIVE)}>
           Timeframe
-          <Icon
-            name="chevron-down"
-            size={16}
-            className={cx("shrink-0 transition-transform duration-150", HEADER_FILTER_INTERACTIVE, open && "rotate-180")}
-            aria-hidden
-          />
         </span>
         <span className="ml-0.5 shrink-0 rounded bg-surface-container px-2 py-1 text-sm font-normal text-text-primary">
           {formatTimeframeLabel(range.from, range.to)}

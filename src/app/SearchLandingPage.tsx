@@ -173,12 +173,6 @@ function SearchToolbarActions({
             className="flex items-center gap-2 rounded py-1 pr-1 text-left text-sm font-semibold leading-5 tracking-[0.4px] text-text-primary transition-colors hover:bg-overlay-subtle focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-interactive-active focus-visible:ring-offset-2 focus-visible:ring-offset-surface-container"
             onClick={() => onCriteriaOpenChange(!criteriaOpen)}
           >
-            <Icon
-              name="chevron-down"
-              size={18}
-              className={`shrink-0 text-text-primary transition-transform duration-150 ease-out ${criteriaOpen ? "" : "-rotate-90"}`}
-              aria-hidden
-            />
             Search Criteria
           </button>
           <SearchCriteriaModeRadios value={criteriaMode} onChange={onCriteriaModeChange} />

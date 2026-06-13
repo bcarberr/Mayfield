@@ -1,6 +1,6 @@
-import { useEffect, useMemo, useRef, useState, type CSSProperties } from "react";
-import { createPortal } from "react-dom";
+import { useMemo, useState } from "react";
 import { Icon, type SeverityShapeIconName } from "../../design-system";
+import { useTimeframe } from "../../context/TimeframeContext";
 import { Button } from "../ui/Button";
 import { ColumnHeaderMenu } from "../ui/ColumnHeaderMenu";
 import { FilterColumnPanel, type FilterColumnPanelTool } from "../ui/FilterColumnPanel";
@@ -11,11 +11,20 @@ import { useResizableColumns } from "../ui/useResizableColumns";
 import { TruncatedText } from "../ui/TruncatedText";
 import { Checkbox } from "../uiCheckbox";
 import { cx, DatavisGridlineRule, InsightCard } from "./datavisCard";
-import { SourceEndpointsSankeyChart } from "./SourceEndpointsSankeyChart";
+import { CHART_CATEGORY_FILL, HorizontalBarPanel } from "./horizontalBarPanel";
+import { TimeSeriesAreaChart } from "./timeSeriesAreaChart";
+import {
+  buildHourlyAxisTicks,
+  buildHourlyBuckets,
+  findSpikeBucketIndex,
+  formatBucketTimeLabel,
+  hourlySeverityValues,
+  SPIKE_CLOCK_HOUR,
+} from "./timeframeChartUtils";
 
 type NetworkSeverity = "Critical" | "High" | "Medium" | "Low" | "Informational";
 
-const NETWORK_SEV_COLORS: Record<NetworkSeverity, string> = {
+const SEV_BAR: Record<NetworkSeverity, string> = {
   Critical: "#ff604a",
   High: "#f28830",
   Medium: "#fac354",
@@ -23,7 +32,7 @@ const NETWORK_SEV_COLORS: Record<NetworkSeverity, string> = {
   Informational: "#9b6bac",
 };
 
-const NETWORK_SEV_ICONS: Record<NetworkSeverity, SeverityShapeIconName> = {
+const SEV_ICONS: Record<NetworkSeverity, SeverityShapeIconName> = {
   Critical: "severity-critical",
   High: "severity-high",
   Medium: "severity-medium",
@@ -31,7 +40,7 @@ const NETWORK_SEV_ICONS: Record<NetworkSeverity, SeverityShapeIconName> = {
   Informational: "severity-info",
 };
 
-const NETWORK_SEVERITY_ORDER: Record<NetworkSeverity, number> = {
+const SEVERITY_ORDER: Record<NetworkSeverity, number> = {
   Critical: 0,
   High: 1,
   Medium: 2,
@@ -39,17 +48,27 @@ const NETWORK_SEVERITY_ORDER: Record<NetworkSeverity, number> = {
   Informational: 4,
 };
 
-type NetworkEventType = "HTTP Activity" | "Vulnerability";
+type TrafficActivityType = "DNS" | "Email" | "FTP" | "HTTP" | "SSH";
 
-const EVENT_TYPE_ICON: Record<NetworkEventType, { name: "network-activity" | "ocsf-findings"; className: string }> = {
-  "HTTP Activity": {
-    name: "network-activity",
-    className: "text-datavis-data-peanut-orange",
-  },
-  Vulnerability: {
-    name: "ocsf-findings",
-    className: "text-datavis-data-smalt-green-40",
-  },
+type NetworkEventType =
+  | "HTTP Activity"
+  | "DNS Activity"
+  | "Email Activity"
+  | "FTP Activity"
+  | "SSH Activity";
+
+type NetworkActivityRow = {
+  id: string;
+  severity: NetworkSeverity;
+  time: string;
+  eventType: NetworkEventType;
+  title: string;
+  activity: string;
+  status: string;
+  trafficType: TrafficActivityType;
+  sourceIp: string;
+  destinationIp: string;
+  connector: string;
 };
 
 function connectorSwatch(connector: string) {
@@ -58,359 +77,331 @@ function connectorSwatch(connector: string) {
   return "bg-feedback-negative";
 }
 
-type NetworkActivityRow = {
+const TRAFFIC_ACTIVITY_ROWS = [
+  { label: "DNS", value: 63400, color: CHART_CATEGORY_FILL },
+  { label: "Email", value: 5353, color: CHART_CATEGORY_FILL },
+  { label: "FTP", value: 3306, color: CHART_CATEGORY_FILL },
+  { label: "HTTP", value: 1900, color: CHART_CATEGORY_FILL },
+  { label: "SSH", value: 443, color: CHART_CATEGORY_FILL },
+] as const;
+
+const SEVERITY_ROWS = [
+  { label: "Critical", value: 112, color: SEV_BAR.Critical },
+  { label: "High", value: 204, color: SEV_BAR.High },
+  { label: "Medium", value: 388, color: SEV_BAR.Medium },
+  { label: "Low", value: 512, color: SEV_BAR.Low },
+  { label: "Info", value: 820, color: SEV_BAR.Informational },
+] as const;
+
+type SourceDestPair = {
   id: string;
-  severity: NetworkSeverity;
-  title: string;
-  time: string;
-  activity: string;
-  status: string;
-  eventType: NetworkEventType;
-  connector: string;
+  source: string;
+  destination: string;
+  value: number;
 };
 
-/** Same titles and column values as the Findings datagrid in SummaryInsightsDashboard. */
+const PAIR_BAR_FILL = "#4a9eff";
+
+const SOURCE_DEST_X_MAX = 1400;
+const SOURCE_DEST_X_TICKS = [0, 350, 700, 1050, 1400] as const;
+
+const SOURCE_DEST_PAIRS: SourceDestPair[] = [
+  { id: "10.0.1.44→203.0.113.5", source: "10.0.1.44", destination: "203.0.113.5", value: 1240 },
+  { id: "192.168.10.5→8.8.8.8", source: "192.168.10.5", destination: "8.8.8.8", value: 986 },
+  { id: "10.0.2.18→172.16.4.90", source: "10.0.2.18", destination: "172.16.4.90", value: 712 },
+  { id: "203.0.113.12→10.0.3.55", source: "203.0.113.12", destination: "10.0.3.55", value: 548 },
+];
+
 const NETWORK_ACTIVITY_ROWS: NetworkActivityRow[] = [
   {
     id: "1",
     severity: "Critical",
-    title: "This and that happened over cat r…",
-    time: "2024-07-31 14:22:08",
-    activity: "Post",
+    time: "14:22:08",
+    eventType: "DNS Activity",
+    title: "DNS tunneling pattern observed on outbound resolver…",
+    activity: "Traffic",
     status: "Failure",
-    eventType: "HTTP Activity",
+    trafficType: "DNS",
+    sourceIp: "10.0.1.44",
+    destinationIp: "203.0.113.5",
     connector: "BCs1",
   },
   {
     id: "2",
     severity: "High",
-    title: "Multiple failed logins from unusual region and follow-on…",
-    time: "2024-07-31 13:05:41",
-    activity: "Put",
-    status: "Unknown",
+    time: "13:05:41",
     eventType: "HTTP Activity",
+    title: "HTTP response handling anomaly on edge gateway…",
+    activity: "Update",
+    status: "Success",
+    trafficType: "HTTP",
+    sourceIp: "192.168.10.5",
+    destinationIp: "8.8.8.8",
     connector: "BC-CS-Athena",
   },
   {
     id: "3",
-    severity: "High",
-    title: "Policy violation: privileged container launch detected in…",
-    time: "2024-07-31 11:40:12",
-    activity: "Delete",
-    status: "Other",
-    eventType: "Vulnerability",
+    severity: "Medium",
+    time: "11:40:12",
+    eventType: "Email Activity",
+    title: "Unusual SMTP relay volume from internal mail host…",
+    activity: "Open",
+    status: "Success",
+    trafficType: "Email",
+    sourceIp: "10.0.2.18",
+    destinationIp: "172.16.4.90",
     connector: "BC-CS",
   },
   {
     id: "4",
-    severity: "Medium",
-    title: "Scheduled scan completed with warnings on production cl…",
-    time: "2024-07-31 09:12:00",
-    activity: "Connect",
-    status: "New",
-    eventType: "HTTP Activity",
+    severity: "Low",
+    time: "09:12:00",
+    eventType: "FTP Activity",
+    title: "FTP session opened to external file transfer node…",
+    activity: "Refuse",
+    status: "Failure",
+    trafficType: "FTP",
+    sourceIp: "203.0.113.12",
+    destinationIp: "10.0.3.55",
     connector: "BCs1",
   },
   {
     id: "5",
-    severity: "Low",
-    title: "Certificate renewal reminder for edge gateway cluster…",
-    time: "2024-07-30 22:18:55",
-    activity: "Create",
-    status: "In Progress",
-    eventType: "Vulnerability",
+    severity: "Informational",
+    time: "22:18:55",
+    eventType: "SSH Activity",
+    title: "SSH session established from bastion host…",
+    activity: "Traffic",
+    status: "Success",
+    trafficType: "SSH",
+    sourceIp: "10.0.1.44",
+    destinationIp: "203.0.113.5",
     connector: "BC-CS-Athena",
   },
   {
     id: "6",
-    severity: "Informational",
-    title: "Connector health check succeeded across all regions…",
-    time: "2024-07-30 18:00:03",
-    activity: "Update",
-    status: "Suppressed",
-    eventType: "Vulnerability",
-    connector: "BCs1",
+    severity: "High",
+    time: "18:00:03",
+    eventType: "DNS Activity",
+    title: "Repeated NXDOMAIN responses to rare TLD queries…",
+    activity: "Traffic",
+    status: "Success",
+    trafficType: "DNS",
+    sourceIp: "192.168.10.5",
+    destinationIp: "8.8.8.8",
+    connector: "BC-CS",
   },
   {
     id: "7",
     severity: "Critical",
-    title: "Anomalous outbound DNS tunneling pattern observed…",
-    time: "2024-07-30 16:44:19",
-    activity: "Post",
-    status: "Failure",
+    time: "16:44:19",
     eventType: "HTTP Activity",
-    connector: "BC-CS-Athena",
+    title: "Suspicious POST burst to newly registered domain…",
+    activity: "Traffic",
+    status: "Failure",
+    trafficType: "HTTP",
+    sourceIp: "10.0.2.18",
+    destinationIp: "172.16.4.90",
+    connector: "BCs1",
   },
   {
     id: "8",
-    severity: "High",
-    title: "Service principal credential rotation outside change win…",
-    time: "2024-07-30 12:01:47",
-    activity: "Put",
-    status: "Unknown",
-    eventType: "Vulnerability",
-    connector: "BC-CS",
+    severity: "Medium",
+    time: "12:01:47",
+    eventType: "HTTP Activity",
+    title: "TLS downgrade attempt on internal API endpoint…",
+    activity: "Update",
+    status: "Success",
+    trafficType: "HTTP",
+    sourceIp: "203.0.113.12",
+    destinationIp: "10.0.3.55",
+    connector: "BC-CS-Athena",
   },
   {
     id: "9",
-    severity: "Medium",
-    title: "Unusual API call volume from service account in staging…",
-    time: "2024-07-30 09:33:22",
-    activity: "Post",
-    status: "New",
-    eventType: "HTTP Activity",
+    severity: "Low",
+    time: "09:33:22",
+    eventType: "Email Activity",
+    title: "Outbound message flagged for suspicious attachment…",
+    activity: "Open",
+    status: "Success",
+    trafficType: "Email",
+    sourceIp: "10.0.1.44",
+    destinationIp: "203.0.113.5",
     connector: "BCs1",
   },
   {
     id: "10",
-    severity: "Low",
-    title: "Deprecated TLS version negotiated on internal load balanc…",
-    time: "2024-07-29 21:15:08",
-    activity: "Connect",
-    status: "In Progress",
-    eventType: "Vulnerability",
-    connector: "BC-CS-Athena",
-  },
-  {
-    id: "11",
-    severity: "Critical",
-    title: "Ransomware-like file encryption activity detected on fil…",
-    time: "2024-07-29 17:48:51",
-    activity: "Delete",
+    severity: "High",
+    time: "21:15:08",
+    eventType: "FTP Activity",
+    title: "Large file upload over cleartext FTP channel…",
+    activity: "Traffic",
     status: "Failure",
-    eventType: "Vulnerability",
+    trafficType: "FTP",
+    sourceIp: "192.168.10.5",
+    destinationIp: "8.8.8.8",
     connector: "BC-CS",
-  },
-  {
-    id: "12",
-    severity: "Informational",
-    title: "Weekly compliance report generated for SOC 2 controls…",
-    time: "2024-07-29 14:00:00",
-    activity: "Create",
-    status: "Suppressed",
-    eventType: "Vulnerability",
-    connector: "BCs1",
-  },
-  {
-    id: "13",
-    severity: "High",
-    title: "Impossible travel login attempt from two continents…",
-    time: "2024-07-29 08:27:36",
-    activity: "Post",
-    status: "Unknown",
-    eventType: "HTTP Activity",
-    connector: "BC-CS-Athena",
-  },
-  {
-    id: "14",
-    severity: "Medium",
-    title: "S3 bucket policy changed to allow public read access…",
-    time: "2024-07-28 23:59:14",
-    activity: "Update",
-    status: "Other",
-    eventType: "HTTP Activity",
-    connector: "BC-CS",
-  },
-  {
-    id: "15",
-    severity: "Critical",
-    title: "This and that happened over cat r…",
-    time: "2024-07-31 14:22:08",
-    activity: "Post",
-    status: "Failure",
-    eventType: "HTTP Activity",
-    connector: "BCs1",
-  },
-  {
-    id: "16",
-    severity: "High",
-    title: "Multiple failed logins from unusual region and follow-on…",
-    time: "2024-07-31 13:05:41",
-    activity: "Put",
-    status: "Unknown",
-    eventType: "HTTP Activity",
-    connector: "BC-CS-Athena",
-  },
-  {
-    id: "17",
-    severity: "High",
-    title: "Policy violation: privileged container launch detected in…",
-    time: "2024-07-31 11:40:12",
-    activity: "Delete",
-    status: "Other",
-    eventType: "Vulnerability",
-    connector: "BC-CS",
-  },
-  {
-    id: "18",
-    severity: "Medium",
-    title: "Scheduled scan completed with warnings on production cl…",
-    time: "2024-07-31 09:12:00",
-    activity: "Connect",
-    status: "New",
-    eventType: "HTTP Activity",
-    connector: "BCs1",
-  },
-  {
-    id: "19",
-    severity: "Low",
-    title: "Certificate renewal reminder for edge gateway cluster…",
-    time: "2024-07-30 22:18:55",
-    activity: "Create",
-    status: "In Progress",
-    eventType: "Vulnerability",
-    connector: "BC-CS-Athena",
-  },
-  {
-    id: "20",
-    severity: "Informational",
-    title: "Connector health check succeeded across all regions…",
-    time: "2024-07-30 18:00:03",
-    activity: "Update",
-    status: "Suppressed",
-    eventType: "Vulnerability",
-    connector: "BCs1",
   },
 ];
 
-const TOTAL_NETWORK_RESULTS = 1384;
+const TOTAL_NETWORK_RESULTS = 2036;
 
-const ROW_ACTION_ITEMS = ["Action one", "Action two", "Action three"] as const;
-
-function RowActionsMenu({ rowId }: { rowId: string }) {
-  const [open, setOpen] = useState(false);
-  const [menuStyle, setMenuStyle] = useState<CSSProperties>({});
-  const buttonRef = useRef<HTMLButtonElement>(null);
-
-  useEffect(() => {
-    if (!open || !buttonRef.current) return;
-
-    const updatePosition = () => {
-      const rect = buttonRef.current!.getBoundingClientRect();
-      setMenuStyle({
-        position: "fixed",
-        top: rect.bottom + 4,
-        left: rect.right,
-        transform: "translateX(-100%)",
-      });
-    };
-
-    updatePosition();
-    window.addEventListener("scroll", updatePosition, true);
-    window.addEventListener("resize", updatePosition);
-    return () => {
-      window.removeEventListener("scroll", updatePosition, true);
-      window.removeEventListener("resize", updatePosition);
-    };
-  }, [open]);
-
-  useEffect(() => {
-    if (!open) return;
-    const onDocClick = (e: MouseEvent) => {
-      if (buttonRef.current && !buttonRef.current.contains(e.target as Node)) {
-        const menu = document.getElementById(`network-actions-menu-${rowId}`);
-        if (menu && menu.contains(e.target as Node)) return;
-        setOpen(false);
-      }
-    };
-    const onKey = (e: KeyboardEvent) => {
-      if (e.key === "Escape") setOpen(false);
-    };
-    document.addEventListener("mousedown", onDocClick);
-    document.addEventListener("keydown", onKey);
-    return () => {
-      document.removeEventListener("mousedown", onDocClick);
-      document.removeEventListener("keydown", onKey);
-    };
-  }, [open, rowId]);
-
-  return (
-    <div className="relative flex justify-start">
-      <Button
-        ref={buttonRef}
-        type="button"
-        variant="ghost"
-        className="size-7 shrink-0 p-0 text-text-tertiary hover:text-text-primary [&_svg]:!size-4"
-        aria-label={`Actions for network event ${rowId}`}
-        aria-expanded={open}
-        aria-haspopup="menu"
-        onClick={() => setOpen((value) => !value)}
-      >
-        <Icon name="navi-more-vert" size={16} />
-      </Button>
-      {open
-        ? createPortal(
-            <div
-              id={`network-actions-menu-${rowId}`}
-              role="menu"
-              aria-label={`Actions for network event ${rowId}`}
-              style={menuStyle}
-              className="z-50 min-w-[9rem] rounded border border-border-container bg-surface-modal py-1 shadow-[0_4px_12px_rgba(0,0,0,0.35)]"
-            >
-              {ROW_ACTION_ITEMS.map((label) => (
-                <button
-                  key={label}
-                  type="button"
-                  role="menuitem"
-                  className="block w-full px-3 py-1.5 text-left text-sm text-text-secondary transition-colors hover:bg-overlay-subtle hover:text-text-primary"
-                  onClick={() => setOpen(false)}
-                >
-                  {label}
-                </button>
-              ))}
-            </div>,
-            document.body,
-          )
-        : null}
-    </div>
-  );
+function isTrafficActivityType(label: string): label is TrafficActivityType {
+  return label === "DNS" || label === "Email" || label === "FTP" || label === "HTTP" || label === "SSH";
 }
 
-type NetworkSortColumn = "severity" | "title" | "time" | "activity" | "status" | "eventType" | "connector";
+function isNetworkSeverity(label: string): label is NetworkSeverity {
+  return label in SEV_BAR;
+}
 
-/** px widths: select, severity, title, time, activity, status, event type, connector, actions */
-const NETWORK_SELECT_COL_WIDTH = 40;
-const NETWORK_COL_DEFAULTS: readonly number[] = [
-  NETWORK_SELECT_COL_WIDTH,
-  108,
-  260,
-  168,
-  88,
-  112,
-  120,
-  120,
-  56,
-];
-const NETWORK_COL_MINS: readonly number[] = [
-  NETWORK_SELECT_COL_WIDTH,
-  72,
-  100,
-  120,
-  56,
-  72,
-  80,
-  80,
-  48,
-];
+function severityMatchesFilter(rowSeverity: NetworkSeverity, filter: string): boolean {
+  if (filter === "Info") return rowSeverity === "Informational";
+  return rowSeverity === filter;
+}
 
 function networkMatchesSearch(row: NetworkActivityRow, query: string): boolean {
   const q = query.trim().toLowerCase();
   if (!q) return true;
 
-  const haystack = [
+  return [
     row.severity,
-    row.title,
     row.time,
+    row.eventType,
+    row.title,
     row.activity,
     row.status,
-    row.eventType,
+    row.trafficType,
+    row.sourceIp,
+    row.destinationIp,
     row.connector,
   ]
     .join(" ")
-    .toLowerCase();
-
-  return haystack.includes(q);
+    .toLowerCase()
+    .includes(q);
 }
+
+type SourceDestinationPairsPanelProps = {
+  rows: readonly SourceDestPair[];
+  selectedId?: string | null;
+  onPairClick?: (id: string) => void;
+};
+
+function SourceDestinationPairsPanel({ rows, selectedId = null, onPairClick }: SourceDestinationPairsPanelProps) {
+  const interactive = Boolean(onPairClick);
+  const filterActive = selectedId != null;
+
+  return (
+    <div className="flex min-h-0 min-w-0 flex-1 flex-col lg:h-full">
+      <div className="relative flex min-h-[200px] flex-1 flex-col">
+        <div
+          className="pointer-events-none absolute inset-y-0 left-[20px] right-[20px] flex justify-between"
+          aria-hidden
+        >
+          {SOURCE_DEST_X_TICKS.map((t) => (
+            <div key={t} className="flex h-full w-0 justify-center">
+              <div className="h-full w-px bg-datavis-gridlines" />
+            </div>
+          ))}
+        </div>
+        <div className="relative flex h-full min-h-0 flex-col justify-between">
+          {rows.map((row) => {
+            const pct = Math.min(
+              100,
+              Math.max((row.value / SOURCE_DEST_X_MAX) * 100, row.value > 0 ? 6 : 0),
+            );
+            const selected = interactive && selectedId === row.id;
+            const dimmed = filterActive && !selected;
+
+            const labelClasses = cx(
+              "text-base-small transition-colors",
+              "group-hover:font-semibold group-hover:text-text-primary",
+              selected ? "font-semibold text-text-primary" : dimmed ? "text-text-disabled" : "text-text-tertiary",
+            );
+
+            const rowBody = (
+              <>
+                <div className="flex w-[7.5rem] min-w-0 shrink-0 items-center justify-end gap-0.5 sm:w-36 sm:gap-1">
+                  <TruncatedText className={labelClasses} wrapperClassName="min-w-0 max-w-[3.25rem] sm:max-w-[4.5rem]">
+                    {row.source}
+                  </TruncatedText>
+                  <span className={cx("shrink-0 text-base-small", labelClasses)} aria-hidden>
+                    →
+                  </span>
+                  <TruncatedText className={labelClasses} wrapperClassName="min-w-0 max-w-[3.25rem] sm:max-w-[4.5rem]">
+                    {row.destination}
+                  </TruncatedText>
+                </div>
+                <div className="flex min-h-5 min-w-0 flex-1 items-center gap-[8px]">
+                  <div
+                    className={cx(
+                      "h-5 shrink-0 rounded-sm transition-opacity duration-150",
+                      dimmed ? "opacity-35 group-hover:opacity-55" : interactive && !selected && "opacity-90 group-hover:opacity-100",
+                    )}
+                    style={{
+                      width: `min(${pct}%, calc(100% - 3.25rem))`,
+                      backgroundColor: PAIR_BAR_FILL,
+                    }}
+                  />
+                  <span
+                    className={cx(
+                      "shrink-0 text-xs font-bold tabular-nums transition-colors",
+                      "group-hover:text-text-primary",
+                      dimmed ? "text-text-disabled" : "text-text-primary",
+                    )}
+                  >
+                    {row.value}
+                  </span>
+                </div>
+              </>
+            );
+
+            if (interactive) {
+              return (
+                <button
+                  key={row.id}
+                  type="button"
+                  aria-pressed={selected}
+                  aria-label={`Filter network events for ${row.source} to ${row.destination}`}
+                  className={cx(
+                    "group flex min-h-6 w-full shrink-0 items-center gap-2 rounded-sm text-left sm:gap-3",
+                    "cursor-pointer transition-colors",
+                    "focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-interactive-active focus-visible:ring-offset-2 focus-visible:ring-offset-datavis-card-bg",
+                  )}
+                  onClick={() => onPairClick!(row.id)}
+                >
+                  {rowBody}
+                </button>
+              );
+            }
+
+            return (
+              <div key={row.id} className="flex min-h-6 shrink-0 items-center gap-2 sm:gap-3">
+                {rowBody}
+              </div>
+            );
+          })}
+        </div>
+      </div>
+      <div className="mt-4 shrink-0 px-[20px]">
+        <div className="h-px shrink-0 bg-datavis-gridlines" aria-hidden />
+      </div>
+      <div className="flex shrink-0 justify-between px-[20px] pt-2 text-base-small text-text-tertiary">
+        {SOURCE_DEST_X_TICKS.map((t) => (
+          <span key={t} className="w-8 shrink-0 text-center tabular-nums first:w-6 first:text-left last:text-right">
+            {t}
+          </span>
+        ))}
+      </div>
+    </div>
+  );
+}
+
+type NetworkSortColumn = "severity" | "time" | "eventType" | "title" | "activity" | "status" | "connector";
+
+const SELECT_COL_WIDTH = 40;
+const COL_DEFAULTS: readonly number[] = [SELECT_COL_WIDTH, 108, 96, 140, 280, 88, 96, 120];
+const COL_MINS: readonly number[] = [SELECT_COL_WIDTH, 72, 72, 96, 120, 56, 72, 80];
 
 function NetworkActivityTable({ rows }: { rows: NetworkActivityRow[] }) {
   const [selected, setSelected] = useState<Set<string>>(() => new Set());
@@ -424,9 +415,9 @@ function NetworkActivityTable({ rows }: { rows: NetworkActivityRow[] }) {
     displayWidths,
     minTableWidth,
   } = useResizableColumns({
-    selectColWidth: NETWORK_SELECT_COL_WIDTH,
-    colDefaults: NETWORK_COL_DEFAULTS,
-    colMins: NETWORK_COL_MINS,
+    selectColWidth: SELECT_COL_WIDTH,
+    colDefaults: COL_DEFAULTS,
+    colMins: COL_MINS,
   });
 
   const allIds = useMemo(() => rows.map((r) => r.id), [rows]);
@@ -450,12 +441,12 @@ function NetworkActivityTable({ rows }: { rows: NetworkActivityRow[] }) {
 
   const sortComparators = useMemo(
     (): Record<NetworkSortColumn, (a: NetworkActivityRow, b: NetworkActivityRow) => number> => ({
-      severity: (a, b) => NETWORK_SEVERITY_ORDER[a.severity] - NETWORK_SEVERITY_ORDER[b.severity],
-      title: (a, b) => compareStrings(a.title, b.title),
+      severity: (a, b) => SEVERITY_ORDER[a.severity] - SEVERITY_ORDER[b.severity],
       time: (a, b) => compareStrings(a.time, b.time),
+      eventType: (a, b) => compareStrings(a.eventType, b.eventType),
+      title: (a, b) => compareStrings(a.title, b.title),
       activity: (a, b) => compareStrings(a.activity, b.activity),
       status: (a, b) => compareStrings(a.status, b.status),
-      eventType: (a, b) => compareStrings(a.eventType, b.eventType),
       connector: (a, b) => compareStrings(a.connector, b.connector),
     }),
     [],
@@ -496,11 +487,7 @@ function NetworkActivityTable({ rows }: { rows: NetworkActivityRow[] }) {
               style={colStyle(1)}
               className="relative h-10 border-r border-datavis-gridlines px-2 py-0 align-middle text-xs font-bold uppercase tracking-wide text-text-primary"
             >
-              <ColumnHeaderMenu
-                label="Severity"
-                menuLabel="Severity column options"
-                {...getSortProps("severity")}
-              />
+              <ColumnHeaderMenu label="Severity" menuLabel="Severity column options" {...getSortProps("severity")} />
               {resizeHandle(1)}
             </th>
             <th
@@ -508,7 +495,7 @@ function NetworkActivityTable({ rows }: { rows: NetworkActivityRow[] }) {
               style={colStyle(2)}
               className="relative h-10 border-r border-datavis-gridlines px-2 py-0 align-middle text-xs font-bold uppercase tracking-wide text-text-primary"
             >
-              <ColumnHeaderMenu label="Title" menuLabel="Title column options" {...getSortProps("title")} />
+              <ColumnHeaderMenu label="Time" menuLabel="Time column options" {...getSortProps("time")} />
               {resizeHandle(2)}
             </th>
             <th
@@ -516,7 +503,7 @@ function NetworkActivityTable({ rows }: { rows: NetworkActivityRow[] }) {
               style={colStyle(3)}
               className="relative h-10 border-r border-datavis-gridlines px-2 py-0 align-middle text-xs font-bold uppercase tracking-wide text-text-primary"
             >
-              <ColumnHeaderMenu label="Time" menuLabel="Time column options" {...getSortProps("time")} />
+              <ColumnHeaderMenu label="Type" menuLabel="Type column options" {...getSortProps("eventType")} />
               {resizeHandle(3)}
             </th>
             <th
@@ -524,7 +511,7 @@ function NetworkActivityTable({ rows }: { rows: NetworkActivityRow[] }) {
               style={colStyle(4)}
               className="relative h-10 border-r border-datavis-gridlines px-2 py-0 align-middle text-xs font-bold uppercase tracking-wide text-text-primary"
             >
-              <ColumnHeaderMenu label="Activity" menuLabel="Activity column options" {...getSortProps("activity")} />
+              <ColumnHeaderMenu label="Title" menuLabel="Title column options" {...getSortProps("title")} />
               {resizeHandle(4)}
             </th>
             <th
@@ -532,7 +519,7 @@ function NetworkActivityTable({ rows }: { rows: NetworkActivityRow[] }) {
               style={colStyle(5)}
               className="relative h-10 border-r border-datavis-gridlines px-2 py-0 align-middle text-xs font-bold uppercase tracking-wide text-text-primary"
             >
-              <ColumnHeaderMenu label="Status" menuLabel="Status column options" {...getSortProps("status")} />
+              <ColumnHeaderMenu label="Activity" menuLabel="Activity column options" {...getSortProps("activity")} />
               {resizeHandle(5)}
             </th>
             <th
@@ -540,133 +527,228 @@ function NetworkActivityTable({ rows }: { rows: NetworkActivityRow[] }) {
               style={colStyle(6)}
               className="relative h-10 border-r border-datavis-gridlines px-2 py-0 align-middle text-xs font-bold uppercase tracking-wide text-text-primary"
             >
-              <ColumnHeaderMenu
-                label="Event type"
-                menuLabel="Event type column options"
-                {...getSortProps("eventType")}
-              />
+              <ColumnHeaderMenu label="Status" menuLabel="Status column options" {...getSortProps("status")} />
               {resizeHandle(6)}
             </th>
             <th
               scope="col"
               style={colStyle(7)}
-              className="relative h-10 border-r border-datavis-gridlines px-2 py-0 align-middle text-xs font-bold uppercase tracking-wide text-text-primary"
-            >
-              <ColumnHeaderMenu label="Connector" menuLabel="Connector column options" {...getSortProps("connector")} />
-              {resizeHandle(7)}
-            </th>
-            <th
-              scope="col"
-              style={colStyle(8)}
               className="relative h-10 px-2 py-0 align-middle text-xs font-bold uppercase tracking-wide text-text-primary"
             >
-              <span className="block translate-y-px truncate">Actions</span>
-              {resizeHandle(8)}
+              <ColumnHeaderMenu label="Connectors" menuLabel="Connectors column options" {...getSortProps("connector")} />
+              {resizeHandle(7)}
             </th>
           </tr>
         </thead>
         <tbody>
-          {displayRows.map((row) => {
-            const et = EVENT_TYPE_ICON[row.eventType];
-            return (
-              <tr key={row.id} className="h-10 border-b border-datavis-gridlines hover:bg-overlay-subtle">
-                <td style={colStyle(0)} className="h-10 px-0 py-0 align-middle">
-                  <div className="flex items-center justify-center">
-                    <Checkbox
-                      checked={selected.has(row.id)}
-                      onCheckedChange={(c) => toggleRow(row.id, c)}
-                      aria-label={`Select network event ${row.id}`}
-                    />
-                  </div>
-                </td>
-                <td style={colStyle(1)} className="h-10 px-2 py-0 align-middle">
-                  <span className="inline-flex items-center gap-2">
-                    <SeverityTableIcon
-                      name={NETWORK_SEV_ICONS[row.severity]}
-                      color={NETWORK_SEV_COLORS[row.severity]}
-                    />
-                    <span className="text-sm text-text-secondary">{row.severity}</span>
-                  </span>
-                </td>
-                <td style={colStyle(2)} className="h-10 min-w-0 px-2 py-0 align-middle">
-                  <TruncatedText
-                    as="button"
-                    className="w-full text-left text-sm font-semibold text-interactive-active hover:underline focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-interactive-active"
-                  >
-                    {row.title}
+          {displayRows.map((row) => (
+            <tr key={row.id} className="h-10 border-b border-datavis-gridlines hover:bg-overlay-subtle">
+              <td style={colStyle(0)} className="h-10 px-0 py-0 align-middle">
+                <div className="flex items-center justify-center">
+                  <Checkbox
+                    checked={selected.has(row.id)}
+                    onCheckedChange={(c) => toggleRow(row.id, c)}
+                    aria-label={`Select network event ${row.id}`}
+                  />
+                </div>
+              </td>
+              <td style={colStyle(1)} className="h-10 px-2 py-0 align-middle">
+                <span className="inline-flex items-center gap-2">
+                  <SeverityTableIcon name={SEV_ICONS[row.severity]} color={SEV_BAR[row.severity]} />
+                  <span className="text-sm text-text-secondary">{row.severity}</span>
+                </span>
+              </td>
+              <td style={colStyle(2)} className="h-10 min-w-0 px-2 py-0 align-middle tabular-nums">
+                <TruncatedText className="text-sm text-text-secondary">{row.time}</TruncatedText>
+              </td>
+              <td style={colStyle(3)} className="h-10 min-w-0 overflow-hidden px-2 py-0 align-middle">
+                <span className="flex w-full min-w-0 items-center gap-2">
+                  <Icon
+                    name="ocsf-network-activity"
+                    size={16}
+                    className="size-4 shrink-0 text-datavis-data-peanut-orange [&_svg]:!size-4"
+                    aria-hidden
+                  />
+                  <TruncatedText className="w-full text-sm text-text-secondary" wrapperClassName="min-w-0 flex-1">
+                    {row.eventType}
                   </TruncatedText>
-                </td>
-                <td style={colStyle(3)} className="h-10 min-w-0 px-2 py-0 align-middle tabular-nums">
-                  <TruncatedText className="text-sm text-text-secondary">{row.time}</TruncatedText>
-                </td>
-                <td style={colStyle(4)} className="h-10 min-w-0 px-2 py-0 align-middle">
-                  <TruncatedText className="text-sm text-text-secondary">{row.activity}</TruncatedText>
-                </td>
-                <td style={colStyle(5)} className="h-10 min-w-0 px-2 py-0 align-middle">
-                  <TruncatedText className="text-sm text-text-secondary">{row.status}</TruncatedText>
-                </td>
-                <td style={colStyle(6)} className="h-10 min-w-0 px-2 py-0 align-middle">
-                  <span className="inline-flex min-w-0 items-center gap-2">
-                    <Icon
-                      name={et.name}
-                      size={16}
-                      className={cx("size-4 shrink-0 [&_svg]:!size-4", et.className)}
-                      aria-hidden
-                    />
-                    <TruncatedText className="text-sm text-text-secondary" wrapperClassName="min-w-0 flex-1">
-                      {row.eventType}
-                    </TruncatedText>
-                  </span>
-                </td>
-                <td style={colStyle(7)} className="h-10 min-w-0 px-2 py-0 align-middle">
-                  <span className="inline-flex min-w-0 items-center gap-2">
-                    <span
-                      className={cx("size-2.5 shrink-0 rounded-sm", connectorSwatch(row.connector))}
-                      aria-hidden
-                    />
-                    <TruncatedText className="text-sm text-text-secondary" wrapperClassName="min-w-0 flex-1">
-                      {row.connector}
-                    </TruncatedText>
-                  </span>
-                </td>
-                <td style={colStyle(8)} className="h-10 px-2 py-0 align-middle">
-                  <RowActionsMenu rowId={row.id} />
-                </td>
-              </tr>
-            );
-          })}
+                </span>
+              </td>
+              <td style={colStyle(4)} className="h-10 min-w-0 px-2 py-0 align-middle">
+                <TruncatedText
+                  as="button"
+                  className="w-full text-left text-sm font-semibold text-interactive-active hover:underline focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-interactive-active"
+                >
+                  {row.title}
+                </TruncatedText>
+              </td>
+              <td style={colStyle(5)} className="h-10 min-w-0 px-2 py-0 align-middle">
+                <TruncatedText className="text-sm text-text-secondary">{row.activity}</TruncatedText>
+              </td>
+              <td style={colStyle(6)} className="h-10 min-w-0 px-2 py-0 align-middle">
+                <TruncatedText className="text-sm text-text-secondary">{row.status}</TruncatedText>
+              </td>
+              <td style={colStyle(7)} className="h-10 min-w-0 px-2 py-0 align-middle">
+                <span className="inline-flex min-w-0 items-center gap-2">
+                  <span
+                    className={cx("size-2.5 shrink-0 rounded-sm", connectorSwatch(row.connector))}
+                    aria-hidden
+                  />
+                  <TruncatedText className="text-sm text-text-secondary" wrapperClassName="min-w-0 flex-1">
+                    {row.connector}
+                  </TruncatedText>
+                </span>
+              </td>
+            </tr>
+          ))}
         </tbody>
       </table>
     </div>
   );
 }
 
-/** Figma `9680:18627` — Network Activity body for Federated Analytics. */
+/** Figma concept — Network Activity body for Federated Analytics. */
 export function NetworkActivityContent() {
+  const { range: timeframe } = useTimeframe();
+  const [trafficFilter, setTrafficFilter] = useState<TrafficActivityType | null>(null);
+  const [severityFilter, setSeverityFilter] = useState<string | null>(null);
+  const [pairFilter, setPairFilter] = useState<string | null>(null);
   const [searchQuery, setSearchQuery] = useState("");
   const [tableTool, setTableTool] = useState<FilterColumnPanelTool | null>(null);
 
   const filteredRows = useMemo(
-    () => NETWORK_ACTIVITY_ROWS.filter((row) => networkMatchesSearch(row, searchQuery)),
-    [searchQuery],
+    () =>
+      NETWORK_ACTIVITY_ROWS.filter((row) => {
+        if (trafficFilter && row.trafficType !== trafficFilter) return false;
+        if (severityFilter && !severityMatchesFilter(row.severity, severityFilter)) return false;
+        if (pairFilter) {
+          const pair = SOURCE_DEST_PAIRS.find((item) => item.id === pairFilter);
+          if (pair && (row.sourceIp !== pair.source || row.destinationIp !== pair.destination)) return false;
+        }
+        if (!networkMatchesSearch(row, searchQuery)) return false;
+        return true;
+      }),
+    [trafficFilter, severityFilter, pairFilter, searchQuery],
   );
 
-  const hasActiveFilters = searchQuery.trim().length > 0;
+  const hasActiveFilters =
+    trafficFilter != null ||
+    severityFilter != null ||
+    pairFilter != null ||
+    searchQuery.trim().length > 0;
+
+  const handleTrafficClick = (label: string) => {
+    if (!isTrafficActivityType(label)) return;
+    setTrafficFilter((current) => (current === label ? null : label));
+  };
+
+  const handleSeverityClick = (label: string) => {
+    if (label !== "Info" && !isNetworkSeverity(label)) return;
+    setSeverityFilter((current) => (current === label ? null : label));
+  };
+
+  const handlePairClick = (id: string) => {
+    setPairFilter((current) => (current === id ? null : id));
+  };
+
+  const handleChartSeverityClick = (seriesId: string) => {
+    if (!isNetworkSeverity(seriesId)) return;
+    setSeverityFilter((current) => (current === seriesId ? null : seriesId));
+  };
+
+  const eventsPerHourChart = useMemo(() => {
+    const buckets = buildHourlyBuckets(timeframe);
+    const spikeIndex = findSpikeBucketIndex(buckets, timeframe.to);
+    const includeDate = timeframe.to.getTime() - timeframe.from.getTime() > 36 * 3_600_000;
+    const xLabels = buckets.map((bucket) => formatBucketTimeLabel(bucket.start, includeDate));
+    const { indices: xTickIndices, labels: xTickLabels } = buildHourlyAxisTicks(buckets, timeframe);
+
+    const series = [
+      {
+        id: "Medium",
+        label: "Medium",
+        color: SEV_BAR.Medium,
+        icon: SEV_ICONS.Medium,
+        values: hourlySeverityValues(14, buckets, spikeIndex),
+      },
+      {
+        id: "High",
+        label: "High",
+        color: SEV_BAR.High,
+        icon: SEV_ICONS.High,
+        values: hourlySeverityValues(10, buckets, spikeIndex),
+      },
+      {
+        id: "Critical",
+        label: "Critical",
+        color: SEV_BAR.Critical,
+        icon: SEV_ICONS.Critical,
+        values: hourlySeverityValues(4, buckets, spikeIndex),
+      },
+    ] as const;
+
+    const spikeHighlight =
+      spikeIndex != null
+        ? { index: spikeIndex, label: `spike ~${SPIKE_CLOCK_HOUR}:00` }
+        : undefined;
+
+    return { series, xLabels, xTickIndices, xTickLabels, spikeHighlight };
+  }, [timeframe]);
 
   return (
     <div className="flex shrink-0 flex-col gap-4 p-4 sm:p-5">
-      <InsightCard title="Top 15 Source Endpoints">
-        <div className="-mx-3 -mt-3 sm:-mx-4 sm:-mt-3">
-          <SourceEndpointsSankeyChart />
-        </div>
+      <InsightCard title="Network Events Per Hour By Severity">
+        <TimeSeriesAreaChart
+          series={eventsPerHourChart.series}
+          xLabels={eventsPerHourChart.xLabels}
+          xTickIndices={eventsPerHourChart.xTickIndices}
+          xTickLabels={eventsPerHourChart.xTickLabels}
+          spikeHighlight={eventsPerHourChart.spikeHighlight}
+          ariaLabel="Network events per hour by severity"
+          selectedSeriesId={severityFilter && isNetworkSeverity(severityFilter) ? severityFilter : null}
+          onSeriesClick={handleChartSeverityClick}
+        />
       </InsightCard>
+
+      <div className="grid min-h-0 shrink-0 grid-cols-1 items-stretch gap-4 lg:grid-cols-3">
+        <InsightCard title="Traffic By Activity Type" fillHeight>
+          <HorizontalBarPanel
+            rows={TRAFFIC_ACTIVITY_ROWS}
+            selectedLabel={trafficFilter}
+            onBarClick={handleTrafficClick}
+            filterAriaLabel={(label) => `Filter network events by ${label} traffic`}
+            xMax={70000}
+            xTicks={[0, 17500, 35000, 52500, 70000]}
+          />
+        </InsightCard>
+        <InsightCard title="Severity ID" fillHeight>
+          <HorizontalBarPanel
+            rows={SEVERITY_ROWS}
+            selectedLabel={severityFilter}
+            onBarClick={handleSeverityClick}
+            filterAriaLabel={(label) => `Filter network events by ${label} severity`}
+            xMax={900}
+            xTicks={[0, 225, 450, 675, 900]}
+          />
+        </InsightCard>
+        <InsightCard title="Top Source → Destination Pairs" fillHeight>
+          <SourceDestinationPairsPanel
+            rows={SOURCE_DEST_PAIRS}
+            selectedId={pairFilter}
+            onPairClick={handlePairClick}
+          />
+        </InsightCard>
+      </div>
 
       <section className="mx-0 mb-0 flex min-h-0 min-w-0 flex-1 flex-col overflow-hidden rounded-[4px] border border-border-container bg-datavis-card-bg shadow-[0_1px_5px_rgba(0,0,0,0.2)]">
         <div className="shrink-0 bg-datavis-card-bg pb-3 pl-4 pr-6 pt-3 sm:pl-5">
-          <h2 className="text-base-semibold text-text-primary">Network Activity</h2>
+          <h2 className="text-base-semibold text-text-primary">Network Activity Events</h2>
           <div className="mt-2 flex flex-wrap items-center gap-3">
             <p className="shrink-0 text-base-small text-text-secondary">
               {filteredRows.length} of {TOTAL_NETWORK_RESULTS} Results
+              {trafficFilter ? ` · ${trafficFilter}` : ""}
+              {severityFilter ? ` · ${severityFilter}` : ""}
+              {pairFilter ? ` · ${pairFilter.replace("→", " → ")}` : ""}
               {searchQuery.trim() ? ` · “${searchQuery.trim()}”` : ""}
             </p>
             <div className="w-[300px] shrink-0">
@@ -676,7 +758,7 @@ export function NetworkActivityContent() {
                 value={searchQuery}
                 onChange={(event) => setSearchQuery(event.target.value)}
                 className="!bg-datavis-card-bg"
-                aria-label="Search network activity"
+                aria-label="Search network activity events"
               />
             </div>
             {hasActiveFilters ? (
@@ -684,7 +766,12 @@ export function NetworkActivityContent() {
                 type="button"
                 variant="ghost"
                 className="h-8 shrink-0 gap-1.5 px-2 text-base-small text-text-tertiary hover:text-text-primary [&_svg]:!h-2 [&_svg]:!w-3"
-                onClick={() => setSearchQuery("")}
+                onClick={() => {
+                  setTrafficFilter(null);
+                  setSeverityFilter(null);
+                  setPairFilter(null);
+                  setSearchQuery("");
+                }}
               >
                 <Icon name="action-filter-list" size={12} aria-hidden />
                 Clear all filters
