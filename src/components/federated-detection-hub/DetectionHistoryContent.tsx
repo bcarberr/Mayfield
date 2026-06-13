@@ -1,5 +1,5 @@
-import { useMemo, useState } from "react";
-import { Icon, type SeverityShapeIconName } from "../../design-system";
+import { Fragment, useMemo, useState } from "react";
+import { Checkbox, Icon, type SeverityShapeIconName } from "../../design-system";
 import { Button } from "../ui/Button";
 import { ColumnHeaderMenu } from "../ui/ColumnHeaderMenu";
 import { compareStrings, useColumnSort } from "../ui/useColumnSort";
@@ -39,7 +39,12 @@ type RunHistoryRow = {
   findingsGenerated: number | null;
   duration: string | null;
   triggeredBy: string;
+  details: string;
 };
+
+const RUN_HISTORY_SELECT_COL_WIDTH = 40;
+const RUN_HISTORY_EXPAND_COL_WIDTH = 40;
+const RUN_HISTORY_COLUMN_COUNT = 9;
 
 const SEV_COLORS: Record<DetectionSeverity, string> = {
   Critical: "#ff604a",
@@ -94,6 +99,8 @@ const RUN_HISTORY_ROWS: RunHistoryRow[] = [
     findingsGenerated: null,
     duration: null,
     triggeredBy: "Schedule",
+    details:
+      "Run failed during connector query execution. SMB lateral movement correlation did not complete; verify Athena table permissions.",
   },
   {
     id: "run-2",
@@ -104,6 +111,8 @@ const RUN_HISTORY_ROWS: RunHistoryRow[] = [
     findingsGenerated: 861,
     duration: "3.2s",
     triggeredBy: "Schedule",
+    details:
+      "Scheduled run completed successfully. Encoded PowerShell activity was evaluated across connected endpoints and 861 findings were generated.",
   },
   {
     id: "run-3",
@@ -114,6 +123,8 @@ const RUN_HISTORY_ROWS: RunHistoryRow[] = [
     findingsGenerated: 209,
     duration: "2.8s",
     triggeredBy: "Schedule",
+    details:
+      "Scheduled run completed successfully. LSASS and credential store access patterns were correlated against baseline activity.",
   },
   {
     id: "run-4",
@@ -124,6 +135,7 @@ const RUN_HISTORY_ROWS: RunHistoryRow[] = [
     findingsGenerated: null,
     duration: null,
     triggeredBy: "Schedule",
+    details: "Detection is disabled. The scheduled run was skipped and no findings were generated.",
   },
   {
     id: "run-5",
@@ -134,6 +146,8 @@ const RUN_HISTORY_ROWS: RunHistoryRow[] = [
     findingsGenerated: 24,
     duration: "4.1s",
     triggeredBy: "Manual (j.alvarez)",
+    details:
+      "Manual run triggered by j.alvarez completed successfully. Token manipulation and sudo misuse events were evaluated.",
   },
   {
     id: "run-6",
@@ -144,6 +158,8 @@ const RUN_HISTORY_ROWS: RunHistoryRow[] = [
     findingsGenerated: 319,
     duration: "3.5s",
     triggeredBy: "Schedule",
+    details:
+      "Scheduled run completed successfully. Unusual SMB session setup patterns were correlated across endpoint telemetry sources.",
   },
   {
     id: "run-7",
@@ -154,6 +170,8 @@ const RUN_HISTORY_ROWS: RunHistoryRow[] = [
     findingsGenerated: 11,
     duration: "2.1s",
     triggeredBy: "Schedule",
+    details:
+      "Scheduled run completed successfully. Low-volume credential access anomalies were indexed for analyst review.",
   },
   {
     id: "run-8",
@@ -164,6 +182,8 @@ const RUN_HISTORY_ROWS: RunHistoryRow[] = [
     findingsGenerated: 56,
     duration: "3.0s",
     triggeredBy: "Schedule",
+    details:
+      "Scheduled run completed successfully. High-entropy DNS lookups were matched against resolver and endpoint logs.",
   },
   {
     id: "run-9",
@@ -174,6 +194,8 @@ const RUN_HISTORY_ROWS: RunHistoryRow[] = [
     findingsGenerated: 33,
     duration: "2.9s",
     triggeredBy: "Schedule",
+    details:
+      "Scheduled run completed successfully. Local admin group changes outside approved change windows were flagged.",
   },
   {
     id: "run-10",
@@ -184,6 +206,8 @@ const RUN_HISTORY_ROWS: RunHistoryRow[] = [
     findingsGenerated: 42,
     duration: "3.8s",
     triggeredBy: "Schedule",
+    details:
+      "Scheduled run completed successfully. Mass file rename and encryption extension patterns were evaluated across file activity logs.",
   },
   {
     id: "run-11",
@@ -194,6 +218,8 @@ const RUN_HISTORY_ROWS: RunHistoryRow[] = [
     findingsGenerated: null,
     duration: null,
     triggeredBy: "Schedule",
+    details:
+      "Run failed while joining identity geolocation data. Authentication source tables returned incomplete location metadata.",
   },
   {
     id: "run-12",
@@ -204,6 +230,8 @@ const RUN_HISTORY_ROWS: RunHistoryRow[] = [
     findingsGenerated: null,
     duration: "1.9s",
     triggeredBy: "Schedule",
+    details:
+      "Scheduled run completed with no new findings. Bucket ACL changes were evaluated and no public exposure was detected in this interval.",
   },
   {
     id: "run-13",
@@ -214,6 +242,8 @@ const RUN_HISTORY_ROWS: RunHistoryRow[] = [
     findingsGenerated: 72,
     duration: "3.1s",
     triggeredBy: "Manual (s.chen)",
+    details:
+      "Manual run triggered by s.chen completed successfully. Service ticket requests targeting weak SPN configurations were indexed.",
   },
   {
     id: "run-14",
@@ -224,6 +254,8 @@ const RUN_HISTORY_ROWS: RunHistoryRow[] = [
     findingsGenerated: 18,
     duration: "2.4s",
     triggeredBy: "Schedule",
+    details:
+      "Scheduled run completed successfully. Endpoint protection stop and exclusion path events were correlated with change tickets.",
   },
   {
     id: "run-15",
@@ -234,6 +266,8 @@ const RUN_HISTORY_ROWS: RunHistoryRow[] = [
     findingsGenerated: 9,
     duration: "2.0s",
     triggeredBy: "Schedule",
+    details:
+      "Scheduled run completed successfully. Third-party OAuth grants with broad mail scopes were evaluated for privileged accounts.",
   },
   {
     id: "run-16",
@@ -244,6 +278,8 @@ const RUN_HISTORY_ROWS: RunHistoryRow[] = [
     findingsGenerated: 24,
     duration: "2.7s",
     triggeredBy: "Schedule",
+    details:
+      "Scheduled run completed successfully. Obfuscated PowerShell commands outside approved automation accounts were flagged.",
   },
 ];
 
@@ -428,10 +464,41 @@ type RunHistorySortColumn =
   | "duration"
   | "triggeredBy";
 
-const RUN_HISTORY_COL_DEFAULTS: readonly number[] = [280, 115, 130, 130, 140, 90, 180];
-const RUN_HISTORY_COL_MINS: readonly number[] = [160, 72, 100, 100, 100, 72, 120];
+const RUN_HISTORY_COL_DEFAULTS: readonly number[] = [
+  RUN_HISTORY_SELECT_COL_WIDTH,
+  RUN_HISTORY_EXPAND_COL_WIDTH,
+  280,
+  115,
+  130,
+  130,
+  140,
+  90,
+  180,
+];
+const RUN_HISTORY_COL_MINS: readonly number[] = [
+  RUN_HISTORY_SELECT_COL_WIDTH,
+  RUN_HISTORY_EXPAND_COL_WIDTH,
+  160,
+  72,
+  100,
+  100,
+  100,
+  72,
+  120,
+];
 
-function RunHistoryTable({ rows }: { rows: RunHistoryRow[] }) {
+function RunHistoryTable({
+  rows,
+  expandedIds,
+  onToggleExpand,
+  onToggleExpandAll,
+}: {
+  rows: RunHistoryRow[];
+  expandedIds: Set<string>;
+  onToggleExpand: (id: string) => void;
+  onToggleExpandAll: () => void;
+}) {
+  const [selected, setSelected] = useState<Set<string>>(() => new Set());
   const {
     containerRef,
     colStyle,
@@ -442,11 +509,31 @@ function RunHistoryTable({ rows }: { rows: RunHistoryRow[] }) {
     displayWidths,
     minTableWidth,
   } = useResizableColumns({
-    selectColWidth: RUN_HISTORY_COL_DEFAULTS[0]!,
+    selectColWidth: RUN_HISTORY_SELECT_COL_WIDTH,
     colDefaults: RUN_HISTORY_COL_DEFAULTS,
     colMins: RUN_HISTORY_COL_MINS,
     minTableWidth: 960,
   });
+
+  const allIds = useMemo(() => rows.map((row) => row.id), [rows]);
+  const total = allIds.length;
+  const selectedOnPage = useMemo(() => allIds.filter((id) => selected.has(id)).length, [allIds, selected]);
+  const allSelected = total > 0 && selectedOnPage === total;
+  const someSelected = selectedOnPage > 0 && !allSelected;
+  const allExpanded = rows.length > 0 && rows.every((row) => expandedIds.has(row.id));
+
+  const toggleAll = (checked: boolean) => {
+    setSelected(checked ? new Set(allIds) : new Set());
+  };
+
+  const toggleRow = (id: string, checked: boolean) => {
+    setSelected((prev) => {
+      const next = new Set(prev);
+      if (checked) next.add(id);
+      else next.delete(id);
+      return next;
+    });
+  };
 
   const thClass =
     "relative h-10 border-r border-datavis-gridlines px-2 py-0 align-middle text-xs font-bold uppercase tracking-wide text-text-primary";
@@ -487,73 +574,145 @@ function RunHistoryTable({ rows }: { rows: RunHistoryRow[] }) {
         </colgroup>
         <thead>
           <tr className="h-10 border-b border-datavis-gridlines bg-surface-table-row-header">
-            <th scope="col" style={colStyle(0)} className={thClass}>
-              <ColumnHeaderMenu label="Detection" menuLabel="Detection column options" {...getSortProps("detectionName")} />
+            <th scope="col" style={colStyle(0)} className="relative h-10 border-r border-datavis-gridlines px-0 py-0 align-middle">
+              <div className="flex items-center justify-center">
+                <Checkbox
+                  checked={allSelected}
+                  indeterminate={someSelected}
+                  onCheckedChange={toggleAll}
+                  aria-label="Select all rows"
+                />
+              </div>
               {resizeHandle(0)}
             </th>
-            <th scope="col" style={colStyle(1)} className={thClass}>
-              <ColumnHeaderMenu label="Severity" menuLabel="Severity column options" {...getSortProps("severity")} />
+            <th scope="col" style={colStyle(1)} className={cx(thClass, "px-0")}>
+              <div className="flex justify-center">
+                <button
+                  type="button"
+                  className="inline-flex items-center p-0 text-text-tertiary hover:text-text-primary"
+                  aria-expanded={allExpanded}
+                  aria-label={allExpanded ? "Collapse all run details" : "Expand all run details"}
+                  onClick={onToggleExpandAll}
+                >
+                  <Icon
+                    name="navi-arrow-drop-down"
+                    size={32}
+                    className={cx("block shrink-0 transition-transform", allExpanded ? "rotate-0" : "-rotate-90")}
+                    aria-hidden
+                  />
+                  <Icon name="navi-chevron-right" size={20} className="-ml-4 block shrink-0" aria-hidden />
+                </button>
+              </div>
               {resizeHandle(1)}
             </th>
             <th scope="col" style={colStyle(2)} className={thClass}>
-              <ColumnHeaderMenu label="Run Time" menuLabel="Run Time column options" {...getSortProps("runTime")} />
+              <ColumnHeaderMenu label="Detection" menuLabel="Detection column options" {...getSortProps("detectionName")} />
               {resizeHandle(2)}
             </th>
             <th scope="col" style={colStyle(3)} className={thClass}>
-              <ColumnHeaderMenu label="Status" menuLabel="Status column options" {...getSortProps("status")} />
+              <ColumnHeaderMenu label="Severity" menuLabel="Severity column options" {...getSortProps("severity")} />
               {resizeHandle(3)}
             </th>
             <th scope="col" style={colStyle(4)} className={thClass}>
+              <ColumnHeaderMenu label="Run Time" menuLabel="Run Time column options" {...getSortProps("runTime")} />
+              {resizeHandle(4)}
+            </th>
+            <th scope="col" style={colStyle(5)} className={thClass}>
+              <ColumnHeaderMenu label="Status" menuLabel="Status column options" {...getSortProps("status")} />
+              {resizeHandle(5)}
+            </th>
+            <th scope="col" style={colStyle(6)} className={thClass}>
               <ColumnHeaderMenu
                 label="Findings Generated"
                 menuLabel="Findings Generated column options"
                 {...getSortProps("findingsGenerated")}
               />
-              {resizeHandle(4)}
+              {resizeHandle(6)}
             </th>
-            <th scope="col" style={colStyle(5)} className={thClass}>
+            <th scope="col" style={colStyle(7)} className={thClass}>
               <ColumnHeaderMenu label="Duration" menuLabel="Duration column options" {...getSortProps("duration")} />
-              {resizeHandle(5)}
+              {resizeHandle(7)}
             </th>
-            <th scope="col" style={colStyle(6)} className={thClass}>
+            <th scope="col" style={colStyle(8)} className={thClass}>
               <ColumnHeaderMenu
                 label="Triggered By"
                 menuLabel="Triggered By column options"
                 {...getSortProps("triggeredBy")}
               />
-              {resizeHandle(6)}
+              {resizeHandle(8)}
             </th>
           </tr>
         </thead>
         <tbody>
-          {displayRows.map((row) => (
-            <tr key={row.id} className="h-10 border-b border-datavis-gridlines hover:bg-overlay-subtle">
-              <td style={colStyle(0)} className={cx(tdClass, "min-w-0")}>
-                <TruncatedText className="w-full font-semibold text-interactive-active">{row.detectionName}</TruncatedText>
-              </td>
-              <td style={colStyle(1)} className={tdClass}>
-                <span className="inline-flex items-center gap-2">
-                  <SeverityTableIcon name={SEV_ICONS[row.severity]} color={SEV_COLORS[row.severity]} />
-                  <span className="font-semibold text-text-primary">{row.severity}</span>
-                </span>
-              </td>
-              <td style={colStyle(2)} className={tdClass}>
-                {row.runTime}
-              </td>
-              <td style={colStyle(3)} className={tdClass}>
-                <RunStatusCell status={row.status} />
-              </td>
-              <td style={colStyle(4)} className={tdClass}>
-                <FindingsGeneratedCell value={row.findingsGenerated} />
-              </td>
-              <td style={colStyle(5)} className={tdClass}>
-                {row.duration ?? "—"}
-              </td>
-              <td style={colStyle(6)} className={tdClass}>
-                {row.triggeredBy}
-              </td>
-            </tr>
-          ))}
+          {displayRows.map((row) => {
+            const expanded = expandedIds.has(row.id);
+            return (
+              <Fragment key={row.id}>
+                <tr className="h-10 border-b border-datavis-gridlines hover:bg-overlay-subtle">
+                  <td style={colStyle(0)} className="h-10 px-0 py-0 align-middle">
+                    <div className="flex items-center justify-center">
+                      <Checkbox
+                        checked={selected.has(row.id)}
+                        onCheckedChange={(checked) => toggleRow(row.id, checked)}
+                        aria-label={`Select ${row.detectionName}`}
+                      />
+                    </div>
+                  </td>
+                  <td style={colStyle(1)} className="h-10 px-0 py-0 align-middle">
+                    <div className="flex justify-center">
+                      <button
+                        type="button"
+                        className="p-1 text-text-tertiary hover:text-text-primary"
+                        aria-expanded={expanded}
+                        aria-label={
+                          expanded ? `Collapse run details for ${row.detectionName}` : `Expand run details for ${row.detectionName}`
+                        }
+                        onClick={() => onToggleExpand(row.id)}
+                      >
+                        <Icon
+                          name="navi-arrow-drop-down"
+                          size={32}
+                          className={cx("block transition-transform", expanded ? "rotate-0" : "-rotate-90")}
+                          aria-hidden
+                        />
+                      </button>
+                    </div>
+                  </td>
+                  <td style={colStyle(2)} className={cx(tdClass, "min-w-0")}>
+                    <TruncatedText className="w-full font-semibold text-interactive-active">{row.detectionName}</TruncatedText>
+                  </td>
+                  <td style={colStyle(3)} className={tdClass}>
+                    <span className="inline-flex items-center gap-2">
+                      <SeverityTableIcon name={SEV_ICONS[row.severity]} color={SEV_COLORS[row.severity]} />
+                      <span className="font-semibold text-text-primary">{row.severity}</span>
+                    </span>
+                  </td>
+                  <td style={colStyle(4)} className={tdClass}>
+                    {row.runTime}
+                  </td>
+                  <td style={colStyle(5)} className={tdClass}>
+                    <RunStatusCell status={row.status} />
+                  </td>
+                  <td style={colStyle(6)} className={tdClass}>
+                    <FindingsGeneratedCell value={row.findingsGenerated} />
+                  </td>
+                  <td style={colStyle(7)} className={tdClass}>
+                    {row.duration ?? "—"}
+                  </td>
+                  <td style={colStyle(8)} className={tdClass}>
+                    {row.triggeredBy}
+                  </td>
+                </tr>
+                {expanded ? (
+                  <tr className="border-b border-datavis-gridlines bg-surface-table-row-header">
+                    <td colSpan={RUN_HISTORY_COLUMN_COUNT} className="px-4 py-3 align-top">
+                      <p className="text-sm leading-relaxed text-text-secondary">{row.details}</p>
+                    </td>
+                  </tr>
+                ) : null}
+              </Fragment>
+            );
+          })}
         </tbody>
       </table>
     </div>
@@ -563,6 +722,7 @@ function RunHistoryTable({ rows }: { rows: RunHistoryRow[] }) {
 export function DetectionHistoryContent() {
   const [tableTool, setTableTool] = useState<FilterColumnPanelTool | null>("filter");
   const [searchQuery, setSearchQuery] = useState("");
+  const [expandedIds, setExpandedIds] = useState<Set<string>>(() => new Set());
   const [runHistoryFilter, setRunHistoryFilter] = useState<RunHistoryFilter | null>(null);
   const [detectionNameFilter, setDetectionNameFilter] = useState<string | null>(null);
   const [severityFilter, setSeverityFilter] = useState<DetectionSeverity | null>(null);
@@ -601,6 +761,31 @@ export function DetectionHistoryContent() {
     setSeverityFilter((current) => (current === severity ? null : severity));
     setRunHistoryFilter(null);
     setDetectionNameFilter(null);
+  };
+
+  const toggleExpand = (id: string) => {
+    setExpandedIds((current) => {
+      const next = new Set(current);
+      if (next.has(id)) next.delete(id);
+      else next.add(id);
+      return next;
+    });
+  };
+
+  const toggleExpandAll = () => {
+    setExpandedIds((current) => {
+      const visibleIds = filteredRows.map((row) => row.id);
+      const everyVisibleExpanded =
+        visibleIds.length > 0 && visibleIds.every((id) => current.has(id));
+
+      if (everyVisibleExpanded) {
+        const next = new Set(current);
+        for (const id of visibleIds) next.delete(id);
+        return next;
+      }
+
+      return new Set([...current, ...visibleIds]);
+    });
   };
 
   return (
@@ -663,7 +848,12 @@ export function DetectionHistoryContent() {
             onFilterClick={() => setTableTool(tableTool === "filter" ? null : "filter")}
             onColumnsClick={() => setTableTool(tableTool === "columns" ? null : "columns")}
           />
-          <RunHistoryTable rows={filteredRows} />
+          <RunHistoryTable
+            rows={filteredRows}
+            expandedIds={expandedIds}
+            onToggleExpand={toggleExpand}
+            onToggleExpandAll={toggleExpandAll}
+          />
         </div>
       </section>
     </>
