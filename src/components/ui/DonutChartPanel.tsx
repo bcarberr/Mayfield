@@ -5,7 +5,8 @@ const cx = (...c: (string | false | undefined)[]) => c.filter(Boolean).join(" ")
 /** Figma `7671:8959` / donut `7671:9014` — 188px ring, 137px hole. */
 export const DONUT_CHART_OUTER_PX = 188;
 export const DONUT_CHART_INNER_PX = 137;
-const DONUT_CHART_INSET_PX = (DONUT_CHART_OUTER_PX - DONUT_CHART_INNER_PX) / 2;
+const DONUT_CHART_COMPACT_OUTER_PX = 148;
+const DONUT_CHART_COMPACT_INNER_PX = 108;
 
 export type DonutSegment = {
   label: string;
@@ -48,6 +49,7 @@ export type DonutChartPanelProps = {
   selectedLabel?: string | null;
   onSegmentClick?: (label: string) => void;
   ariaLabel: string;
+  size?: "default" | "compact";
 };
 
 /** Figma `7671:9014` — interactive donut with legend (Top Findings Detection pattern). */
@@ -58,7 +60,12 @@ export function DonutChartPanel({
   selectedLabel = null,
   onSegmentClick,
   ariaLabel,
+  size = "default",
 }: DonutChartPanelProps) {
+  const compact = size === "compact";
+  const outerPx = compact ? DONUT_CHART_COMPACT_OUTER_PX : DONUT_CHART_OUTER_PX;
+  const innerPx = compact ? DONUT_CHART_COMPACT_INNER_PX : DONUT_CHART_INNER_PX;
+  const insetPx = (outerPx - innerPx) / 2;
   const chartRef = useRef<HTMLDivElement>(null);
   const [hoveredLabel, setHoveredLabel] = useState<string | null>(null);
   const [tooltipPos, setTooltipPos] = useState<{ x: number; y: number } | null>(null);
@@ -92,10 +99,10 @@ export function DonutChartPanel({
   const sortedSegments = useMemo(() => [...segments].sort((a, b) => b.value - a.value), [segments]);
 
   const arcs = useMemo(() => {
-    const cxPos = DONUT_CHART_OUTER_PX / 2;
-    const cyPos = DONUT_CHART_OUTER_PX / 2;
-    const outerR = DONUT_CHART_OUTER_PX / 2;
-    const innerR = DONUT_CHART_INNER_PX / 2;
+    const cxPos = outerPx / 2;
+    const cyPos = outerPx / 2;
+    const outerR = outerPx / 2;
+    const innerR = innerPx / 2;
     let angle = 0;
 
     return sortedSegments.map((segment) => {
@@ -110,17 +117,17 @@ export function DonutChartPanel({
         path: donutSegmentPath(cxPos, cyPos, innerR, outerR, startAngle, endAngle),
       };
     });
-  }, [sortedSegments, total]);
+  }, [sortedSegments, total, outerPx, innerPx]);
 
   const hovered = arcs.find((segment) => segment.label === hoveredLabel);
   const interactive = Boolean(onSegmentClick);
 
   return (
-    <div className="flex flex-1 flex-col items-center gap-6 sm:flex-row sm:items-start">
+    <div className={cx("flex flex-col items-center sm:flex-row sm:items-start", compact ? "gap-4" : "gap-6")}>
       <div
         ref={chartRef}
         className="relative shrink-0"
-        style={{ width: DONUT_CHART_OUTER_PX, height: DONUT_CHART_OUTER_PX }}
+        style={{ width: outerPx, height: outerPx }}
       >
         {hovered && tooltipPos ? (
           <div
@@ -135,9 +142,9 @@ export function DonutChartPanel({
           </div>
         ) : null}
         <svg
-          width={DONUT_CHART_OUTER_PX}
-          height={DONUT_CHART_OUTER_PX}
-          viewBox={`0 0 ${DONUT_CHART_OUTER_PX} ${DONUT_CHART_OUTER_PX}`}
+          width={outerPx}
+          height={outerPx}
+          viewBox={`0 0 ${outerPx} ${outerPx}`}
           role="img"
           aria-label={ariaLabel}
           onMouseLeave={clearHover}
@@ -172,15 +179,22 @@ export function DonutChartPanel({
         </svg>
         <div
           className="pointer-events-none absolute flex flex-col items-center justify-center rounded-full bg-datavis-card-bg text-center text-text-primary"
-          style={{ inset: DONUT_CHART_INSET_PX }}
+          style={{ inset: insetPx }}
         >
-          <span className="text-2xl font-normal leading-8 tracking-[0.7px] tabular-nums">
+          <span
+            className={cx(
+              "font-normal tabular-nums tracking-[0.7px]",
+              compact ? "text-xl leading-7" : "text-2xl leading-8",
+            )}
+          >
             {total.toLocaleString()}
           </span>
-          <span className="text-2xl font-normal leading-8 tracking-[0.7px]">{centerLabel}</span>
+          <span className={cx("font-normal tracking-[0.7px]", compact ? "text-xl leading-7" : "text-2xl leading-8")}>
+            {centerLabel}
+          </span>
         </div>
       </div>
-      <ul className="min-w-0 flex-1 space-y-3">
+      <ul className={cx("min-w-0 flex-1", compact ? "space-y-2" : "space-y-3")}>
         {arcs.map((segment) => (
           <li key={segment.label}>
             {interactive ? (

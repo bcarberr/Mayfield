@@ -1,8 +1,9 @@
-import { useEffect } from "react";
+import { useCallback, useEffect, useState } from "react";
 import { Icon } from "../design-system";
 import { FederatedDetectionHubDashboard } from "../components/federated-detection-hub/FederatedDetectionHubDashboard";
 import { SearchTopHeader } from "../components/SearchTopHeader";
 import { Button } from "../components/ui/Button";
+import { ContentAreaSlideOverHost, type ContentAreaSlideOverState } from "../components/ui/SlideOver";
 import { V4NavThinner } from "../components/V4NavThinner";
 import { NAV_RAIL_TARGETS } from "./navRailTargets";
 
@@ -10,6 +11,11 @@ import { NAV_RAIL_TARGETS } from "./navRailTargets";
  * Federated Detection Hub — Figma `7671:7964` (`02a` Manage Detections).
  */
 export function FederatedDetectionHubPage() {
+  const [slideOver, setSlideOver] = useState<ContentAreaSlideOverState | null>(null);
+  const handleSlideOverChange = useCallback((state: ContentAreaSlideOverState | null) => {
+    setSlideOver(state);
+  }, []);
+
   useEffect(() => {
     const previous = document.title;
     document.title = "Federated Detection Hub";
@@ -43,7 +49,9 @@ export function FederatedDetectionHubPage() {
           }
         />
 
-        <FederatedDetectionHubDashboard />
+        <ContentAreaSlideOverHost slideOver={slideOver}>
+          <FederatedDetectionHubDashboard onSlideOverChange={handleSlideOverChange} />
+        </ContentAreaSlideOverHost>
       </div>
     </div>
   );

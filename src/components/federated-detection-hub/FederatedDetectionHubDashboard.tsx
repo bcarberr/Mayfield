@@ -1,4 +1,4 @@
-import { Fragment, useMemo, useState, type ReactNode } from "react";
+import { Fragment, useEffect, useMemo, useState } from "react";
 import { Checkbox, Icon, Switch, type SeverityShapeIconName } from "../../design-system";
 import { Button } from "../ui/Button";
 import { ColumnHeaderMenu } from "../ui/ColumnHeaderMenu";
@@ -12,10 +12,13 @@ import { FilterColumnPanel, type FilterColumnPanelTool } from "../ui/FilterColum
 import { Input } from "../ui/Input";
 import { SeverityTableIcon } from "../ui/SeverityTableIcon";
 import { Modal } from "../ui/Modal";
-import { SlideOver } from "../ui/SlideOver";
+import { type ContentAreaSlideOverState } from "../ui/SlideOver";
 import { TruncatedText } from "../ui/TruncatedText";
-import { DONUT_CHART_OUTER_PX, DonutChartPanel } from "../ui/DonutChartPanel";
+import { DonutChartPanel } from "../ui/DonutChartPanel";
 import { useResizableColumns } from "../ui/useResizableColumns";
+import { InsightCard } from "../summary-insights/datavisCard";
+import { HorizontalBarPanel } from "../summary-insights/horizontalBarPanel";
+import { DetectionHistoryContent } from "./DetectionHistoryContent";
 import { DetectionLibraryContent } from "./DetectionLibraryContent";
 import { QueuedForReviewContent } from "./QueuedForReviewContent";
 
@@ -117,6 +120,16 @@ const SEV_ICONS: Record<DetectionSeverity, SeverityShapeIconName> = {
 };
 
 const OVERALL_FINDINGS_COUNT = 1389;
+
+const SEVERITY_BREAKDOWN_ROWS = [
+  { label: "Critical", value: 118, color: SEV_COLORS.Critical },
+  { label: "High", value: 337, color: SEV_COLORS.High },
+  { label: "Medium", value: 667, color: SEV_COLORS.Medium },
+  { label: "Low", value: 267, color: SEV_COLORS.Low },
+] as const;
+
+const SEVERITY_BREAKDOWN_X_MAX = 700;
+const SEVERITY_BREAKDOWN_X_TICKS = [0, 175, 350, 525, 700] as const;
 
 const DETECTION_ROWS: DetectionRow[] = [
   {
@@ -297,41 +310,6 @@ const DETECTION_ROWS: DetectionRow[] = [
   },
 ];
 
-function HubCard({
-  title,
-  titleTrailing,
-  children,
-  className,
-}: {
-  title: string;
-  titleTrailing?: ReactNode;
-  children: ReactNode;
-  className?: string;
-}) {
-  return (
-    <section
-      className={cx(
-        "flex min-h-0 min-w-0 flex-col overflow-hidden rounded-[4px] border border-border-container bg-datavis-card-bg shadow-datavis-card",
-        className,
-      )}
-    >
-      <header className="flex shrink-0 items-center gap-3 bg-datavis-card-bg px-4 py-3 sm:px-6">
-        <h2 className="shrink-0 text-base-semibold text-text-primary">{title}</h2>
-        {titleTrailing ? (
-          <div className="min-w-0 flex-1 text-right">{titleTrailing}</div>
-        ) : (
-          <div className="flex-1" aria-hidden />
-        )}
-        <Button variant="ghost" className="shrink-0 p-1 text-text-tertiary hover:text-text-primary" aria-label="Card options">
-          <Icon name="navi-more-vert" size={16} />
-        </Button>
-      </header>
-      <div className="mx-4 h-px shrink-0 bg-datavis-gridlines sm:mx-6" aria-hidden />
-      <div className="flex min-h-0 flex-1 flex-col bg-datavis-card-bg p-4 sm:p-6 sm:pt-4">{children}</div>
-    </section>
-  );
-}
-
 function HubTabs({ active, onChange }: { active: HubTab; onChange: (tab: HubTab) => void }) {
   return (
     <nav className="flex shrink-0 gap-6 px-6" aria-label="Detection hub sections">
@@ -381,22 +359,31 @@ function SystemHealthCard({
     );
 
   return (
-    <HubCard
-      className="h-full"
+    <InsightCard
       title="System Health"
-      titleTrailing={<span className="text-sm font-semibold text-text-tertiary">Last evaluated: 18h ago</span>}
+      compact
+      stretch
+      headerActions={
+        <div className="flex min-w-0 items-center gap-2">
+          <span className="truncate text-base-small text-text-tertiary">Last evaluated: 18h ago</span>
+          <Button variant="ghost" className="shrink-0 p-1 text-text-tertiary hover:text-text-primary" aria-label="Chart options">
+            <Icon name="navi-more-vert" />
+          </Button>
+        </div>
+      }
     >
-      <div className="grid grid-cols-[27px_minmax(0,1fr)] gap-x-3 gap-y-4">
+      <div className="flex h-full flex-col justify-start pt-1">
+        <div className="grid grid-cols-[27px_minmax(0,1fr)] gap-x-3 gap-y-2">
         <Icon
           name="action-check"
           size={20}
-          className="inline-flex h-5 w-[27px] shrink-0 self-center text-feedback-positive [&>svg]:!h-5 [&>svg]:!w-[27px]"
+          className="inline-flex h-5 w-[27px] shrink-0 self-start text-feedback-positive [&>svg]:!h-5 [&>svg]:!w-[27px]"
           aria-hidden
         />
-        <span className="text-2xl font-bold tracking-wide text-text-primary">System Healthy</span>
-        <ul className="col-start-2 space-y-3">
+        <span className="text-xl font-bold tracking-wide text-text-primary">System Healthy</span>
+        <ul className="col-start-2 space-y-1.5">
           <li className="flex items-baseline gap-3">
-            <span className="w-16 shrink-0 text-2xl font-bold tabular-nums text-text-primary">
+            <span className="w-14 shrink-0 text-xl font-bold tabular-nums text-text-primary">
               {runningNormallyCount}/{totalCount}
             </span>
             <button
@@ -409,9 +396,9 @@ function SystemHealthCard({
             </button>
           </li>
           <li className="flex items-baseline gap-3">
-            <span className="flex w-16 shrink-0 items-center gap-1">
-              <span className="text-2xl font-bold tabular-nums text-text-primary">{needAttentionCount}</span>
-              <Icon name="error-outline" size={18} className="shrink-0 text-feedback-negative" aria-hidden />
+            <span className="flex w-14 shrink-0 items-center gap-1">
+              <span className="text-xl font-bold tabular-nums text-text-primary">{needAttentionCount}</span>
+              <Icon name="error-outline" size={16} className="shrink-0 text-feedback-negative" aria-hidden />
             </span>
             <button
               type="button"
@@ -423,7 +410,7 @@ function SystemHealthCard({
             </button>
           </li>
           <li className="flex items-baseline gap-3">
-            <span className="w-16 shrink-0 text-2xl font-bold tabular-nums text-text-primary">{inactiveCount}</span>
+            <span className="w-14 shrink-0 text-xl font-bold tabular-nums text-text-primary">{inactiveCount}</span>
             <button
               type="button"
               aria-pressed={selectedFilter === "inactive"}
@@ -434,8 +421,9 @@ function SystemHealthCard({
             </button>
           </li>
         </ul>
+        </div>
       </div>
-    </HubCard>
+    </InsightCard>
   );
 }
 
@@ -453,16 +441,19 @@ function TopFindingsCard({
   onSegmentClick: (label: string) => void;
 }) {
   return (
-    <HubCard className="h-full" title="Top Findings Detection">
-      <DonutChartPanel
-        segments={TOP_FINDINGS_SEGMENTS}
-        total={OVERALL_FINDINGS_COUNT}
-        centerLabel="Findings"
-        selectedLabel={selectedLabel}
-        onSegmentClick={onSegmentClick}
-        ariaLabel="Top findings by detection"
-      />
-    </HubCard>
+    <InsightCard title="Top Findings Detection" compact stretch>
+      <div className="flex h-full items-start pt-1">
+        <DonutChartPanel
+          segments={TOP_FINDINGS_SEGMENTS}
+          total={OVERALL_FINDINGS_COUNT}
+          centerLabel="findings"
+          selectedLabel={selectedLabel}
+          onSegmentClick={onSegmentClick}
+          ariaLabel="Top findings by detection"
+          size="compact"
+        />
+      </div>
+    </InsightCard>
   );
 }
 
@@ -474,76 +465,20 @@ function SeverityBreakdownCard({
   selectedSeverity: BreakdownSeverity | null;
   onSeverityClick: (severity: BreakdownSeverity) => void;
 }) {
-  const rows = useMemo(
-    () =>
-      [
-        { label: "Critical" as const, value: 118, color: SEV_COLORS.Critical },
-        { label: "High" as const, value: 337, color: SEV_COLORS.High },
-        { label: "Medium" as const, value: 667, color: SEV_COLORS.Medium },
-        { label: "Low" as const, value: 267, color: SEV_COLORS.Low },
-      ] as const,
-    [],
-  );
-  const max = Math.max(...rows.map((r) => r.value));
-  const filterActive = selectedSeverity != null;
-
   return (
-    <HubCard className="h-full" title={`Severity Breakdown (Overall ${OVERALL_FINDINGS_COUNT.toLocaleString()} Findings)`}>
-      <div
-        className="flex flex-1 flex-col justify-between"
-        style={{ minHeight: DONUT_CHART_OUTER_PX - 24 }}
-      >
-        {rows.map((row) => {
-          const selected = selectedSeverity === row.label;
-          const dimmed = filterActive && !selected;
-
-          return (
-            <button
-              key={row.label}
-              type="button"
-              aria-pressed={selected}
-              aria-label={`Filter detections by ${row.label} severity`}
-              className={cx(
-                "group flex min-h-[34px] w-full flex-col justify-end gap-1.5 rounded-sm text-left transition-colors",
-                "focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-interactive-active focus-visible:ring-offset-2 focus-visible:ring-offset-datavis-card-bg",
-              )}
-              onClick={() => onSeverityClick(row.label)}
-            >
-              <div className="flex items-baseline justify-between gap-3">
-                <span
-                  className={cx(
-                    "text-sm font-semibold transition-colors",
-                    selected ? "text-text-primary" : dimmed ? "text-text-disabled" : "text-text-primary",
-                  )}
-                >
-                  {row.label}
-                </span>
-                <span
-                  className={cx(
-                    "shrink-0 text-sm font-bold tabular-nums transition-colors",
-                    dimmed ? "text-text-disabled" : "text-text-primary",
-                  )}
-                >
-                  {row.value}
-                </span>
-              </div>
-              <div className="relative h-3 rounded-sm bg-datavis-gridlines">
-                <div
-                  className={cx(
-                    "absolute inset-y-0 left-0 rounded-sm transition-opacity",
-                    dimmed ? "opacity-35 group-hover:opacity-55" : "opacity-100",
-                  )}
-                  style={{
-                    width: `${Math.max(6, (row.value / max) * 100)}%`,
-                    backgroundColor: row.color,
-                  }}
-                />
-              </div>
-            </button>
-          );
-        })}
-      </div>
-    </HubCard>
+    <InsightCard title="Severity ID" compact stretch>
+      <HorizontalBarPanel
+        rows={SEVERITY_BREAKDOWN_ROWS}
+        selectedLabel={selectedSeverity}
+        onBarClick={(label) => onSeverityClick(label as BreakdownSeverity)}
+        filterAriaLabel={(label) => `Filter detections by ${label} severity`}
+        xMax={SEVERITY_BREAKDOWN_X_MAX}
+        xTicks={SEVERITY_BREAKDOWN_X_TICKS}
+        axisLabel="Findings"
+        dense
+        denseRowGap={16}
+      />
+    </InsightCard>
   );
 }
 
@@ -1108,7 +1043,7 @@ function DetectionsTable({
   );
 }
 
-function ManageDetectionsContent() {
+function ManageDetectionsContent({ onSlideOverChange }: { onSlideOverChange: (state: ContentAreaSlideOverState | null) => void }) {
   const [tableTool, setTableTool] = useState<FilterColumnPanelTool | null>("filter");
   const [searchQuery, setSearchQuery] = useState("");
   const [expandedIds, setExpandedIds] = useState<Set<string>>(() => new Set());
@@ -1216,6 +1151,26 @@ function ManageDetectionsContent() {
     [detectionRows, drawerDetectionId],
   );
 
+  useEffect(() => {
+    onSlideOverChange(
+      drawerRow
+        ? {
+            ariaLabel: `Detection: ${drawerRow.name}`,
+            onClose: () => setDrawerDetectionId(null),
+            panel: (
+              <DetectionDetailPanel
+                row={drawerRow}
+                enabled={enabledById[drawerRow.id] ?? drawerRow.enabled}
+                mode={drawerMode}
+                onClose={() => setDrawerDetectionId(null)}
+              />
+            ),
+          }
+        : null,
+    );
+    return () => onSlideOverChange(null);
+  }, [drawerRow, drawerMode, enabledById, onSlideOverChange]);
+
   const toggleExpand = (id: string) => {
     setExpandedIds((current) => {
       const next = new Set(current);
@@ -1259,7 +1214,7 @@ function ManageDetectionsContent() {
 
   return (
     <>
-      <div className="grid shrink-0 grid-cols-1 items-stretch gap-4 xl:grid-cols-3">
+      <div className="grid shrink-0 grid-cols-1 items-stretch gap-4 lg:grid-cols-3">
         <SystemHealthCard
           runningNormallyCount={systemHealthCounts.runningNormally}
           totalCount={systemHealthCounts.total}
@@ -1307,39 +1262,34 @@ function ManageDetectionsContent() {
         onClose={handleCloseCopyDetection}
         onConfirm={handleConfirmCopyDetection}
       />
-      {drawerRow ? (
-        <SlideOver
-          open
-          onClose={() => setDrawerDetectionId(null)}
-          ariaLabel={`Detection: ${drawerRow.name}`}
-          panelClassName="max-w-[480px]"
-        >
-          <DetectionDetailPanel
-            row={drawerRow}
-            enabled={enabledById[drawerRow.id] ?? drawerRow.enabled}
-            mode={drawerMode}
-            onClose={() => setDrawerDetectionId(null)}
-          />
-        </SlideOver>
-      ) : null}
     </>
   );
 }
 
-export function FederatedDetectionHubDashboard() {
+export function FederatedDetectionHubDashboard({
+  onSlideOverChange,
+}: {
+  onSlideOverChange: (state: ContentAreaSlideOverState | null) => void;
+}) {
   const [activeTab, setActiveTab] = useState<HubTab>("Manage Detections");
 
+  useEffect(() => {
+    onSlideOverChange(null);
+  }, [activeTab, onSlideOverChange]);
+
   return (
-    <div className="relative flex min-h-0 flex-1 flex-col overflow-hidden pt-6">
+    <div className="flex min-h-0 flex-1 flex-col overflow-hidden pt-6">
       <HubTabs active={activeTab} onChange={setActiveTab} />
 
       <div className="flex min-h-0 flex-1 flex-col gap-4 overflow-y-auto px-6 py-4 sm:py-5">
         {activeTab === "Manage Detections" ? (
-          <ManageDetectionsContent />
+          <ManageDetectionsContent onSlideOverChange={onSlideOverChange} />
         ) : activeTab === "Detection Library" ? (
-          <DetectionLibraryContent />
+          <DetectionLibraryContent onSlideOverChange={onSlideOverChange} />
         ) : activeTab === "Queued For Review" ? (
-          <QueuedForReviewContent />
+          <QueuedForReviewContent onSlideOverChange={onSlideOverChange} />
+        ) : activeTab === "Detection History" ? (
+          <DetectionHistoryContent />
         ) : (
           <div className="flex flex-1 items-center justify-center rounded-[4px] border border-border-container bg-datavis-card-bg p-12 text-center shadow-datavis-card">
             <p className="text-sm text-text-tertiary">{activeTab} — content coming soon.</p>

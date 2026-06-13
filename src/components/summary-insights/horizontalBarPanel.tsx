@@ -31,6 +31,8 @@ export function HorizontalBarPanel({
   xTicks = DEFAULT_X_TICKS,
   axisLabel,
   chartHeight,
+  dense = false,
+  denseRowGap,
 }: {
   rows: readonly BarRow[];
   selectedLabel?: string | null;
@@ -41,15 +43,24 @@ export function HorizontalBarPanel({
   axisLabel?: string;
   /** Override plot height — use when fewer rows should match another chart's row density. */
   chartHeight?: number;
+  /** Tighter row spacing and smaller bars — for compact dashboard widgets. */
+  dense?: boolean;
+  /** Gap between dense rows in pixels. Defaults to 16. */
+  denseRowGap?: number;
 }) {
+  const resolvedDenseRowGap = dense ? (denseRowGap ?? 16) : undefined;
+
   return (
-    <div className="flex min-h-0 min-w-0 flex-1 flex-col lg:h-full">
+    <div className={cx("flex min-h-0 min-w-0 flex-col", chartHeight == null && !dense && "flex-1 lg:h-full")}>
       <div
-        className={cx("relative flex flex-col", chartHeight == null && "min-h-[200px] flex-1")}
+        className={cx("relative flex flex-col", chartHeight == null && !dense && "min-h-[200px] flex-1")}
         style={chartHeight != null ? { height: chartHeight } : undefined}
       >
         <ChartGridLines xTicks={xTicks} />
-        <div className="relative flex h-full min-h-0 flex-col justify-between">
+        <div
+          className={cx("relative flex min-h-0 flex-col", dense ? "justify-start" : "h-full justify-between")}
+          style={resolvedDenseRowGap != null ? { gap: resolvedDenseRowGap } : undefined}
+        >
           {rows.map((row) => {
             const pct = Math.min(100, Math.max((row.value / xMax) * 100, row.value > 0 ? 6 : 0));
             const fill = row.color ?? CHART_CATEGORY_FILL;
@@ -73,10 +84,11 @@ export function HorizontalBarPanel({
                 >
                   {row.label}
                 </span>
-                <div className="flex min-h-5 min-w-0 flex-1 items-center gap-[8px]">
+                <div className={cx("flex min-w-0 flex-1 items-center gap-[8px]", dense ? "min-h-4" : "min-h-5")}>
                   <div
                     className={cx(
-                      "h-5 shrink-0 rounded-sm transition-opacity duration-150",
+                      "shrink-0 rounded-sm transition-opacity duration-150",
+                      dense ? "h-4" : "h-5",
                       dimmed ? "opacity-35 group-hover:opacity-55" : interactive && !selected && "opacity-90 group-hover:opacity-100",
                     )}
                     style={{
@@ -105,7 +117,8 @@ export function HorizontalBarPanel({
                   aria-pressed={selected}
                   aria-label={filterAriaLabel(row.label)}
                   className={cx(
-                    "group flex min-h-6 w-full shrink-0 items-center gap-2 rounded-sm text-left sm:gap-3",
+                    "group flex w-full shrink-0 items-center gap-2 rounded-sm text-left sm:gap-3",
+                    dense ? "min-h-5" : "min-h-6",
                     "cursor-pointer transition-colors",
                     "focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-interactive-active focus-visible:ring-offset-2 focus-visible:ring-offset-datavis-card-bg",
                   )}
@@ -117,24 +130,28 @@ export function HorizontalBarPanel({
             }
 
             return (
-              <div key={row.label} className="flex min-h-6 shrink-0 items-center gap-2 sm:gap-3">
+              <div key={row.label} className={cx("flex shrink-0 items-center gap-2 sm:gap-3", dense ? "min-h-5" : "min-h-6")}>
                 {rowBody}
               </div>
             );
           })}
         </div>
       </div>
-      <div className="mt-4 shrink-0 px-[20px]">
+      <div className={cx("shrink-0 px-[20px]", dense ? "mt-3" : "mt-4")}>
         <div className="h-px shrink-0 bg-datavis-gridlines" aria-hidden />
       </div>
-      <div className="flex shrink-0 justify-between px-[20px] pt-2 text-base-small text-text-tertiary">
+      <div className={cx("flex shrink-0 justify-between px-[20px] text-base-small text-text-tertiary", dense ? "pt-1" : "pt-2")}>
         {xTicks.map((t) => (
           <span key={t} className="w-8 shrink-0 text-center tabular-nums first:w-6 first:text-left last:text-right">
             {t}
           </span>
         ))}
       </div>
-      {axisLabel ? <p className="mt-1 shrink-0 text-center text-base-semibold text-text-primary">{axisLabel}</p> : null}
+      {axisLabel ? (
+        <p className={cx("shrink-0 text-center text-base-semibold text-text-primary", dense ? "mt-0.5" : "mt-1")}>
+          {axisLabel}
+        </p>
+      ) : null}
     </div>
   );
 }

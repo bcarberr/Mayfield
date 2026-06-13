@@ -1,4 +1,4 @@
-import { Fragment, useMemo, useState } from "react";
+import { Fragment, useEffect, useMemo, useState } from "react";
 import { Checkbox, Icon, Switch, type SeverityShapeIconName } from "../../design-system";
 import { Button } from "../ui/Button";
 import { ColumnHeaderMenu } from "../ui/ColumnHeaderMenu";
@@ -12,7 +12,7 @@ import {
 import { FilterColumnPanel, type FilterColumnPanelTool } from "../ui/FilterColumnPanel";
 import { Input } from "../ui/Input";
 import { SeverityTableIcon } from "../ui/SeverityTableIcon";
-import { SlideOver } from "../ui/SlideOver";
+import { type ContentAreaSlideOverState } from "../ui/SlideOver";
 import { TruncatedText } from "../ui/TruncatedText";
 import { useResizableColumns } from "../ui/useResizableColumns";
 
@@ -851,7 +851,7 @@ function LibraryDetectionsTable({
   );
 }
 
-export function DetectionLibraryContent() {
+export function DetectionLibraryContent({ onSlideOverChange }: { onSlideOverChange: (state: ContentAreaSlideOverState | null) => void }) {
   const [tableTool, setTableTool] = useState<FilterColumnPanelTool | null>("filter");
   const [searchQuery, setSearchQuery] = useState("");
   const [expandedIds, setExpandedIds] = useState<Set<string>>(() => new Set());
@@ -886,6 +886,25 @@ export function DetectionLibraryContent() {
   const drawerRow = drawerDetectionId
     ? LIBRARY_DETECTION_ROWS.find((row) => row.id === drawerDetectionId) ?? null
     : null;
+
+  useEffect(() => {
+    onSlideOverChange(
+      drawerRow
+        ? {
+            ariaLabel: `Detection: ${drawerRow.name}`,
+            onClose: () => setDrawerDetectionId(null),
+            panel: (
+              <LibraryDetectionDetailPanel
+                row={drawerRow}
+                enabled={enabledById[drawerRow.id] ?? drawerRow.enabled}
+                onClose={() => setDrawerDetectionId(null)}
+              />
+            ),
+          }
+        : null,
+    );
+    return () => onSlideOverChange(null);
+  }, [drawerRow, enabledById, onSlideOverChange]);
 
   const toggleExpand = (id: string) => {
     setExpandedIds((prev) => {
@@ -952,21 +971,6 @@ export function DetectionLibraryContent() {
           setStatFilter(null);
         }}
       />
-
-      {drawerRow ? (
-        <SlideOver
-          open
-          onClose={() => setDrawerDetectionId(null)}
-          ariaLabel={`Detection: ${drawerRow.name}`}
-          panelClassName="max-w-[480px]"
-        >
-          <LibraryDetectionDetailPanel
-            row={drawerRow}
-            enabled={enabledById[drawerRow.id] ?? drawerRow.enabled}
-            onClose={() => setDrawerDetectionId(null)}
-          />
-        </SlideOver>
-      ) : null}
     </>
   );
 }

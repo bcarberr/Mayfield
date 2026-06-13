@@ -14,22 +14,33 @@ export function InsightCard({
   children,
   headerActions,
   fillHeight = false,
+  compact = false,
+  stretch = false,
 }: {
   title: string;
   children: ReactNode;
   headerActions?: ReactNode;
   /** When true, card stretches to fill a grid/flex parent (e.g. findings chart row). */
   fillHeight?: boolean;
+  /** Reduced header/body padding for compact dashboard widget rows. */
+  compact?: boolean;
+  /** Match sibling height in a stretched grid row without forcing full-page flex growth. */
+  stretch?: boolean;
 }) {
   return (
     <section
       className={cx(
         "flex min-w-0 flex-col overflow-hidden rounded-[4px] border border-border-container",
         "bg-datavis-card-bg shadow-[0_1px_5px_rgba(0,0,0,0.2),0_2px_2px_rgba(0,0,0,0.14)]",
-        fillHeight ? "min-h-0 flex-1 lg:h-full" : "shrink-0",
+        fillHeight ? "min-h-0 flex-1 lg:h-full" : stretch ? "h-full" : "shrink-0",
       )}
     >
-      <header className="flex shrink-0 items-center justify-between gap-3 bg-datavis-card-bg px-4 py-3 sm:px-5">
+      <header
+        className={cx(
+          "flex shrink-0 items-center justify-between gap-3 bg-datavis-card-bg px-4 sm:px-5",
+          compact ? "py-2.5" : "py-3",
+        )}
+      >
         <h2 className="min-w-0 truncate text-base-semibold text-text-primary">{title}</h2>
         {headerActions ?? (
           <Button variant="ghost" className="shrink-0 p-1 text-text-tertiary hover:text-text-primary" aria-label="Chart options">
@@ -40,8 +51,9 @@ export function InsightCard({
       <DatavisGridlineRule />
       <div
         className={cx(
-          "flex flex-col bg-datavis-card-bg px-3 pb-4 pt-3 sm:px-4",
-          fillHeight ? "min-h-0 flex-1" : "shrink-0",
+          "flex flex-col bg-datavis-card-bg sm:px-4",
+          compact ? "px-3 py-3.5" : "px-3 pb-4 pt-3",
+          fillHeight || stretch ? "min-h-0 flex-1" : "shrink-0",
         )}
       >
         {children}

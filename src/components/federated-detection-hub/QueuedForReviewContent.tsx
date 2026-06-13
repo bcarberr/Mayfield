@@ -1,4 +1,4 @@
-import { Fragment, useMemo, useState } from "react";
+import { Fragment, useEffect, useMemo, useState } from "react";
 import { Checkbox, Icon, Switch, type SeverityShapeIconName } from "../../design-system";
 import { Button } from "../ui/Button";
 import { ColumnHeaderMenu } from "../ui/ColumnHeaderMenu";
@@ -12,7 +12,7 @@ import { FilterColumnPanel, type FilterColumnPanelTool } from "../ui/FilterColum
 import { Input } from "../ui/Input";
 import { SeverityTableIcon } from "../ui/SeverityTableIcon";
 import { Modal } from "../ui/Modal";
-import { SlideOver } from "../ui/SlideOver";
+import { type ContentAreaSlideOverState } from "../ui/SlideOver";
 import { TruncatedText } from "../ui/TruncatedText";
 import { useResizableColumns } from "../ui/useResizableColumns";
 
@@ -725,7 +725,7 @@ function QueuedReviewTable({
   );
 }
 
-export function QueuedForReviewContent() {
+export function QueuedForReviewContent({ onSlideOverChange }: { onSlideOverChange: (state: ContentAreaSlideOverState | null) => void }) {
   const [tableTool, setTableTool] = useState<FilterColumnPanelTool | null>("filter");
   const [searchQuery, setSearchQuery] = useState("");
   const [expandedIds, setExpandedIds] = useState<Set<string>>(() => new Set());
@@ -825,6 +825,26 @@ export function QueuedForReviewContent() {
     ? queuedRows.find((row) => row.id === drawerDetectionId) ?? null
     : null;
 
+  useEffect(() => {
+    onSlideOverChange(
+      drawerRow
+        ? {
+            ariaLabel: `Detection: ${drawerRow.name}`,
+            onClose: () => setDrawerDetectionId(null),
+            panel: (
+              <QueuedDetectionDetailPanel
+                row={drawerRow}
+                enabled={enabledById[drawerRow.id] ?? drawerRow.enabled}
+                mode={drawerMode}
+                onClose={() => setDrawerDetectionId(null)}
+              />
+            ),
+          }
+        : null,
+    );
+    return () => onSlideOverChange(null);
+  }, [drawerRow, drawerMode, enabledById, onSlideOverChange]);
+
   const toggleExpand = (id: string) => {
     setExpandedIds((prev) => {
       const next = new Set(prev);
@@ -901,21 +921,6 @@ export function QueuedForReviewContent() {
         onClose={handleCloseCopyDetection}
         onConfirm={handleConfirmCopyDetection}
       />
-      {drawerRow ? (
-        <SlideOver
-          open
-          onClose={() => setDrawerDetectionId(null)}
-          ariaLabel={`Detection: ${drawerRow.name}`}
-          panelClassName="max-w-[480px]"
-        >
-          <QueuedDetectionDetailPanel
-            row={drawerRow}
-            enabled={enabledById[drawerRow.id] ?? drawerRow.enabled}
-            mode={drawerMode}
-            onClose={() => setDrawerDetectionId(null)}
-          />
-        </SlideOver>
-      ) : null}
     </>
   );
 }
