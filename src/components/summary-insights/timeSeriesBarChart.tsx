@@ -1,5 +1,4 @@
 import { useMemo } from "react";
-import { cx } from "./datavisCard";
 
 type TimeSeriesSpikeHighlight = {
   index: number;
@@ -10,6 +9,8 @@ type TimeSeriesBarChartProps = {
   values: readonly number[];
   xLabels: readonly string[];
   barColor: string;
+  /** Per-bar fill override. */
+  barColors?: readonly string[];
   yMax?: number;
   yTicks?: readonly number[];
   height?: number;
@@ -24,6 +25,7 @@ export function TimeSeriesBarChart({
   values,
   xLabels,
   barColor,
+  barColors,
   yMax: yMaxProp,
   yTicks: yTicksProp,
   height = 140,
@@ -54,6 +56,8 @@ export function TimeSeriesBarChart({
       : null;
 
   const toY = (tick: number) => height - (tick / yMax) * height;
+
+  const barFill = (index: number) => barColors?.[index] ?? barColor;
 
   return (
     <div className="flex min-h-0 w-full min-w-0 flex-col">
@@ -109,7 +113,7 @@ export function TimeSeriesBarChart({
                 width={bar.width}
                 height={bar.height}
                 rx={2}
-                fill={barColor}
+                fill={barFill(bar.index)}
                 className="opacity-95"
               />
             ))}
@@ -138,21 +142,15 @@ export function TimeSeriesBarChart({
         <div className="w-7 shrink-0" aria-hidden />
         <div className="relative min-w-0 flex-1 pt-2">
           <div className="flex justify-between text-base-small text-text-tertiary">
-            {xLabels.map((label, index) => (
-              <span
-                key={label}
-                className={cx(
-                  "shrink-0 tabular-nums first:text-left last:text-right",
-                  spikeHighlight?.index === index && "font-semibold text-interactive-active",
-                )}
-              >
+            {xLabels.map((label) => (
+              <span key={label} className="shrink-0 tabular-nums first:text-left last:text-right">
                 {label}
               </span>
             ))}
           </div>
           {spikeCenterX != null && spikeLabel ? (
             <p
-              className="pointer-events-none absolute top-full mt-0.5 -translate-x-1/2 whitespace-nowrap text-base-small font-semibold text-interactive-active"
+              className="pointer-events-none absolute top-full mt-0.5 -translate-x-1/2 whitespace-nowrap text-base-small font-semibold text-feedback-negative"
               style={{ left: `${((spikeHighlight!.index + 0.5) / Math.max(values.length, 1)) * 100}%` }}
             >
               {spikeLabel}

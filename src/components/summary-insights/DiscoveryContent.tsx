@@ -1,5 +1,6 @@
 import { useMemo, useState } from "react";
 import { Icon, type SeverityShapeIconName } from "../../design-system";
+import { useTimeframe, type TimeframeRange } from "../../context/TimeframeContext";
 import { Button } from "../ui/Button";
 import { ColumnHeaderMenu } from "../ui/ColumnHeaderMenu";
 import { DonutChartPanel } from "../ui/DonutChartPanel";
@@ -66,9 +67,60 @@ type DiscoveryRow = {
   patchStatus: PatchStatus;
 };
 
-const WEEKDAY_LABELS = ["Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun"] as const;
-const NEW_ASSETS_VALUES = [14, 16, 12, 38, 18, 11, 9] as const;
-const SPIKE_DAY_INDEX = 3;
+const WEEKDAY_SHORT = ["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"] as const;
+
+type DailyDiscoveryChart = {
+  xLabels: string[];
+  values: number[];
+  spikeIndex: number | null;
+  spikeLabel: string;
+  yMax: number;
+  yTicks: number[];
+};
+
+function buildDailyDiscoveryChart({ from, to }: TimeframeRange): DailyDiscoveryChart {
+  const msPerDay = 86_400_000;
+  const startDay = new Date(from);
+  startDay.setHours(0, 0, 0, 0);
+  const endDay = new Date(to);
+  endDay.setHours(0, 0, 0, 0);
+
+  const dayCount = Math.max(1, Math.round((endDay.getTime() - startDay.getTime()) / msPerDay) + 1);
+  const useDate = dayCount > 7;
+
+  const xLabels: string[] = [];
+  const values: number[] = [];
+  let spikeIndex: number | null = null;
+
+  const spikeDayMs = endDay.getTime();
+
+  for (let i = 0; i < dayCount; i++) {
+    const day = new Date(startDay.getTime() + i * msPerDay);
+    if (useDate) {
+      xLabels.push(new Intl.DateTimeFormat("en-US", { month: "short", day: "numeric" }).format(day));
+    } else {
+      xLabels.push(WEEKDAY_SHORT[day.getDay()]);
+    }
+
+    const isSpike = day.getTime() === spikeDayMs;
+    if (isSpike) spikeIndex = i;
+    const base = 12;
+    const dow = day.getDay();
+    const weekdayMultiplier = dow === 0 || dow === 6 ? 0.7 : 1.0 + (dow === 4 ? 0.2 : 0);
+    const value = isSpike ? 38 : Math.max(8, Math.round(base * weekdayMultiplier * (0.9 + (i % 3) * 0.1)));
+    values.push(value);
+  }
+
+  const peak = Math.max(...values, 10);
+  const yMax = Math.ceil(peak / 10) * 10;
+  const step = yMax / 4;
+  const yTicks = [0, step, step * 2, step * 3, yMax];
+
+  const spikeDayOfWeek = spikeIndex != null ? WEEKDAY_SHORT[new Date(spikeDayMs).getDay()] : "Thu";
+  const spikeLabel = `${spikeDayOfWeek} spike: ${values[spikeIndex ?? 0] ?? 38} new cloud resources in us-east-2, no IaC tag`;
+
+  return { xLabels, values, spikeIndex, spikeLabel, yMax, yTicks };
+}
 
 const PLATFORM_ROWS = [
   { label: "Windows", value: 1204, color: CHART_CATEGORY_FILL },
@@ -475,6 +527,7 @@ function DiscoveryEventsTable({ rows }: { rows: DiscoveryRow[] }) {
 
 /** Figma concept — Discovery body for Federated Analytics. */
 export function DiscoveryContent() {
+  const { range: timeframe } = useTimeframe();
   const [platformFilter, setPlatformFilter] = useState<DevicePlatform | null>(null);
   const [severityFilter, setSeverityFilter] = useState<DiscoverySeverity | null>(null);
   const [patchFilter, setPatchFilter] = useState<PatchStatus | null>(null);
@@ -499,6 +552,8 @@ export function DiscoveryContent() {
     patchFilter != null ||
     searchQuery.trim().length > 0;
 
+  const dailyChart = useMemo(() => buildDailyDiscoveryChart(timeframe), [timeframe]);
+
   const handlePlatformClick = (label: string) => {
     if (!isDevicePlatform(label)) return;
     setPlatformFilter((current) => (current === label ? null : label));
@@ -514,22 +569,24 @@ export function DiscoveryContent() {
     setPatchFilter((current) => (current === label ? null : label));
   };
 
-  const newAssetsSpikeHighlight = { index: SPIKE_DAY_INDEX, label: "spike Thu" } as const;
-
   return (
     <div className="flex shrink-0 flex-col gap-4 p-4 sm:p-5">
       <InsightCard title="New Assets Discovered Over Time">
         <TimeSeriesBarChart
-          values={NEW_ASSETS_VALUES}
-          xLabels={WEEKDAY_LABELS}
+          values={dailyChart.values}
+          xLabels={dailyChart.xLabels}
           barColor={NEW_ASSETS_LINE}
-          spikeHighlight={newAssetsSpikeHighlight}
-          yMax={40}
-          yTicks={[0, 10, 20, 30, 40]}
-          ariaLabel="New assets discovered over time by day of week"
+          spikeHighlight={
+            dailyChart.spikeIndex != null
+              ? { index: dailyChart.spikeIndex, label: `spike ${dailyChart.xLabels[dailyChart.spikeIndex]}` }
+              : undefined
+          }
+          yMax={dailyChart.yMax}
+          yTicks={dailyChart.yTicks}
+          ariaLabel="New assets discovered over time by day"
         />
         <p className="mt-1 pl-9 text-base-small text-text-tertiary">
-          Thu spike: 38 new cloud resources in us-east-2, no IaC tag
+          {dailyChart.spikeLabel}
         </p>
       </InsightCard>
 

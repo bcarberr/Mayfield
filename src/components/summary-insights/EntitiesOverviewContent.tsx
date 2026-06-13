@@ -1,23 +1,52 @@
-import { useState } from "react";
-import { Icon } from "../../design-system";
-import entitiesTopByTypeChart from "../../assets/entities-top-by-type-chart.png?url";
+import { useMemo, useState } from "react";
+import { Icon, type SeverityShapeIconName } from "../../design-system";
 import { Button } from "../ui/Button";
+import { ColumnHeaderMenu } from "../ui/ColumnHeaderMenu";
+import { FilterColumnPanel, type FilterColumnPanelTool } from "../ui/FilterColumnPanel";
+import { Input } from "../ui/Input";
+import { SeverityTableIcon } from "../ui/SeverityTableIcon";
+import { compareStrings, useColumnSort } from "../ui/useColumnSort";
+import { useResizableColumns } from "../ui/useResizableColumns";
 import { TruncatedText } from "../ui/TruncatedText";
 import { Checkbox } from "../uiCheckbox";
-import { DatavisGridlineRule, InsightCard } from "./datavisCard";
+import { CHART_CATEGORY_FILL, HorizontalBarPanel } from "./horizontalBarPanel";
+import { cx, DatavisGridlineRule, InsightCard } from "./datavisCard";
+import { TimeSeriesBarChart } from "./timeSeriesBarChart";
 
 const ENTITY_BAR_FILL = "#6dc6a1";
 const ENTITY_BAR_TRACK = "rgba(158, 158, 158, 0.2)";
+const NEW_ENTITIES_BAR = "#4a9eff";
+const TOP_ENTITY_VOLUME_BAR = "#4a9eff";
+
+const WEEKDAY_LABELS = ["Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun"] as const;
+const NEW_ENTITIES_PER_DAY = [18, 16, 14, 61, 17, 12, 10] as const;
+const SPIKE_DAY_INDEX = 3;
+
+const ENTITY_TYPE_ROWS = [
+  { label: "Devices", value: 2957, color: CHART_CATEGORY_FILL },
+  { label: "Users", value: 2041, color: CHART_CATEGORY_FILL },
+  { label: "Accounts", value: 1588, color: CHART_CATEGORY_FILL },
+  { label: "Cloud", value: 988, color: CHART_CATEGORY_FILL },
+  { label: "Processes", value: 655, color: CHART_CATEGORY_FILL },
+] as const;
+
+const ENTITY_RISK_ROWS = [
+  { label: "Critical", value: 31, color: "#ff604a" },
+  { label: "High", value: 94, color: "#f28830" },
+  { label: "Medium", value: 212, color: "#fac354" },
+  { label: "Low", value: 418, color: "#57969e" },
+  { label: "Info", value: 5474, color: "#9b6bac" },
+] as const;
+
+const TOP_ENTITIES_BY_VOLUME_ROWS = [
+  { label: "WIN-DC01", value: 3402, color: TOP_ENTITY_VOLUME_BAR },
+  { label: "svc-backup", value: 2587, color: TOP_ENTITY_VOLUME_BAR },
+  { label: "api-prod-04", value: 1994, color: TOP_ENTITY_VOLUME_BAR },
+  { label: "j.alvarez", value: 1410, color: TOP_ENTITY_VOLUME_BAR },
+] as const;
 
 type EntityListItem = {
   label: string;
-  value: number;
-};
-
-type TopEntityRow = {
-  rank: number;
-  entityType: string;
-  name: string;
   value: number;
 };
 
@@ -27,19 +56,6 @@ type EntityCategoryCardData = {
   items: EntityListItem[];
   totalCount: number;
 };
-
-const TOP_10_ENTITIES: TopEntityRow[] = [
-  { rank: 1, entityType: "Username", name: "bcarberr", value: 2654 },
-  { rank: 2, entityType: "Username", name: "carberry", value: 1400 },
-  { rank: 3, entityType: "Username", name: "bonwoncar", value: 1200 },
-  { rank: 4, entityType: "Username", name: "BCarberry", value: 894 },
-  { rank: 5, entityType: "IP Address", name: "207.23.24.11", value: 762 },
-  { rank: 6, entityType: "IP Address", name: "198.23.24.14", value: 698 },
-  { rank: 7, entityType: "IP Address", name: "168.222.24.13", value: 650 },
-  { rank: 8, entityType: "IP Address", name: "167.111.22.01", value: 598 },
-  { rank: 9, entityType: "Hostname", name: "norma-laptop", value: 543 },
-  { rank: 10, entityType: "Hostname", name: "https://thisandthat.com", value: 300 },
-];
 
 const ENTITY_CATEGORY_CARDS: EntityCategoryCardData[] = [
   {
@@ -151,119 +167,6 @@ function EntityAmountBar({ value, maxValue }: { value: number; maxValue: number 
   );
 }
 
-/** Figma `1595:50003`–`1595:50006` positions relative to chart `1595:49098` (1339×374). */
-const ENTITY_TYPE_LABELS = [
-  { label: "Usernames", left: "13.7%", top: "31.6%", className: "text-[clamp(1.375rem,2.8vw,3rem)] leading-[0.92]" },
-  { label: "IP Addresses", left: "44.4%", top: "5.6%", className: "text-[clamp(1.25rem,2.5vw,2.5rem)] leading-[0.95]" },
-  { label: "Hostnames", left: "67.5%", top: "55.6%", className: "text-[clamp(1.125rem,2.2vw,2.125rem)] leading-[0.95]" },
-  { label: "MAC Addresses", left: "43.5%", bottom: "2.5%", className: "text-[clamp(1rem,1.8vw,1.75rem)] leading-none" },
-] as const;
-
-/** Figma `1595:49098` / `1595:49099` — packed teal bubble clusters by entity type. */
-function EntitiesBubbleChart() {
-  return (
-    <div className="relative w-full shrink-0 overflow-hidden">
-      <div className="relative aspect-[1339/374] w-full">
-        <img
-          src={entitiesTopByTypeChart}
-          alt=""
-          className="absolute inset-0 size-full object-cover object-center"
-          aria-hidden
-        />
-        {ENTITY_TYPE_LABELS.map((item) => (
-          <p
-            key={item.label}
-            className={`pointer-events-none absolute z-10 max-w-[32%] font-black text-text-primary ${item.className}`}
-            style={{
-              left: item.left,
-              top: "top" in item ? item.top : undefined,
-              bottom: "bottom" in item ? item.bottom : undefined,
-            }}
-          >
-            {item.label}
-          </p>
-        ))}
-      </div>
-      <p className="sr-only">Top entities by type: Usernames, IP Addresses, Hostnames, and MAC Addresses</p>
-    </div>
-  );
-}
-
-const TOP_10_ENTITIES_GRID =
-  "grid-cols-[1.125rem_1.5rem_minmax(5.5rem,8.5rem)_minmax(6rem,12rem)_1fr] sm:grid-cols-[1.125rem_1.75rem_minmax(6.5rem,10rem)_minmax(8rem,16rem)_1fr]";
-
-/** Figma `1595:48984` — ranked top-10 entity overview above the six category widgets. */
-function Top10EntitiesPanel() {
-  const maxValue = TOP_10_ENTITIES[0]?.value ?? 1;
-  const [selectedRanks, setSelectedRanks] = useState<Set<number>>(() => new Set());
-
-  const toggleRow = (rank: number, checked: boolean) => {
-    setSelectedRanks((prev) => {
-      const next = new Set(prev);
-      if (checked) next.add(rank);
-      else next.delete(rank);
-      return next;
-    });
-  };
-
-  return (
-    <InsightCard title="Top 10 Entities">
-      <div className="flex shrink-0 flex-col">
-        <div
-          className={`grid ${TOP_10_ENTITIES_GRID} items-end gap-x-3 px-1 pb-2 sm:gap-x-4 sm:px-2`}
-        >
-          <span aria-hidden />
-          <span aria-hidden />
-          <span className="text-xs font-bold uppercase tracking-[0.4px] text-text-primary">Type of entity</span>
-          <span className="text-xs font-bold uppercase tracking-[0.4px] text-text-primary">Name</span>
-          <span className="text-xs font-bold uppercase tracking-[0.4px] text-text-primary">Total amount</span>
-        </div>
-        <DatavisGridlineRule inset={false} />
-        <ol className="min-h-0 flex-1">
-          {TOP_10_ENTITIES.map((row) => {
-            const pct = Math.max((row.value / maxValue) * 100, row.value > 0 ? 4 : 0);
-
-            return (
-              <li key={row.rank} className="border-b border-datavis-gridlines last:border-b-0">
-                <div
-                  className={`grid ${TOP_10_ENTITIES_GRID} items-center gap-x-3 px-1 py-[11px] sm:gap-x-4 sm:px-2`}
-                >
-                  <Checkbox
-                    checked={selectedRanks.has(row.rank)}
-                    onCheckedChange={(checked) => toggleRow(row.rank, checked)}
-                    aria-label={`Select ${row.name}`}
-                  />
-                  <span className="text-base-semibold tabular-nums text-text-tertiary">
-                    {String(row.rank).padStart(2, "0")}
-                  </span>
-                  <TruncatedText className="text-base-semibold text-text-secondary">{row.entityType}</TruncatedText>
-                  <TruncatedText className="text-base-semibold text-text-secondary">{row.name}</TruncatedText>
-                  <div className="flex min-w-0 items-center gap-3">
-                    <div className="relative h-1.5 min-w-0 flex-1">
-                      <div
-                        className="absolute inset-0 rounded-sm bg-text-tertiary opacity-20"
-                        aria-hidden
-                      />
-                      <div
-                        className="absolute inset-y-0 left-0 rounded-sm bg-datavis-data-smalt-green-40"
-                        style={{ width: `${pct}%` }}
-                        aria-hidden
-                      />
-                    </div>
-                    <span className="w-10 shrink-0 text-right text-base-small tabular-nums tracking-[0.4px] text-text-secondary">
-                      {formatCount(row.value)}
-                    </span>
-                  </div>
-                </div>
-              </li>
-            );
-          })}
-        </ol>
-      </div>
-    </InsightCard>
-  );
-}
-
 function EntityCategoryCard({ data }: { data: EntityCategoryCardData }) {
   const maxItemValue = data.items[0]?.value ?? 1;
 
@@ -307,23 +210,657 @@ function EntityCategoryCard({ data }: { data: EntityCategoryCardData }) {
   );
 }
 
+const newEntitiesSpikeHighlight = { index: SPIKE_DAY_INDEX, label: "spike Thu" } as const;
+
+type EntitiesDetailTab = "entities" | "aggregated";
+
+const ENTITIES_DETAIL_TABS: readonly { id: EntitiesDetailTab; label: string }[] = [
+  { id: "entities", label: "Entities" },
+  { id: "aggregated", label: "Entities Aggregated" },
+];
+
+type EntityRisk = "Critical" | "High" | "Medium" | "Low";
+
+const ENTITY_RISK_BAR: Record<EntityRisk, string> = {
+  Critical: "#ff604a",
+  High: "#f28830",
+  Medium: "#fac354",
+  Low: "#57969e",
+};
+
+const ENTITY_RISK_ICONS: Record<EntityRisk, SeverityShapeIconName> = {
+  Critical: "severity-critical",
+  High: "severity-high",
+  Medium: "severity-medium",
+  Low: "severity-low",
+};
+
+const ENTITY_RISK_ORDER: Record<EntityRisk, number> = {
+  Critical: 0,
+  High: 1,
+  Medium: 2,
+  Low: 3,
+};
+
+type AggregatedEntityRow = {
+  id: string;
+  risk: EntityRisk;
+  entity: string;
+  type: string;
+  lastSeen: string;
+  eventCount: number;
+  categories: string;
+  connector: string;
+};
+
+const AGGREGATED_ENTITY_ROWS: AggregatedEntityRow[] = [
+  {
+    id: "1",
+    risk: "High",
+    entity: "j.alvarez",
+    type: "User",
+    lastSeen: "14:22:08",
+    eventCount: 1410,
+    categories: "Authentication, Network Activity, Findings",
+    connector: "BC-CS-Athena",
+  },
+  {
+    id: "2",
+    risk: "Critical",
+    entity: "WIN-DC01",
+    type: "Device",
+    lastSeen: "13:05:41",
+    eventCount: 3402,
+    categories: "System Activity, Account Change, Discovery",
+    connector: "BCs1",
+  },
+  {
+    id: "3",
+    risk: "Medium",
+    entity: "svc-backup",
+    type: "Account",
+    lastSeen: "11:40:12",
+    eventCount: 2587,
+    categories: "Identity & Access, System Activity",
+    connector: "BC-CS",
+  },
+  {
+    id: "4",
+    risk: "Low",
+    entity: "api-prod-04",
+    type: "Cloud Resource",
+    lastSeen: "09:12:00",
+    eventCount: 1994,
+    categories: "Network Activity, Discovery",
+    connector: "BC-CS-Athena",
+  },
+  {
+    id: "5",
+    risk: "High",
+    entity: "s3-bucket-7f2a",
+    type: "Cloud Resource",
+    lastSeen: "22:18:55",
+    eventCount: 872,
+    categories: "Discovery, Findings",
+    connector: "BCs1",
+  },
+  {
+    id: "6",
+    risk: "Medium",
+    entity: "edge-vm-19",
+    type: "Device",
+    lastSeen: "18:00:03",
+    eventCount: 654,
+    categories: "Discovery, System Activity",
+    connector: "BC-CS",
+  },
+  {
+    id: "7",
+    risk: "Low",
+    entity: "t.nguyen",
+    type: "User",
+    lastSeen: "16:44:19",
+    eventCount: 512,
+    categories: "Authentication, Identity & Access",
+    connector: "BCs1",
+  },
+  {
+    id: "8",
+    risk: "Critical",
+    entity: "sql-prod-02",
+    type: "Device",
+    lastSeen: "12:01:47",
+    eventCount: 1188,
+    categories: "System Activity, Findings",
+    connector: "BC-CS-Athena",
+  },
+  {
+    id: "9",
+    risk: "Medium",
+    entity: "jump-host-01",
+    type: "Device",
+    lastSeen: "10:33:22",
+    eventCount: 743,
+    categories: "Network Activity, System Activity",
+    connector: "BC-CS",
+  },
+  {
+    id: "10",
+    risk: "High",
+    entity: "admin",
+    type: "User",
+    lastSeen: "08:15:09",
+    eventCount: 965,
+    categories: "Authentication, Account Change",
+    connector: "BCs1",
+  },
+  {
+    id: "11",
+    risk: "Low",
+    entity: "web-edge-07",
+    type: "Device",
+    lastSeen: "07:42:18",
+    eventCount: 421,
+    categories: "Network Activity",
+    connector: "BC-CS-Athena",
+  },
+  {
+    id: "12",
+    risk: "Critical",
+    entity: "iam-root-prod",
+    type: "Account",
+    lastSeen: "06:58:44",
+    eventCount: 2104,
+    categories: "Identity & Access, Findings",
+    connector: "BC-CS",
+  },
+  {
+    id: "13",
+    risk: "High",
+    entity: "ec2-web-09",
+    type: "Cloud Resource",
+    lastSeen: "05:21:31",
+    eventCount: 1336,
+    categories: "Discovery, Network Activity",
+    connector: "BCs1",
+  },
+  {
+    id: "14",
+    risk: "Medium",
+    entity: "m.chen",
+    type: "User",
+    lastSeen: "04:09:57",
+    eventCount: 588,
+    categories: "Authentication, Identity & Access",
+    connector: "BC-CS-Athena",
+  },
+  {
+    id: "15",
+    risk: "Low",
+    entity: "lambda-etl-01",
+    type: "Cloud Resource",
+    lastSeen: "03:44:12",
+    eventCount: 302,
+    categories: "System Activity",
+    connector: "BC-CS",
+  },
+  {
+    id: "16",
+    risk: "High",
+    entity: "k.patel",
+    type: "User",
+    lastSeen: "02:18:06",
+    eventCount: 877,
+    categories: "Authentication, Findings",
+    connector: "BCs1",
+  },
+  {
+    id: "17",
+    risk: "Medium",
+    entity: "norma-laptop",
+    type: "Device",
+    lastSeen: "01:55:33",
+    eventCount: 467,
+    categories: "Discovery, System Activity",
+    connector: "BC-CS-Athena",
+  },
+  {
+    id: "18",
+    risk: "Critical",
+    entity: "priv-svc-deploy",
+    type: "Account",
+    lastSeen: "00:41:28",
+    eventCount: 1542,
+    categories: "Identity & Access, System Activity, Findings",
+    connector: "BC-CS",
+  },
+  {
+    id: "19",
+    risk: "Low",
+    entity: "staging-db-03",
+    type: "Cloud Resource",
+    lastSeen: "23:12:04",
+    eventCount: 198,
+    categories: "Network Activity, Discovery",
+    connector: "BCs1",
+  },
+  {
+    id: "20",
+    risk: "Medium",
+    entity: "platform-team",
+    type: "User",
+    lastSeen: "21:07:51",
+    eventCount: 629,
+    categories: "Account Change, Identity & Access",
+    connector: "BC-CS-Athena",
+  },
+];
+
+const TOTAL_AGGREGATED_ENTITIES = 2487;
+const AGGREGATED_PAGE_SIZE = 20;
+
+function connectorSwatch(connector: string) {
+  if (connector.startsWith("BCs")) return "bg-feedback-info";
+  if (connector.includes("Athena")) return "bg-interactive-active";
+  return "bg-feedback-negative";
+}
+
+function aggregatedMatchesSearch(row: AggregatedEntityRow, query: string): boolean {
+  const q = query.trim().toLowerCase();
+  if (!q) return true;
+
+  return [
+    row.risk,
+    row.entity,
+    row.type,
+    row.lastSeen,
+    String(row.eventCount),
+    row.categories,
+    row.connector,
+  ]
+    .join(" ")
+    .toLowerCase()
+    .includes(q);
+}
+
+type AggregatedSortColumn =
+  | "risk"
+  | "entity"
+  | "type"
+  | "lastSeen"
+  | "eventCount"
+  | "categories"
+  | "connector";
+
+const SELECT_COL_WIDTH = 40;
+const AGGREGATED_COL_DEFAULTS: readonly number[] = [
+  SELECT_COL_WIDTH,
+  108,
+  140,
+  120,
+  96,
+  96,
+  260,
+  120,
+];
+const AGGREGATED_COL_MINS: readonly number[] = [
+  SELECT_COL_WIDTH,
+  72,
+  96,
+  88,
+  72,
+  72,
+  140,
+  88,
+];
+
+function EntitiesAggregatedTable({ rows }: { rows: AggregatedEntityRow[] }) {
+  const [selected, setSelected] = useState<Set<string>>(() => new Set());
+  const {
+    containerRef,
+    colStyle,
+    baseTotal,
+    tableFillsContainer,
+    isResizing,
+    resizeHandle,
+    displayWidths,
+    minTableWidth,
+  } = useResizableColumns({
+    selectColWidth: SELECT_COL_WIDTH,
+    colDefaults: AGGREGATED_COL_DEFAULTS,
+    colMins: AGGREGATED_COL_MINS,
+  });
+
+  const allIds = useMemo(() => rows.map((r) => r.id), [rows]);
+  const total = allIds.length;
+  const selectedOnPage = useMemo(() => allIds.filter((id) => selected.has(id)).length, [allIds, selected]);
+  const allSelected = total > 0 && selectedOnPage === total;
+  const someSelected = selectedOnPage > 0 && !allSelected;
+
+  const toggleAll = (checked: boolean) => {
+    setSelected(checked ? new Set(allIds) : new Set());
+  };
+
+  const toggleRow = (id: string, checked: boolean) => {
+    setSelected((prev) => {
+      const next = new Set(prev);
+      if (checked) next.add(id);
+      else next.delete(id);
+      return next;
+    });
+  };
+
+  const sortComparators = useMemo(
+    (): Record<AggregatedSortColumn, (a: AggregatedEntityRow, b: AggregatedEntityRow) => number> => ({
+      risk: (a, b) => ENTITY_RISK_ORDER[a.risk] - ENTITY_RISK_ORDER[b.risk],
+      entity: (a, b) => compareStrings(a.entity, b.entity),
+      type: (a, b) => compareStrings(a.type, b.type),
+      lastSeen: (a, b) => compareStrings(a.lastSeen, b.lastSeen),
+      eventCount: (a, b) => a.eventCount - b.eventCount,
+      categories: (a, b) => compareStrings(a.categories, b.categories),
+      connector: (a, b) => compareStrings(a.connector, b.connector),
+    }),
+    [],
+  );
+  const { sortedRows, getSortProps } = useColumnSort(sortComparators);
+  const displayRows = sortedRows(rows);
+
+  return (
+    <div ref={containerRef} className={cx("min-h-0 w-full min-w-0", isResizing && "select-none")}>
+      <table
+        className="table-fixed border-collapse text-left text-sm"
+        style={{
+          width: tableFillsContainer ? "100%" : baseTotal,
+          minWidth: Math.max(minTableWidth, baseTotal),
+        }}
+      >
+        <caption className="sr-only">Aggregated entities</caption>
+        <colgroup>
+          {displayWidths.map((w, i) => (
+            <col key={i} style={{ width: w }} />
+          ))}
+        </colgroup>
+        <thead>
+          <tr className="h-10 border-b border-datavis-gridlines bg-surface-table-row-header">
+            <th scope="col" style={colStyle(0)} className="relative h-10 border-r border-datavis-gridlines px-0 py-0 align-middle">
+              <div className="flex items-center justify-center">
+                <Checkbox
+                  checked={allSelected}
+                  indeterminate={someSelected}
+                  onCheckedChange={toggleAll}
+                  aria-label="Select all rows"
+                />
+              </div>
+              {resizeHandle(0)}
+            </th>
+            <th
+              scope="col"
+              style={colStyle(1)}
+              className="relative h-10 border-r border-datavis-gridlines px-2 py-0 align-middle text-xs font-bold uppercase tracking-wide text-text-primary"
+            >
+              <ColumnHeaderMenu label="Risk" menuLabel="Risk column options" {...getSortProps("risk")} />
+              {resizeHandle(1)}
+            </th>
+            <th
+              scope="col"
+              style={colStyle(2)}
+              className="relative h-10 border-r border-datavis-gridlines px-2 py-0 align-middle text-xs font-bold uppercase tracking-wide text-text-primary"
+            >
+              <ColumnHeaderMenu label="Entity" menuLabel="Entity column options" {...getSortProps("entity")} />
+              {resizeHandle(2)}
+            </th>
+            <th
+              scope="col"
+              style={colStyle(3)}
+              className="relative h-10 border-r border-datavis-gridlines px-2 py-0 align-middle text-xs font-bold uppercase tracking-wide text-text-primary"
+            >
+              <ColumnHeaderMenu label="Type" menuLabel="Type column options" {...getSortProps("type")} />
+              {resizeHandle(3)}
+            </th>
+            <th
+              scope="col"
+              style={colStyle(4)}
+              className="relative h-10 border-r border-datavis-gridlines px-2 py-0 align-middle text-xs font-bold uppercase tracking-wide text-text-primary"
+            >
+              <ColumnHeaderMenu label="Last Seen" menuLabel="Last seen column options" {...getSortProps("lastSeen")} />
+              {resizeHandle(4)}
+            </th>
+            <th
+              scope="col"
+              style={colStyle(5)}
+              className="relative h-10 border-r border-datavis-gridlines px-2 py-0 align-middle text-xs font-bold uppercase tracking-wide text-text-primary"
+            >
+              <ColumnHeaderMenu label="# Events" menuLabel="Events column options" {...getSortProps("eventCount")} />
+              {resizeHandle(5)}
+            </th>
+            <th
+              scope="col"
+              style={colStyle(6)}
+              className="relative h-10 border-r border-datavis-gridlines px-2 py-0 align-middle text-xs font-bold uppercase tracking-wide text-text-primary"
+            >
+              <ColumnHeaderMenu
+                label="Categories Involved"
+                menuLabel="Categories involved column options"
+                {...getSortProps("categories")}
+              />
+              {resizeHandle(6)}
+            </th>
+            <th
+              scope="col"
+              style={colStyle(7)}
+              className="relative h-10 px-2 py-0 align-middle text-xs font-bold uppercase tracking-wide text-text-primary"
+            >
+              <ColumnHeaderMenu label="Connector" menuLabel="Connector column options" {...getSortProps("connector")} />
+              {resizeHandle(7)}
+            </th>
+          </tr>
+        </thead>
+        <tbody>
+          {displayRows.map((row) => (
+            <tr key={row.id} className="h-10 border-b border-datavis-gridlines hover:bg-overlay-subtle">
+              <td style={colStyle(0)} className="h-10 px-0 py-0 align-middle">
+                <div className="flex items-center justify-center">
+                  <Checkbox
+                    checked={selected.has(row.id)}
+                    onCheckedChange={(c) => toggleRow(row.id, c)}
+                    aria-label={`Select entity ${row.entity}`}
+                  />
+                </div>
+              </td>
+              <td style={colStyle(1)} className="h-10 px-2 py-0 align-middle">
+                <span className="inline-flex items-center gap-2">
+                  <SeverityTableIcon name={ENTITY_RISK_ICONS[row.risk]} color={ENTITY_RISK_BAR[row.risk]} />
+                  <span className="text-sm text-text-secondary">{row.risk}</span>
+                </span>
+              </td>
+              <td style={colStyle(2)} className="h-10 min-w-0 px-2 py-0 align-middle">
+                <TruncatedText
+                  as="button"
+                  className="w-full text-left text-sm font-semibold text-interactive-active hover:underline focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-interactive-active"
+                >
+                  {row.entity}
+                </TruncatedText>
+              </td>
+              <td style={colStyle(3)} className="h-10 min-w-0 px-2 py-0 align-middle">
+                <TruncatedText className="text-sm text-text-secondary">{row.type}</TruncatedText>
+              </td>
+              <td style={colStyle(4)} className="h-10 min-w-0 px-2 py-0 align-middle tabular-nums">
+                <TruncatedText className="text-sm text-text-secondary">{row.lastSeen}</TruncatedText>
+              </td>
+              <td style={colStyle(5)} className="h-10 min-w-0 px-2 py-0 align-middle tabular-nums">
+                <TruncatedText className="text-sm text-text-secondary">{formatCount(row.eventCount)}</TruncatedText>
+              </td>
+              <td style={colStyle(6)} className="h-10 min-w-0 px-2 py-0 align-middle">
+                <TruncatedText className="text-sm text-text-secondary">{row.categories}</TruncatedText>
+              </td>
+              <td style={colStyle(7)} className="h-10 min-w-0 overflow-hidden px-2 py-0 align-middle">
+                <span className="flex w-full min-w-0 items-center gap-2">
+                  <span className={cx("size-2.5 shrink-0 rounded-sm", connectorSwatch(row.connector))} aria-hidden />
+                  <TruncatedText className="w-full text-sm text-text-secondary" wrapperClassName="min-w-0 flex-1">
+                    {row.connector}
+                  </TruncatedText>
+                </span>
+              </td>
+            </tr>
+          ))}
+        </tbody>
+      </table>
+    </div>
+  );
+}
+
+function EntitiesDetailTabs({
+  active,
+  onChange,
+}: {
+  active: EntitiesDetailTab;
+  onChange: (tab: EntitiesDetailTab) => void;
+}) {
+  return (
+    <nav className="flex shrink-0 gap-6 border-b border-border-container" aria-label="Entity detail views">
+      {ENTITIES_DETAIL_TABS.map((tab) => {
+        const isActive = tab.id === active;
+        return (
+          <button
+            key={tab.id}
+            type="button"
+            className={cx(
+              "border-b-2 pb-3 text-sm font-semibold transition-colors",
+              isActive
+                ? "border-interactive-active text-text-primary"
+                : "border-transparent text-text-tertiary hover:text-text-secondary",
+            )}
+            aria-current={isActive ? "page" : undefined}
+            onClick={() => onChange(tab.id)}
+          >
+            {tab.label}
+          </button>
+        );
+      })}
+    </nav>
+  );
+}
+
+function EntitiesAggregatedPanel() {
+  const [searchQuery, setSearchQuery] = useState("");
+  const [tableTool, setTableTool] = useState<FilterColumnPanelTool | null>(null);
+
+  const filteredRows = useMemo(
+    () => AGGREGATED_ENTITY_ROWS.filter((row) => aggregatedMatchesSearch(row, searchQuery)),
+    [searchQuery],
+  );
+
+  const displayedRows = useMemo(
+    () => filteredRows.slice(0, AGGREGATED_PAGE_SIZE),
+    [filteredRows],
+  );
+
+  return (
+    <section className="mx-0 mb-0 flex min-h-0 min-w-0 flex-1 flex-col overflow-hidden rounded-[4px] border border-border-container bg-datavis-card-bg shadow-[0_1px_5px_rgba(0,0,0,0.2)]">
+      <div className="shrink-0 bg-datavis-card-bg pb-3 pl-4 pr-6 pt-3 sm:pl-5">
+        <h2 className="text-base-semibold text-text-primary">Entities</h2>
+        <div className="mt-2 flex flex-wrap items-center gap-3">
+          <p className="shrink-0 text-base-small text-text-secondary">
+            {displayedRows.length} of {TOTAL_AGGREGATED_ENTITIES} Results
+            {searchQuery.trim() ? ` · “${searchQuery.trim()}”` : ""}
+          </p>
+          <div className="w-[300px] shrink-0">
+            <Input
+              variant="search"
+              placeholder="Search"
+              value={searchQuery}
+              onChange={(event) => setSearchQuery(event.target.value)}
+              className="!bg-datavis-card-bg"
+              aria-label="Search aggregated entities"
+            />
+          </div>
+          {searchQuery.trim() ? (
+            <Button
+              type="button"
+              variant="ghost"
+              className="h-8 shrink-0 gap-1.5 px-2 text-base-small text-text-tertiary hover:text-text-primary [&_svg]:!h-2 [&_svg]:!w-3"
+              onClick={() => setSearchQuery("")}
+            >
+              <Icon name="action-filter-list" size={12} aria-hidden />
+              Clear all filters
+            </Button>
+          ) : null}
+          <Button type="button" variant="secondary" className="ml-auto shrink-0 gap-1.5 px-3">
+            <Icon name="action-file-download" size={18} aria-hidden />
+            Export All
+          </Button>
+        </div>
+      </div>
+      <DatavisGridlineRule inset={false} />
+      <div className="flex min-h-0 flex-1 overflow-auto bg-datavis-card-bg">
+        <FilterColumnPanel
+          active={tableTool}
+          onFilterClick={() => setTableTool(tableTool === "filter" ? null : "filter")}
+          onColumnsClick={() => setTableTool(tableTool === "columns" ? null : "columns")}
+        />
+        <div className="min-h-0 min-w-0 flex-1 pb-3">
+          <EntitiesAggregatedTable rows={displayedRows} />
+        </div>
+      </div>
+    </section>
+  );
+}
+
 /** Figma `1595:48982` — Entities Overview body for Federated Analytics. */
 export function EntitiesOverviewContent() {
+  const [activeDetailTab, setActiveDetailTab] = useState<EntitiesDetailTab>("entities");
   return (
     <div className="flex shrink-0 flex-col gap-4 p-4 sm:p-5">
-      <InsightCard title="Top Entities By Type">
-        <div className="-mx-3 -mt-3 -mb-4 sm:-mx-4">
-          <EntitiesBubbleChart />
-        </div>
+      <InsightCard title="New Entities Seen Per Day">
+        <TimeSeriesBarChart
+          values={NEW_ENTITIES_PER_DAY}
+          xLabels={WEEKDAY_LABELS}
+          barColor={NEW_ENTITIES_BAR}
+          spikeHighlight={newEntitiesSpikeHighlight}
+          yMax={70}
+          yTicks={[0, 20, 40, 60, 70]}
+          ariaLabel="New entities seen per day by weekday"
+        />
+        <p className="mt-1 pl-9 text-base-small text-text-tertiary">
+          Thu spike correlates with new cloud resources from Discovery
+        </p>
       </InsightCard>
 
-      <Top10EntitiesPanel />
-
-      <div className="grid min-h-0 grid-cols-1 gap-4 lg:grid-cols-3">
-        {ENTITY_CATEGORY_CARDS.map((card) => (
-          <EntityCategoryCard key={card.title} data={card} />
-        ))}
+      <div className="grid min-h-0 shrink-0 grid-cols-1 items-stretch gap-4 lg:grid-cols-3">
+        <InsightCard title="Entity Types" fillHeight>
+          <HorizontalBarPanel
+            rows={ENTITY_TYPE_ROWS}
+            xMax={3200}
+            xTicks={[0, 800, 1600, 2400, 3200]}
+          />
+        </InsightCard>
+        <InsightCard title="Entity Risk" fillHeight>
+          <HorizontalBarPanel
+            rows={ENTITY_RISK_ROWS}
+            xMax={6000}
+            xTicks={[0, 1500, 3000, 4500, 6000]}
+          />
+        </InsightCard>
+        <InsightCard title="Top Entities By Event Volume" fillHeight>
+          <HorizontalBarPanel
+            rows={TOP_ENTITIES_BY_VOLUME_ROWS}
+            xMax={3600}
+            xTicks={[0, 900, 1800, 2700, 3600]}
+          />
+        </InsightCard>
       </div>
+
+      <EntitiesDetailTabs active={activeDetailTab} onChange={setActiveDetailTab} />
+
+      {activeDetailTab === "entities" ? (
+        <div className="grid min-h-0 grid-cols-1 gap-4 lg:grid-cols-3">
+          {ENTITY_CATEGORY_CARDS.map((card) => (
+            <EntityCategoryCard key={card.title} data={card} />
+          ))}
+        </div>
+      ) : (
+        <EntitiesAggregatedPanel />
+      )}
     </div>
   );
 }

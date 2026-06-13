@@ -115,9 +115,6 @@ const SEVERITY_ROWS = [
 
 const TOP_USERS_BAR = "#4a9eff";
 
-/** Match Activity Classes row density (6 rows in 200px) for the 4-row users chart. */
-const USERS_CHART_HEIGHT = (200 / 6) * 4;
-
 const TOP_USERS_ROWS = [
   { label: "svc-backup", value: 214, color: TOP_USERS_BAR },
   { label: "j.alvarez", value: 112, color: TOP_USERS_BAR },
@@ -581,7 +578,7 @@ export function IdentityAccessContent() {
         />
       </InsightCard>
 
-      <div className="grid min-h-0 shrink-0 grid-cols-1 items-stretch gap-4 lg:grid-cols-2 lg:grid-rows-1">
+      <div className="grid min-h-0 shrink-0 grid-cols-1 items-stretch gap-4 lg:grid-cols-3">
         <InsightCard title="Identity & Access Management Classes" fillHeight>
           <HorizontalBarPanel
             rows={IAM_MANAGEMENT_CLASS_ROWS}
@@ -602,19 +599,17 @@ export function IdentityAccessContent() {
             xTicks={[0, 175, 350, 525, 700]}
           />
         </InsightCard>
+        <InsightCard title="Top Users By Failed Logins" fillHeight>
+          <HorizontalBarPanel
+            rows={TOP_USERS_ROWS}
+            selectedLabel={userFilter}
+            onBarClick={handleUserClick}
+            filterAriaLabel={(label) => `Filter identity events by user ${label}`}
+            xMax={250}
+            xTicks={[0, 50, 100, 150, 200]}
+          />
+        </InsightCard>
       </div>
-
-      <InsightCard title="Top Users By Failed Logins">
-        <HorizontalBarPanel
-          rows={TOP_USERS_ROWS}
-          selectedLabel={userFilter}
-          onBarClick={handleUserClick}
-          filterAriaLabel={(label) => `Filter identity events by user ${label}`}
-          xMax={250}
-          xTicks={[0, 50, 100, 150, 200]}
-          chartHeight={USERS_CHART_HEIGHT}
-        />
-      </InsightCard>
 
       <section className="mx-0 mb-0 flex min-h-0 min-w-0 flex-1 flex-col overflow-hidden rounded-[4px] border border-border-container bg-datavis-card-bg shadow-[0_1px_5px_rgba(0,0,0,0.2)]">
         <div className="shrink-0 bg-datavis-card-bg pb-3 pl-4 pr-6 pt-3 sm:pl-5">

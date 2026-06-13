@@ -1,6 +1,5 @@
 import { useId, useMemo } from "react";
 import type { SeverityShapeIconName } from "../../design-system";
-import { SeverityTableIcon } from "../ui/SeverityTableIcon";
 import { cx } from "./datavisCard";
 
 export type TimeSeriesSeries = {
@@ -261,10 +260,12 @@ export function TimeSeriesAreaChart({
 
       <ul className="mt-5 flex shrink-0 flex-wrap gap-x-3 gap-y-1 pl-9">
         {series.map((s) => {
-          const marker = s.icon ? (
-            <SeverityTableIcon name={s.icon} color={s.color} />
-          ) : (
-            <span className="size-2 shrink-0 rounded-sm" style={{ backgroundColor: s.color }} aria-hidden />
+          const marker = (
+            <span
+              className="size-2 shrink-0 rounded-full"
+              style={{ backgroundColor: s.color }}
+              aria-hidden
+            />
           );
 
           return (

@@ -1,5 +1,6 @@
 import { lazy, Suspense } from "react";
 import { Route, Routes } from "react-router-dom";
+import { TimeframeProvider } from "../context/TimeframeContext";
 import { ROUTES } from "./routes";
 
 const ConnectorsPage = lazy(() => import("./ConnectorsPage").then((m) => ({ default: m.ConnectorsPage })));
@@ -29,6 +30,7 @@ function RouteFallback() {
 
 export function App() {
   return (
+    <TimeframeProvider>
     <div className="h-full min-h-screen min-h-0">
       <Suspense fallback={<RouteFallback />}>
         <Routes>
@@ -48,5 +50,6 @@ export function App() {
         </Routes>
       </Suspense>
     </div>
+    </TimeframeProvider>
   );
 }

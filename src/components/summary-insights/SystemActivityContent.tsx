@@ -117,9 +117,6 @@ const SEVERITY_ROWS = [
   { label: "Informational", value: 540, color: SEV_BAR.Informational },
 ] as const;
 
-/** Match Activity Classes row density (6 rows in 200px) for the 4-row hosts chart. */
-const HOST_CHART_HEIGHT = (200 / 6) * 4;
-
 const HOST_ROWS = [
   { label: "WIN-DC01", value: 301, color: HOST_BAR_FILL },
   { label: "SQL-PROD-02", value: 214, color: HOST_BAR_FILL },
@@ -599,7 +596,7 @@ export function SystemActivityContent() {
         />
       </InsightCard>
 
-      <div className="grid min-h-0 shrink-0 grid-cols-1 items-stretch gap-4 lg:grid-cols-2 lg:grid-rows-1">
+      <div className="grid min-h-0 shrink-0 grid-cols-1 items-stretch gap-4 lg:grid-cols-3">
         <InsightCard title="Activity Classes" fillHeight>
           <HorizontalBarPanel
             rows={ACTIVITY_CLASS_ROWS}
@@ -620,19 +617,17 @@ export function SystemActivityContent() {
             xTicks={[0, 150, 300, 450, 600]}
           />
         </InsightCard>
+        <InsightCard title="Top Hosts By Process Launches" fillHeight>
+          <HorizontalBarPanel
+            rows={HOST_ROWS}
+            selectedLabel={hostFilter}
+            onBarClick={handleHostClick}
+            filterAriaLabel={(label) => `Filter system activity by host ${label}`}
+            xMax={350}
+            xTicks={[0, 75, 150, 225, 300]}
+          />
+        </InsightCard>
       </div>
-
-      <InsightCard title="Top Hosts By Process Launches">
-        <HorizontalBarPanel
-          rows={HOST_ROWS}
-          selectedLabel={hostFilter}
-          onBarClick={handleHostClick}
-          filterAriaLabel={(label) => `Filter system activity by host ${label}`}
-          xMax={350}
-          xTicks={[0, 75, 150, 225, 300]}
-          chartHeight={HOST_CHART_HEIGHT}
-        />
-      </InsightCard>
 
       <section className="mx-0 mb-0 flex min-h-0 min-w-0 flex-1 flex-col overflow-hidden rounded-[4px] border border-border-container bg-datavis-card-bg shadow-[0_1px_5px_rgba(0,0,0,0.2)]">
         <div className="shrink-0 bg-datavis-card-bg pb-3 pl-4 pr-6 pt-3 sm:pl-5">
