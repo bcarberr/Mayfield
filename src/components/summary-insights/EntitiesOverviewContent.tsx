@@ -1,5 +1,6 @@
 import { useMemo, useState } from "react";
 import { Icon, type SeverityShapeIconName } from "../../design-system";
+import { useTimeframe, type TimeframeRange } from "../../context/TimeframeContext";
 import { Button } from "../ui/Button";
 import { ColumnHeaderMenu } from "../ui/ColumnHeaderMenu";
 import { FilterColumnPanel, type FilterColumnPanelTool } from "../ui/FilterColumnPanel";
@@ -18,9 +19,56 @@ const ENTITY_BAR_TRACK = "rgba(158, 158, 158, 0.2)";
 const NEW_ENTITIES_BAR = "#4a9eff";
 const TOP_ENTITY_VOLUME_BAR = "#4a9eff";
 
-const WEEKDAY_LABELS = ["Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun"] as const;
-const NEW_ENTITIES_PER_DAY = [18, 16, 14, 61, 17, 12, 10] as const;
-const SPIKE_DAY_INDEX = 3;
+const WEEKDAY_SHORT = ["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"] as const;
+
+type DailyEntityChart = {
+  xLabels: string[];
+  values: number[];
+  spikeIndex: number | null;
+  spikeLabel: string;
+  yMax: number;
+  yTicks: number[];
+};
+
+function buildDailyEntityChart({ from, to }: TimeframeRange): DailyEntityChart {
+  const msPerDay = 86_400_000;
+  const startDay = new Date(from);
+  startDay.setHours(0, 0, 0, 0);
+  const endDay = new Date(to);
+  endDay.setHours(0, 0, 0, 0);
+
+  const dayCount = Math.max(1, Math.round((endDay.getTime() - startDay.getTime()) / msPerDay) + 1);
+  const useDate = dayCount > 7;
+
+  const xLabels: string[] = [];
+  const values: number[] = [];
+  let spikeIndex: number | null = null;
+  const spikeDayMs = endDay.getTime();
+
+  for (let i = 0; i < dayCount; i++) {
+    const day = new Date(startDay.getTime() + i * msPerDay);
+    if (useDate) {
+      xLabels.push(new Intl.DateTimeFormat("en-US", { month: "short", day: "numeric" }).format(day));
+    } else {
+      xLabels.push(WEEKDAY_SHORT[day.getDay()]);
+    }
+    const isSpike = day.getTime() === spikeDayMs;
+    if (isSpike) spikeIndex = i;
+    const dow = day.getDay();
+    const weekdayMultiplier = dow === 0 || dow === 6 ? 0.7 : 1.0 + (dow === 4 ? 0.2 : 0);
+    values.push(isSpike ? 61 : Math.max(8, Math.round(14 * weekdayMultiplier * (0.9 + (i % 3) * 0.1))));
+  }
+
+  const peak = Math.max(...values, 10);
+  const yMax = Math.ceil(peak / 10) * 10;
+  const step = yMax / 4;
+  const yTicks = [0, step, step * 2, step * 3, yMax];
+
+  const spikeDayLabel = spikeIndex != null ? (xLabels[spikeIndex] ?? "") : "";
+  const spikeLabel = `${spikeDayLabel} spike correlates with new cloud resources from Discovery`;
+
+  return { xLabels, values, spikeIndex, spikeLabel, yMax, yTicks };
+}
 
 const ENTITY_TYPE_ROWS = [
   { label: "Devices", value: 2957, color: CHART_CATEGORY_FILL },
@@ -53,6 +101,7 @@ type EntityListItem = {
 type EntityCategoryCardData = {
   title: string;
   total: string;
+  uniqueSeenLabel: string;
   items: EntityListItem[];
   totalCount: number;
 };
@@ -61,6 +110,7 @@ const ENTITY_CATEGORY_CARDS: EntityCategoryCardData[] = [
   {
     title: "Top IP Addresses",
     total: "5.6K",
+    uniqueSeenLabel: "unique IPs seen",
     totalCount: 25,
     items: [
       { label: "207.32.75.34", value: 1240 },
@@ -73,6 +123,7 @@ const ENTITY_CATEGORY_CARDS: EntityCategoryCardData[] = [
   {
     title: "Top Usernames",
     total: "7.6K",
+    uniqueSeenLabel: "unique usernames seen",
     totalCount: 25,
     items: [
       { label: "bcarberr", value: 2654 },
@@ -85,6 +136,7 @@ const ENTITY_CATEGORY_CARDS: EntityCategoryCardData[] = [
   {
     title: "Top Hostnames",
     total: "2.6K",
+    uniqueSeenLabel: "unique hostnames seen",
     totalCount: 25,
     items: [
       { label: "norma-laptop", value: 1240 },
@@ -97,6 +149,7 @@ const ENTITY_CATEGORY_CARDS: EntityCategoryCardData[] = [
   {
     title: "Top CVEs",
     total: "2.4K",
+    uniqueSeenLabel: "unique CVEs seen",
     totalCount: 25,
     items: [
       { label: "www.normansrestaurant.com", value: 1240 },
@@ -109,6 +162,7 @@ const ENTITY_CATEGORY_CARDS: EntityCategoryCardData[] = [
   {
     title: "MAC Addresses",
     total: "2.1K",
+    uniqueSeenLabel: "unique MAC addresses seen",
     totalCount: 25,
     items: [
       { label: "www.normansrestaurant.com", value: 1240 },
@@ -121,6 +175,7 @@ const ENTITY_CATEGORY_CARDS: EntityCategoryCardData[] = [
   {
     title: "Top URLs",
     total: "1.9K",
+    uniqueSeenLabel: "unique URLs seen",
     totalCount: 25,
     items: [
       { label: "207.32.75.34", value: 1240 },
@@ -173,8 +228,9 @@ function EntityCategoryCard({ data }: { data: EntityCategoryCardData }) {
   return (
     <InsightCard title={data.title} headerActions={<EntityCardHeaderActions />}>
       <div className="flex min-h-0 flex-1 flex-col">
-        <div className="mx-1 flex h-[7.875rem] items-center justify-center rounded bg-surface-modal sm:mx-0">
+        <div className="mx-1 flex h-[7.875rem] flex-col items-center justify-center gap-1 rounded bg-surface-modal sm:mx-0">
           <p className="text-[3rem] font-black leading-[2.75rem] text-text-primary">{data.total}</p>
+          <p className="text-base-small text-text-tertiary">{data.uniqueSeenLabel}</p>
         </div>
         <ol className="mt-3 min-h-0 flex-1 divide-y divide-datavis-gridlines">
           {data.items.map((item, index) => (
@@ -210,7 +266,6 @@ function EntityCategoryCard({ data }: { data: EntityCategoryCardData }) {
   );
 }
 
-const newEntitiesSpikeHighlight = { index: SPIKE_DAY_INDEX, label: "spike Thu" } as const;
 
 type EntitiesDetailTab = "entities" | "aggregated";
 
@@ -808,21 +863,28 @@ function EntitiesAggregatedPanel() {
 
 /** Figma `1595:48982` — Entities Overview body for Federated Analytics. */
 export function EntitiesOverviewContent() {
+  const { range: timeframe } = useTimeframe();
   const [activeDetailTab, setActiveDetailTab] = useState<EntitiesDetailTab>("entities");
+  const dailyChart = useMemo(() => buildDailyEntityChart(timeframe), [timeframe]);
+
   return (
     <div className="flex shrink-0 flex-col gap-4 p-4 sm:p-5">
       <InsightCard title="New Entities Seen Per Day">
         <TimeSeriesBarChart
-          values={NEW_ENTITIES_PER_DAY}
-          xLabels={WEEKDAY_LABELS}
+          values={dailyChart.values}
+          xLabels={dailyChart.xLabels}
           barColor={NEW_ENTITIES_BAR}
-          spikeHighlight={newEntitiesSpikeHighlight}
-          yMax={70}
-          yTicks={[0, 20, 40, 60, 70]}
-          ariaLabel="New entities seen per day by weekday"
+          spikeHighlight={
+            dailyChart.spikeIndex != null
+              ? { index: dailyChart.spikeIndex, label: `spike ${dailyChart.xLabels[dailyChart.spikeIndex]}` }
+              : undefined
+          }
+          yMax={dailyChart.yMax}
+          yTicks={dailyChart.yTicks}
+          ariaLabel="New entities seen per day"
         />
         <p className="mt-1 pl-9 text-base-small text-text-tertiary">
-          Thu spike correlates with new cloud resources from Discovery
+          {dailyChart.spikeLabel}
         </p>
       </InsightCard>
 
