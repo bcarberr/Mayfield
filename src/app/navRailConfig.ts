@@ -6,3 +6,6 @@ export const SHOW_ADDONS_NAV = false;
 
 /** Set to `true` to restore AI Agents nav slot and `/ai-agents` page (`AiAgentsPage.tsx`). */
 export const SHOW_AI_AGENTS_PAGE = false;
+
+/** Amazon Athena connector wizard Step 3 — Map & Review Data (`AmazonAthenaMapReviewStep.tsx`). */
+export const SHOW_ATHENA_CONNECTOR_STEP_3 = true;

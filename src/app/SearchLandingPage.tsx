@@ -201,7 +201,7 @@ function SearchToolbarActions({
                 <Icon name="action-cancel-clear" className="shrink-0 text-current" aria-hidden />
                 Clear Search
               </Button>
-              <Button type="button" variant="secondary" className={toolbarBtnRing} disabled>
+              <Button type="button" variant="secondary" className={toolbarBtnRing} disabled={!hasFsqlQuery}>
                 Create New Detection
               </Button>
               <Button type="button" variant="secondary" className={toolbarBtnRing} disabled={!hasFsqlQuery}>
@@ -230,6 +230,9 @@ function SearchToolbarActions({
               >
                 <Icon name="action-cancel-clear" className="shrink-0 text-current" aria-hidden />
                 Clear Search
+              </Button>
+              <Button type="button" variant="secondary" className={toolbarBtnRing} disabled={!queryBuilderValid}>
+                Create New Detection
               </Button>
               <Button type="button" variant="secondary" className={toolbarBtnRing} disabled={!queryBuilderValid}>
                 <Icon name="action-saved-search" className="shrink-0 text-current" aria-hidden />

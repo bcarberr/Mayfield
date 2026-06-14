@@ -16,6 +16,8 @@ type ConnectorFiltersProps = {
   onCategoryToggle: (categoryId: ConnectorCategoryId, enabled: boolean) => void;
   onCategoryOrderChange: (order: ConnectorCategoryId[]) => void;
   onResetFilters: () => void;
+  /** Focus ring offset surface — modal drawer vs page background. */
+  ringOffsetSurface?: "page" | "modal";
 };
 
 function reorderCategoryIds(
@@ -107,6 +109,7 @@ function FilterTag({
   onDragOver,
   onDragLeave,
   onDrop,
+  ringOffsetClass,
 }: {
   label: string;
   enabled: boolean;
@@ -118,6 +121,7 @@ function FilterTag({
   onDragOver: (event: DragEvent<HTMLDivElement>) => void;
   onDragLeave: () => void;
   onDrop: (event: DragEvent<HTMLDivElement>) => void;
+  ringOffsetClass: string;
 }) {
   return (
     <div
@@ -134,7 +138,7 @@ function FilterTag({
           ? "border-interactive-active bg-interactive-selected"
           : "border-border-container bg-surface-container opacity-80",
         isDragging && "opacity-50",
-        isDragOver && !isDragging && "ring-1 ring-interactive-active ring-offset-1 ring-offset-surface-page",
+        isDragOver && !isDragging && cx("ring-1 ring-interactive-active ring-offset-1", ringOffsetClass),
       )}
     >
       <FilterTagMoveHandle isDragging={isDragging} label={label} />
@@ -157,7 +161,10 @@ export function ConnectorFilters({
   onCategoryToggle,
   onCategoryOrderChange,
   onResetFilters,
+  ringOffsetSurface = "page",
 }: ConnectorFiltersProps) {
+  const ringOffsetClass =
+    ringOffsetSurface === "modal" ? "ring-offset-surface-modal" : "ring-offset-surface-page";
   const [draggedId, setDraggedId] = useState<ConnectorCategoryId | null>(null);
   const [dragOverId, setDragOverId] = useState<ConnectorCategoryId | null>(null);
 
@@ -196,7 +203,10 @@ export function ConnectorFilters({
         <button
           type="button"
           aria-expanded={expanded}
-          className="-ml-[7px] flex items-center gap-0.5 rounded py-0.5 text-left focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-interactive-active focus-visible:ring-offset-2 focus-visible:ring-offset-surface-page"
+          className={cx(
+            "-ml-[7px] flex items-center gap-0.5 rounded py-0.5 text-left focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-interactive-active focus-visible:ring-offset-2",
+            ringOffsetClass,
+          )}
           onClick={() => onExpandedChange(!expanded)}
         >
           <Icon
@@ -239,6 +249,7 @@ export function ConnectorFilters({
               onDragOver={handleDragOver(category.id)}
               onDragLeave={() => setDragOverId((current) => (current === category.id ? null : current))}
               onDrop={handleDrop(category.id)}
+              ringOffsetClass={ringOffsetClass}
             />
           ))}
         </div>

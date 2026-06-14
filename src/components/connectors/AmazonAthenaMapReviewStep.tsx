@@ -1,0 +1,678 @@
+import { useCallback, useEffect, useId, useMemo, useState, type ReactNode } from "react";
+import { Checkbox, Icon } from "../../design-system";
+import { Button } from "../ui/Button";
+import { DataTable, type DataTableColumn } from "../ui/DataTable";
+import { Input } from "../ui/Input";
+import { Switch } from "../ui/Switch";
+
+const cx = (...c: (string | false | undefined)[]) => c.filter(Boolean).join(" ");
+
+export const ADVANCED_MODE_CALLOUT =
+  "Advanced Mode allows mapping of more details and will give more context for investigations and threat hunting.";
+
+type MappingRow = {
+  source: string;
+  sample: string;
+  mapped: boolean;
+  tags?: string[];
+};
+
+function isMappedRow(r: MappingRow): boolean {
+  return Boolean(r.mapped && r.tags?.length);
+}
+
+type MapVisibilityMode = "all" | "hideMapped" | "hideUnmapped";
+
+function MapVisibilityTrimode({
+  value,
+  onChange,
+}: {
+  value: MapVisibilityMode;
+  onChange: (next: MapVisibilityMode) => void;
+}) {
+  const gid = useId().replace(/:/g, "");
+  const leftRadioId = `${gid}-radio-left`;
+  const midRadioId = `${gid}-radio-mid`;
+  const rightRadioId = `${gid}-radio-right`;
+
+  return (
+    <div
+      role="radiogroup"
+      aria-label="Filter rows by mapping status"
+      className="flex flex-wrap items-center gap-x-3 gap-y-2"
+    >
+      <label
+        htmlFor={leftRadioId}
+        className={cx(
+          "cursor-pointer select-none text-sm font-semibold leading-[18px] underline-offset-2",
+          value === "hideMapped" ? "text-text-primary" : "text-text-tertiary hover:text-text-secondary",
+        )}
+      >
+        Hide Mapped
+      </label>
+
+      <div
+        className={cx(
+          "relative h-[18px] w-12 shrink-0 overflow-hidden rounded-full px-[3px] transition-colors duration-150 ease-out",
+          value === "all" && "border border-solid border-border-rule bg-transparent",
+          (value === "hideMapped" || value === "hideUnmapped") &&
+            "border-0 bg-interactive-active hover:bg-[var(--color-primary-hover)] active:bg-[var(--color-primary-pressed)]",
+        )}
+      >
+        <span
+          aria-hidden
+          className={cx(
+            "pointer-events-none absolute top-1/2 z-0 size-3 rounded-full transition-[left,transform,background-color] duration-200 ease-out",
+            value === "all" && "bg-border-container",
+            (value === "hideMapped" || value === "hideUnmapped") && "bg-text-on-primary",
+            value === "hideMapped" && "left-[3px] -translate-y-1/2",
+            value === "all" && "left-1/2 -translate-x-1/2 -translate-y-1/2",
+            value === "hideUnmapped" && "left-[calc(100%-15px)] -translate-y-1/2",
+          )}
+        />
+        <button
+          id={leftRadioId}
+          type="button"
+          role="radio"
+          aria-checked={value === "hideMapped"}
+          aria-label="Show only unmapped fields"
+          tabIndex={0}
+          onClick={() => onChange("hideMapped")}
+          className="absolute inset-y-0 left-0 z-[1] w-1/3 cursor-pointer rounded-l-full border-0 bg-transparent p-0 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-interactive-active focus-visible:ring-offset-2 focus-visible:ring-offset-surface-modal"
+        />
+        <button
+          id={midRadioId}
+          type="button"
+          role="radio"
+          aria-checked={value === "all"}
+          aria-label="Show all rows"
+          tabIndex={0}
+          onClick={() => onChange("all")}
+          className="absolute inset-y-0 left-1/3 z-[1] w-1/3 cursor-pointer border-0 bg-transparent p-0 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-interactive-active focus-visible:ring-offset-2 focus-visible:ring-offset-surface-modal"
+        />
+        <button
+          id={rightRadioId}
+          type="button"
+          role="radio"
+          aria-checked={value === "hideUnmapped"}
+          aria-label="Show only mapped fields"
+          tabIndex={0}
+          onClick={() => onChange("hideUnmapped")}
+          className="absolute inset-y-0 left-2/3 z-[1] w-1/3 cursor-pointer rounded-r-full border-0 bg-transparent p-0 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-interactive-active focus-visible:ring-offset-2 focus-visible:ring-offset-surface-modal"
+        />
+      </div>
+
+      <label
+        htmlFor={rightRadioId}
+        className={cx(
+          "cursor-pointer select-none text-sm font-semibold leading-[18px] underline-offset-2",
+          value === "hideUnmapped" ? "text-text-primary" : "text-text-tertiary hover:text-text-secondary",
+        )}
+      >
+        Hide Unmapped
+      </label>
+    </div>
+  );
+}
+
+const INITIAL_ROWS: MappingRow[] = [
+  { source: "action", sample: "allow_st*", mapped: false },
+  { source: "appclass", sample: "gostringsam*", mapped: false },
+  { source: "appname", sample: "thisApp_name*", mapped: false },
+  { source: "bwclassname", sample: "thbwe_junk_classname*", mapped: false },
+  { source: "bytes_in", sample: "1024", mapped: false },
+  { source: "bytes_out", sample: "2048", mapped: false },
+  { source: "client_ip", sample: "10.0.0.1", mapped: false },
+  { source: "dest_port", sample: "443", mapped: false },
+  { source: "duration_ms", sample: "42", mapped: false },
+  { source: "hostname", sample: "web-01.internal", mapped: false },
+  { source: "http_method", sample: "GET", mapped: false },
+  { source: "http_status", sample: "200", mapped: false },
+  { source: "protocol", sample: "HTTPS", mapped: false },
+  { source: "request_path", sample: "/api/v1/health", mapped: false },
+  { source: "user_agent", sample: "Mozilla/5.0…", mapped: false },
+];
+
+const MAPPING_FIELD_COLGROUP = (
+  <colgroup>
+    <col style={{ width: "calc((100% - 4rem - 3rem) / 2)" }} />
+    <col style={{ width: "3rem" }} />
+    <col style={{ width: "calc((100% - 4rem - 3rem) / 2)" }} />
+    <col style={{ width: "4rem" }} />
+  </colgroup>
+);
+
+function Tag({ children }: { children: string }) {
+  return (
+    <span className="inline-flex h-5 max-w-full items-center gap-1 rounded bg-surface-container px-1.5 text-[11px] font-semibold text-text-secondary ring-1 ring-border-container">
+      <span className="truncate">{children}</span>
+      <button
+        type="button"
+        className="shrink-0 text-text-tertiary hover:text-text-primary"
+        aria-label={`Remove ${children}`}
+      >
+        <Icon name="close" size={12} />
+      </button>
+    </span>
+  );
+}
+
+const MAP_SCHEMA_ENTITY_GROUPS: string[] = ["Account ID", "Account Name"];
+
+const MAP_SCHEMA_ENTITY_FIELDS: string[] = [
+  "Command Line",
+  "Country",
+  "Credential ID",
+  "CVE ID",
+  "CDW ID",
+  "Email Address",
+  "File Hash",
+  "Filename",
+  "Group ID",
+  "Group Name",
+  "Hostname",
+  "IP Address",
+  "MAC Address",
+  "Port",
+  "Process ID",
+  "Process Name",
+  "Script Content",
+  "Serial Number",
+  "Subnet",
+  "URL",
+  "User Agent",
+  "User ID",
+  "User Name",
+];
+
+type MapSchemaRecommendedRow =
+  | { kind: "field"; name: string; enum?: boolean; info?: boolean }
+  | { kind: "plain"; name: string };
+
+const MAP_SCHEMA_RECOMMENDED: MapSchemaRecommendedRow[] = [
+  { kind: "field", name: "activity_id", enum: true, info: true },
+  { kind: "plain", name: "activity_name" },
+  { kind: "field", name: "category_uid", enum: true, info: true },
+  { kind: "plain", name: "category_name" },
+  { kind: "field", name: "severity_id", enum: true, info: true },
+  { kind: "plain", name: "severity" },
+  { kind: "field", name: "type_id", enum: true, info: true },
+  { kind: "plain", name: "type_name" },
+];
+
+function MapSchemaRowInfoDragCluster({ title }: { title: string }) {
+  return (
+    <span className="inline-flex shrink-0 items-center gap-[8px] text-text-tertiary">
+      <Icon name="feedback-info-outline" size={16} className="shrink-0" title={title} />
+      <Icon name="action-drag-indicator" size={11} className="shrink-0" aria-hidden />
+    </span>
+  );
+}
+
+function MapSchemaEntityRowChevron() {
+  return (
+    <span className="flex h-2.5 w-2.5 shrink-0 items-center justify-center text-text-primary" aria-hidden>
+      <Icon name="chevron-down" size={12} className="-rotate-90 block" />
+    </span>
+  );
+}
+
+function MapSchemaEntityGroupRow({ label }: { label: string }) {
+  return (
+    <div className="flex h-7 w-full items-center gap-2 py-1">
+      <Icon name="feedback-info-outline" size={16} className="shrink-0 text-text-tertiary" title={`About ${label}`} />
+      <MapSchemaEntityRowChevron />
+      <span className="truncate text-xs font-semibold leading-4 tracking-[0.4px] text-text-primary">{label}</span>
+    </div>
+  );
+}
+
+function MapSchemaEntityFieldRow({ label }: { label: string }) {
+  return (
+    <div className="flex h-7 w-full min-w-0 items-center gap-2 py-1">
+      <Icon name="feedback-info-outline" size={16} className="shrink-0 text-text-tertiary" title={`About ${label}`} />
+      <MapSchemaEntityRowChevron />
+      <span className="min-w-0 truncate text-xs font-semibold leading-4 tracking-[0.4px] text-text-secondary">{label}</span>
+    </div>
+  );
+}
+
+function MapSchemaRecommendedFieldRow({
+  row,
+  onMapField,
+}: {
+  row: MapSchemaRecommendedRow;
+  onMapField: (fieldName: string) => void;
+}) {
+  const infoTitle = `About ${row.name}`;
+  if (row.kind === "plain") {
+    return (
+      <button
+        type="button"
+        onClick={() => onMapField(row.name)}
+        className="flex h-7 w-full min-w-0 items-center gap-2 rounded py-1 text-left hover:bg-overlay-subtle"
+      >
+        <MapSchemaRowInfoDragCluster title={infoTitle} />
+        <span className="min-w-0 truncate text-xs font-semibold leading-4 tracking-[0.4px] text-text-secondary">{row.name}</span>
+      </button>
+    );
+  }
+  return (
+    <button
+      type="button"
+      onClick={() => onMapField(row.name)}
+      className="flex h-7 w-full min-w-0 items-center gap-2 rounded py-1 text-left hover:bg-overlay-subtle"
+    >
+      <MapSchemaRowInfoDragCluster title={infoTitle} />
+      <span className="min-w-0 flex-1 truncate text-xs font-semibold leading-4 tracking-[0.4px] text-text-secondary">
+        <span>{row.name} </span>
+        {row.enum ? <span className="font-semibold italic text-[#b4b0ff]">enum</span> : null}
+      </span>
+    </button>
+  );
+}
+
+function MapSchemaOverviewCard({ onMapRecommendedField }: { onMapRecommendedField: (fieldName: string) => void }) {
+  const [treeView, setTreeView] = useState(false);
+  const [entitiesOpen, setEntitiesOpen] = useState(true);
+  const [recommendedOpen, setRecommendedOpen] = useState(true);
+
+  return (
+    <div className="flex min-h-0 flex-1 flex-col rounded border border-border-rule bg-surface-modal px-4 pt-2 pb-3">
+      <div className="flex min-h-0 flex-1 flex-col">
+        <div className="shrink-0">
+          <div className="flex shrink-0 items-center gap-2">
+            <p className="shrink-0 text-[12px] font-bold uppercase leading-[14px] tracking-[0.4px] text-text-tertiary">
+              MAP Schema
+            </p>
+            <button
+              type="button"
+              aria-label="Map schema mode: Basic Mode"
+              className={cx(
+                "flex h-7 min-w-0 flex-1 items-center justify-between gap-2 rounded-full border px-3 text-left transition-colors",
+                "border-border-container bg-surface-container text-text-secondary hover:text-text-primary",
+              )}
+            >
+              <span className="min-w-0 truncate text-[14px] font-bold leading-5 tracking-[0.4px]">Basic Mode</span>
+              <Icon name="chevron-down" size={20} className="shrink-0" />
+            </button>
+          </div>
+          <div className="mt-4">
+            <p className="text-left text-[14px] font-bold leading-5 tracking-[0.4px] text-text-primary">HTTP Activity</p>
+          </div>
+          <div className="mt-3 border-t border-border-rule pt-3">
+            <Input
+              variant="search"
+              readOnly
+              tabIndex={-1}
+              startAdornment={<Icon name="search" />}
+              placeholder="Search"
+              className="w-full border-border-rule px-1.5"
+            />
+          </div>
+          <div className="mt-3 flex flex-wrap items-center gap-2 text-base-small">
+            <MapSchemaRowInfoDragCluster title="About required fields" />
+            <span className="font-semibold text-text-primary">time*</span>
+            <span className="font-semibold italic text-accent-required">required</span>
+          </div>
+        </div>
+
+        <div className="mt-3 min-h-0 flex-1 overflow-y-auto">
+          <div className="flex flex-col gap-px">
+            <div className="flex h-7 w-full min-h-7 flex-wrap items-center gap-2 py-1">
+              <button
+                type="button"
+                onClick={() => setEntitiesOpen((v) => !v)}
+                aria-expanded={entitiesOpen}
+                className="flex min-w-0 shrink-0 items-center gap-2 rounded py-0.5 pr-1 text-left text-text-primary hover:bg-overlay-subtle focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-interactive-active"
+              >
+                <Icon
+                  name="chevron-down"
+                  size={12}
+                  className={cx("shrink-0 transition-transform duration-150", !entitiesOpen && "-rotate-90")}
+                  aria-hidden
+                />
+                <span className="text-xs font-semibold uppercase leading-4 tracking-[0.4px]">Entities</span>
+              </button>
+              <span className="ml-auto flex min-w-0 flex-1 items-center justify-end gap-2 pl-2">
+                <Checkbox
+                  checked={treeView}
+                  onCheckedChange={setTreeView}
+                  label="Show As Tree View"
+                  labelClassName="text-base-small text-text-secondary"
+                />
+              </span>
+            </div>
+
+            {entitiesOpen ? (
+              <>
+                {MAP_SCHEMA_ENTITY_GROUPS.map((label) => (
+                  <MapSchemaEntityGroupRow key={label} label={label} />
+                ))}
+                {MAP_SCHEMA_ENTITY_FIELDS.map((label) => (
+                  <MapSchemaEntityFieldRow key={label} label={label} />
+                ))}
+              </>
+            ) : null}
+
+            <div className="flex h-7 w-full min-h-7 items-center gap-2 py-1">
+              <button
+                type="button"
+                onClick={() => setRecommendedOpen((v) => !v)}
+                aria-expanded={recommendedOpen}
+                className="flex min-w-0 items-center gap-2 rounded py-0.5 pr-1 text-left text-text-primary hover:bg-overlay-subtle focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-interactive-active"
+              >
+                <Icon
+                  name="chevron-down"
+                  size={12}
+                  className={cx("shrink-0 transition-transform duration-150", !recommendedOpen && "-rotate-90")}
+                  aria-hidden
+                />
+                <span className="text-xs font-semibold uppercase leading-4 tracking-[0.4px]">Recommended</span>
+              </button>
+            </div>
+            {recommendedOpen
+              ? MAP_SCHEMA_RECOMMENDED.map((row, i) => (
+                  <MapSchemaRecommendedFieldRow
+                    key={`${row.kind}-${"name" in row ? row.name : i}`}
+                    row={row}
+                    onMapField={onMapRecommendedField}
+                  />
+                ))
+              : null}
+          </div>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+function CopilotMark() {
+  const uid = useId().replace(/:/g, "");
+  const ga = `${uid}-spark-a`;
+  const gb = `${uid}-spark-b`;
+
+  return (
+    <div className="-ml-[10px] flex shrink-0 items-center gap-3">
+      <div className="flex items-center gap-0">
+        <svg width="44.8" height="35.2" viewBox="0 0 44.8 35.2" fill="none" className="shrink-0" aria-hidden>
+          <defs>
+            <linearGradient id={ga} x1="0%" y1="0%" x2="100%" y2="100%">
+              <stop offset="0%" stopColor="#1ec1dd" />
+              <stop offset="100%" stopColor="#7fe8ff" />
+            </linearGradient>
+            <linearGradient id={gb} x1="0%" y1="100%" x2="100%" y2="0%">
+              <stop offset="0%" stopColor="#ff8200" />
+              <stop offset="100%" stopColor="#fac354" />
+            </linearGradient>
+          </defs>
+          <svg x="0" y="0" width="35.2" height="35.2" viewBox="0 0 24 24">
+            <path
+              d="M12 3l1.2 4.2L17 8.5l-3.8 1.3L12 14l-1.2-4.2L7 8.5l3.8-1.3L12 3Z"
+              fill={`url(#${ga})`}
+            />
+          </svg>
+          <svg x="22.4" y="3.2" width="22.4" height="22.4" viewBox="0 0 24 24">
+            <path
+              d="M12 3l1.2 4.2L17 8.5l-3.8 1.3L12 14l-1.2-4.2L7 8.5l3.8-1.3L12 3Z"
+              fill={`url(#${gb})`}
+            />
+          </svg>
+        </svg>
+        <span className="-ml-0.5 text-base font-semibold leading-6 text-text-primary">Copilot</span>
+      </div>
+      <span className="rounded bg-beta px-1.5 py-0.5 text-xs font-bold uppercase tracking-wide text-beta-text">
+        BETA
+      </span>
+    </div>
+  );
+}
+
+function MappingToolbarV2() {
+  const [allowAutosave, setAllowAutosave] = useState(true);
+
+  return (
+    <div className="bg-surface-modal">
+      <p className="text-base-semibold text-text-primary">Event Class to Map</p>
+      <div className="mt-2 flex min-h-[32px] flex-wrap items-center justify-between gap-x-3 gap-y-2">
+        <div className="flex min-w-0 flex-wrap items-center gap-x-3 gap-y-2">
+          <button
+            type="button"
+            className="flex h-7 w-60 shrink-0 items-center gap-1 rounded border border-border-rule bg-surface-modal px-3 text-left hover:bg-overlay-subtle"
+          >
+            <Icon
+              name="network-activity"
+              size={16}
+              className="shrink-0 text-datavis-data-peanut-orange"
+              title="Network activity"
+            />
+            <span className="min-w-0 flex-1 truncate text-sm font-semibold text-text-primary">HTTP Activity</span>
+            <Icon name="chevron-down" className="shrink-0 text-text-secondary" />
+          </button>
+          <button
+            type="button"
+            className="shrink-0 rounded p-0.5 text-text-tertiary hover:bg-overlay-subtle hover:text-text-secondary"
+            aria-label="About event class"
+          >
+            <Icon name="feedback-info-outline" />
+          </button>
+          <CopilotMark />
+        </div>
+        <div className="flex shrink-0 flex-wrap items-center gap-x-6 gap-y-2">
+          <Switch checked={allowAutosave} onCheckedChange={setAllowAutosave} label="Allow Autosave" />
+          <Button variant="tertiary" className="gap-1 text-sm font-semibold text-text-secondary hover:text-text-primary">
+            <Icon name="close" />
+            Clear All Mappings
+          </Button>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+function FieldMappingBar({
+  rows,
+  mapVisibility,
+  onMapVisibilityChange,
+  table,
+}: {
+  rows: MappingRow[];
+  mapVisibility: MapVisibilityMode;
+  onMapVisibilityChange: (next: MapVisibilityMode) => void;
+  table: ReactNode;
+}) {
+  const mapped = rows.filter(isMappedRow).length;
+  return (
+    <div className="flex min-h-0 min-w-0 flex-1 flex-col bg-surface-modal px-0 py-4">
+      <div className="shrink-0">
+        <p className="mb-3 text-sm font-semibold text-text-secondary">
+          Mapped Fields: <span className="text-text-primary">{mapped}</span>
+        </p>
+        <div className="grid w-full min-w-0 grid-cols-1 gap-y-3 md:grid-cols-[minmax(0,1fr)_3rem_minmax(0,1fr)_4rem] md:gap-x-0">
+          <div className="flex min-w-0 flex-wrap items-baseline gap-x-[16px] md:min-w-0">
+            <p className="min-w-0 text-sm font-semibold leading-[18px]">
+              <span className="text-text-primary">Source: </span>
+              <span className="text-text-secondary">sample-securitystuff-schema-this-long</span>
+            </p>
+            <p className="shrink-0 text-xs font-semibold italic leading-[18px] tracking-wide text-text-tertiary">
+              Sample data shown*
+            </p>
+          </div>
+          <div className="hidden md:block" aria-hidden />
+          <div className="flex min-w-0 flex-wrap items-center justify-start gap-2">
+            <p className="text-sm font-semibold leading-[18px]">
+              <span className="text-text-primary">Target: </span>
+              <span className="text-text-secondary">Query Data Model</span>
+            </p>
+            <Icon name="feedback-info-outline" className="shrink-0 text-text-tertiary" />
+          </div>
+          <div className="hidden md:block" aria-hidden />
+
+          <div className="flex min-w-0 w-full flex-wrap items-center gap-3 md:min-w-0">
+            <Input
+              variant="search"
+              readOnly
+              tabIndex={-1}
+              startAdornment={<Icon name="search" />}
+              placeholder="Search source fields"
+              className="w-[200px] shrink-0"
+            />
+            <Switch checked={false} disabled label="Show Hidden Fields" />
+          </div>
+          <div className="hidden md:block" aria-hidden />
+          <div className="flex min-w-0 items-center justify-start">
+            <MapVisibilityTrimode value={mapVisibility} onChange={onMapVisibilityChange} />
+          </div>
+          <div className="hidden md:block" aria-hidden />
+        </div>
+      </div>
+      <div className="min-h-0 w-full min-w-0 flex-1 overflow-y-auto px-0 pb-28 pt-2">{table}</div>
+    </div>
+  );
+}
+
+/** Amazon Athena connector wizard Step 3 — Map & Review Data (Config-Schema-v2). */
+export function AmazonAthenaMapReviewStep({
+  onHasMappedFieldsChange,
+}: {
+  onHasMappedFieldsChange?: (hasMappedFields: boolean) => void;
+}) {
+  const [rows, setRows] = useState<MappingRow[]>(() => INITIAL_ROWS.map((row) => ({ ...row })));
+  const [mapVisibility, setMapVisibility] = useState<MapVisibilityMode>("all");
+
+  const hasMappedFields = useMemo(() => rows.some(isMappedRow), [rows]);
+
+  useEffect(() => {
+    onHasMappedFieldsChange?.(hasMappedFields);
+  }, [hasMappedFields, onHasMappedFieldsChange]);
+
+  const mapRecommendedField = useCallback((fieldName: string) => {
+    const tag = fieldName
+      .trim()
+      .toLowerCase()
+      .replace(/[^a-z0-9]+/g, "_")
+      .replace(/^_|_$/g, "");
+
+    setRows((current) => {
+      const firstUnmapped = current.find((row) => !isMappedRow(row));
+      if (!firstUnmapped) return current;
+
+      return current.map((row) =>
+        row.source === firstUnmapped.source ? { ...row, mapped: true, tags: [tag || fieldName] } : row,
+      );
+    });
+  }, []);
+
+  const clearRowMapping = useCallback((source: string) => {
+    setRows((current) =>
+      current.map((row) => (row.source === source ? { ...row, mapped: false, tags: undefined } : row)),
+    );
+  }, []);
+
+  const visibleRows = useMemo(() => {
+    return rows.filter((r) => {
+      const mapped = isMappedRow(r);
+      if (mapVisibility === "hideMapped" && mapped) return false;
+      if (mapVisibility === "hideUnmapped" && !mapped) return false;
+      return true;
+    });
+  }, [rows, mapVisibility]);
+
+  const columns: DataTableColumn<MappingRow>[] = useMemo(
+    () => [
+      {
+        id: "source",
+        header: "Source",
+        className: "min-w-0 py-2 pl-0 pr-2 align-middle",
+        cell: (r) => (
+          <div className="flex min-h-7 w-full min-w-0 items-center gap-2 rounded border border-border-rule bg-surface-modal px-3 py-1">
+            <p className="min-w-0 flex-1 truncate text-xs font-semibold tracking-[0.4px]">
+              <span className="text-text-primary">{r.source}</span>
+              <span className="whitespace-pre"> </span>
+              <span className="font-semibold italic text-text-tertiary">{r.sample}</span>
+            </p>
+            <Icon name="visibility" size={20} className="shrink-0 text-text-tertiary" />
+          </div>
+        ),
+      },
+      {
+        id: "_barGap",
+        header: "",
+        className: "p-0 align-middle",
+        cell: () => null,
+      },
+      {
+        id: "target",
+        header: "Target",
+        className: "min-w-0 py-2 pl-0 pr-2 align-middle",
+        cell: (r) => (
+          <div className="flex min-h-7 w-full min-w-0 items-center gap-1 rounded border border-border-rule bg-surface-modal px-3 py-1">
+            {isMappedRow(r) ? (
+              <div className="flex min-w-0 w-full flex-wrap gap-1">
+                {(r.tags ?? []).map((t) => (
+                  <Tag key={t}>{t}</Tag>
+                ))}
+              </div>
+            ) : (
+              <span className="min-w-0 flex-1 truncate px-1 text-xs font-semibold italic tracking-[0.4px] text-text-tertiary">
+                Unmapped
+              </span>
+            )}
+          </div>
+        ),
+      },
+      {
+        id: "actions",
+        header: "",
+        className: "w-16 min-w-[4rem] max-w-[4rem] shrink-0 py-2 pl-4 pr-2 text-end align-middle",
+        cell: (r) => (
+          <div className="flex w-full justify-end">
+            <Button
+              variant="ghost"
+              className="text-text-tertiary hover:text-text-primary"
+              aria-label="Clear row"
+              onClick={() => clearRowMapping(r.source)}
+            >
+              <Icon name="close" />
+            </Button>
+          </div>
+        ),
+      },
+    ],
+    [clearRowMapping],
+  );
+
+  return (
+    <>
+      <p className="shrink-0 py-3 text-base-semibold italic text-text-tertiary">{ADVANCED_MODE_CALLOUT}</p>
+
+      <div className="flex min-h-0 flex-1 flex-col bg-surface-modal md:flex-row md:items-stretch">
+        <div className="flex min-h-0 min-w-0 flex-1 flex-col overflow-hidden">
+          <div className="shrink-0 border-b border-border-rule px-0 py-4">
+            <MappingToolbarV2 />
+          </div>
+          <FieldMappingBar
+            rows={rows}
+            mapVisibility={mapVisibility}
+            onMapVisibilityChange={setMapVisibility}
+            table={
+              <DataTable<MappingRow>
+                caption="Map source fields from the security schema to the query data model."
+                colgroup={MAPPING_FIELD_COLGROUP}
+                hideHeader
+                className="w-full min-w-0"
+                rowKey={(r) => r.source}
+                rows={visibleRows}
+                columns={columns}
+              />
+            }
+          />
+        </div>
+
+        <div className="flex min-h-0 w-full flex-1 flex-col border-t border-border-rule py-4 md:w-[300px] md:flex-none md:border-t-0 md:py-4 md:pl-4">
+          <MapSchemaOverviewCard onMapRecommendedField={mapRecommendedField} />
+        </div>
+      </div>
+    </>
+  );
+}

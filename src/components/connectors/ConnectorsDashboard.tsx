@@ -2,25 +2,16 @@ import { useMemo, useState } from "react";
 import { ConnectorCard } from "./ConnectorCard";
 import { ConnectorFilters } from "./ConnectorFilters";
 import {
+  isDefaultCategoryOrder,
+  isDefaultEnabledCategories,
+  usePersistedDashboardConnectorFilters,
+} from "./connectorFilterState";
+import {
   CONNECTOR_CATEGORIES,
   CONNECTOR_INSTANCES,
   type ConnectorCategoryId,
   type ConnectorInstance,
 } from "./connectorsData";
-
-const DEFAULT_CATEGORY_ORDER = CONNECTOR_CATEGORIES.map((category) => category.id);
-const DEFAULT_ENABLED_CATEGORIES = new Set(DEFAULT_CATEGORY_ORDER);
-
-function isDefaultCategoryOrder(order: readonly ConnectorCategoryId[]) {
-  return order.length === DEFAULT_CATEGORY_ORDER.length && order.every((id, index) => id === DEFAULT_CATEGORY_ORDER[index]);
-}
-
-function isDefaultEnabledCategories(enabled: ReadonlySet<ConnectorCategoryId>) {
-  return (
-    enabled.size === DEFAULT_ENABLED_CATEGORIES.size &&
-    DEFAULT_CATEGORY_ORDER.every((id) => enabled.has(id))
-  );
-}
 
 export type ConnectorsDashboardProps = {
   onConfigureConnector?: (connectorId: string) => void;
@@ -31,11 +22,15 @@ export function ConnectorsDashboard({ onConfigureConnector }: ConnectorsDashboar
   const [connectors, setConnectors] = useState<ConnectorInstance[]>(() =>
     CONNECTOR_INSTANCES.map((connector) => ({ ...connector })),
   );
-  const [categoryOrder, setCategoryOrder] = useState<ConnectorCategoryId[]>(() => [...DEFAULT_CATEGORY_ORDER]);
-  const [enabledCategories, setEnabledCategories] = useState<Set<ConnectorCategoryId>>(
-    () => new Set(DEFAULT_ENABLED_CATEGORIES),
-  );
-  const [filtersExpanded, setFiltersExpanded] = useState(false);
+  const {
+    categoryOrder,
+    enabledCategories,
+    filtersExpanded,
+    setCategoryOrder,
+    setCategoryEnabled,
+    setFiltersExpanded,
+    resetFilters,
+  } = usePersistedDashboardConnectorFilters();
 
   const categoriesById = useMemo(
     () => new Map(CONNECTOR_CATEGORIES.map((category) => [category.id, category])),
@@ -71,24 +66,10 @@ export function ConnectorsDashboard({ onConfigureConnector }: ConnectorsDashboar
   const filtersAltered =
     !isDefaultCategoryOrder(categoryOrder) || !isDefaultEnabledCategories(enabledCategories);
 
-  const resetFilters = () => {
-    setCategoryOrder([...DEFAULT_CATEGORY_ORDER]);
-    setEnabledCategories(new Set(DEFAULT_ENABLED_CATEGORIES));
-  };
-
   const setConnectorEnabled = (connectorId: string, enabled: boolean) => {
     setConnectors((current) =>
       current.map((connector) => (connector.id === connectorId ? { ...connector, enabled } : connector)),
     );
-  };
-
-  const setCategoryEnabled = (categoryId: ConnectorCategoryId, enabled: boolean) => {
-    setEnabledCategories((current) => {
-      const next = new Set(current);
-      if (enabled) next.add(categoryId);
-      else next.delete(categoryId);
-      return next;
-    });
   };
 
   return (

@@ -1,4 +1,5 @@
 import { type ReactNode, useEffect } from "react";
+import { createPortal } from "react-dom";
 
 export type SlideOverProps = {
   open: boolean;
@@ -21,6 +22,55 @@ export type ContentAreaSlideOverState = {
 };
 
 const cx = (...c: (string | false | undefined)[]) => c.filter(Boolean).join(" ");
+
+/** Panel width for connector setup / add flows — full content column (viewport minus `w-10` nav rail). */
+export const CONNECTOR_PAGE_SLIDE_OVER_PANEL_CLASS = "w-[calc(100vw-2.5rem)] max-w-none shrink-0";
+
+/**
+ * Full-viewport modal drawer — scrim covers nav + page header; panel slides in from the right at full height.
+ * Figma Modal Scrim + page drawer (`1718:21521`, `1718:21522`).
+ */
+export function PageSlideOver({
+  open,
+  onClose,
+  children,
+  ariaLabel = "Panel",
+  panelClassName = CONNECTOR_PAGE_SLIDE_OVER_PANEL_CLASS,
+}: Omit<SlideOverProps, "dimNav">) {
+  useEffect(() => {
+    if (!open) return;
+    const onKey = (event: KeyboardEvent) => {
+      if (event.key === "Escape") onClose();
+    };
+    document.addEventListener("keydown", onKey);
+    return () => document.removeEventListener("keydown", onKey);
+  }, [open, onClose]);
+
+  if (!open) return null;
+
+  return createPortal(
+    <div className="fixed inset-0 z-50 flex overflow-hidden">
+      <button
+        type="button"
+        className="absolute inset-0 animate-overlay-scrim-in bg-overlay-scrim"
+        aria-label="Close panel"
+        onClick={onClose}
+      />
+      <aside
+        role="dialog"
+        aria-modal="true"
+        aria-label={ariaLabel}
+        className={cx(
+          "relative z-10 ml-auto flex h-full min-h-0 animate-slide-over-in flex-col overflow-hidden border-l border-border-rule bg-surface-modal shadow-[-4px_0_24px_rgba(0,0,0,0.25)]",
+          panelClassName ?? CONNECTOR_PAGE_SLIDE_OVER_PANEL_CLASS,
+        )}
+      >
+        {children}
+      </aside>
+    </div>,
+    document.body,
+  );
+}
 
 /**
  * Content-column drawer host — main area + right aside below `SearchTopHeader`,
@@ -61,8 +111,8 @@ export function ContentAreaSlideOverHost({
           aria-modal="true"
           aria-label={slideOver.ariaLabel}
           className={cx(
-            "relative z-40 mr-5 flex h-full w-[min(100%,480px)] shrink-0 animate-slide-over-in flex-col overflow-hidden border-l border-r border-border-rule bg-surface-modal",
-            slideOver.panelClassName,
+            "relative z-40 mr-5 flex h-full shrink-0 animate-slide-over-in flex-col overflow-hidden border-l border-r border-border-rule bg-surface-modal",
+            slideOver.panelClassName ?? "w-[min(100%,480px)]",
           )}
         >
           {slideOver.panel}
