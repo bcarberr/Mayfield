@@ -1,0 +1,26 @@
+<svg viewBox="0 0 33 28" fill="none" xmlns="http://www.w3.org/2000/svg" aria-hidden="true">
+  <path d="M11.0897 4.3652C12.2683 14.6474 22.3178 15.9569 22.3178 15.9569C11.1594 18.7077 11.0897 27.5486 11.0897 27.5486C9.91106 17.4641 0 15.9569 0 15.9569C10.8814 13.5337 11.0897 4.3652 11.0897 4.3652Z" fill="url(#copilot-spark-teal-a)" fill-opacity="0.8"/>
+  <path d="M11.0897 4.3652C12.2683 14.6474 22.3178 15.9569 22.3178 15.9569C11.1594 18.7077 11.0897 27.5486 11.0897 27.5486C9.91106 17.4641 0 15.9569 0 15.9569C10.8814 13.5337 11.0897 4.3652 11.0897 4.3652Z" fill="url(#copilot-spark-teal-b)"/>
+  <path d="M25.4053 3.07709C26.1634 9.36064 32.6281 10.1609 32.6281 10.1609C25.4501 11.842 25.4053 17.2447 25.4053 17.2447C24.6471 11.082 18.2715 10.1609 18.2715 10.1609C25.2713 8.68004 25.4053 3.07709 25.4053 3.07709Z" fill="url(#copilot-spark-orange-a)" fill-opacity="0.8"/>
+  <path d="M25.4053 3.07709C26.1634 9.36064 32.6281 10.1609 32.6281 10.1609C25.4501 11.842 25.4053 17.2447 25.4053 17.2447C24.6471 11.082 18.2715 10.1609 18.2715 10.1609C25.2713 8.68004 25.4053 3.07709 25.4053 3.07709Z" fill="url(#copilot-spark-orange-b)"/>
+  <defs>
+    <linearGradient id="copilot-spark-teal-a" x1="0" y1="15.9569" x2="22.3178" y2="15.9569" gradientUnits="userSpaceOnUse">
+      <stop stop-color="#804100" stop-opacity="0.4"/>
+      <stop offset="0.658654" stop-color="#FF8200"/>
+      <stop offset="0.985577" stop-color="#864502" stop-opacity="0.4"/>
+    </linearGradient>
+    <linearGradient id="copilot-spark-teal-b" x1="7.63563" y1="9.24466" x2="11.1353" y2="19.7437" gradientUnits="userSpaceOnUse">
+      <stop stop-color="#3CD2EB"/>
+      <stop offset="1" stop-color="#037F9C"/>
+    </linearGradient>
+    <linearGradient id="copilot-spark-orange-a" x1="18.2715" y1="10.1609" x2="32.6281" y2="10.1609" gradientUnits="userSpaceOnUse">
+      <stop stop-color="#804100" stop-opacity="0.4"/>
+      <stop offset="0.658654" stop-color="#FF8200"/>
+      <stop offset="0.985577" stop-color="#864502" stop-opacity="0.4"/>
+    </linearGradient>
+    <linearGradient id="copilot-spark-orange-b" x1="23.1834" y1="6.05898" x2="25.2351" y2="12.5382" gradientUnits="userSpaceOnUse">
+      <stop stop-color="#FFD1A1"/>
+      <stop offset="1" stop-color="#FF8200"/>
+    </linearGradient>
+  </defs>
+</svg>

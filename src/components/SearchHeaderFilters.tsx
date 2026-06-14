@@ -29,7 +29,7 @@ function SearchHeaderFilterDropdown({
       aria-haspopup="menu"
       aria-expanded={open}
       aria-label={`${menuLabel} filter`}
-      className="group inline-flex max-w-full items-center gap-1.5 rounded py-0.5 text-left transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-interactive-active focus-visible:ring-offset-2 focus-visible:ring-offset-surface-container"
+      className="group flex w-full max-w-full items-center gap-1.5 rounded py-0.5 text-left transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-interactive-active focus-visible:ring-offset-2 focus-visible:ring-offset-surface-container lg:inline-flex lg:w-auto"
       onClick={() => setOpen((current) => !current)}
     >
       <Icon name={icon} size={16} className={cx("shrink-0", HEADER_FILTER_INTERACTIVE)} aria-hidden />
@@ -48,7 +48,11 @@ function SearchHeaderFilterDropdown({
 /** Federated Search header filters — Figma search workspace filter row. */
 export function SearchHeaderFilters() {
   return (
-    <div className="flex flex-wrap items-center gap-4" role="group" aria-label="Search filters">
+    <div
+      className="flex w-full flex-col items-start gap-3 lg:w-auto lg:flex-row lg:flex-nowrap lg:items-center lg:gap-4"
+      role="group"
+      aria-label="Search filters"
+    >
       <SearchHeaderFilterDropdown
         icon="connectors"
         label="Connectors"

@@ -1,4 +1,4 @@
-import { type KeyboardEvent, useCallback, useEffect, useId, useRef, useState } from "react";
+import { type KeyboardEvent, useCallback, useEffect, useRef, useState } from "react";
 import { Icon } from "../design-system";
 import {
   type CopilotAssistantResponse,
@@ -9,10 +9,19 @@ import {
   resolveCopilotPrompt,
 } from "../lib/fsqlCopilotResponder";
 import { Button } from "./ui/Button";
+import { SearchAgentsPanel } from "./search/SearchAgentsPanel";
+import aiAgentsNavSvg from "../assets/nav-v4/ai-agents.svg?raw";
+import copilotSparklesUrl from "../assets/icons/copilot-sparkles.svg?url";
 
 const cx = (...c: (string | false | undefined)[]) => c.filter(Boolean).join(" ");
 
 const COPILOT_PANEL_WIDTH = 360;
+const COPILOT_PANEL_MIN_WIDTH = 280;
+const COPILOT_PANEL_MAX_WIDTH = 640;
+
+function clampCopilotPanelWidth(width: number) {
+  return Math.round(Math.min(COPILOT_PANEL_MAX_WIDTH, Math.max(COPILOT_PANEL_MIN_WIDTH, width)));
+}
 
 type ChatMessage = {
   id: string;
@@ -21,30 +30,15 @@ type ChatMessage = {
   response?: CopilotAssistantResponse;
 };
 
-function CopilotSparkMark() {
-  const uid = useId().replace(/:/g, "");
-  const ga = `${uid}-spark-a`;
-  const gb = `${uid}-spark-b`;
-
+function CopilotSparkMark({ className }: { className?: string }) {
   return (
-    <svg width="44.8" height="35.2" viewBox="0 0 44.8 35.2" fill="none" className="shrink-0" aria-hidden>
-      <defs>
-        <linearGradient id={ga} x1="0%" y1="0%" x2="100%" y2="100%">
-          <stop offset="0%" stopColor="#1ec1dd" />
-          <stop offset="100%" stopColor="#7fe8ff" />
-        </linearGradient>
-        <linearGradient id={gb} x1="0%" y1="100%" x2="100%" y2="0%">
-          <stop offset="0%" stopColor="#ff8200" />
-          <stop offset="100%" stopColor="#fac354" />
-        </linearGradient>
-      </defs>
-      <svg x="0" y="0" width="35.2" height="35.2" viewBox="0 0 24 24">
-        <path d="M12 3l1.2 4.2L17 8.5l-3.8 1.3L12 14l-1.2-4.2L7 8.5l3.8-1.3L12 3Z" fill={`url(#${ga})`} />
-      </svg>
-      <svg x="22.4" y="3.2" width="22.4" height="22.4" viewBox="0 0 24 24">
-        <path d="M12 3l1.2 4.2L17 8.5l-3.8 1.3L12 14l-1.2-4.2L7 8.5l3.8-1.3L12 3Z" fill={`url(#${gb})`} />
-      </svg>
-    </svg>
+    <img
+      src={copilotSparklesUrl}
+      alt=""
+      aria-hidden
+      draggable={false}
+      className={cx("block shrink-0 object-contain", className)}
+    />
   );
 }
 
@@ -102,7 +96,7 @@ function CopilotResponseBlock({
               onClick={() => onSendToFsqlSearch(block.text.trim())}
             >
               <Icon name="action-search" className="shrink-0 text-current" aria-hidden />
-              Send to FSQL Search
+              Send to Query
             </Button>
           ) : null}
         </div>
@@ -227,13 +221,65 @@ export type CopilotSubmitRequest = {
   prompt: string;
 };
 
-function SearchCopilotPanel({
-  onClose,
+type AssistantPanelMode = "copilot" | "agents";
+
+const ASSISTANT_MODE_OPTIONS: readonly { id: AssistantPanelMode; label: string }[] = [
+  { id: "copilot", label: "Copilot" },
+  { id: "agents", label: "Agents" },
+];
+
+function NavSvgInline({ svg, className }: { svg: string; className?: string }) {
+  return (
+    <span
+      className={cx("inline-flex shrink-0 [&>svg]:size-full", className)}
+      aria-hidden
+      dangerouslySetInnerHTML={{ __html: svg }}
+    />
+  );
+}
+
+function AssistantModeSwitch({
+  value,
+  onChange,
+}: {
+  value: AssistantPanelMode;
+  onChange: (mode: AssistantPanelMode) => void;
+}) {
+  return (
+    <div
+      role="tablist"
+      aria-label="Assistant mode"
+      className="flex rounded border border-border-rule bg-surface-container p-0.5"
+    >
+      {ASSISTANT_MODE_OPTIONS.map((option) => {
+        const selected = value === option.id;
+        return (
+          <button
+            key={option.id}
+            type="button"
+            role="tab"
+            aria-selected={selected}
+            className={cx(
+              "flex-1 rounded px-3 py-1.5 text-sm font-semibold leading-5 transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-interactive-active focus-visible:ring-offset-2 focus-visible:ring-offset-surface-modal",
+              selected
+                ? "bg-surface-modal text-text-primary shadow-sm"
+                : "text-text-tertiary hover:text-text-secondary",
+            )}
+            onClick={() => onChange(option.id)}
+          >
+            {option.label}
+          </button>
+        );
+      })}
+    </div>
+  );
+}
+
+function CopilotChatView({
   fsqlQuery = "",
   submitRequest,
   onSendToFsqlSearch,
 }: {
-  onClose: () => void;
   fsqlQuery?: string;
   submitRequest?: CopilotSubmitRequest | null;
   onSendToFsqlSearch?: (query: string) => void;
@@ -301,26 +347,7 @@ function SearchCopilotPanel({
   };
 
   return (
-    <div className="flex h-full min-h-0 w-full flex-col">
-      <header className="flex shrink-0 items-start justify-between gap-3 border-b border-border-rule px-4 py-3">
-        <div className="min-w-0">
-          <div className="flex items-center gap-2">
-            <CopilotSparkMark />
-            <span className="text-base font-semibold leading-6 text-text-primary">Copilot</span>
-          </div>
-          <p className="mt-1 text-sm text-text-tertiary">Search assistant copilot</p>
-        </div>
-        <Button
-          type="button"
-          variant="ghost"
-          className="shrink-0 p-1 text-text-tertiary hover:text-text-primary"
-          aria-label="Close copilot"
-          onClick={onClose}
-        >
-          <Icon name="close" size={20} />
-        </Button>
-      </header>
-
+    <div className="flex min-h-0 flex-1 flex-col">
       <div ref={scrollRef} className="flex min-h-0 flex-1 flex-col gap-3 overflow-y-auto px-4 py-4">
         {messages.map((message) => (
           <CopilotMessageBubble
@@ -363,6 +390,208 @@ function SearchCopilotPanel({
   );
 }
 
+export function SearchAssistantPanel({
+  onClose,
+  fsqlQuery = "",
+  submitRequest,
+  onSendToFsqlSearch,
+}: {
+  onClose: () => void;
+  fsqlQuery?: string;
+  submitRequest?: CopilotSubmitRequest | null;
+  onSendToFsqlSearch?: (query: string) => void;
+}) {
+  const [mode, setMode] = useState<AssistantPanelMode>("copilot");
+
+  return (
+    <div className="flex h-full min-h-0 w-full flex-col">
+      <header className="flex shrink-0 flex-col gap-3 border-b border-border-rule px-4 py-3">
+        <div className="flex items-start justify-between gap-3">
+          <div className="min-w-0">
+            <div className="flex items-center gap-2">
+              {mode === "copilot" ? (
+                <CopilotSparkMark className="size-[18px]" />
+              ) : (
+                <NavSvgInline svg={aiAgentsNavSvg} className="size-[18px] text-interactive-active" />
+              )}
+              <span className="text-base font-semibold leading-6 text-text-primary">
+                {mode === "copilot" ? "Copilot" : "Agents"}
+              </span>
+            </div>
+            <p className="mt-1 text-sm text-text-tertiary">
+              {mode === "copilot" ? "Search assistant copilot" : "Choose a specialist agent"}
+            </p>
+          </div>
+          <Button
+            type="button"
+            variant="ghost"
+            className="shrink-0 p-1 text-text-tertiary hover:text-text-primary"
+            aria-label="Close assistant panel"
+            onClick={onClose}
+          >
+            <Icon name="close" size={20} />
+          </Button>
+        </div>
+        <AssistantModeSwitch value={mode} onChange={setMode} />
+      </header>
+
+      {mode === "copilot" ? (
+        <CopilotChatView
+          fsqlQuery={fsqlQuery}
+          submitRequest={submitRequest}
+          onSendToFsqlSearch={onSendToFsqlSearch}
+        />
+      ) : (
+        <SearchAgentsPanel />
+      )}
+    </div>
+  );
+}
+
+/** @deprecated Internal copilot shell — use {@link SearchAssistantPanel}. */
+function SearchCopilotPanel({
+  onClose,
+  fsqlQuery = "",
+  submitRequest,
+  onSendToFsqlSearch,
+}: {
+  onClose: () => void;
+  fsqlQuery?: string;
+  submitRequest?: CopilotSubmitRequest | null;
+  onSendToFsqlSearch?: (query: string) => void;
+}) {
+  return (
+    <SearchAssistantPanel
+      onClose={onClose}
+      fsqlQuery={fsqlQuery}
+      submitRequest={submitRequest}
+      onSendToFsqlSearch={onSendToFsqlSearch}
+    />
+  );
+}
+
+export function SearchCopilotSidePanel({
+  open,
+  onOpenChange,
+  fsqlQuery = "",
+  submitRequest,
+  onSendToFsqlSearch,
+}: {
+  open: boolean;
+  onOpenChange: (open: boolean) => void;
+  fsqlQuery?: string;
+  submitRequest?: CopilotSubmitRequest | null;
+  onSendToFsqlSearch?: (query: string) => void;
+}) {
+  const [panelWidth, setPanelWidth] = useState(COPILOT_PANEL_WIDTH);
+  const [isResizing, setIsResizing] = useState(false);
+  const resizeDragRef = useRef<{ startX: number; startWidth: number } | null>(null);
+
+  const handleResizePointerDown = (event: React.PointerEvent<HTMLButtonElement>) => {
+    event.preventDefault();
+    event.currentTarget.setPointerCapture(event.pointerId);
+    resizeDragRef.current = { startX: event.clientX, startWidth: panelWidth };
+    setIsResizing(true);
+  };
+
+  const handleResizePointerMove = (event: React.PointerEvent<HTMLButtonElement>) => {
+    if (!resizeDragRef.current) return;
+    const { startX, startWidth } = resizeDragRef.current;
+    setPanelWidth(clampCopilotPanelWidth(startWidth + (startX - event.clientX)));
+  };
+
+  const handleResizePointerEnd = (event: React.PointerEvent<HTMLButtonElement>) => {
+    if (event.currentTarget.hasPointerCapture(event.pointerId)) {
+      event.currentTarget.releasePointerCapture(event.pointerId);
+    }
+    resizeDragRef.current = null;
+    setIsResizing(false);
+  };
+
+  return (
+    <aside
+      className={cx(
+        "relative flex h-full shrink-0 flex-col overflow-hidden bg-surface-modal",
+        open ? "border-l border-border-rule" : "border-l-0",
+        !isResizing && "transition-[width,border-color] duration-[280ms] ease-[cubic-bezier(0.32,0.72,0,1)]",
+      )}
+      style={{ width: open ? panelWidth : 0 }}
+      aria-label="Search assistant copilot"
+      aria-hidden={!open}
+    >
+      {open ? (
+        <button
+          type="button"
+          tabIndex={-1}
+          aria-label="Resize assistant panel"
+          aria-orientation="vertical"
+          aria-valuemin={COPILOT_PANEL_MIN_WIDTH}
+          aria-valuemax={COPILOT_PANEL_MAX_WIDTH}
+          aria-valuenow={panelWidth}
+          className={cx(
+            "group/resize absolute -left-1.5 top-0 z-10 h-full w-3 cursor-col-resize touch-none border-0 bg-transparent p-0",
+            "hover:bg-overlay-subtle active:bg-overlay-subtle",
+          )}
+          onPointerDown={handleResizePointerDown}
+          onPointerMove={handleResizePointerMove}
+          onPointerUp={handleResizePointerEnd}
+          onPointerCancel={handleResizePointerEnd}
+          onLostPointerCapture={() => {
+            resizeDragRef.current = null;
+            setIsResizing(false);
+          }}
+        >
+          <span
+            className="pointer-events-none absolute inset-y-0 left-1/2 w-px -translate-x-1/2 bg-transparent transition-colors group-hover/resize:bg-interactive-active group-active/resize:bg-interactive-active"
+            aria-hidden
+          />
+        </button>
+      ) : null}
+      <div
+        className={cx("flex h-full flex-col", !open && "invisible")}
+        style={{ width: panelWidth, minWidth: panelWidth }}
+      >
+        {open ? (
+          <SearchAssistantPanel
+            onClose={() => onOpenChange(false)}
+            fsqlQuery={fsqlQuery}
+            submitRequest={submitRequest}
+            onSendToFsqlSearch={onSendToFsqlSearch}
+          />
+        ) : null}
+      </div>
+    </aside>
+  );
+}
+
+/** @deprecated Use {@link SearchCopilotSidePanel} — copilot docks as a resizable right rail. */
+export function SearchCopilotFullPage({
+  open,
+  onOpenChange,
+  fsqlQuery = "",
+  submitRequest,
+  onSendToFsqlSearch,
+}: {
+  open: boolean;
+  onOpenChange: (open: boolean) => void;
+  fsqlQuery?: string;
+  submitRequest?: CopilotSubmitRequest | null;
+  onSendToFsqlSearch?: (query: string) => void;
+}) {
+  return (
+    <SearchCopilotSidePanel
+      open={open}
+      onOpenChange={onOpenChange}
+      fsqlQuery={fsqlQuery}
+      submitRequest={submitRequest}
+      onSendToFsqlSearch={onSendToFsqlSearch}
+    />
+  );
+}
+
+export { CopilotSparkMark };
+
+/** @deprecated Side-rail copilot — use header trigger with {@link SearchCopilotFullPage}. */
 export function SearchCopilotAside({
   open,
   onOpenChange,

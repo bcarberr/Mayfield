@@ -4,13 +4,13 @@ import { Icon } from "../design-system";
 import { FsqlSearchTextarea } from "../components/FsqlSearchTextarea";
 import { FsqlSearchResultsView } from "../components/search/FsqlSearchResultsView";
 import { SearchQueryBuilder } from "../components/SearchQueryBuilder";
-import { type CopilotSubmitRequest, SearchCopilotAside } from "../components/SearchCopilotPanel";
 import { SearchHeaderFilters } from "../components/SearchHeaderFilters";
 import { SearchTopHeader } from "../components/SearchTopHeader";
 import { V4NavThinner } from "../components/V4NavThinner";
 import { Button } from "../components/ui/Button";
 import connectionAbstractUrl from "../assets/connection-abstract.svg";
 import { useTimeframe } from "../context/TimeframeContext";
+import { useCopilot } from "../context/CopilotContext";
 import { parseFsqlTimeframe } from "../lib/fsqlTimeframeParser";
 import { NAV_RAIL_TARGETS } from "./navRailTargets";
 
@@ -272,13 +272,12 @@ function SearchToolbarActions({
  */
 export function SearchLandingPage() {
   const { setRange: setTimeframeRange } = useTimeframe();
+  const { pendingFsqlQuery, setPendingFsqlQuery } = useCopilot();
   const [criteriaMode, setCriteriaMode] = useState<SearchCriteriaMode>("query-builder");
   const [criteriaOpen, setCriteriaOpen] = useState(true);
   const [fsqlQuery, setFsqlQuery] = useState("");
   const [queryBuilderKey, setQueryBuilderKey] = useState(0);
   const [queryBuilderValid, setQueryBuilderValid] = useState(false);
-  const [copilotOpen, setCopilotOpen] = useState(false);
-  const [copilotSubmitRequest] = useState<CopilotSubmitRequest | null>(null);
   const [fsqlSearchExecuted, setFsqlSearchExecuted] = useState(false);
   const [fsqlSearching, setFsqlSearching] = useState(false);
   const searchTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
@@ -289,6 +288,16 @@ export function SearchLandingPage() {
     };
   }, []);
 
+  useEffect(() => {
+    if (!pendingFsqlQuery) return;
+    setFsqlQuery(pendingFsqlQuery);
+    const parsedTimeframe = parseFsqlTimeframe(pendingFsqlQuery);
+    if (parsedTimeframe) setTimeframeRange(parsedTimeframe);
+    setCriteriaMode("fsql");
+    setCriteriaOpen(true);
+    setPendingFsqlQuery(null);
+  }, [pendingFsqlQuery, setPendingFsqlQuery, setTimeframeRange]);
+
   const executeFsqlSearch = () => {
     if (!fsqlQuery.trim()) return;
     const parsedTimeframe = parseFsqlTimeframe(fsqlQuery);
@@ -298,7 +307,6 @@ export function SearchLandingPage() {
     setFsqlSearching(true);
     searchTimerRef.current = setTimeout(() => {
       setFsqlSearching(false);
-      setCopilotOpen(false);
       setCriteriaOpen(false);
       searchTimerRef.current = null;
     }, 450);
@@ -310,20 +318,12 @@ export function SearchLandingPage() {
     if (parsedTimeframe) setTimeframeRange(parsedTimeframe);
   };
 
-  const handleSendToFsqlSearch = (query: string) => {
-    setFsqlQuery(query);
-    const parsedTimeframe = parseFsqlTimeframe(query);
-    if (parsedTimeframe) setTimeframeRange(parsedTimeframe);
-    setCriteriaMode("fsql");
-    setCopilotOpen(true);
-  };
-
   const handleConvertToFsql = (query: string) => {
     setFsqlQuery(query);
     const parsedTimeframe = parseFsqlTimeframe(query);
     if (parsedTimeframe) setTimeframeRange(parsedTimeframe);
     setCriteriaMode("fsql");
-    setCopilotOpen(true);
+    setCriteriaOpen(true);
   };
 
   const handleClearSearch = () => {
@@ -343,7 +343,7 @@ export function SearchLandingPage() {
 
   const handleCriteriaModeChange = (mode: SearchCriteriaMode) => {
     setCriteriaMode(mode);
-    setCopilotOpen(mode === "fsql");
+    setCriteriaOpen(true);
   };
 
   return (
@@ -351,95 +351,93 @@ export function SearchLandingPage() {
       <V4NavThinner variant="federated-search" activeSection="search" navTargets={NAV_RAIL_TARGETS} />
 
       <div className="relative flex min-h-0 min-w-0 flex-1 flex-col overflow-hidden">
-        <SearchTopHeader headerAfterTitle={<SearchHeaderFilters />} />
-        <SearchToolbarActions
-          criteriaMode={criteriaMode}
-          onCriteriaModeChange={handleCriteriaModeChange}
-          criteriaOpen={criteriaOpen}
-          onCriteriaOpenChange={setCriteriaOpen}
-          fsqlQuery={fsqlQuery}
-          onFsqlQueryChange={handleFsqlQueryChange}
-          queryBuilderKey={queryBuilderKey}
-          queryBuilderValid={queryBuilderValid}
-          onQueryBuilderValidChange={setQueryBuilderValid}
-          onClearSearch={handleClearSearch}
-          onFsqlSearch={executeFsqlSearch}
-          onConvertToFsql={handleConvertToFsql}
+        <SearchTopHeader
+          headerAfterTitle={<SearchHeaderFilters />}
         />
-
-        <div className="relative flex min-h-0 flex-1 overflow-hidden">
-          {criteriaMode === "fsql" ? (
-            fsqlSearchExecuted ? (
-              <FsqlSearchResultsView isSearching={fsqlSearching} />
-            ) : (
-              <div className="min-h-0 min-w-0 flex-1 bg-surface-container" aria-label="FSQL search workspace" />
-            )
-          ) : (
-            <div className="relative min-h-0 min-w-0 flex-1 overflow-hidden">
-              <div
-                className="pointer-events-none absolute inset-0 z-0 select-none overflow-hidden [html[data-theme=light]_&]:opacity-50"
-                aria-hidden
-              >
-                <img
-                  src={connectionAbstractUrl}
-                  alt=""
-                  className="h-full w-full object-cover object-bottom"
-                  draggable={false}
-                />
-              </div>
-
-              <main
-                className="relative z-[1] flex min-h-0 flex-1 flex-col items-center overflow-y-auto px-6 py-12 sm:py-16 md:py-20"
-                aria-label="Query builder search workspace"
-              >
-                <div className="mt-[60px] flex w-full max-w-[720px] flex-col items-stretch">
-                  <h1 className="text-center text-3xl font-bold leading-9 tracking-[0.5px] text-text-primary sm:text-4xl sm:leading-tight">
-                    Welcome Bonnie Carberry!
-                  </h1>
-                  <p className="mx-auto mt-4 max-w-[560px] text-center text-base leading-6 text-text-secondary">
-                    Query every connected source from a single field. Combine field paths, identifiers, and
-                    plain-language terms in one search.
-                  </p>
-
-                  <section className="mt-14 pt-10 text-text-tertiary" aria-labelledby="search-tips-heading">
-                    <h2 id="search-tips-heading" className="text-base-semibold text-text-primary">
-                      Search tips
-                    </h2>
-                    <ul className="mt-4 space-y-3 text-base-small">
-                      <li className="flex gap-3">
-                        <span className="mt-0.5 shrink-0 font-semibold">•</span>
-                        <span>
-                          Narrow by connector or dataset name — matching behaves like the mapping workspace quick
-                          filters.
-                        </span>
-                      </li>
-                      <li className="flex gap-3">
-                        <span className="mt-0.5 shrink-0 font-semibold">•</span>
-                        <span>
-                          Use field paths (for example{" "}
-                          <span className="font-mono text-text-tertiary">event.action</span>) to jump to schema-aligned
-                          results.
-                        </span>
-                      </li>
-                      <li className="flex gap-3">
-                        <span className="mt-0.5 shrink-0 font-semibold">•</span>
-                        <span>Combine plain-language phrases with identifiers from your normalized model.</span>
-                      </li>
-                    </ul>
-                  </section>
-                </div>
-              </main>
-            </div>
-          )}
-          <SearchCopilotAside
-            open={copilotOpen}
-            onOpenChange={setCopilotOpen}
+        <div className="relative flex min-h-0 flex-1 flex-col overflow-hidden">
+          <SearchToolbarActions
+            criteriaMode={criteriaMode}
+            onCriteriaModeChange={handleCriteriaModeChange}
+            criteriaOpen={criteriaOpen}
+            onCriteriaOpenChange={setCriteriaOpen}
             fsqlQuery={fsqlQuery}
-            submitRequest={copilotSubmitRequest}
-            onSendToFsqlSearch={handleSendToFsqlSearch}
+            onFsqlQueryChange={handleFsqlQueryChange}
+            queryBuilderKey={queryBuilderKey}
+            queryBuilderValid={queryBuilderValid}
+            onQueryBuilderValidChange={setQueryBuilderValid}
+            onClearSearch={handleClearSearch}
+            onFsqlSearch={executeFsqlSearch}
+            onConvertToFsql={handleConvertToFsql}
           />
+
+          <div className="relative flex min-h-0 flex-1 overflow-hidden">
+            {criteriaMode === "fsql" ? (
+              fsqlSearchExecuted ? (
+                <FsqlSearchResultsView isSearching={fsqlSearching} />
+              ) : (
+                <div className="min-h-0 min-w-0 flex-1 bg-surface-container" aria-label="FSQL search workspace" />
+              )
+            ) : (
+              <div className="relative min-h-0 min-w-0 flex-1 overflow-hidden">
+                <div
+                  className="pointer-events-none absolute inset-0 z-0 select-none overflow-hidden [html[data-theme=light]_&]:opacity-50"
+                  aria-hidden
+                >
+                  <img
+                    src={connectionAbstractUrl}
+                    alt=""
+                    className="h-full w-full object-cover object-bottom"
+                    draggable={false}
+                  />
+                </div>
+
+                <main
+                  className="relative z-[1] flex min-h-0 flex-1 flex-col items-center overflow-y-auto px-6 py-12 sm:py-16 md:py-20"
+                  aria-label="Query builder search workspace"
+                >
+                  <div className="mt-[60px] flex w-full max-w-[720px] flex-col items-stretch">
+                    <h1 className="text-center text-3xl font-bold leading-9 tracking-[0.5px] text-text-primary sm:text-4xl sm:leading-tight">
+                      Welcome Bonnie Carberry!
+                    </h1>
+                    <p className="mx-auto mt-4 max-w-[560px] text-center text-base leading-6 text-text-secondary">
+                      Query every connected source from a single field. Combine field paths, identifiers, and
+                      plain-language terms in one search.
+                    </p>
+
+                    <section className="mt-14 pt-10 text-text-tertiary" aria-labelledby="search-tips-heading">
+                      <h2 id="search-tips-heading" className="text-base-semibold text-text-primary">
+                        Search tips
+                      </h2>
+                      <ul className="mt-4 space-y-3 text-base-small">
+                        <li className="flex gap-3">
+                          <span className="mt-0.5 shrink-0 font-semibold">•</span>
+                          <span>
+                            Narrow by connector or dataset name — matching behaves like the mapping workspace quick
+                            filters.
+                          </span>
+                        </li>
+                        <li className="flex gap-3">
+                          <span className="mt-0.5 shrink-0 font-semibold">•</span>
+                          <span>
+                            Use field paths (for example{" "}
+                            <span className="font-mono text-text-tertiary">event.action</span>) to jump to schema-aligned
+                            results.
+                          </span>
+                        </li>
+                        <li className="flex gap-3">
+                          <span className="mt-0.5 shrink-0 font-semibold">•</span>
+                          <span>Combine plain-language phrases with identifiers from your normalized model.</span>
+                        </li>
+                      </ul>
+                    </section>
+                  </div>
+                </main>
+              </div>
+            )}
+          </div>
         </div>
       </div>
+
     </div>
   );
 }

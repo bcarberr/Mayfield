@@ -74,21 +74,21 @@ export function TimeframeFilterDropdown() {
   const canApply = draftFromDate != null && draftToDate != null;
 
   return (
-    <div ref={containerRef} className="relative min-w-0">
+    <div ref={containerRef} className="relative w-full min-w-0 lg:w-auto">
       <button
         type="button"
         aria-haspopup="dialog"
         aria-expanded={open}
         aria-controls={panelId}
         aria-label="Timeframe filter"
-        className="group inline-flex max-w-full items-center gap-1.5 rounded py-0.5 text-left transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-interactive-active focus-visible:ring-offset-2 focus-visible:ring-offset-surface-container"
+        className="group flex w-full max-w-full items-center gap-1.5 rounded py-0.5 text-left transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-interactive-active focus-visible:ring-offset-2 focus-visible:ring-offset-surface-container lg:inline-flex lg:w-auto"
         onClick={() => (open ? setOpen(false) : openPanel())}
       >
         <Icon name="action-time" size={16} className={cx("shrink-0", HEADER_FILTER_INTERACTIVE)} aria-hidden />
         <span className={cx("inline-flex shrink-0 items-center gap-1 text-sm font-semibold", HEADER_FILTER_INTERACTIVE)}>
           Timeframe
         </span>
-        <span className="ml-0.5 shrink-0 rounded bg-surface-container px-2 py-1 text-sm font-normal text-text-primary">
+        <span className="ml-0.5 min-w-0 max-w-[12rem] truncate rounded bg-surface-container px-2 py-1 text-sm font-normal text-text-primary lg:max-w-none lg:whitespace-nowrap">
           {formatTimeframeLabel(range.from, range.to)}
         </span>
       </button>

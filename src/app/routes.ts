@@ -5,6 +5,7 @@ export const ROUTES = {
   federatedDetectionHub: "/federated-detection-hub",
   summaryInsights: "/summary-insights",
   dataPipelines: "/data-pipelines",
+  /** Hidden when `SHOW_AI_AGENTS_PAGE` is false — see `navRailConfig.ts`. */
   aiAgents: "/ai-agents",
   settings: "/settings",
   addons: "/addons",

@@ -6,6 +6,7 @@ import { NAV_RAIL_TARGETS } from "./navRailTargets";
 
 /**
  * AI Agents workspace — chat interface with specialist agent sidebar.
+ * Hidden from nav and routing while `SHOW_AI_AGENTS_PAGE` is false (see `navRailConfig.ts`).
  */
 export function AiAgentsPage() {
   useEffect(() => {

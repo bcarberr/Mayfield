@@ -1,7 +1,10 @@
 import { lazy, Suspense } from "react";
-import { Route, Routes } from "react-router-dom";
+import { Route, Routes, useNavigate } from "react-router-dom";
 import { TimeframeProvider } from "../context/TimeframeContext";
+import { CopilotProvider, useCopilot } from "../context/CopilotContext";
+import { SearchCopilotSidePanel } from "../components/SearchCopilotPanel";
 import { ROUTES } from "./routes";
+import { SHOW_AI_AGENTS_PAGE } from "./navRailConfig";
 
 const ConnectorsPage = lazy(() => import("./ConnectorsPage").then((m) => ({ default: m.ConnectorsPage })));
 const SearchLandingPage = lazy(() => import("./SearchLandingPage").then((m) => ({ default: m.SearchLandingPage })));
@@ -14,7 +17,9 @@ const DataPipelinesPage = lazy(() =>
 const FederatedDetectionHubPage = lazy(() =>
   import("./FederatedDetectionHubPage").then((m) => ({ default: m.FederatedDetectionHubPage })),
 );
-const AiAgentsPage = lazy(() => import("./AiAgentsPage").then((m) => ({ default: m.AiAgentsPage })));
+const AiAgentsPage = SHOW_AI_AGENTS_PAGE
+  ? lazy(() => import("./AiAgentsPage").then((m) => ({ default: m.AiAgentsPage })))
+  : null;
 const SettingsPage = lazy(() => import("./SettingsPage").then((m) => ({ default: m.SettingsPage })));
 const WorkspacePlaceholderPage = lazy(() =>
   import("./WorkspacePlaceholderPage").then((m) => ({ default: m.WorkspacePlaceholderPage })),
@@ -28,10 +33,17 @@ function RouteFallback() {
   );
 }
 
-export function App() {
+function AppShell() {
+  const { open, setOpen, setPendingFsqlQuery } = useCopilot();
+  const navigate = useNavigate();
+
+  const handleSendToFsqlSearch = (query: string) => {
+    setPendingFsqlQuery(query);
+    navigate(ROUTES.search);
+  };
   return (
-    <TimeframeProvider>
-      <div className="h-full min-h-screen min-h-0">
+    <div className="flex h-full min-h-screen">
+      <div className="relative flex min-h-0 min-w-0 flex-1 flex-col">
         <Suspense fallback={<RouteFallback />}>
           <Routes>
             <Route path="/" element={<SummaryInsightsPage />} />
@@ -42,7 +54,9 @@ export function App() {
             <Route path={ROUTES.federatedDetectionHub} element={<FederatedDetectionHubPage />} />
             <Route path={ROUTES.summaryInsights} element={<SummaryInsightsPage />} />
             <Route path={ROUTES.dataPipelines} element={<DataPipelinesPage />} />
-            <Route path={ROUTES.aiAgents} element={<AiAgentsPage />} />
+            {SHOW_AI_AGENTS_PAGE && AiAgentsPage ? (
+              <Route path={ROUTES.aiAgents} element={<AiAgentsPage />} />
+            ) : null}
             <Route path={ROUTES.settings} element={<SettingsPage />} />
             <Route
               path={ROUTES.adminSettings}
@@ -51,6 +65,17 @@ export function App() {
           </Routes>
         </Suspense>
       </div>
+      <SearchCopilotSidePanel open={open} onOpenChange={setOpen} onSendToFsqlSearch={handleSendToFsqlSearch} />
+    </div>
+  );
+}
+
+export function App() {
+  return (
+    <TimeframeProvider>
+      <CopilotProvider>
+        <AppShell />
+      </CopilotProvider>
     </TimeframeProvider>
   );
 }
