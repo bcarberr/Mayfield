@@ -2,14 +2,16 @@ import { useState, type DragEvent } from "react";
 import { Icon } from "../../design-system";
 import { Button } from "../ui/Button";
 import type { ConnectorCategory, ConnectorCategoryId } from "./connectorsData";
+import { ConnectorSelectionCountText } from "./ConnectorSelectionCountText";
 
 const cx = (...c: (string | false | undefined)[]) => c.filter(Boolean).join(" ");
 
 type ConnectorFiltersProps = {
   categories: readonly ConnectorCategory[];
   enabledCategories: ReadonlySet<ConnectorCategoryId>;
-  visibleCount: number;
-  totalCount: number;
+  /** When set, overrides the live enabled/total connector count (e.g. add-connector catalog). */
+  visibleCount?: number;
+  totalCount?: number;
   filtersAltered: boolean;
   expanded: boolean;
   onExpandedChange: (expanded: boolean) => void;
@@ -165,6 +167,7 @@ export function ConnectorFilters({
 }: ConnectorFiltersProps) {
   const ringOffsetClass =
     ringOffsetSurface === "modal" ? "ring-offset-surface-modal" : "ring-offset-surface-page";
+  const useLiveInstanceCounts = visibleCount == null || totalCount == null;
   const [draggedId, setDraggedId] = useState<ConnectorCategoryId | null>(null);
   const [dragOverId, setDragOverId] = useState<ConnectorCategoryId | null>(null);
 
@@ -218,7 +221,14 @@ export function ConnectorFilters({
           <span className="text-base-semibold">
             <span className="text-interactive-active">Filters: </span>
             <span className="font-normal text-text-primary">
-              Connectors {visibleCount} of {totalCount}
+              Connectors{" "}
+              {useLiveInstanceCounts ? (
+                <ConnectorSelectionCountText />
+              ) : (
+                <>
+                  {visibleCount} of {totalCount}
+                </>
+              )}
             </span>
           </span>
         </button>

@@ -124,9 +124,14 @@ let addConnectorFiltersStore: AddConnectorFiltersSnapshot = readStoredSnapshot(
   createDefaultAddConnectorSnapshot,
 );
 
+const dashboardFilterListeners = new Set<() => void>();
+let dashboardFilterStoreVersion = 0;
+
 function persistDashboardSnapshot(next: ConnectorFiltersSnapshot): void {
   dashboardFiltersStore = next;
   writeStoredSnapshot(DASHBOARD_FILTERS_STORAGE_KEY, next);
+  dashboardFilterStoreVersion += 1;
+  for (const listener of dashboardFilterListeners) listener();
 }
 
 function persistAddConnectorSnapshot(next: AddConnectorFiltersSnapshot): void {
@@ -146,6 +151,23 @@ export function isDefaultEnabledCategories(enabled: ReadonlySet<ConnectorCategor
     enabled.size === DEFAULT_ENABLED_CONNECTOR_CATEGORY_IDS.length &&
     DEFAULT_CONNECTOR_CATEGORY_ORDER.every((id) => enabled.has(id))
   );
+}
+
+export function getDashboardEnabledCategories(): ReadonlySet<ConnectorCategoryId> {
+  return toEnabledSet(dashboardFiltersStore.enabledCategoryIds);
+}
+
+export function getDashboardCategoryOrder(): ConnectorCategoryId[] {
+  return [...dashboardFiltersStore.categoryOrder];
+}
+
+export function getDashboardFilterStoreVersion(): number {
+  return dashboardFilterStoreVersion;
+}
+
+export function subscribeDashboardConnectorFilters(listener: () => void): () => void {
+  dashboardFilterListeners.add(listener);
+  return () => dashboardFilterListeners.delete(listener);
 }
 
 export function usePersistedDashboardConnectorFilters() {

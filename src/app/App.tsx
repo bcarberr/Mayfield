@@ -1,12 +1,15 @@
-import { lazy, Suspense } from "react";
-import { Route, Routes, useNavigate } from "react-router-dom";
+import { lazy, Suspense, useCallback } from "react";
+import { matchPath, Route, Routes, useLocation, useNavigate } from "react-router-dom";
 import { TimeframeProvider } from "../context/TimeframeContext";
 import { CopilotProvider, useCopilot } from "../context/CopilotContext";
 import { SearchCopilotSidePanel } from "../components/SearchCopilotPanel";
-import { ROUTES } from "./routes";
+import { DEFAULT_ROUTE, ROUTES, type ConnectorsLocationState } from "./routes";
 import { SHOW_AI_AGENTS_PAGE } from "./navRailConfig";
 
 const ConnectorsPage = lazy(() => import("./ConnectorsPage").then((m) => ({ default: m.ConnectorsPage })));
+const ConnectorsPanelSlideOver = lazy(() =>
+  import("./ConnectorsPage").then((m) => ({ default: m.ConnectorsPanelSlideOver })),
+);
 const SearchLandingPage = lazy(() => import("./SearchLandingPage").then((m) => ({ default: m.SearchLandingPage })));
 const SummaryInsightsPage = lazy(() =>
   import("./SummaryInsightsPage").then((m) => ({ default: m.SummaryInsightsPage })),
@@ -35,7 +38,28 @@ function RouteFallback() {
 
 function AppShell() {
   const { open, setOpen, setPendingFsqlQuery } = useCopilot();
+  const location = useLocation();
   const navigate = useNavigate();
+  const navState = location.state as ConnectorsLocationState | null;
+
+  const connectorsPanelOpen =
+    Boolean(matchPath({ path: ROUTES.connectors, end: true }, location.pathname)) &&
+    navState?.connectorsVariant === "panel";
+  const routesLocation = connectorsPanelOpen
+    ? (navState?.background ?? { pathname: DEFAULT_ROUTE, search: "", hash: "", state: null, key: "default" })
+    : location;
+
+  const closeConnectorsPanel = useCallback(() => {
+    const background = navState?.background;
+    if (background) {
+      navigate(
+        { pathname: background.pathname, search: background.search, hash: background.hash },
+        { replace: true },
+      );
+      return;
+    }
+    navigate(DEFAULT_ROUTE, { replace: true });
+  }, [navState?.background, navigate]);
 
   const handleSendToFsqlSearch = (query: string) => {
     setPendingFsqlQuery(query);
@@ -45,7 +69,7 @@ function AppShell() {
     <div className="flex h-full min-h-screen">
       <div className="relative flex min-h-0 min-w-0 flex-1 flex-col">
         <Suspense fallback={<RouteFallback />}>
-          <Routes>
+          <Routes location={routesLocation}>
             <Route path="/" element={<SummaryInsightsPage />} />
             <Route path={ROUTES.connectors} element={<ConnectorsPage />} />
             {/* Hidden from nav when SHOW_ADDONS_NAV is false — see navRailConfig.ts */}
@@ -64,6 +88,11 @@ function AppShell() {
             />
           </Routes>
         </Suspense>
+        {connectorsPanelOpen ? (
+          <Suspense fallback={null}>
+            <ConnectorsPanelSlideOver open onClose={closeConnectorsPanel} />
+          </Suspense>
+        ) : null}
       </div>
       <SearchCopilotSidePanel open={open} onOpenChange={setOpen} onSendToFsqlSearch={handleSendToFsqlSearch} />
     </div>

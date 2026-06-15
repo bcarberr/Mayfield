@@ -360,6 +360,7 @@ function FloatingActions({
 
 export type ConnectorSetupPanelProps = {
   onClose: () => void;
+  onSave?: (connector: ConnectorSetupTarget, enabled: boolean) => void;
   connector: ConnectorSetupTarget;
 };
 
@@ -376,7 +377,7 @@ function ConnectorSetupHeaderIcon({ icon, title }: { icon: ConnectorLargeIconNam
 }
 
 /** Connector setup — dynamic schema wizard or static single-form, from `ConnectorsPage`. */
-export function ConnectorSetupPanel({ onClose, connector }: ConnectorSetupPanelProps) {
+export function ConnectorSetupPanel({ onClose, onSave, connector }: ConnectorSetupPanelProps) {
   const isDynamicSchema = isDynamicSchemaCategory(connector.categoryId);
   const maxStep: StepIndex = SHOW_ATHENA_CONNECTOR_STEP_3 ? 3 : 2;
   const [currentStep, setCurrentStep] = useState<StepIndex>(1);
@@ -407,8 +408,12 @@ export function ConnectorSetupPanel({ onClose, connector }: ConnectorSetupPanelP
 
   const handlePrimaryAction = () => {
     if (!canAdvanceFromCurrentStep) return;
-    if (isLastStep) onClose();
-    else goToNextStep();
+    if (isLastStep) {
+      onSave?.(connector, connectorEnabled);
+      onClose();
+      return;
+    }
+    goToNextStep();
   };
 
   const isLastStep = !isDynamicSchema || currentStep === maxStep;

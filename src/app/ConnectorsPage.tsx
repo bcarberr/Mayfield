@@ -7,8 +7,13 @@ import {
   type ConnectorPlatformType,
   type ConnectorSetupTarget,
 } from "../components/connectors/connectorPlatformTypes";
+import { saveConnectorFromSetup } from "../components/connectors/connectorEnabledState";
+import { ConnectorSelectionCountText } from "../components/connectors/ConnectorSelectionCountText";
 import { SearchTopHeader } from "../components/SearchTopHeader";
-import { PageSlideOver } from "../components/ui/SlideOver";
+import {
+  CONNECTOR_PAGE_SLIDE_OVER_PANEL_CLASS,
+  PageSlideOver,
+} from "../components/ui/SlideOver";
 import { Button } from "../components/ui/Button";
 import { Input } from "../components/ui/Input";
 import { V4NavThinner } from "../components/V4NavThinner";
@@ -22,20 +27,8 @@ type SlideOverMode =
   | { kind: "add" }
   | { kind: "setup"; connector: ConnectorSetupTarget };
 
-/**
- * Connectors workspace — Figma `6582:59192` (06a Connectors).
- * Add Connector catalog — Figma `1718:21128` / drawer `1718:21522`.
- */
-export function ConnectorsPage() {
+function useConnectorsSetupSlideOver() {
   const [slideOverMode, setSlideOverMode] = useState<SlideOverMode | null>(null);
-
-  useEffect(() => {
-    const previous = document.title;
-    document.title = "Connectors";
-    return () => {
-      document.title = previous;
-    };
-  }, []);
 
   const closeSlideOver = useCallback(() => {
     setSlideOverMode(null);
@@ -61,6 +54,117 @@ export function ConnectorsPage() {
     });
   }, []);
 
+  const handleSetupSave = useCallback((connector: ConnectorSetupTarget, enabled: boolean) => {
+    saveConnectorFromSetup(connector, enabled);
+  }, []);
+
+  const setupSlideOver = slideOverMode != null && (
+    <PageSlideOver
+      open
+      onClose={closeSlideOver}
+      ariaLabel={slideOverMode.kind === "add" ? "Add connector" : "Connector setup"}
+      panelClassName={CONNECTOR_PAGE_SLIDE_OVER_PANEL_CLASS}
+    >
+      {slideOverMode.kind === "add" ? (
+        <AddConnectorDrawer onClose={closeSlideOver} onSelectPlatform={handleSelectPlatform} />
+      ) : (
+        <Suspense
+          fallback={
+            <div className="flex h-full items-center justify-center text-sm text-text-tertiary">
+              Loading connector setup…
+            </div>
+          }
+        >
+            <ConnectorSetupPanel
+              onClose={closeSlideOver}
+              onSave={handleSetupSave}
+              connector={slideOverMode.connector}
+            />
+        </Suspense>
+      )}
+    </PageSlideOver>
+  );
+
+  return { openAddConnector, openSetup, setupSlideOver };
+}
+
+/** Connectors grid and nested add/setup drawers — shared by full page and header panel. */
+export type ConnectorsWorkspaceProps = {
+  chromeSurface?: "page" | "modal";
+};
+
+export function ConnectorsWorkspace({ chromeSurface = "page" }: ConnectorsWorkspaceProps) {
+  const { openSetup, setupSlideOver } = useConnectorsSetupSlideOver();
+
+  return (
+    <>
+      <ConnectorsDashboard onConfigureConnector={openSetup} chromeSurface={chromeSurface} />
+      {setupSlideOver}
+    </>
+  );
+}
+
+export type ConnectorsPanelSlideOverProps = {
+  open: boolean;
+  onClose: () => void;
+};
+
+/** Header-triggered connectors drawer — dashboard only, no page header chrome. */
+export function ConnectorsPanelSlideOver({ open, onClose }: ConnectorsPanelSlideOverProps) {
+  useEffect(() => {
+    if (!open) return;
+    const previous = document.title;
+    document.title = "Connectors";
+    return () => {
+      document.title = previous;
+    };
+  }, [open]);
+
+  return (
+    <PageSlideOver open={open} onClose={onClose} ariaLabel="Connectors">
+      <div className="flex h-full min-h-0 flex-col text-text-primary">
+        <header className="shrink-0 border-b border-border-rule bg-surface-modal px-6 pt-5 pb-4">
+          <div className="flex items-center justify-between gap-4">
+            <div className="flex min-w-0 items-baseline gap-3">
+              <h1 className="text-[24px] font-bold leading-8 tracking-[0.7px] text-text-primary">Connectors</h1>
+              <span className="rounded bg-surface-container px-2 py-1 text-sm font-semibold text-text-primary">
+                <ConnectorSelectionCountText />
+              </span>
+            </div>
+            <Button
+              type="button"
+              variant="ghost"
+              className="size-8 shrink-0 rounded-2xl p-1 ring-offset-surface-modal"
+              aria-label="Close connectors panel"
+              onClick={onClose}
+            >
+              <Icon name="close" size={24} />
+            </Button>
+          </div>
+        </header>
+        <main className="flex min-h-0 flex-1 flex-col overflow-hidden px-5 pb-6 pt-6">
+          <ConnectorsWorkspace chromeSurface="modal" />
+        </main>
+      </div>
+    </PageSlideOver>
+  );
+}
+
+/**
+ * Connectors workspace — Figma `6582:59192` (06a Connectors).
+ * Add Connector catalog — Figma `1718:21128` / drawer `1718:21522`.
+ */
+export function ConnectorsPage() {
+  const { openAddConnector, openSetup, setupSlideOver } = useConnectorsSetupSlideOver();
+
+  useEffect(() => {
+    const previous = document.title;
+    document.title = "Connectors";
+    return () => {
+      document.title = previous;
+    };
+  }, []);
+
   return (
     <div className="flex h-full min-h-0 bg-surface-page text-text-primary">
       <V4NavThinner variant="federated-search" activeSection="connectors" navTargets={NAV_RAIL_TARGETS} />
@@ -82,6 +186,9 @@ export function ConnectorsPage() {
           }
           titleTrailing={
             <div className="flex items-center gap-4" role="toolbar" aria-label="Connector actions">
+              <span className="rounded bg-surface-container px-2 py-1 text-sm font-semibold text-text-primary">
+                <ConnectorSelectionCountText />
+              </span>
               <Button
                 type="button"
                 variant="secondary"
@@ -99,30 +206,12 @@ export function ConnectorsPage() {
           }
         />
 
-        <main className="flex min-h-0 flex-1 flex-col overflow-y-auto px-5 py-6">
+        <main className="flex min-h-0 flex-1 flex-col overflow-hidden px-5 pb-6 pt-6">
           <ConnectorsDashboard onConfigureConnector={openSetup} />
         </main>
       </div>
 
-      <PageSlideOver
-        open={slideOverMode != null}
-        onClose={closeSlideOver}
-        ariaLabel={slideOverMode?.kind === "add" ? "Add connector" : "Connector setup"}
-      >
-        {slideOverMode?.kind === "add" ? (
-          <AddConnectorDrawer onClose={closeSlideOver} onSelectPlatform={handleSelectPlatform} />
-        ) : slideOverMode?.kind === "setup" ? (
-          <Suspense
-            fallback={
-              <div className="flex h-full items-center justify-center text-sm text-text-tertiary">
-                Loading connector setup…
-              </div>
-            }
-          >
-            <ConnectorSetupPanel onClose={closeSlideOver} connector={slideOverMode.connector} />
-          </Suspense>
-        ) : null}
-      </PageSlideOver>
+      {setupSlideOver}
     </div>
   );
 }

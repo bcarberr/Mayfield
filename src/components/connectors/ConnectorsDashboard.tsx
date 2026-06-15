@@ -1,27 +1,31 @@
-import { useMemo, useState } from "react";
+import { useMemo, useCallback } from "react";
 import { ConnectorCard } from "./ConnectorCard";
 import { ConnectorFilters } from "./ConnectorFilters";
+import { resetAllConnectorsEnabled, usePersistedConnectorInstances, useShowConnectorResetToDefault } from "./connectorEnabledState";
 import {
-  isDefaultCategoryOrder,
-  isDefaultEnabledCategories,
   usePersistedDashboardConnectorFilters,
 } from "./connectorFilterState";
 import {
   CONNECTOR_CATEGORIES,
-  CONNECTOR_INSTANCES,
   type ConnectorCategoryId,
   type ConnectorInstance,
 } from "./connectorsData";
 
 export type ConnectorsDashboardProps = {
   onConfigureConnector?: (connectorId: string) => void;
+  /** Page vs panel surface — controls filter bar background and focus rings. */
+  chromeSurface?: "page" | "modal";
 };
 
+const cx = (...c: (string | false | undefined)[]) => c.filter(Boolean).join(" ");
+
 /** Figma `6582:59192` — 06a Connectors connections grid. */
-export function ConnectorsDashboard({ onConfigureConnector }: ConnectorsDashboardProps) {
-  const [connectors, setConnectors] = useState<ConnectorInstance[]>(() =>
-    CONNECTOR_INSTANCES.map((connector) => ({ ...connector })),
-  );
+export function ConnectorsDashboard({
+  onConfigureConnector,
+  chromeSurface = "page",
+}: ConnectorsDashboardProps) {
+  const { connectors, setConnectorEnabled } = usePersistedConnectorInstances();
+  const showResetToDefault = useShowConnectorResetToDefault();
   const {
     categoryOrder,
     enabledCategories,
@@ -58,36 +62,34 @@ export function ConnectorsDashboard({ onConfigureConnector }: ConnectorsDashboar
     [orderedCategories, enabledCategories],
   );
 
-  const visibleCount = useMemo(
-    () => connectors.filter((connector) => enabledCategories.has(connector.categoryId)).length,
-    [connectors, enabledCategories],
-  );
-
-  const filtersAltered =
-    !isDefaultCategoryOrder(categoryOrder) || !isDefaultEnabledCategories(enabledCategories);
-
-  const setConnectorEnabled = (connectorId: string, enabled: boolean) => {
-    setConnectors((current) =>
-      current.map((connector) => (connector.id === connectorId ? { ...connector, enabled } : connector)),
-    );
-  };
+  const handleResetFilters = useCallback(() => {
+    resetFilters();
+    resetAllConnectorsEnabled();
+  }, [resetFilters]);
 
   return (
-    <div className="flex min-h-0 flex-1 flex-col gap-6">
-      <ConnectorFilters
-        categories={orderedCategories}
-        enabledCategories={enabledCategories}
-        visibleCount={visibleCount}
-        totalCount={connectors.length}
-        filtersAltered={filtersAltered}
-        expanded={filtersExpanded}
-        onExpandedChange={setFiltersExpanded}
-        onCategoryToggle={setCategoryEnabled}
-        onCategoryOrderChange={setCategoryOrder}
-        onResetFilters={resetFilters}
-      />
+    <div className="flex min-h-0 flex-1 flex-col overflow-hidden">
+      <div
+        className={cx(
+          "shrink-0 pb-6",
+          chromeSurface === "modal" ? "bg-surface-modal" : "bg-surface-page",
+        )}
+      >
+        <ConnectorFilters
+          categories={orderedCategories}
+          enabledCategories={enabledCategories}
+          filtersAltered={showResetToDefault}
+          expanded={filtersExpanded}
+          onExpandedChange={setFiltersExpanded}
+          onCategoryToggle={setCategoryEnabled}
+          onCategoryOrderChange={setCategoryOrder}
+          onResetFilters={handleResetFilters}
+          ringOffsetSurface={chromeSurface}
+        />
+      </div>
 
-      <div className="flex flex-col gap-8">
+      <div className="min-h-0 flex-1 overflow-y-auto">
+        <div className="flex flex-col gap-8">
         {visibleCategories.map((category) => {
           const categoryConnectors = connectorsByCategory.get(category.id) ?? [];
           if (categoryConnectors.length === 0) return null;
@@ -109,6 +111,7 @@ export function ConnectorsDashboard({ onConfigureConnector }: ConnectorsDashboar
             </section>
           );
         })}
+        </div>
       </div>
     </div>
   );

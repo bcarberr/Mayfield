@@ -15,6 +15,20 @@ export const ROUTES = {
 /** Default landing page — rendered at `/` and aliased at `ROUTES.summaryInsights`. */
 export const DEFAULT_ROUTE = ROUTES.summaryInsights;
 
+/** `location.state` when opening connectors as a header slide-over panel. */
+export type ConnectorsLocationState = {
+  background?: { pathname: string; search: string; hash: string };
+  connectorsVariant?: "panel";
+};
+
+export function connectorsPanelLocationState(background: {
+  pathname: string;
+  search: string;
+  hash: string;
+}): ConnectorsLocationState {
+  return { background, connectorsVariant: "panel" };
+}
+
 /** Query param that opens the connector setup slide-over on `ROUTES.connectors`. */
 export const CONNECTOR_SETUP_SEARCH_PARAM = "setup";
 
