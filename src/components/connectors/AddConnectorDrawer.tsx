@@ -3,6 +3,7 @@ import { Icon } from "../../design-system";
 import { Button } from "../ui/Button";
 import { Input } from "../ui/Input";
 import { ConnectorFilters } from "./ConnectorFilters";
+import { SlideOverHeaderBackButton } from "../ui/SlideOver";
 import {
   isDefaultCategoryOrder,
   isDefaultEnabledCategories,
@@ -80,7 +81,8 @@ export function AddConnectorDrawer({ onClose, onSelectPlatform }: AddConnectorDr
     <div className="flex h-full min-h-0 flex-col bg-surface-modal text-text-primary">
       <header className="shrink-0 border-b border-border-rule bg-surface-modal px-6 pt-5 pb-4">
         <div className="flex flex-wrap items-center justify-between gap-4">
-          <div className="flex min-w-0 flex-wrap items-center gap-4">
+          <div className="flex min-w-0 flex-wrap items-center gap-3">
+            <SlideOverHeaderBackButton onClose={onClose} className="ring-offset-surface-modal" />
             <h1 className="text-[24px] font-bold leading-8 tracking-[0.7px] text-text-primary">Add Connector:</h1>
             <div className="w-[240px] shrink-0">
               <Input

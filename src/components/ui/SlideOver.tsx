@@ -1,5 +1,7 @@
 import { type ReactNode, useEffect } from "react";
 import { createPortal } from "react-dom";
+import { Icon } from "../../design-system";
+import { Button } from "./Button";
 
 export type SlideOverProps = {
   open: boolean;
@@ -22,6 +24,68 @@ export type ContentAreaSlideOverState = {
 };
 
 const cx = (...c: (string | false | undefined)[]) => c.filter(Boolean).join(" ");
+
+/** Header back chevron — use in slide-over panel title rows (Add Connector, setup, etc.). */
+export function SlideOverHeaderBackButton({
+  onClose,
+  className,
+}: {
+  onClose: () => void;
+  className?: string;
+}) {
+  return (
+    <Button
+      type="button"
+      variant="ghost"
+      className={cx("size-8 shrink-0 rounded-2xl p-1", className)}
+      aria-label="Close panel"
+      title="Close"
+      onClick={onClose}
+    >
+      <Icon name="navi-chevron-left" size={20} aria-hidden />
+    </Button>
+  );
+}
+
+/** Left-edge chevron dismiss control shared by all slide-over shells. */
+export function SlideOverCloseChevron({ onClose }: { onClose: () => void }) {
+  return (
+    <button
+      type="button"
+      onClick={(event) => {
+        event.stopPropagation();
+        onClose();
+      }}
+      aria-label="Close panel"
+      title="Close"
+      className={cx(
+        "pointer-events-auto absolute top-1/2 left-0 z-50 flex h-16 w-8 -translate-x-1/2 -translate-y-1/2 flex-col items-center justify-center",
+        "rounded-md border border-border-rule bg-surface-modal text-text-secondary shadow-md",
+        "transition-colors hover:bg-overlay-subtle hover:text-text-primary",
+        "focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-interactive-active focus-visible:ring-offset-2 focus-visible:ring-offset-surface-modal",
+      )}
+    >
+      <Icon name="navi-chevron-left" size={20} aria-hidden />
+    </button>
+  );
+}
+
+function SlideOverPanelFrame({
+  onClose,
+  children,
+  className,
+}: {
+  onClose: () => void;
+  children: ReactNode;
+  className?: string;
+}) {
+  return (
+    <div className={cx("relative flex h-full min-h-0 flex-col overflow-visible", className)}>
+      <div className="flex min-h-0 flex-1 flex-col overflow-hidden">{children}</div>
+      <SlideOverCloseChevron onClose={onClose} />
+    </div>
+  );
+}
 
 /** Panel width for connector setup / add flows — full content column (viewport minus `w-10` nav rail). */
 export const CONNECTOR_PAGE_SLIDE_OVER_PANEL_CLASS = "w-[calc(100vw-2.5rem)] max-w-none shrink-0";
@@ -61,11 +125,11 @@ export function PageSlideOver({
         aria-modal="true"
         aria-label={ariaLabel}
         className={cx(
-          "relative z-10 ml-auto flex h-full min-h-0 animate-slide-over-in flex-col overflow-hidden border-l border-border-rule bg-surface-modal shadow-[-4px_0_24px_rgba(0,0,0,0.25)]",
+          "relative z-10 ml-auto flex h-full min-h-0 animate-slide-over-in flex-col overflow-visible border-l border-border-rule bg-surface-modal shadow-[-4px_0_24px_rgba(0,0,0,0.25)]",
           panelClassName ?? CONNECTOR_PAGE_SLIDE_OVER_PANEL_CLASS,
         )}
       >
-        {children}
+        <SlideOverPanelFrame onClose={onClose}>{children}</SlideOverPanelFrame>
       </aside>
     </div>,
     document.body,
@@ -111,11 +175,11 @@ export function ContentAreaSlideOverHost({
           aria-modal="true"
           aria-label={slideOver.ariaLabel}
           className={cx(
-            "relative z-40 mr-5 flex h-full shrink-0 animate-slide-over-in flex-col overflow-hidden border-l border-r border-border-rule bg-surface-modal",
+            "relative z-40 mr-5 flex h-full shrink-0 animate-slide-over-in flex-col overflow-visible border-l border-r border-border-rule bg-surface-modal",
             slideOver.panelClassName ?? "w-[min(100%,480px)]",
           )}
         >
-          {slideOver.panel}
+          <SlideOverPanelFrame onClose={slideOver.onClose}>{slideOver.panel}</SlideOverPanelFrame>
         </aside>
       ) : null}
     </div>
@@ -156,24 +220,24 @@ export function SlideOver({
         />
       ) : null}
       <div className="absolute inset-0 z-40 flex min-h-0 overflow-hidden">
-      <button
-        type="button"
-        className="absolute inset-0 animate-overlay-scrim-in bg-overlay-scrim"
-        aria-label="Close panel"
-        onClick={onClose}
-      />
-      <div
-        role="dialog"
-        aria-modal="true"
-        aria-label={ariaLabel}
-        className={cx(
-          "relative z-10 ml-auto flex h-full min-h-0 w-full animate-slide-over-in flex-col bg-surface-modal shadow-[-4px_0_24px_rgba(0,0,0,0.25)]",
-          panelClassName,
-        )}
-      >
-        {children}
+        <button
+          type="button"
+          className="absolute inset-0 animate-overlay-scrim-in bg-overlay-scrim"
+          aria-label="Close panel"
+          onClick={onClose}
+        />
+        <div
+          role="dialog"
+          aria-modal="true"
+          aria-label={ariaLabel}
+          className={cx(
+            "relative z-10 ml-auto flex h-full min-h-0 w-full animate-slide-over-in flex-col overflow-visible bg-surface-modal shadow-[-4px_0_24px_rgba(0,0,0,0.25)]",
+            panelClassName,
+          )}
+        >
+          <SlideOverPanelFrame onClose={onClose}>{children}</SlideOverPanelFrame>
+        </div>
       </div>
-    </div>
     </>
   );
 }

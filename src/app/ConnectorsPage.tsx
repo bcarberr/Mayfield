@@ -13,6 +13,7 @@ import { SearchTopHeader } from "../components/SearchTopHeader";
 import {
   CONNECTOR_PAGE_SLIDE_OVER_PANEL_CLASS,
   PageSlideOver,
+  SlideOverHeaderBackButton,
 } from "../components/ui/SlideOver";
 import { Button } from "../components/ui/Button";
 import { Input } from "../components/ui/Input";
@@ -125,11 +126,14 @@ export function ConnectorsPanelSlideOver({ open, onClose }: ConnectorsPanelSlide
       <div className="flex h-full min-h-0 flex-col text-text-primary">
         <header className="shrink-0 border-b border-border-rule bg-surface-modal px-6 pt-5 pb-4">
           <div className="flex items-center justify-between gap-4">
-            <div className="flex min-w-0 items-baseline gap-3">
-              <h1 className="text-[24px] font-bold leading-8 tracking-[0.7px] text-text-primary">Connectors</h1>
-              <span className="rounded bg-surface-container px-2 py-1 text-sm font-semibold text-text-primary">
-                <ConnectorSelectionCountText />
-              </span>
+            <div className="flex min-w-0 items-center gap-2">
+              <SlideOverHeaderBackButton onClose={onClose} className="ring-offset-surface-modal" />
+              <div className="flex min-w-0 items-baseline gap-3">
+                <h1 className="text-[24px] font-bold leading-8 tracking-[0.7px] text-text-primary">Connectors</h1>
+                <span className="rounded bg-surface-container px-2 py-1 text-sm font-semibold text-text-primary">
+                  <ConnectorSelectionCountText />
+                </span>
+              </div>
             </div>
             <Button
               type="button"
