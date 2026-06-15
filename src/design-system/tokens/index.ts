@@ -1,2 +1,2 @@
 export * from "./colors";
-export * from "./typolgraphy";
+export * from "./typography";
