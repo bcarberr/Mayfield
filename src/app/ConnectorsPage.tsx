@@ -75,11 +75,11 @@ function useConnectorsSetupSlideOver() {
             </div>
           }
         >
-            <ConnectorSetupPanel
-              onClose={closeSlideOver}
-              onSave={handleSetupSave}
-              connector={slideOverMode.connector}
-            />
+          <ConnectorSetupPanel
+            onClose={closeSlideOver}
+            onSave={handleSetupSave}
+            connector={slideOverMode.connector}
+          />
         </Suspense>
       )}
     </PageSlideOver>
@@ -174,21 +174,23 @@ export function ConnectorsPage() {
           title="Connectors"
           chromeSurface="page"
           headerAfterTitle={
-            <div className="w-[240px] shrink-0">
-              <Input
-                variant="search"
-                placeholder="Search"
-                className="!bg-surface-container"
-                startAdornment={<Icon name="search" size={18} aria-hidden />}
-                aria-label="Search connectors"
-              />
+            <div className="flex min-w-0 items-center gap-4">
+              <span className="shrink-0 rounded bg-surface-container px-2 py-1 text-sm font-semibold text-text-primary">
+                <ConnectorSelectionCountText />
+              </span>
+              <div className="w-[240px] shrink-0">
+                <Input
+                  variant="search"
+                  placeholder="Search"
+                  className="!bg-surface-container"
+                  startAdornment={<Icon name="search" size={18} aria-hidden />}
+                  aria-label="Search connectors"
+                />
+              </div>
             </div>
           }
           titleTrailing={
             <div className="flex items-center gap-4" role="toolbar" aria-label="Connector actions">
-              <span className="rounded bg-surface-container px-2 py-1 text-sm font-semibold text-text-primary">
-                <ConnectorSelectionCountText />
-              </span>
               <Button
                 type="button"
                 variant="secondary"
