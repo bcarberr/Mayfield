@@ -313,7 +313,7 @@ const DETECTION_ROWS: DetectionRow[] = [
 
 function HubTabs({ active, onChange }: { active: HubTab; onChange: (tab: HubTab) => void }) {
   return (
-    <nav className="flex shrink-0 gap-6 px-6" aria-label="Detection hub sections">
+    <nav className="flex min-w-0 flex-1 gap-6" aria-label="Detection hub sections">
       {HUB_TABS.map((tab) => {
         const isActive = tab === active;
         return (
@@ -1281,7 +1281,18 @@ export function FederatedDetectionHubDashboard({
 
   return (
     <div className="flex min-h-0 flex-1 flex-col overflow-hidden pt-6">
-      <HubTabs active={activeTab} onChange={setActiveTab} />
+      <div className="flex shrink-0 items-end justify-between gap-4 px-6">
+        <HubTabs active={activeTab} onChange={setActiveTab} />
+        <Button type="button" variant="secondary" className="mb-3 h-8 shrink-0 ring-offset-surface-page">
+          <Icon
+            name="action-add"
+            size={12}
+            className="size-3 shrink-0 text-current [&>svg]:!size-[12px]"
+            aria-hidden
+          />
+          Create New Detection
+        </Button>
+      </div>
 
       <div className="flex min-h-0 flex-1 flex-col gap-4 overflow-y-auto px-6 py-4 sm:py-5">
         {activeTab === "Manage Detections" ? (
