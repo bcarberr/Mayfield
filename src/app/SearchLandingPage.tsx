@@ -9,13 +9,17 @@ import { SearchTopHeader } from "../components/SearchTopHeader";
 import { V4NavThinner } from "../components/V4NavThinner";
 import { Button } from "../components/ui/Button";
 import connectionAbstractUrl from "../assets/connection-abstract.svg";
-import { useTimeframe } from "../context/TimeframeContext";
+import { useTimeframe, type TimeframeRange } from "../context/TimeframeContext";
 import { useCopilot } from "../context/CopilotContext";
 import { parseFsqlTimeframe } from "../lib/fsqlTimeframeParser";
 import { NAV_RAIL_TARGETS } from "./navRailTargets";
 
 const toolbarBtnRing = "ring-offset-surface-container";
 const cx = (...c: (string | false | undefined)[]) => c.filter(Boolean).join(" ");
+
+function cloneTimeframeRange(range: TimeframeRange): TimeframeRange {
+  return { from: new Date(range.from), to: new Date(range.to) };
+}
 
 export type SearchCriteriaMode = "query-builder" | "fsql";
 
@@ -274,7 +278,7 @@ function SearchToolbarActions({
  * Federated search entry screen — query builder, FSQL, and Copilot assistant.
  */
 export function SearchLandingPage() {
-  const { setRange: setTimeframeRange } = useTimeframe();
+  const { range: timeframe, setRange: setTimeframeRange } = useTimeframe();
   const { pendingFsqlQuery, setPendingFsqlQuery } = useCopilot();
   const [criteriaMode, setCriteriaMode] = useState<SearchCriteriaMode>("query-builder");
   const [criteriaOpen, setCriteriaOpen] = useState(true);
@@ -283,6 +287,7 @@ export function SearchLandingPage() {
   const [queryBuilderValid, setQueryBuilderValid] = useState(false);
   const [fsqlSearchExecuted, setFsqlSearchExecuted] = useState(false);
   const [fsqlSearching, setFsqlSearching] = useState(false);
+  const [searchInitialTimeframe, setSearchInitialTimeframe] = useState<TimeframeRange | null>(null);
   const searchTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   useEffect(() => {
@@ -304,7 +309,9 @@ export function SearchLandingPage() {
   const executeFsqlSearch = () => {
     if (!fsqlQuery.trim()) return;
     const parsedTimeframe = parseFsqlTimeframe(fsqlQuery);
+    const searchTimeframe = parsedTimeframe ?? timeframe;
     if (parsedTimeframe) setTimeframeRange(parsedTimeframe);
+    setSearchInitialTimeframe(cloneTimeframeRange(searchTimeframe));
     if (searchTimerRef.current) clearTimeout(searchTimerRef.current);
     setFsqlSearchExecuted(true);
     setFsqlSearching(true);
@@ -334,6 +341,7 @@ export function SearchLandingPage() {
       setFsqlQuery("");
       setFsqlSearchExecuted(false);
       setFsqlSearching(false);
+      setSearchInitialTimeframe(null);
       if (searchTimerRef.current) {
         clearTimeout(searchTimerRef.current);
         searchTimerRef.current = null;
@@ -376,7 +384,10 @@ export function SearchLandingPage() {
           <div className="relative flex min-h-0 flex-1 overflow-hidden">
             {criteriaMode === "fsql" ? (
               fsqlSearchExecuted ? (
-                <FsqlSearchResultsView isSearching={fsqlSearching} />
+                <FsqlSearchResultsView
+                  isSearching={fsqlSearching}
+                  searchInitialTimeframe={searchInitialTimeframe}
+                />
               ) : (
                 <div className="min-h-0 min-w-0 flex-1 bg-surface-container" aria-label="FSQL search workspace" />
               )

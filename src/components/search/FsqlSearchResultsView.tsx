@@ -1,6 +1,6 @@
-import { useEffect, useMemo, useRef, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { Icon } from "../../design-system";
-import { useTimeframe } from "../../context/TimeframeContext";
+import { useTimeframe, type TimeframeRange } from "../../context/TimeframeContext";
 import { FilterColumnPanel, type FilterColumnPanelTool } from "../ui/FilterColumnPanel";
 import { SeverityTableIcon } from "../ui/SeverityTableIcon";
 import { DataGridExportButton } from "../ui/DataGridExportButton";
@@ -19,6 +19,7 @@ import {
   fsqlResultMatchesSearch,
   type FsqlSearchResultRow,
 } from "./fsqlSearchResultsData";
+import { timeframeFromBucketSelection } from "../summary-insights/timeframeChartUtils";
 
 const RESULTS_PAGE_SIZE = 20;
 
@@ -230,16 +231,46 @@ function FsqlSearchResultsTable({ rows }: { rows: FsqlSearchResultRow[] }) {
   );
 }
 
-export function FsqlSearchResultsView({ isSearching }: { isSearching?: boolean }) {
-  const { range: timeframe } = useTimeframe();
+export function FsqlSearchResultsView({
+  isSearching,
+  searchInitialTimeframe,
+}: {
+  isSearching?: boolean;
+  searchInitialTimeframe: TimeframeRange | null;
+}) {
+  const { range: timeframe, setRange } = useTimeframe();
   const [searchQuery, setSearchQuery] = useState("");
   const [page, setPage] = useState(0);
   const [tableTool, setTableTool] = useState<FilterColumnPanelTool | null>(null);
   const [timeframeRefreshing, setTimeframeRefreshing] = useState(false);
+  const [isChartZoomed, setIsChartZoomed] = useState(false);
   const isFirstTimeframeRender = useRef(true);
 
   const resultRows = useMemo(() => buildFsqlSearchResults(timeframe), [timeframe]);
   const timeline = useMemo(() => buildFsqlResultsTimeline(timeframe), [timeframe]);
+
+  const handleTimelineBrush = useCallback(
+    ({ startIndex, endIndex }: { startIndex: number; endIndex: number }) => {
+      const nextRange = timeframeFromBucketSelection(timeframe, timeline.buckets, startIndex, endIndex);
+      if (!nextRange) return;
+      setIsChartZoomed(true);
+      setRange(nextRange);
+    },
+    [timeframe, timeline.buckets, setRange],
+  );
+
+  const handleChartZoomReset = useCallback(() => {
+    if (!searchInitialTimeframe) return;
+    setRange({
+      from: new Date(searchInitialTimeframe.from),
+      to: new Date(searchInitialTimeframe.to),
+    });
+    setIsChartZoomed(false);
+  }, [searchInitialTimeframe, setRange]);
+
+  useEffect(() => {
+    setIsChartZoomed(false);
+  }, [searchInitialTimeframe?.from.getTime(), searchInitialTimeframe?.to.getTime()]);
 
   useEffect(() => {
     if (isFirstTimeframeRender.current) {
@@ -268,15 +299,30 @@ export function FsqlSearchResultsView({ isSearching }: { isSearching?: boolean }
     [filteredRows, pageStart],
   );
 
-  const showLoading = Boolean(isSearching || timeframeRefreshing);
+  const showTableLoading = Boolean(isSearching || timeframeRefreshing);
+  const showChartLoading = Boolean(isSearching);
   const showPagination = filteredRows.length > RESULTS_PAGE_SIZE;
 
   return (
     <div className="flex min-h-0 flex-1 flex-col overflow-y-auto bg-surface-container p-4 sm:p-5">
       <InsightCard title="Total Results">
         <div className="flex min-h-0 flex-col">
-          <p className="mb-2 pl-9 text-base-small text-text-tertiary">Hours</p>
-          {showLoading ? (
+          <p className="mb-2 pl-9 text-base-small text-text-tertiary">
+            Hours · drag to zoom
+            {isChartZoomed && searchInitialTimeframe ? (
+              <>
+                {" · "}
+                <button
+                  type="button"
+                  className="font-semibold text-feedback-caution hover:underline"
+                  onClick={handleChartZoomReset}
+                >
+                  Reset
+                </button>
+              </>
+            ) : null}
+          </p>
+          {showChartLoading ? (
             <div className="flex h-[140px] items-center justify-center text-sm text-text-tertiary">Searching…</div>
           ) : (
             <TimeSeriesBarChart
@@ -287,6 +333,7 @@ export function FsqlSearchResultsView({ isSearching }: { isSearching?: boolean }
               yTicks={timeline.yTicks}
               height={140}
               ariaLabel="Total search results per hour"
+              onBrushCommit={handleTimelineBrush}
             />
           )}
         </div>
@@ -320,14 +367,14 @@ export function FsqlSearchResultsView({ isSearching }: { isSearching?: boolean }
             onColumnsClick={() => setTableTool(tableTool === "columns" ? null : "columns")}
           />
           <div className="min-h-0 min-w-0 flex-1 pb-3">
-            {showLoading ? (
+            {showTableLoading ? (
               <div className="flex h-40 items-center justify-center text-sm text-text-tertiary">Loading results…</div>
             ) : (
               <FsqlSearchResultsTable rows={displayedRows} />
             )}
           </div>
         </div>
-        {showPagination && !showLoading ? (
+        {showPagination && !showTableLoading ? (
           <div className="flex shrink-0 flex-wrap items-center justify-between gap-3 border-t border-datavis-gridlines px-4 py-2.5 sm:px-5">
             <p className="text-base-small text-text-tertiary">
               Page {safePage + 1} of {pageCount}

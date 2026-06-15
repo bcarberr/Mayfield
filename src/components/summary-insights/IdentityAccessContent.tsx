@@ -1,6 +1,5 @@
 import { useMemo, useState } from "react";
 import { Icon, type SeverityShapeIconName } from "../../design-system";
-import { useTimeframe } from "../../context/TimeframeContext";
 import { Button } from "../ui/Button";
 import { ColumnHeaderMenu } from "../ui/ColumnHeaderMenu";
 import { FilterColumnPanel, type FilterColumnPanelTool } from "../ui/FilterColumnPanel";
@@ -12,6 +11,16 @@ import { useResizableColumns } from "../ui/useResizableColumns";
 import { TruncatedText } from "../ui/TruncatedText";
 import { Checkbox } from "../uiCheckbox";
 import { cx, DatavisGridlineRule, InsightCard } from "./datavisCard";
+import {
+  buildHourlyEventRows,
+  ChartZoomHint,
+  countByLabel,
+  formatAnalyticsRowTime,
+  horizontalBarScale,
+  rowTimeInTimeframe,
+  topCountsByLabel,
+  useFederatedAnalyticsTimeframeZoom,
+} from "./federatedAnalyticsZoom";
 import { HorizontalBarPanel } from "./horizontalBarPanel";
 import { TimeSeriesAreaChart } from "./timeSeriesAreaChart";
 import {
@@ -116,12 +125,8 @@ const SEVERITY_ROWS = [
 
 const TOP_USERS_BAR = "#4a9eff";
 
-const TOP_USERS_ROWS = [
-  { label: "svc-backup", value: 214, color: TOP_USERS_BAR },
-  { label: "j.alvarez", value: 112, color: TOP_USERS_BAR },
-  { label: "admin", value: 81, color: TOP_USERS_BAR },
-  { label: "t.nguyen", value: 42, color: TOP_USERS_BAR },
-] as const;
+const IAM_MANAGEMENT_CLASS_ORDER = IAM_MANAGEMENT_CLASS_ROWS.map((row) => row.label);
+const SEVERITY_CHART_ORDER = SEVERITY_ROWS.map((row) => row.label);
 
 const IDENTITY_ACCESS_ROWS: IdentityAccessRow[] = [
   {
@@ -223,8 +228,6 @@ const IDENTITY_ACCESS_ROWS: IdentityAccessRow[] = [
     sourceIp: "203.0.113.5",
   },
 ];
-
-const TOTAL_IDENTITY_RESULTS = 6566;
 
 function identityMatchesSearch(row: IdentityAccessRow, query: string): boolean {
   const q = query.trim().toLowerCase();
@@ -486,23 +489,73 @@ function IdentityAccessTable({ rows }: { rows: IdentityAccessRow[] }) {
 
 /** Figma concept — Identity & Access body for Federated Analytics. */
 export function IdentityAccessContent() {
-  const { range: timeframe } = useTimeframe();
+  const { timeframe, initialTimeframe, isChartZoomed, handleTimelineBrush, handleChartZoomReset } =
+    useFederatedAnalyticsTimeframeZoom("hourly");
   const [eventClassFilter, setEventClassFilter] = useState<IdentityEventClass | null>(null);
   const [severityFilter, setSeverityFilter] = useState<IdentitySeverity | null>(null);
   const [userFilter, setUserFilter] = useState<string | null>(null);
   const [searchQuery, setSearchQuery] = useState("");
   const [tableTool, setTableTool] = useState<FilterColumnPanelTool | null>(null);
 
+  const tableRows = useMemo(
+    () =>
+      buildHourlyEventRows(IDENTITY_ACCESS_ROWS, initialTimeframe, (template, id, eventTime) => ({
+        ...template,
+        id,
+        time: formatAnalyticsRowTime(eventTime),
+      })),
+    [initialTimeframe],
+  );
+
+  const timeframeScopedRows = useMemo(
+    () => tableRows.filter((row) => rowTimeInTimeframe(row.time, timeframe)),
+    [tableRows, timeframe],
+  );
+
+  const iamManagementClassRows = useMemo(
+    () => countByLabel(timeframeScopedRows, IAM_MANAGEMENT_CLASS_ORDER, (row) => row.eventClass),
+    [timeframeScopedRows],
+  );
+
+  const iamManagementClassBarScale = useMemo(
+    () => horizontalBarScale(iamManagementClassRows.map((row) => row.value)),
+    [iamManagementClassRows],
+  );
+
+  const severityChartRows = useMemo(
+    () =>
+      countByLabel(timeframeScopedRows, SEVERITY_CHART_ORDER, (row) => row.severity).map((row) => ({
+        ...row,
+        color: SEV_BAR[row.label as IdentitySeverity],
+      })),
+    [timeframeScopedRows],
+  );
+
+  const severityBarScale = useMemo(
+    () => horizontalBarScale(severityChartRows.map((row) => row.value)),
+    [severityChartRows],
+  );
+
+  const topUsersChartRows = useMemo(
+    () => topCountsByLabel(timeframeScopedRows, (row) => row.user, 4, TOP_USERS_BAR),
+    [timeframeScopedRows],
+  );
+
+  const topUsersBarScale = useMemo(
+    () => horizontalBarScale(topUsersChartRows.map((row) => row.value)),
+    [topUsersChartRows],
+  );
+
   const filteredRows = useMemo(
     () =>
-      IDENTITY_ACCESS_ROWS.filter((row) => {
+      timeframeScopedRows.filter((row) => {
         if (eventClassFilter && row.eventClass !== eventClassFilter) return false;
         if (severityFilter && row.severity !== severityFilter) return false;
         if (userFilter && row.user !== userFilter) return false;
         if (!identityMatchesSearch(row, searchQuery)) return false;
         return true;
       }),
-    [eventClassFilter, severityFilter, userFilter, searchQuery],
+    [timeframeScopedRows, eventClassFilter, severityFilter, userFilter, searchQuery],
   );
 
   const hasActiveFilters =
@@ -561,12 +614,13 @@ export function IdentityAccessContent() {
         ? { index: spikeIndex, label: `spike ~${SPIKE_CLOCK_HOUR}:00` }
         : undefined;
 
-    return { series, xLabels, xTickIndices, xTickLabels, spikeHighlight };
+    return { series, xLabels, xTickIndices, xTickLabels, spikeHighlight, buckets };
   }, [timeframe]);
 
   return (
     <div className="flex shrink-0 flex-col gap-4 p-4 sm:p-5">
       <InsightCard title="Identity & Access Events Per Hour By Severity">
+        <ChartZoomHint unit="Hours" isChartZoomed={isChartZoomed} onReset={handleChartZoomReset} />
         <TimeSeriesAreaChart
           series={eventsPerHourChart.series}
           xLabels={eventsPerHourChart.xLabels}
@@ -576,38 +630,39 @@ export function IdentityAccessContent() {
           ariaLabel="Identity and access events per hour by severity"
           selectedSeriesId={severityFilter}
           onSeriesClick={handleSeverityClick}
+          onBrushCommit={(selection) => handleTimelineBrush(selection, eventsPerHourChart.buckets)}
         />
       </InsightCard>
 
       <div className="grid min-h-0 shrink-0 grid-cols-1 items-stretch gap-4 lg:grid-cols-3">
         <InsightCard title="Identity & Access Management Classes" fillHeight>
           <HorizontalBarPanel
-            rows={IAM_MANAGEMENT_CLASS_ROWS}
+            rows={iamManagementClassRows}
             selectedLabel={eventClassFilter}
             onBarClick={handleEventClassClick}
             filterAriaLabel={(label) => `Filter identity events by ${label}`}
-            xMax={2000}
-            xTicks={[0, 500, 1000, 1500, 2000]}
+            xMax={iamManagementClassBarScale.xMax}
+            xTicks={iamManagementClassBarScale.xTicks}
           />
         </InsightCard>
         <InsightCard title="Severity ID" fillHeight>
           <HorizontalBarPanel
-            rows={SEVERITY_ROWS}
+            rows={severityChartRows}
             selectedLabel={severityFilter}
             onBarClick={handleSeverityClick}
             filterAriaLabel={(label) => `Filter identity events by ${label} severity`}
-            xMax={700}
-            xTicks={[0, 175, 350, 525, 700]}
+            xMax={severityBarScale.xMax}
+            xTicks={severityBarScale.xTicks}
           />
         </InsightCard>
         <InsightCard title="Top Users By Failed Logins" fillHeight>
           <HorizontalBarPanel
-            rows={TOP_USERS_ROWS}
+            rows={topUsersChartRows}
             selectedLabel={userFilter}
             onBarClick={handleUserClick}
             filterAriaLabel={(label) => `Filter identity events by user ${label}`}
-            xMax={250}
-            xTicks={[0, 50, 100, 150, 200]}
+            xMax={topUsersBarScale.xMax}
+            xTicks={topUsersBarScale.xTicks}
           />
         </InsightCard>
       </div>
@@ -617,7 +672,7 @@ export function IdentityAccessContent() {
           <h2 className="text-base-semibold text-text-primary">Identity & Access Events</h2>
           <div className="mt-2 flex flex-wrap items-center gap-3">
             <p className="shrink-0 text-base-small text-text-secondary">
-              {filteredRows.length} of {TOTAL_IDENTITY_RESULTS} Results
+              {filteredRows.length} of {timeframeScopedRows.length} Results
               {eventClassFilter ? ` · ${eventClassFilter}` : ""}
               {severityFilter ? ` · ${severityFilter}` : ""}
               {userFilter ? ` · ${userFilter}` : ""}

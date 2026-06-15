@@ -1,6 +1,5 @@
 import { useMemo, useState } from "react";
 import { Icon, type SeverityShapeIconName } from "../../design-system";
-import { useTimeframe } from "../../context/TimeframeContext";
 import { Button } from "../ui/Button";
 import { ColumnHeaderMenu } from "../ui/ColumnHeaderMenu";
 import { FilterColumnPanel, type FilterColumnPanelTool } from "../ui/FilterColumnPanel";
@@ -12,6 +11,16 @@ import { useResizableColumns } from "../ui/useResizableColumns";
 import { TruncatedText } from "../ui/TruncatedText";
 import { Checkbox } from "../uiCheckbox";
 import { cx, DatavisGridlineRule, InsightCard } from "./datavisCard";
+import {
+  buildHourlyEventRows,
+  ChartZoomHint,
+  countByLabel,
+  formatAnalyticsRowTime,
+  horizontalBarScale,
+  rowTimeInTimeframe,
+  topCountsByLabel,
+  useFederatedAnalyticsTimeframeZoom,
+} from "./federatedAnalyticsZoom";
 import { HorizontalBarPanel } from "./horizontalBarPanel";
 import { TimeSeriesAreaChart } from "./timeSeriesAreaChart";
 import {
@@ -118,12 +127,8 @@ const SEVERITY_ROWS = [
   { label: "Informational", value: 540, color: SEV_BAR.Informational },
 ] as const;
 
-const HOST_ROWS = [
-  { label: "WIN-DC01", value: 301, color: HOST_BAR_FILL },
-  { label: "SQL-PROD-02", value: 214, color: HOST_BAR_FILL },
-  { label: "JUMP-HOST-01", value: 132, color: HOST_BAR_FILL },
-  { label: "WEB-EDGE-07", value: 71, color: HOST_BAR_FILL },
-] as const;
+const ACTIVITY_CLASS_ORDER = ACTIVITY_CLASS_ROWS.map((row) => row.label);
+const SEVERITY_CHART_ORDER = SEVERITY_ROWS.map((row) => row.label);
 
 const SYSTEM_ACTIVITY_ROWS: SystemActivityRow[] = [
   {
@@ -247,8 +252,6 @@ const SYSTEM_ACTIVITY_ROWS: SystemActivityRow[] = [
     process: "cmd.exe",
   },
 ];
-
-const TOTAL_SYSTEM_RESULTS = 2492;
 
 function systemMatchesSearch(row: SystemActivityRow, query: string): boolean {
   const q = query.trim().toLowerCase();
@@ -507,23 +510,73 @@ function SystemActivityTable({ rows }: { rows: SystemActivityRow[] }) {
 
 /** Figma concept — System Activity body for Federated Analytics. */
 export function SystemActivityContent() {
-  const { range: timeframe } = useTimeframe();
+  const { timeframe, initialTimeframe, isChartZoomed, handleTimelineBrush, handleChartZoomReset } =
+    useFederatedAnalyticsTimeframeZoom("hourly");
   const [activityClassFilter, setActivityClassFilter] = useState<ActivityClass | null>(null);
   const [severityFilter, setSeverityFilter] = useState<SystemSeverity | null>(null);
   const [hostFilter, setHostFilter] = useState<string | null>(null);
   const [searchQuery, setSearchQuery] = useState("");
   const [tableTool, setTableTool] = useState<FilterColumnPanelTool | null>(null);
 
+  const tableRows = useMemo(
+    () =>
+      buildHourlyEventRows(SYSTEM_ACTIVITY_ROWS, initialTimeframe, (template, id, eventTime) => ({
+        ...template,
+        id,
+        time: formatAnalyticsRowTime(eventTime),
+      })),
+    [initialTimeframe],
+  );
+
+  const timeframeScopedRows = useMemo(
+    () => tableRows.filter((row) => rowTimeInTimeframe(row.time, timeframe)),
+    [tableRows, timeframe],
+  );
+
+  const activityClassRows = useMemo(
+    () => countByLabel(timeframeScopedRows, ACTIVITY_CLASS_ORDER, (row) => row.activityClass),
+    [timeframeScopedRows],
+  );
+
+  const activityClassBarScale = useMemo(
+    () => horizontalBarScale(activityClassRows.map((row) => row.value)),
+    [activityClassRows],
+  );
+
+  const severityChartRows = useMemo(
+    () =>
+      countByLabel(timeframeScopedRows, SEVERITY_CHART_ORDER, (row) => row.severity).map((row) => ({
+        ...row,
+        color: SEV_BAR[row.label as SystemSeverity],
+      })),
+    [timeframeScopedRows],
+  );
+
+  const severityBarScale = useMemo(
+    () => horizontalBarScale(severityChartRows.map((row) => row.value)),
+    [severityChartRows],
+  );
+
+  const hostChartRows = useMemo(
+    () => topCountsByLabel(timeframeScopedRows, (row) => row.host, 4, HOST_BAR_FILL),
+    [timeframeScopedRows],
+  );
+
+  const hostBarScale = useMemo(
+    () => horizontalBarScale(hostChartRows.map((row) => row.value)),
+    [hostChartRows],
+  );
+
   const filteredRows = useMemo(
     () =>
-      SYSTEM_ACTIVITY_ROWS.filter((row) => {
+      timeframeScopedRows.filter((row) => {
         if (activityClassFilter && row.activityClass !== activityClassFilter) return false;
         if (severityFilter && row.severity !== severityFilter) return false;
         if (hostFilter && row.host !== hostFilter) return false;
         if (!systemMatchesSearch(row, searchQuery)) return false;
         return true;
       }),
-    [activityClassFilter, severityFilter, hostFilter, searchQuery],
+    [timeframeScopedRows, activityClassFilter, severityFilter, hostFilter, searchQuery],
   );
 
   const hasActiveFilters =
@@ -579,12 +632,13 @@ export function SystemActivityContent() {
         ? { index: spikeIndex, label: `spike ~${SPIKE_CLOCK_HOUR}:00` }
         : undefined;
 
-    return { series, xLabels, xTickIndices, xTickLabels, spikeHighlight };
+    return { series, xLabels, xTickIndices, xTickLabels, spikeHighlight, buckets };
   }, [timeframe]);
 
   return (
     <div className="flex shrink-0 flex-col gap-4 p-4 sm:p-5">
       <InsightCard title="System Events Per Hour By Severity">
+        <ChartZoomHint unit="Hours" isChartZoomed={isChartZoomed} onReset={handleChartZoomReset} />
         <TimeSeriesAreaChart
           series={eventsPerHourChart.series}
           xLabels={eventsPerHourChart.xLabels}
@@ -594,38 +648,39 @@ export function SystemActivityContent() {
           ariaLabel="System activity events per hour by severity"
           selectedSeriesId={severityFilter}
           onSeriesClick={handleSeverityClick}
+          onBrushCommit={(selection) => handleTimelineBrush(selection, eventsPerHourChart.buckets)}
         />
       </InsightCard>
 
       <div className="grid min-h-0 shrink-0 grid-cols-1 items-stretch gap-4 lg:grid-cols-3">
         <InsightCard title="Activity Classes" fillHeight>
           <HorizontalBarPanel
-            rows={ACTIVITY_CLASS_ROWS}
+            rows={activityClassRows}
             selectedLabel={activityClassFilter}
             onBarClick={handleActivityClassClick}
             filterAriaLabel={(label) => `Filter system activity by ${label}`}
-            xMax={900}
-            xTicks={[0, 200, 400, 600, 800]}
+            xMax={activityClassBarScale.xMax}
+            xTicks={activityClassBarScale.xTicks}
           />
         </InsightCard>
         <InsightCard title="Severity ID" fillHeight>
           <HorizontalBarPanel
-            rows={SEVERITY_ROWS}
+            rows={severityChartRows}
             selectedLabel={severityFilter}
             onBarClick={handleSeverityClick}
             filterAriaLabel={(label) => `Filter system activity by ${label} severity`}
-            xMax={600}
-            xTicks={[0, 150, 300, 450, 600]}
+            xMax={severityBarScale.xMax}
+            xTicks={severityBarScale.xTicks}
           />
         </InsightCard>
         <InsightCard title="Top Hosts By Process Launches" fillHeight>
           <HorizontalBarPanel
-            rows={HOST_ROWS}
+            rows={hostChartRows}
             selectedLabel={hostFilter}
             onBarClick={handleHostClick}
             filterAriaLabel={(label) => `Filter system activity by host ${label}`}
-            xMax={350}
-            xTicks={[0, 75, 150, 225, 300]}
+            xMax={hostBarScale.xMax}
+            xTicks={hostBarScale.xTicks}
           />
         </InsightCard>
       </div>
@@ -635,7 +690,7 @@ export function SystemActivityContent() {
           <h2 className="text-base-semibold text-text-primary">System Activity Events</h2>
           <div className="mt-2 flex flex-wrap items-center gap-3">
             <p className="shrink-0 text-base-small text-text-secondary">
-              {filteredRows.length} of {TOTAL_SYSTEM_RESULTS} Results
+              {filteredRows.length} of {timeframeScopedRows.length} Results
               {activityClassFilter ? ` · ${activityClassFilter}` : ""}
               {severityFilter ? ` · ${severityFilter}` : ""}
               {hostFilter ? ` · ${hostFilter}` : ""}

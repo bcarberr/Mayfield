@@ -1,6 +1,7 @@
-import { useId, useMemo } from "react";
+import { useCallback, useId, useMemo, useRef, useState, type PointerEvent as ReactPointerEvent } from "react";
 import type { SeverityShapeIconName } from "../../design-system";
 import { cx } from "./datavisCard";
+import type { TimeSeriesBrushSelection } from "./timeSeriesBarChart";
 
 export type TimeSeriesSeries = {
   id: string;
@@ -34,7 +35,11 @@ type TimeSeriesAreaChartProps = {
   xTickIndices?: readonly number[];
   /** Labels paired with `xTickIndices`; falls back to `xLabels[index]`. */
   xTickLabels?: readonly string[];
+  /** When set, drag on the plot to select a range and zoom in. */
+  onBrushCommit?: (selection: TimeSeriesBrushSelection) => void;
 };
+
+const MIN_BRUSH_WIDTH_PX = 8;
 
 const PLOT_VIEW_WIDTH = 1000;
 
@@ -81,8 +86,82 @@ export function TimeSeriesAreaChart({
   spikeHighlight,
   xTickIndices: xTickIndicesProp,
   xTickLabels,
+  onBrushCommit,
 }: TimeSeriesAreaChartProps) {
   const gradientId = useId();
+  const plotRef = useRef<HTMLDivElement>(null);
+  const brushDragRef = useRef<{ pointerId: number; startX: number; currentX: number } | null>(null);
+  const [brushOverlay, setBrushOverlay] = useState<{ startX: number; currentX: number } | null>(null);
+  const brushEnabled = onBrushCommit != null;
+  const bucketCount = xLabels.length;
+
+  const clientXToPlotX = useCallback((clientX: number) => {
+    const rect = plotRef.current?.getBoundingClientRect();
+    if (!rect || rect.width <= 0) return 0;
+    return Math.max(0, Math.min(rect.width, clientX - rect.left));
+  }, []);
+
+  const plotXToIndex = useCallback(
+    (x: number, edge: "start" | "end") => {
+      const rect = plotRef.current?.getBoundingClientRect();
+      if (!rect || rect.width <= 0 || bucketCount === 0) return 0;
+
+      const ratio = Math.max(0, Math.min(1, x / rect.width));
+      if (edge === "end") {
+        if (ratio >= 1) return bucketCount - 1;
+        return Math.min(bucketCount - 1, Math.max(0, Math.ceil(ratio * bucketCount) - 1));
+      }
+
+      return Math.min(bucketCount - 1, Math.max(0, Math.floor(ratio * bucketCount)));
+    },
+    [bucketCount],
+  );
+
+  const commitBrush = useCallback(
+    (brush: { startX: number; currentX: number }) => {
+      if (!onBrushCommit) return;
+      if (Math.abs(brush.currentX - brush.startX) < MIN_BRUSH_WIDTH_PX) return;
+
+      const left = Math.min(brush.startX, brush.currentX);
+      const right = Math.max(brush.startX, brush.currentX);
+      const startIndex = plotXToIndex(left, "start");
+      const endIndex = plotXToIndex(right, "end");
+      onBrushCommit({ startIndex, endIndex: Math.max(startIndex, endIndex) });
+    },
+    [onBrushCommit, plotXToIndex],
+  );
+
+  const handlePointerDown = (event: ReactPointerEvent<HTMLDivElement>) => {
+    if (!brushEnabled) return;
+    event.preventDefault();
+    const x = clientXToPlotX(event.clientX);
+    brushDragRef.current = { pointerId: event.pointerId, startX: x, currentX: x };
+    setBrushOverlay({ startX: x, currentX: x });
+    event.currentTarget.setPointerCapture(event.pointerId);
+  };
+
+  const handlePointerMove = (event: ReactPointerEvent<HTMLDivElement>) => {
+    const drag = brushDragRef.current;
+    if (!drag || event.pointerId !== drag.pointerId) return;
+
+    const x = clientXToPlotX(event.clientX);
+    brushDragRef.current = { ...drag, currentX: x };
+    setBrushOverlay({ startX: drag.startX, currentX: x });
+  };
+
+  const finishBrush = (event: ReactPointerEvent<HTMLDivElement>) => {
+    const drag = brushDragRef.current;
+    if (!drag || event.pointerId !== drag.pointerId) return;
+
+    brushDragRef.current = null;
+    setBrushOverlay(null);
+
+    if (event.currentTarget.hasPointerCapture(event.pointerId)) {
+      event.currentTarget.releasePointerCapture(event.pointerId);
+    }
+
+    commitBrush(drag);
+  };
 
   const stackedTotals = useMemo(() => {
     const len = xLabels.length;
@@ -120,7 +199,7 @@ export function TimeSeriesAreaChart({
       ? (spikeHighlight.label ?? `spike ~${xLabels[spikeHighlight.index] ?? ""}`)
       : null;
 
-  const interactive = Boolean(onSeriesClick);
+  const interactive = Boolean(onSeriesClick) && !brushEnabled;
   const filterActive = selectedSeriesId != null;
 
   const legendItemClass = (seriesId: string) => {
@@ -151,11 +230,36 @@ export function TimeSeriesAreaChart({
           ))}
         </div>
 
-        <div className="relative min-h-0 min-w-0 flex-1 overflow-hidden" style={{ height }}>
+        <div
+          ref={plotRef}
+          className={
+            brushEnabled
+              ? "relative min-h-0 min-w-0 flex-1 cursor-crosshair overflow-hidden touch-none select-none"
+              : "relative min-h-0 min-w-0 flex-1 overflow-hidden"
+          }
+          style={{ height }}
+          onPointerDown={handlePointerDown}
+          onPointerMove={handlePointerMove}
+          onPointerUp={finishBrush}
+          onPointerCancel={() => {
+            brushDragRef.current = null;
+            setBrushOverlay(null);
+          }}
+        >
+          {brushOverlay ? (
+            <div
+              className="pointer-events-none absolute inset-y-0 z-10 border border-interactive-active bg-interactive-active/15"
+              style={{
+                left: Math.min(brushOverlay.startX, brushOverlay.currentX),
+                width: Math.abs(brushOverlay.currentX - brushOverlay.startX),
+              }}
+              aria-hidden
+            />
+          ) : null}
           <svg
             viewBox={`0 0 ${PLOT_VIEW_WIDTH} ${height}`}
             preserveAspectRatio="none"
-            className="block h-full w-full"
+            className="pointer-events-none block h-full w-full"
             role="img"
             aria-label={ariaLabel}
           >

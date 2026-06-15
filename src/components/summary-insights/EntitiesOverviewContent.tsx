@@ -1,6 +1,6 @@
 import { useMemo, useState } from "react";
 import { Icon, type SeverityShapeIconName } from "../../design-system";
-import { useTimeframe, type TimeframeRange } from "../../context/TimeframeContext";
+import { type TimeframeRange } from "../../context/TimeframeContext";
 import { Button } from "../ui/Button";
 import { ColumnHeaderMenu } from "../ui/ColumnHeaderMenu";
 import { FilterColumnPanel, type FilterColumnPanelTool } from "../ui/FilterColumnPanel";
@@ -11,9 +11,19 @@ import { compareStrings, useColumnSort } from "../ui/useColumnSort";
 import { useResizableColumns } from "../ui/useResizableColumns";
 import { TruncatedText } from "../ui/TruncatedText";
 import { Checkbox } from "../uiCheckbox";
+import {
+  buildDailyEventRows,
+  ChartZoomHint,
+  countByLabel,
+  formatAnalyticsRowTime,
+  horizontalBarScale,
+  rowTimeInTimeframe,
+  useFederatedAnalyticsTimeframeZoom,
+} from "./federatedAnalyticsZoom";
 import { CHART_CATEGORY_FILL, HorizontalBarPanel } from "./horizontalBarPanel";
 import { cx, DatavisGridlineRule, InsightCard } from "./datavisCard";
 import { TimeSeriesBarChart } from "./timeSeriesBarChart";
+import { buildDailyBuckets, type HourBucket } from "./timeframeChartUtils";
 
 const ENTITY_BAR_FILL = "#6dc6a1";
 const ENTITY_BAR_TRACK = "rgba(158, 158, 158, 0.2)";
@@ -29,36 +39,32 @@ type DailyEntityChart = {
   spikeLabel: string;
   yMax: number;
   yTicks: number[];
+  buckets: HourBucket[];
 };
 
-function buildDailyEntityChart({ from, to }: TimeframeRange): DailyEntityChart {
-  const msPerDay = 86_400_000;
-  const startDay = new Date(from);
-  startDay.setHours(0, 0, 0, 0);
-  const endDay = new Date(to);
-  endDay.setHours(0, 0, 0, 0);
-
-  const dayCount = Math.max(1, Math.round((endDay.getTime() - startDay.getTime()) / msPerDay) + 1);
-  const useDate = dayCount > 7;
+function buildDailyEntityChart(range: TimeframeRange): DailyEntityChart {
+  const buckets = buildDailyBuckets(range);
+  const useDate = buckets.length > 7;
+  const endDayMs = new Date(range.to);
+  endDayMs.setHours(0, 0, 0, 0);
 
   const xLabels: string[] = [];
   const values: number[] = [];
   let spikeIndex: number | null = null;
-  const spikeDayMs = endDay.getTime();
 
-  for (let i = 0; i < dayCount; i++) {
-    const day = new Date(startDay.getTime() + i * msPerDay);
+  buckets.forEach((bucket, i) => {
+    const day = bucket.start;
     if (useDate) {
       xLabels.push(new Intl.DateTimeFormat("en-US", { month: "short", day: "numeric" }).format(day));
     } else {
       xLabels.push(WEEKDAY_SHORT[day.getDay()]);
     }
-    const isSpike = day.getTime() === spikeDayMs;
+    const isSpike = day.getTime() === endDayMs.getTime();
     if (isSpike) spikeIndex = i;
     const dow = day.getDay();
     const weekdayMultiplier = dow === 0 || dow === 6 ? 0.7 : 1.0 + (dow === 4 ? 0.2 : 0);
     values.push(isSpike ? 61 : Math.max(8, Math.round(14 * weekdayMultiplier * (0.9 + (i % 3) * 0.1))));
-  }
+  });
 
   const peak = Math.max(...values, 10);
   const yMax = Math.ceil(peak / 10) * 10;
@@ -68,7 +74,7 @@ function buildDailyEntityChart({ from, to }: TimeframeRange): DailyEntityChart {
   const spikeDayLabel = spikeIndex != null ? (xLabels[spikeIndex] ?? "") : "";
   const spikeLabel = `${spikeDayLabel} spike correlates with new cloud resources from Discovery`;
 
-  return { xLabels, values, spikeIndex, spikeLabel, yMax, yTicks };
+  return { xLabels, values, spikeIndex, spikeLabel, yMax, yTicks, buckets };
 }
 
 const ENTITY_TYPE_ROWS = [
@@ -87,12 +93,33 @@ const ENTITY_RISK_ROWS = [
   { label: "Info", value: 5474, color: "#9b6bac" },
 ] as const;
 
-const TOP_ENTITIES_BY_VOLUME_ROWS = [
-  { label: "WIN-DC01", value: 3402, color: TOP_ENTITY_VOLUME_BAR },
-  { label: "svc-backup", value: 2587, color: TOP_ENTITY_VOLUME_BAR },
-  { label: "api-prod-04", value: 1994, color: TOP_ENTITY_VOLUME_BAR },
-  { label: "j.alvarez", value: 1410, color: TOP_ENTITY_VOLUME_BAR },
-] as const;
+const ENTITY_TYPE_ORDER = ENTITY_TYPE_ROWS.map((row) => row.label);
+const ENTITY_RISK_CHART_ORDER = ENTITY_RISK_ROWS.map((row) => row.label);
+
+const ENTITY_RISK_CHART_COLORS: Record<(typeof ENTITY_RISK_CHART_ORDER)[number], string> = {
+  Critical: "#ff604a",
+  High: "#f28830",
+  Medium: "#fac354",
+  Low: "#57969e",
+  Info: "#9b6bac",
+};
+
+function entityTypeChartLabel(type: string): string {
+  switch (type) {
+    case "User":
+      return "Users";
+    case "Device":
+      return "Devices";
+    case "Account":
+      return "Accounts";
+    case "Cloud Resource":
+      return "Cloud";
+    case "Process":
+      return "Processes";
+    default:
+      return type;
+  }
+}
 
 type EntityListItem = {
   label: string;
@@ -512,8 +539,19 @@ const AGGREGATED_ENTITY_ROWS: AggregatedEntityRow[] = [
   },
 ];
 
-const TOTAL_AGGREGATED_ENTITIES = 2487;
 const AGGREGATED_PAGE_SIZE = 20;
+
+function topEntitiesByEventVolume(rows: readonly AggregatedEntityRow[], limit: number) {
+  const totals = new Map<string, number>();
+  for (const row of rows) {
+    totals.set(row.entity, (totals.get(row.entity) ?? 0) + row.eventCount);
+  }
+
+  return [...totals.entries()]
+    .sort((a, b) => b[1] - a[1])
+    .slice(0, limit)
+    .map(([label, value]) => ({ label, value, color: TOP_ENTITY_VOLUME_BAR }));
+}
 
 function connectorSwatch(connector: string) {
   if (connector.startsWith("BCs")) return "bg-feedback-info";
@@ -797,13 +835,13 @@ function EntitiesDetailTabs({
   );
 }
 
-function EntitiesAggregatedPanel() {
+function EntitiesAggregatedPanel({ rows }: { rows: AggregatedEntityRow[] }) {
   const [searchQuery, setSearchQuery] = useState("");
   const [tableTool, setTableTool] = useState<FilterColumnPanelTool | null>(null);
 
   const filteredRows = useMemo(
-    () => AGGREGATED_ENTITY_ROWS.filter((row) => aggregatedMatchesSearch(row, searchQuery)),
-    [searchQuery],
+    () => rows.filter((row) => aggregatedMatchesSearch(row, searchQuery)),
+    [rows, searchQuery],
   );
 
   const displayedRows = useMemo(
@@ -817,7 +855,7 @@ function EntitiesAggregatedPanel() {
         <h2 className="text-base-semibold text-text-primary">Entities</h2>
         <div className="mt-2 flex flex-wrap items-center gap-3">
           <p className="shrink-0 text-base-small text-text-secondary">
-            {displayedRows.length} of {TOTAL_AGGREGATED_ENTITIES} Results
+            {displayedRows.length} of {rows.length} Results
             {searchQuery.trim() ? ` · “${searchQuery.trim()}”` : ""}
           </p>
           <div className="w-[300px] shrink-0">
@@ -861,13 +899,71 @@ function EntitiesAggregatedPanel() {
 
 /** Figma `1595:48982` — Entities Overview body for Federated Analytics. */
 export function EntitiesOverviewContent() {
-  const { range: timeframe } = useTimeframe();
+  const { timeframe, initialTimeframe, isChartZoomed, handleTimelineBrush, handleChartZoomReset } =
+    useFederatedAnalyticsTimeframeZoom("daily");
   const [activeDetailTab, setActiveDetailTab] = useState<EntitiesDetailTab>("entities");
+
+  const tableRows = useMemo(
+    () =>
+      buildDailyEventRows(AGGREGATED_ENTITY_ROWS, initialTimeframe, (template, id, eventTime) => ({
+        ...template,
+        id,
+        lastSeen: formatAnalyticsRowTime(eventTime),
+      })),
+    [initialTimeframe],
+  );
+
+  const timeframeScopedRows = useMemo(
+    () => tableRows.filter((row) => rowTimeInTimeframe(row.lastSeen, timeframe)),
+    [tableRows, timeframe],
+  );
+
+  const entityTypeRows = useMemo(
+    () =>
+      countByLabel(timeframeScopedRows, ENTITY_TYPE_ORDER, (row) => entityTypeChartLabel(row.type)).map(
+        (row) => ({
+          ...row,
+          color: CHART_CATEGORY_FILL,
+        }),
+      ),
+    [timeframeScopedRows],
+  );
+
+  const entityTypeBarScale = useMemo(
+    () => horizontalBarScale(entityTypeRows.map((row) => row.value)),
+    [entityTypeRows],
+  );
+
+  const entityRiskRows = useMemo(
+    () =>
+      countByLabel(timeframeScopedRows, ENTITY_RISK_CHART_ORDER, (row) => row.risk).map((row) => ({
+        ...row,
+        color: ENTITY_RISK_CHART_COLORS[row.label as (typeof ENTITY_RISK_CHART_ORDER)[number]],
+      })),
+    [timeframeScopedRows],
+  );
+
+  const entityRiskBarScale = useMemo(
+    () => horizontalBarScale(entityRiskRows.map((row) => row.value)),
+    [entityRiskRows],
+  );
+
+  const topEntitiesByVolumeRows = useMemo(
+    () => topEntitiesByEventVolume(timeframeScopedRows, 4),
+    [timeframeScopedRows],
+  );
+
+  const topEntitiesBarScale = useMemo(
+    () => horizontalBarScale(topEntitiesByVolumeRows.map((row) => row.value)),
+    [topEntitiesByVolumeRows],
+  );
+
   const dailyChart = useMemo(() => buildDailyEntityChart(timeframe), [timeframe]);
 
   return (
     <div className="flex shrink-0 flex-col gap-4 p-4 sm:p-5">
       <InsightCard title="New Entities Seen Per Day">
+        <ChartZoomHint unit="Days" isChartZoomed={isChartZoomed} onReset={handleChartZoomReset} />
         <TimeSeriesBarChart
           values={dailyChart.values}
           xLabels={dailyChart.xLabels}
@@ -880,6 +976,7 @@ export function EntitiesOverviewContent() {
           yMax={dailyChart.yMax}
           yTicks={dailyChart.yTicks}
           ariaLabel="New entities seen per day"
+          onBrushCommit={(selection) => handleTimelineBrush(selection, dailyChart.buckets)}
         />
         <p className="mt-1 pl-9 text-base-small text-text-tertiary">
           {dailyChart.spikeLabel}
@@ -889,23 +986,23 @@ export function EntitiesOverviewContent() {
       <div className="grid min-h-0 shrink-0 grid-cols-1 items-stretch gap-4 lg:grid-cols-3">
         <InsightCard title="Entity Types" fillHeight>
           <HorizontalBarPanel
-            rows={ENTITY_TYPE_ROWS}
-            xMax={3200}
-            xTicks={[0, 800, 1600, 2400, 3200]}
+            rows={entityTypeRows}
+            xMax={entityTypeBarScale.xMax}
+            xTicks={entityTypeBarScale.xTicks}
           />
         </InsightCard>
         <InsightCard title="Entity Risk" fillHeight>
           <HorizontalBarPanel
-            rows={ENTITY_RISK_ROWS}
-            xMax={6000}
-            xTicks={[0, 1500, 3000, 4500, 6000]}
+            rows={entityRiskRows}
+            xMax={entityRiskBarScale.xMax}
+            xTicks={entityRiskBarScale.xTicks}
           />
         </InsightCard>
         <InsightCard title="Top Entities By Event Volume" fillHeight>
           <HorizontalBarPanel
-            rows={TOP_ENTITIES_BY_VOLUME_ROWS}
-            xMax={3600}
-            xTicks={[0, 900, 1800, 2700, 3600]}
+            rows={topEntitiesByVolumeRows}
+            xMax={topEntitiesBarScale.xMax}
+            xTicks={topEntitiesBarScale.xTicks}
           />
         </InsightCard>
       </div>
@@ -919,7 +1016,7 @@ export function EntitiesOverviewContent() {
           ))}
         </div>
       ) : (
-        <EntitiesAggregatedPanel />
+        <EntitiesAggregatedPanel rows={timeframeScopedRows} />
       )}
     </div>
   );

@@ -1,6 +1,5 @@
 import { useMemo, useState } from "react";
 import { Icon, type SeverityShapeIconName } from "../../design-system";
-import { useTimeframe } from "../../context/TimeframeContext";
 import { Button } from "../ui/Button";
 import { ColumnHeaderMenu } from "../ui/ColumnHeaderMenu";
 import { FilterColumnPanel, type FilterColumnPanelTool } from "../ui/FilterColumnPanel";
@@ -12,6 +11,15 @@ import { useResizableColumns } from "../ui/useResizableColumns";
 import { TruncatedText } from "../ui/TruncatedText";
 import { Checkbox } from "../uiCheckbox";
 import { cx, DatavisGridlineRule, InsightCard } from "./datavisCard";
+import {
+  buildHourlyEventRows,
+  ChartZoomHint,
+  countByLabel,
+  formatAnalyticsRowTime,
+  horizontalBarScale,
+  rowTimeInTimeframe,
+  useFederatedAnalyticsTimeframeZoom,
+} from "./federatedAnalyticsZoom";
 import { CHART_CATEGORY_FILL, HorizontalBarPanel } from "./horizontalBarPanel";
 import { TimeSeriesAreaChart } from "./timeSeriesAreaChart";
 import {
@@ -103,8 +111,8 @@ type SourceDestPair = {
 
 const PAIR_BAR_FILL = "#4a9eff";
 
-const SOURCE_DEST_X_MAX = 1400;
-const SOURCE_DEST_X_TICKS = [0, 350, 700, 1050, 1400] as const;
+const TRAFFIC_ORDER = TRAFFIC_ACTIVITY_ROWS.map((row) => row.label);
+const SEVERITY_CHART_ORDER = SEVERITY_ROWS.map((row) => row.label);
 
 const SOURCE_DEST_PAIRS: SourceDestPair[] = [
   { id: "10.0.1.44→203.0.113.5", source: "10.0.1.44", destination: "203.0.113.5", value: 1240 },
@@ -246,8 +254,6 @@ const NETWORK_ACTIVITY_ROWS: NetworkActivityRow[] = [
   },
 ];
 
-const TOTAL_NETWORK_RESULTS = 2036;
-
 function isTrafficActivityType(label: string): label is TrafficActivityType {
   return label === "DNS" || label === "Email" || label === "FTP" || label === "HTTP" || label === "SSH";
 }
@@ -291,6 +297,7 @@ type SourceDestinationPairsPanelProps = {
 function SourceDestinationPairsPanel({ rows, selectedId = null, onPairClick }: SourceDestinationPairsPanelProps) {
   const interactive = Boolean(onPairClick);
   const filterActive = selectedId != null;
+  const { xMax, xTicks } = horizontalBarScale(rows.map((row) => row.value));
 
   return (
     <div className="flex min-h-0 min-w-0 flex-1 flex-col lg:h-full">
@@ -299,7 +306,7 @@ function SourceDestinationPairsPanel({ rows, selectedId = null, onPairClick }: S
           className="pointer-events-none absolute inset-y-0 left-[20px] right-[20px] flex justify-between"
           aria-hidden
         >
-          {SOURCE_DEST_X_TICKS.map((t) => (
+          {xTicks.map((t) => (
             <div key={t} className="flex h-full w-0 justify-center">
               <div className="h-full w-px bg-datavis-gridlines" />
             </div>
@@ -309,7 +316,7 @@ function SourceDestinationPairsPanel({ rows, selectedId = null, onPairClick }: S
           {rows.map((row) => {
             const pct = Math.min(
               100,
-              Math.max((row.value / SOURCE_DEST_X_MAX) * 100, row.value > 0 ? 6 : 0),
+              Math.max((row.value / xMax) * 100, row.value > 0 ? 6 : 0),
             );
             const selected = interactive && selectedId === row.id;
             const dimmed = filterActive && !selected;
@@ -388,7 +395,7 @@ function SourceDestinationPairsPanel({ rows, selectedId = null, onPairClick }: S
         <div className="h-px shrink-0 bg-datavis-gridlines" aria-hidden />
       </div>
       <div className="flex shrink-0 justify-between px-[20px] pt-2 text-base-small text-text-tertiary">
-        {SOURCE_DEST_X_TICKS.map((t) => (
+        {xTicks.map((t) => (
           <span key={t} className="w-8 shrink-0 text-center tabular-nums first:w-6 first:text-left last:text-right">
             {t}
           </span>
@@ -610,16 +617,76 @@ function NetworkActivityTable({ rows }: { rows: NetworkActivityRow[] }) {
 
 /** Figma concept — Network Activity body for Federated Analytics. */
 export function NetworkActivityContent() {
-  const { range: timeframe } = useTimeframe();
+  const { timeframe, initialTimeframe, isChartZoomed, handleTimelineBrush, handleChartZoomReset } =
+    useFederatedAnalyticsTimeframeZoom("hourly");
   const [trafficFilter, setTrafficFilter] = useState<TrafficActivityType | null>(null);
   const [severityFilter, setSeverityFilter] = useState<string | null>(null);
   const [pairFilter, setPairFilter] = useState<string | null>(null);
   const [searchQuery, setSearchQuery] = useState("");
   const [tableTool, setTableTool] = useState<FilterColumnPanelTool | null>(null);
 
+  const tableRows = useMemo(
+    () =>
+      buildHourlyEventRows(NETWORK_ACTIVITY_ROWS, initialTimeframe, (template, id, eventTime) => ({
+        ...template,
+        id,
+        time: formatAnalyticsRowTime(eventTime),
+      })),
+    [initialTimeframe],
+  );
+
+  const timeframeScopedRows = useMemo(
+    () => tableRows.filter((row) => rowTimeInTimeframe(row.time, timeframe)),
+    [tableRows, timeframe],
+  );
+
+  const trafficChartRows = useMemo(
+    () =>
+      countByLabel(timeframeScopedRows, TRAFFIC_ORDER, (row) => row.trafficType).map((row) => ({
+        ...row,
+        color: CHART_CATEGORY_FILL,
+      })),
+    [timeframeScopedRows],
+  );
+
+  const trafficBarScale = useMemo(
+    () => horizontalBarScale(trafficChartRows.map((row) => row.value)),
+    [trafficChartRows],
+  );
+
+  const severityChartRows = useMemo(
+    () =>
+      SEVERITY_CHART_ORDER.map((label) => {
+        const severityKey: NetworkSeverity = label === "Info" ? "Informational" : (label as NetworkSeverity);
+        const value = timeframeScopedRows.filter((row) => row.severity === severityKey).length;
+        return {
+          label,
+          value,
+          color: SEV_BAR[severityKey],
+        };
+      }),
+    [timeframeScopedRows],
+  );
+
+  const severityBarScale = useMemo(
+    () => horizontalBarScale(severityChartRows.map((row) => row.value)),
+    [severityChartRows],
+  );
+
+  const sourceDestPairRows = useMemo(
+    () =>
+      SOURCE_DEST_PAIRS.map((pair) => ({
+        ...pair,
+        value: timeframeScopedRows.filter(
+          (row) => row.sourceIp === pair.source && row.destinationIp === pair.destination,
+        ).length,
+      })),
+    [timeframeScopedRows],
+  );
+
   const filteredRows = useMemo(
     () =>
-      NETWORK_ACTIVITY_ROWS.filter((row) => {
+      timeframeScopedRows.filter((row) => {
         if (trafficFilter && row.trafficType !== trafficFilter) return false;
         if (severityFilter && !severityMatchesFilter(row.severity, severityFilter)) return false;
         if (pairFilter) {
@@ -629,7 +696,7 @@ export function NetworkActivityContent() {
         if (!networkMatchesSearch(row, searchQuery)) return false;
         return true;
       }),
-    [trafficFilter, severityFilter, pairFilter, searchQuery],
+    [timeframeScopedRows, trafficFilter, severityFilter, pairFilter, searchQuery],
   );
 
   const hasActiveFilters =
@@ -693,12 +760,13 @@ export function NetworkActivityContent() {
         ? { index: spikeIndex, label: `spike ~${SPIKE_CLOCK_HOUR}:00` }
         : undefined;
 
-    return { series, xLabels, xTickIndices, xTickLabels, spikeHighlight };
+    return { series, xLabels, xTickIndices, xTickLabels, spikeHighlight, buckets };
   }, [timeframe]);
 
   return (
     <div className="flex shrink-0 flex-col gap-4 p-4 sm:p-5">
       <InsightCard title="Network Events Per Hour By Severity">
+        <ChartZoomHint unit="Hours" isChartZoomed={isChartZoomed} onReset={handleChartZoomReset} />
         <TimeSeriesAreaChart
           series={eventsPerHourChart.series}
           xLabels={eventsPerHourChart.xLabels}
@@ -708,33 +776,34 @@ export function NetworkActivityContent() {
           ariaLabel="Network events per hour by severity"
           selectedSeriesId={severityFilter && isNetworkSeverity(severityFilter) ? severityFilter : null}
           onSeriesClick={handleChartSeverityClick}
+          onBrushCommit={(selection) => handleTimelineBrush(selection, eventsPerHourChart.buckets)}
         />
       </InsightCard>
 
       <div className="grid min-h-0 shrink-0 grid-cols-1 items-stretch gap-4 lg:grid-cols-3">
         <InsightCard title="Traffic By Activity Type" fillHeight>
           <HorizontalBarPanel
-            rows={TRAFFIC_ACTIVITY_ROWS}
+            rows={trafficChartRows}
             selectedLabel={trafficFilter}
             onBarClick={handleTrafficClick}
             filterAriaLabel={(label) => `Filter network events by ${label} traffic`}
-            xMax={70000}
-            xTicks={[0, 17500, 35000, 52500, 70000]}
+            xMax={trafficBarScale.xMax}
+            xTicks={trafficBarScale.xTicks}
           />
         </InsightCard>
         <InsightCard title="Severity ID" fillHeight>
           <HorizontalBarPanel
-            rows={SEVERITY_ROWS}
+            rows={severityChartRows}
             selectedLabel={severityFilter}
             onBarClick={handleSeverityClick}
             filterAriaLabel={(label) => `Filter network events by ${label} severity`}
-            xMax={900}
-            xTicks={[0, 225, 450, 675, 900]}
+            xMax={severityBarScale.xMax}
+            xTicks={severityBarScale.xTicks}
           />
         </InsightCard>
         <InsightCard title="Top Source → Destination Pairs" fillHeight>
           <SourceDestinationPairsPanel
-            rows={SOURCE_DEST_PAIRS}
+            rows={sourceDestPairRows}
             selectedId={pairFilter}
             onPairClick={handlePairClick}
           />
@@ -746,7 +815,7 @@ export function NetworkActivityContent() {
           <h2 className="text-base-semibold text-text-primary">Network Activity Events</h2>
           <div className="mt-2 flex flex-wrap items-center gap-3">
             <p className="shrink-0 text-base-small text-text-secondary">
-              {filteredRows.length} of {TOTAL_NETWORK_RESULTS} Results
+              {filteredRows.length} of {timeframeScopedRows.length} Results
               {trafficFilter ? ` · ${trafficFilter}` : ""}
               {severityFilter ? ` · ${severityFilter}` : ""}
               {pairFilter ? ` · ${pairFilter.replace("→", " → ")}` : ""}

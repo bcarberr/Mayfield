@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useRef, useState, type CSSProperties } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState, type CSSProperties } from "react";
 import { createPortal } from "react-dom";
 import { useNavigate } from "react-router-dom";
 import { Icon } from "../../design-system";
@@ -15,7 +15,7 @@ import { TruncatedText } from "../ui/TruncatedText";
 import { useResizableColumns } from "../ui/useResizableColumns";
 import { Checkbox } from "../uiCheckbox";
 import { ROUTES } from "../../app/routes";
-import { useTimeframe } from "../../context/TimeframeContext";
+import { useTimeframe, type TimeframeRange } from "../../context/TimeframeContext";
 import { EntitiesOverviewContent } from "./EntitiesOverviewContent";
 import { NetworkActivityContent } from "./NetworkActivityContent";
 import { cx, DatavisGridlineRule, InsightCard } from "./datavisCard";
@@ -38,8 +38,10 @@ import {
   buildHourlyBuckets,
   findSpikeBucketIndex,
   formatBucketTimeLabel,
+  hourlyEventMultiplier,
   hourlySeverityValues,
   SPIKE_CLOCK_HOUR,
+  timeframeFromBucketSelection,
 } from "./timeframeChartUtils";
 
 const SEV_BAR: Record<"Critical" | "High" | "Medium" | "Low" | "Informational", string> = {
@@ -80,15 +82,6 @@ type FindingEventType = "HTTP Activity" | "Vulnerability";
 type FindingStatus = "New" | "In Progress" | "Resolved" | "Suppressed";
 
 const STATUS_UNKNOWN_FILL = "#717882";
-
-const FINDING_STATUS_SEGMENTS = [
-  { label: "New", color: SEV_BAR.Critical, value: 38 },
-  { label: "In Progress", color: SEV_BAR.High, value: 22 },
-  { label: "Resolved", color: CHART_CATEGORY_FILL, value: 32 },
-  { label: "Suppressed", color: STATUS_UNKNOWN_FILL, value: 8 },
-] as const;
-
-const FINDING_STATUS_TOTAL = 100;
 
 function isFindingStatus(label: string): label is FindingStatus {
   return label === "New" || label === "In Progress" || label === "Resolved" || label === "Suppressed";
@@ -155,6 +148,85 @@ function findingMatchesSearch(row: FindingRow, query: string): boolean {
     .toLowerCase();
 
   return haystack.includes(q);
+}
+
+function formatFindingRowTime(date: Date): string {
+  const pad2 = (value: number) => String(value).padStart(2, "0");
+  return `${date.getFullYear()}-${pad2(date.getMonth() + 1)}-${pad2(date.getDate())} ${pad2(date.getHours())}:${pad2(date.getMinutes())}:${pad2(date.getSeconds())}`;
+}
+
+function parseFindingRowTime(time: string): Date | null {
+  const match = time.match(/^(\d{4})-(\d{2})-(\d{2}) (\d{2}):(\d{2}):(\d{2})$/);
+  if (!match) return null;
+  return new Date(+match[1], +match[2] - 1, +match[3], +match[4], +match[5], +match[6]);
+}
+
+function findingRowInTimeframe(row: FindingRow, range: TimeframeRange): boolean {
+  const eventTime = parseFindingRowTime(row.time);
+  if (!eventTime) return true;
+  return eventTime.getTime() >= range.from.getTime() && eventTime.getTime() <= range.to.getTime();
+}
+
+function buildFindingRowsForTimeframe(templates: FindingRow[], range: TimeframeRange): FindingRow[] {
+  if (templates.length === 0) return [];
+
+  const buckets = buildHourlyBuckets(range);
+  const spikeIndex = findSpikeBucketIndex(buckets, range.to);
+  const fromMs = range.from.getTime();
+  const toMs = range.to.getTime();
+  const rows: FindingRow[] = [];
+  let templateIndex = 0;
+
+  buckets.forEach((bucket, bucketIndex) => {
+    const isSpike = spikeIndex === bucketIndex;
+    const multiplier = hourlyEventMultiplier(bucket.start.getHours(), isSpike);
+    const count = Math.max(1, Math.round(multiplier * 1.2 + ((bucketIndex * 2) % 2)));
+    const bucketStart = Math.max(bucket.start.getTime(), fromMs);
+    const bucketEnd = Math.min(bucket.start.getTime() + 3_600_000, toMs);
+    const bucketSpan = Math.max(bucketEnd - bucketStart, 60_000);
+
+    for (let i = 0; i < count; i++) {
+      const template = templates[templateIndex % templates.length];
+      templateIndex += 1;
+      const eventMs = bucketStart + (bucketSpan * (i + 0.5)) / count;
+
+      rows.push({
+        ...template,
+        id: String(rows.length + 1),
+        time: formatFindingRowTime(new Date(Math.min(eventMs, toMs))),
+      });
+    }
+  });
+
+  return rows;
+}
+
+const FINDING_CATEGORY_ORDER: FindingCategory[] = [
+  "Vulnerabilities",
+  "Compliance",
+  "Detections",
+  "Incidents",
+  "Security",
+  "Data Security",
+];
+
+const FINDING_SEVERITY_CHART_ORDER: SeverityLevel[] = ["Critical", "High", "Medium", "Low", "Informational"];
+
+const FINDING_STATUS_ORDER: FindingStatus[] = ["New", "In Progress", "Resolved", "Suppressed"];
+
+const FINDING_STATUS_COLORS: Record<FindingStatus, string> = {
+  New: SEV_BAR.Critical,
+  "In Progress": SEV_BAR.High,
+  Resolved: CHART_CATEGORY_FILL,
+  Suppressed: STATUS_UNKNOWN_FILL,
+};
+
+function horizontalBarScale(values: readonly number[]) {
+  const peak = Math.max(...values, 1);
+  const xMax = Math.max(5, Math.ceil(peak / 5) * 5);
+  const step = xMax / 5;
+  const xTicks = [0, step, step * 2, step * 3, step * 4, xMax].map((tick) => Math.round(tick));
+  return { xMax, xTicks };
 }
 
 const FINDING_SEVERITY_ORDER: Record<keyof typeof SEV_BAR, number> = {
@@ -592,38 +664,18 @@ function FederatedAnalyticsComingSoon({ view }: { view: FederatedViewId }) {
 
 export function SummaryInsightsDashboard() {
   const navigate = useNavigate();
-  const { range: timeframe } = useTimeframe();
+  const { range: timeframe, setRange } = useTimeframe();
   const [activeView, setActiveView] = useState<FederatedViewId>(readDefaultFederatedView);
+  const [findingsInitialTimeframe, setFindingsInitialTimeframe] = useState<TimeframeRange | null>(null);
+  const [isFindingsChartZoomed, setIsFindingsChartZoomed] = useState(false);
+  const previousActiveViewRef = useRef(activeView);
   const [severityFilter, setSeverityFilter] = useState<SeverityLevel | null>(null);
   const [categoryFilter, setCategoryFilter] = useState<FindingCategory | null>(null);
   const [statusFilter, setStatusFilter] = useState<FindingStatus | null>(null);
   const [searchQuery, setSearchQuery] = useState("");
   const [tableTool, setTableTool] = useState<FilterColumnPanelTool | null>(null);
   const [drawerFindingId, setDrawerFindingId] = useState<string | null>(null);
-  const categoryRows = useMemo(
-    () => [
-      { label: "Vulnerabilities", value: 408 },
-      { label: "Compliance", value: 321 },
-      { label: "Detections", value: 280 },
-      { label: "Incidents", value: 150 },
-      { label: "Security", value: 75 },
-      { label: "Data Security", value: 75 },
-    ],
-    [],
-  );
-
-  const severityRows = useMemo(
-    () => [
-      { label: "Critical", value: 125, color: SEV_BAR.Critical },
-      { label: "High", value: 203, color: SEV_BAR.High },
-      { label: "Medium", value: 434, color: SEV_BAR.Medium },
-      { label: "Low", value: 264, color: SEV_BAR.Low },
-      { label: "Informational", value: 456, color: SEV_BAR.Informational },
-    ],
-    [],
-  );
-
-  const tableRows: FindingRow[] = useMemo(
+  const findingRowTemplates: FindingRow[] = useMemo(
     () => [
       {
         id: "1",
@@ -825,16 +877,86 @@ export function SummaryInsightsDashboard() {
     [],
   );
 
+  useEffect(() => {
+    const enteredFindings = activeView === "findings" && previousActiveViewRef.current !== "findings";
+    previousActiveViewRef.current = activeView;
+
+    if (activeView !== "findings") return;
+
+    if (enteredFindings || findingsInitialTimeframe === null) {
+      setFindingsInitialTimeframe({
+        from: new Date(timeframe.from),
+        to: new Date(timeframe.to),
+      });
+      setIsFindingsChartZoomed(false);
+    }
+  }, [activeView, timeframe, findingsInitialTimeframe]);
+
+  const tableRows = useMemo(() => {
+    if (!findingsInitialTimeframe) return [];
+    return buildFindingRowsForTimeframe(findingRowTemplates, findingsInitialTimeframe);
+  }, [findingRowTemplates, findingsInitialTimeframe]);
+
+  const timeframeScopedRows = useMemo(
+    () => tableRows.filter((row) => findingRowInTimeframe(row, timeframe)),
+    [tableRows, timeframe],
+  );
+
+  const categoryRows = useMemo(() => {
+    const counts = new Map<FindingCategory, number>();
+    for (const row of timeframeScopedRows) {
+      counts.set(row.category, (counts.get(row.category) ?? 0) + 1);
+    }
+    return FINDING_CATEGORY_ORDER.map((label) => ({
+      label,
+      value: counts.get(label) ?? 0,
+    }));
+  }, [timeframeScopedRows]);
+
+  const categoryBarScale = useMemo(
+    () => horizontalBarScale(categoryRows.map((row) => row.value)),
+    [categoryRows],
+  );
+
+  const severityRows = useMemo(() => {
+    const counts = new Map<SeverityLevel, number>();
+    for (const row of timeframeScopedRows) {
+      counts.set(row.severity, (counts.get(row.severity) ?? 0) + 1);
+    }
+    return FINDING_SEVERITY_CHART_ORDER.map((label) => ({
+      label,
+      value: counts.get(label) ?? 0,
+      color: SEV_BAR[label],
+    }));
+  }, [timeframeScopedRows]);
+
+  const severityBarScale = useMemo(
+    () => horizontalBarScale(severityRows.map((row) => row.value)),
+    [severityRows],
+  );
+
+  const findingStatusSegments = useMemo(() => {
+    const counts = new Map<FindingStatus, number>();
+    for (const row of timeframeScopedRows) {
+      counts.set(row.findingStatus, (counts.get(row.findingStatus) ?? 0) + 1);
+    }
+    return FINDING_STATUS_ORDER.map((label) => ({
+      label,
+      color: FINDING_STATUS_COLORS[label],
+      value: counts.get(label) ?? 0,
+    }));
+  }, [timeframeScopedRows]);
+
   const filteredTableRows = useMemo(
     () =>
-      tableRows.filter((row) => {
+      timeframeScopedRows.filter((row) => {
         if (categoryFilter && row.category !== categoryFilter) return false;
         if (severityFilter && row.severity !== severityFilter) return false;
         if (statusFilter && row.findingStatus !== statusFilter) return false;
         if (!findingMatchesSearch(row, searchQuery)) return false;
         return true;
       }),
-    [tableRows, categoryFilter, severityFilter, statusFilter, searchQuery],
+    [timeframeScopedRows, categoryFilter, severityFilter, statusFilter, searchQuery],
   );
 
   const hasActiveFilters =
@@ -896,8 +1018,32 @@ export function SummaryInsightsDashboard() {
         ? { index: spikeIndex, label: `spike ~${SPIKE_CLOCK_HOUR}:00` }
         : undefined;
 
-    return { series, xLabels, xTickIndices, xTickLabels, spikeHighlight };
+    return { series, xLabels, xTickIndices, xTickLabels, spikeHighlight, buckets };
   }, [timeframe]);
+
+  const handleFindingsTimelineBrush = useCallback(
+    ({ startIndex, endIndex }: { startIndex: number; endIndex: number }) => {
+      const nextRange = timeframeFromBucketSelection(
+        timeframe,
+        eventsPerHourChart.buckets,
+        startIndex,
+        endIndex,
+      );
+      if (!nextRange) return;
+      setIsFindingsChartZoomed(true);
+      setRange(nextRange);
+    },
+    [timeframe, eventsPerHourChart.buckets, setRange],
+  );
+
+  const handleFindingsChartZoomReset = useCallback(() => {
+    if (!findingsInitialTimeframe) return;
+    setRange({
+      from: new Date(findingsInitialTimeframe.from),
+      to: new Date(findingsInitialTimeframe.to),
+    });
+    setIsFindingsChartZoomed(false);
+  }, [findingsInitialTimeframe, setRange]);
 
   return (
     <div className="relative flex min-h-0 flex-1 flex-col overflow-hidden">
@@ -934,6 +1080,21 @@ export function SummaryInsightsDashboard() {
       ) : (
         <div className="flex shrink-0 flex-col gap-4 p-4 sm:p-5">
       <InsightCard title="Finding Events Per Hour By Severity">
+        <p className="mb-2 pl-9 text-base-small text-text-tertiary">
+          Hours · drag to zoom
+          {isFindingsChartZoomed && findingsInitialTimeframe ? (
+            <>
+              {" · "}
+              <button
+                type="button"
+                className="font-semibold text-feedback-caution hover:underline"
+                onClick={handleFindingsChartZoomReset}
+              >
+                Reset
+              </button>
+            </>
+          ) : null}
+        </p>
         <TimeSeriesAreaChart
           series={eventsPerHourChart.series}
           xLabels={eventsPerHourChart.xLabels}
@@ -943,6 +1104,7 @@ export function SummaryInsightsDashboard() {
           ariaLabel="Finding events per hour by severity"
           selectedSeriesId={severityFilter}
           onSeriesClick={handleSeverityBarClick}
+          onBrushCommit={handleFindingsTimelineBrush}
         />
       </InsightCard>
 
@@ -954,6 +1116,8 @@ export function SummaryInsightsDashboard() {
             onBarClick={handleCategoryBarClick}
             filterAriaLabel={(label) => `Filter findings by ${label}`}
             axisLabel="Findings"
+            xMax={categoryBarScale.xMax}
+            xTicks={categoryBarScale.xTicks}
           />
         </InsightCard>
         <InsightCard title="Findings Severity ID" fillHeight>
@@ -963,12 +1127,14 @@ export function SummaryInsightsDashboard() {
             onBarClick={handleSeverityBarClick}
             filterAriaLabel={(label) => `Filter findings by ${label} severity`}
             axisLabel="Findings"
+            xMax={severityBarScale.xMax}
+            xTicks={severityBarScale.xTicks}
           />
         </InsightCard>
         <InsightCard title="Findings By Status" fillHeight>
           <DonutChartPanel
-            segments={FINDING_STATUS_SEGMENTS}
-            total={FINDING_STATUS_TOTAL}
+            segments={findingStatusSegments}
+            total={timeframeScopedRows.length}
             centerLabel="findings"
             selectedLabel={statusFilter}
             onSegmentClick={handleStatusClick}
@@ -982,7 +1148,7 @@ export function SummaryInsightsDashboard() {
           <h2 className="text-base-semibold text-text-primary">Finding Events</h2>
           <div className="mt-2 flex flex-wrap items-center gap-3">
             <p className="shrink-0 text-base-small text-text-secondary">
-              {filteredTableRows.length} of {tableRows.length} Results
+              {filteredTableRows.length} of {timeframeScopedRows.length} Results
               {categoryFilter ? ` · ${categoryFilter}` : ""}
               {severityFilter ? ` · ${severityFilter}` : ""}
               {statusFilter ? ` · ${statusFilter}` : ""}

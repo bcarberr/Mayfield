@@ -1,6 +1,5 @@
 import { useMemo, useState } from "react";
 import { Icon, type SeverityShapeIconName } from "../../design-system";
-import { useTimeframe } from "../../context/TimeframeContext";
 import { Button } from "../ui/Button";
 import { ColumnHeaderMenu } from "../ui/ColumnHeaderMenu";
 import { FilterColumnPanel, type FilterColumnPanelTool } from "../ui/FilterColumnPanel";
@@ -12,7 +11,17 @@ import { useResizableColumns } from "../ui/useResizableColumns";
 import { TruncatedText } from "../ui/TruncatedText";
 import { Checkbox } from "../uiCheckbox";
 import { cx, DatavisGridlineRule, InsightCard } from "./datavisCard";
-import { CHART_CATEGORY_FILL, HorizontalBarPanel } from "./horizontalBarPanel";
+import {
+  buildHourlyEventRows,
+  ChartZoomHint,
+  countByLabel,
+  formatAnalyticsRowTime,
+  horizontalBarScale,
+  rowTimeInTimeframe,
+  topCountsByLabel,
+  useFederatedAnalyticsTimeframeZoom,
+} from "./federatedAnalyticsZoom";
+import { HorizontalBarPanel } from "./horizontalBarPanel";
 import { TimeSeriesAreaChart } from "./timeSeriesAreaChart";
 import {
   buildHourlyAxisTicks,
@@ -87,31 +96,18 @@ function connectorSwatch(connector: string) {
   return "bg-feedback-negative";
 }
 
-const ACTIVITY_CLASS_ROWS = [
-  { label: "API Activity", value: 4180, color: CHART_CATEGORY_FILL },
-  { label: "Web Resource Access", value: 3210, color: CHART_CATEGORY_FILL },
-  { label: "Datastore Activity", value: 1840, color: CHART_CATEGORY_FILL },
-  { label: "File Hosting", value: 1260, color: CHART_CATEGORY_FILL },
-  { label: "App Lifecycle", value: 890, color: CHART_CATEGORY_FILL },
-  { label: "App Error", value: 620, color: CHART_CATEGORY_FILL },
+const ACTIVITY_CLASS_ORDER = [
+  "API Activity",
+  "Web Resource Access",
+  "Datastore Activity",
+  "File Hosting",
+  "App Lifecycle",
+  "App Error",
 ] as const;
 
-const SEVERITY_ROWS = [
-  { label: "Critical", value: 24, color: SEV_BAR.Critical },
-  { label: "High", value: 156, color: SEV_BAR.High },
-  { label: "Medium", value: 340, color: SEV_BAR.Medium },
-  { label: "Low", value: 462, color: SEV_BAR.Low },
-  { label: "Info", value: 7215, color: SEV_BAR.Informational },
-] as const;
+const SEVERITY_CHART_ORDER = ["Critical", "High", "Medium", "Low", "Info"] as const;
 
-const TOP_APP_ROWS = [
-  { label: "Salesforce", value: 2310, color: APP_BAR_FILL },
-  { label: "M365", value: 1740, color: APP_BAR_FILL },
-  { label: "Snowflake", value: 980, color: APP_BAR_FILL },
-  { label: "GitHub", value: 640, color: APP_BAR_FILL },
-] as const;
-
-const APPLICATION_ACTIVITY_ROWS: ApplicationActivityRow[] = [
+const APPLICATION_ACTIVITY_ROW_TEMPLATES: ApplicationActivityRow[] = [
   {
     id: "1",
     severity: "Critical",
@@ -234,10 +230,8 @@ const APPLICATION_ACTIVITY_ROWS: ApplicationActivityRow[] = [
   },
 ];
 
-const TOTAL_APPLICATION_RESULTS = 8197;
-
 function isActivityClass(label: string): label is ActivityClass {
-  return ACTIVITY_CLASS_ROWS.some((row) => row.label === label);
+  return (ACTIVITY_CLASS_ORDER as readonly string[]).includes(label);
 }
 
 function isApplicationSeverity(label: string): label is ApplicationSeverity {
@@ -501,23 +495,75 @@ function ApplicationActivityTable({ rows }: { rows: ApplicationActivityRow[] }) 
 
 /** Figma concept — Application Activity body for Federated Analytics. */
 export function ApplicationActivityContent() {
-  const { range: timeframe } = useTimeframe();
+  const { timeframe, initialTimeframe, isChartZoomed, handleTimelineBrush, handleChartZoomReset } =
+    useFederatedAnalyticsTimeframeZoom("hourly");
   const [activityClassFilter, setActivityClassFilter] = useState<ActivityClass | null>(null);
   const [severityFilter, setSeverityFilter] = useState<string | null>(null);
   const [appFilter, setAppFilter] = useState<string | null>(null);
   const [searchQuery, setSearchQuery] = useState("");
   const [tableTool, setTableTool] = useState<FilterColumnPanelTool | null>(null);
 
+  const tableRows = useMemo(
+    () =>
+      buildHourlyEventRows(APPLICATION_ACTIVITY_ROW_TEMPLATES, initialTimeframe, (template, id, eventTime) => ({
+        ...template,
+        id,
+        time: formatAnalyticsRowTime(eventTime),
+      })),
+    [initialTimeframe],
+  );
+
+  const timeframeScopedRows = useMemo(
+    () => tableRows.filter((row) => rowTimeInTimeframe(row.time, timeframe)),
+    [tableRows, timeframe],
+  );
+
+  const activityClassRows = useMemo(
+    () => countByLabel(timeframeScopedRows, ACTIVITY_CLASS_ORDER, (row) => row.activityClass),
+    [timeframeScopedRows],
+  );
+
+  const activityClassBarScale = useMemo(
+    () => horizontalBarScale(activityClassRows.map((row) => row.value)),
+    [activityClassRows],
+  );
+
+  const severityChartRows = useMemo(
+    () =>
+      countByLabel(timeframeScopedRows, SEVERITY_CHART_ORDER, (row) =>
+        row.severity === "Informational" ? "Info" : row.severity,
+      ).map((row) => ({
+        ...row,
+        color: row.label === "Info" ? SEV_BAR.Informational : SEV_BAR[row.label as ApplicationSeverity],
+      })),
+    [timeframeScopedRows],
+  );
+
+  const severityBarScale = useMemo(
+    () => horizontalBarScale(severityChartRows.map((row) => row.value)),
+    [severityChartRows],
+  );
+
+  const topAppRows = useMemo(
+    () => topCountsByLabel(timeframeScopedRows, (row) => row.app, 4, APP_BAR_FILL),
+    [timeframeScopedRows],
+  );
+
+  const topAppBarScale = useMemo(
+    () => horizontalBarScale(topAppRows.map((row) => row.value)),
+    [topAppRows],
+  );
+
   const filteredRows = useMemo(
     () =>
-      APPLICATION_ACTIVITY_ROWS.filter((row) => {
+      timeframeScopedRows.filter((row) => {
         if (activityClassFilter && row.activityClass !== activityClassFilter) return false;
         if (severityFilter && !severityMatchesFilter(row.severity, severityFilter)) return false;
         if (appFilter && row.app !== appFilter) return false;
         if (!applicationMatchesSearch(row, searchQuery)) return false;
         return true;
       }),
-    [activityClassFilter, severityFilter, appFilter, searchQuery],
+    [timeframeScopedRows, activityClassFilter, severityFilter, appFilter, searchQuery],
   );
 
   const hasActiveFilters =
@@ -581,12 +627,13 @@ export function ApplicationActivityContent() {
         ? { index: spikeIndex, label: `spike ~${APPLICATION_SPIKE_HOUR}:00` }
         : undefined;
 
-    return { series, xLabels, xTickIndices, xTickLabels, spikeHighlight };
+    return { series, xLabels, xTickIndices, xTickLabels, spikeHighlight, buckets };
   }, [timeframe]);
 
   return (
     <div className="flex shrink-0 flex-col gap-4 p-4 sm:p-5">
       <InsightCard title="Application Activity Events Per Hour By Severity">
+        <ChartZoomHint unit="Hours" isChartZoomed={isChartZoomed} onReset={handleChartZoomReset} />
         <TimeSeriesAreaChart
           series={eventsPerHourChart.series}
           xLabels={eventsPerHourChart.xLabels}
@@ -596,38 +643,39 @@ export function ApplicationActivityContent() {
           ariaLabel="Application activity events per hour by severity"
           selectedSeriesId={severityFilter && isApplicationSeverity(severityFilter) ? severityFilter : null}
           onSeriesClick={handleChartSeverityClick}
+          onBrushCommit={(selection) => handleTimelineBrush(selection, eventsPerHourChart.buckets)}
         />
       </InsightCard>
 
       <div className="grid min-h-0 shrink-0 grid-cols-1 items-stretch gap-4 lg:grid-cols-3">
         <InsightCard title="Application Activity Classes" fillHeight>
           <HorizontalBarPanel
-            rows={ACTIVITY_CLASS_ROWS}
+            rows={activityClassRows}
             selectedLabel={activityClassFilter}
             onBarClick={handleActivityClassClick}
             filterAriaLabel={(label) => `Filter application activity by ${label}`}
-            xMax={4500}
-            xTicks={[0, 1125, 2250, 3375, 4500]}
+            xMax={activityClassBarScale.xMax}
+            xTicks={activityClassBarScale.xTicks}
           />
         </InsightCard>
         <InsightCard title="Severity ID" fillHeight>
           <HorizontalBarPanel
-            rows={SEVERITY_ROWS}
+            rows={severityChartRows}
             selectedLabel={severityFilter}
             onBarClick={handleSeverityClick}
             filterAriaLabel={(label) => `Filter application activity by ${label} severity`}
-            xMax={7500}
-            xTicks={[0, 1875, 3750, 5625, 7500]}
+            xMax={severityBarScale.xMax}
+            xTicks={severityBarScale.xTicks}
           />
         </InsightCard>
         <InsightCard title="Top Apps By API Call Volume" fillHeight>
           <HorizontalBarPanel
-            rows={TOP_APP_ROWS}
+            rows={topAppRows}
             selectedLabel={appFilter}
             onBarClick={handleAppClick}
             filterAriaLabel={(label) => `Filter application activity by app ${label}`}
-            xMax={2500}
-            xTicks={[0, 625, 1250, 1875, 2500]}
+            xMax={topAppBarScale.xMax}
+            xTicks={topAppBarScale.xTicks}
           />
         </InsightCard>
       </div>
@@ -637,7 +685,7 @@ export function ApplicationActivityContent() {
           <h2 className="text-base-semibold text-text-primary">Application Activity Events</h2>
           <div className="mt-2 flex flex-wrap items-center gap-3">
             <p className="shrink-0 text-base-small text-text-secondary">
-              {filteredRows.length} of {TOTAL_APPLICATION_RESULTS} Results
+              {filteredRows.length} of {timeframeScopedRows.length} Results
               {activityClassFilter ? ` · ${activityClassFilter}` : ""}
               {severityFilter ? ` · ${severityFilter}` : ""}
               {appFilter ? ` · ${appFilter}` : ""}

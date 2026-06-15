@@ -130,6 +130,7 @@ export function buildFsqlResultsTimeline(timeframe: TimeframeRange) {
     yTicks,
     barColor: TIME_SERIES_BAR_FILL,
     totalResults: counts.reduce((sum, count) => sum + count, 0),
+    buckets,
   };
 }
 

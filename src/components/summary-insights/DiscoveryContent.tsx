@@ -1,6 +1,6 @@
 import { useMemo, useState } from "react";
 import { Icon, type SeverityShapeIconName } from "../../design-system";
-import { useTimeframe, type TimeframeRange } from "../../context/TimeframeContext";
+import type { TimeframeRange } from "../../context/TimeframeContext";
 import { Button } from "../ui/Button";
 import { ColumnHeaderMenu } from "../ui/ColumnHeaderMenu";
 import { DonutChartPanel } from "../ui/DonutChartPanel";
@@ -12,9 +12,19 @@ import { compareStrings, useColumnSort } from "../ui/useColumnSort";
 import { useResizableColumns } from "../ui/useResizableColumns";
 import { TruncatedText } from "../ui/TruncatedText";
 import { Checkbox } from "../uiCheckbox";
+import {
+  buildDailyEventRows,
+  ChartZoomHint,
+  countByLabel,
+  formatAnalyticsRowTime,
+  horizontalBarScale,
+  rowTimeInTimeframe,
+  useFederatedAnalyticsTimeframeZoom,
+} from "./federatedAnalyticsZoom";
 import { CHART_CATEGORY_FILL, HorizontalBarPanel } from "./horizontalBarPanel";
 import { cx, DatavisGridlineRule, InsightCard } from "./datavisCard";
 import { TimeSeriesBarChart } from "./timeSeriesBarChart";
+import { buildDailyBuckets, type HourBucket } from "./timeframeChartUtils";
 
 type DiscoverySeverity = "Critical" | "High" | "Medium" | "Low" | "Informational";
 
@@ -84,76 +94,68 @@ type DailyDiscoveryChart = {
   spikeLabel: string;
   yMax: number;
   yTicks: number[];
+  buckets: HourBucket[];
 };
 
-function buildDailyDiscoveryChart({ from, to }: TimeframeRange): DailyDiscoveryChart {
-  const msPerDay = 86_400_000;
-  const startDay = new Date(from);
-  startDay.setHours(0, 0, 0, 0);
-  const endDay = new Date(to);
-  endDay.setHours(0, 0, 0, 0);
-
-  const dayCount = Math.max(1, Math.round((endDay.getTime() - startDay.getTime()) / msPerDay) + 1);
-  const useDate = dayCount > 7;
+function buildDailyDiscoveryChart(range: TimeframeRange): DailyDiscoveryChart {
+  const buckets = buildDailyBuckets(range);
+  const useDate = buckets.length > 7;
+  const endDayMs = new Date(range.to);
+  endDayMs.setHours(0, 0, 0, 0);
 
   const xLabels: string[] = [];
   const values: number[] = [];
   let spikeIndex: number | null = null;
 
-  const spikeDayMs = endDay.getTime();
-
-  for (let i = 0; i < dayCount; i++) {
-    const day = new Date(startDay.getTime() + i * msPerDay);
+  buckets.forEach((bucket, i) => {
+    const day = bucket.start;
     if (useDate) {
       xLabels.push(new Intl.DateTimeFormat("en-US", { month: "short", day: "numeric" }).format(day));
     } else {
       xLabels.push(WEEKDAY_SHORT[day.getDay()]);
     }
 
-    const isSpike = day.getTime() === spikeDayMs;
+    const isSpike = day.getTime() === endDayMs.getTime();
     if (isSpike) spikeIndex = i;
     const base = 12;
     const dow = day.getDay();
     const weekdayMultiplier = dow === 0 || dow === 6 ? 0.7 : 1.0 + (dow === 4 ? 0.2 : 0);
     const value = isSpike ? 38 : Math.max(8, Math.round(base * weekdayMultiplier * (0.9 + (i % 3) * 0.1)));
     values.push(value);
-  }
+  });
 
   const peak = Math.max(...values, 10);
   const yMax = Math.ceil(peak / 10) * 10;
   const step = yMax / 4;
   const yTicks = [0, step, step * 2, step * 3, yMax];
 
-  const spikeDayOfWeek = spikeIndex != null ? WEEKDAY_SHORT[new Date(spikeDayMs).getDay()] : "Thu";
+  const spikeDayOfWeek = spikeIndex != null ? WEEKDAY_SHORT[endDayMs.getDay()] : "Thu";
   const spikeLabel = `${spikeDayOfWeek} spike: ${values[spikeIndex ?? 0] ?? 38} new cloud resources in us-east-2, no IaC tag`;
 
-  return { xLabels, values, spikeIndex, spikeLabel, yMax, yTicks };
+  return { xLabels, values, spikeIndex, spikeLabel, yMax, yTicks, buckets };
 }
 
-const PLATFORM_ROWS = [
-  { label: "Windows", value: 1204, color: CHART_CATEGORY_FILL },
-  { label: "macOS", value: 540, color: CHART_CATEGORY_FILL },
-  { label: "Linux", value: 748, color: CHART_CATEGORY_FILL },
-  { label: "Cloud / SaaS", value: 412, color: CHART_CATEGORY_FILL },
-  { label: "Unknown", value: 53, color: PLATFORM_UNKNOWN_FILL },
-] as const;
+const PLATFORM_ORDER = ["Windows", "macOS", "Linux", "Cloud / SaaS", "Unknown"] as const;
+const SEVERITY_CHART_ORDER = [
+  "Critical",
+  "High",
+  "Medium",
+  "Low",
+  "Informational",
+] as const satisfies readonly DiscoverySeverity[];
+const PATCH_STATUS_ORDER = [
+  "Up to date",
+  "Missing non-crit",
+  "Missing critical",
+  "Unknown",
+] as const satisfies readonly PatchStatus[];
 
-const SEVERITY_ROWS = [
-  { label: "Critical", value: 18, color: SEV_BAR.Critical },
-  { label: "High", value: 142, color: SEV_BAR.High },
-  { label: "Medium", value: 301, color: SEV_BAR.Medium },
-  { label: "Low", value: 460, color: SEV_BAR.Low },
-  { label: "Informational", value: 2887, color: SEV_BAR.Informational },
-] as const;
-
-const PATCH_SEGMENTS = [
-  { label: "Up to date", color: CHART_CATEGORY_FILL, value: 1833 },
-  { label: "Missing non-crit", color: "#f28830", value: 680 },
-  { label: "Missing critical", color: "#ff604a", value: 236 },
-  { label: "Unknown", color: PLATFORM_UNKNOWN_FILL, value: 208 },
-] as const;
-
-const PATCH_DEVICE_TOTAL = 2957;
+const PATCH_COLORS: Record<PatchStatus, string> = {
+  "Up to date": CHART_CATEGORY_FILL,
+  "Missing non-crit": "#f28830",
+  "Missing critical": "#ff604a",
+  Unknown: PLATFORM_UNKNOWN_FILL,
+};
 
 const DISCOVERY_ROWS: DiscoveryRow[] = [
   {
@@ -287,8 +289,6 @@ const DISCOVERY_ROWS: DiscoveryRow[] = [
     connector: "BC-CS",
   },
 ];
-
-const TOTAL_DISCOVERY_RESULTS = 3808;
 
 function isDevicePlatform(label: string): label is DevicePlatform {
   return (
@@ -567,23 +567,82 @@ function DiscoveryEventsTable({ rows }: { rows: DiscoveryRow[] }) {
 
 /** Figma concept — Discovery body for Federated Analytics. */
 export function DiscoveryContent() {
-  const { range: timeframe } = useTimeframe();
+  const { timeframe, initialTimeframe, isChartZoomed, handleTimelineBrush, handleChartZoomReset } =
+    useFederatedAnalyticsTimeframeZoom("daily");
   const [platformFilter, setPlatformFilter] = useState<DevicePlatform | null>(null);
   const [severityFilter, setSeverityFilter] = useState<DiscoverySeverity | null>(null);
   const [patchFilter, setPatchFilter] = useState<PatchStatus | null>(null);
   const [searchQuery, setSearchQuery] = useState("");
   const [tableTool, setTableTool] = useState<FilterColumnPanelTool | null>(null);
 
+  const tableRows = useMemo(
+    () =>
+      buildDailyEventRows(DISCOVERY_ROWS, initialTimeframe, (template, id, eventTime) => ({
+        ...template,
+        id,
+        time: formatAnalyticsRowTime(eventTime),
+      })),
+    [initialTimeframe],
+  );
+
+  const timeframeScopedRows = useMemo(
+    () => tableRows.filter((row) => rowTimeInTimeframe(row.time, timeframe)),
+    [tableRows, timeframe],
+  );
+
+  const platformRows = useMemo(
+    () =>
+      countByLabel(timeframeScopedRows, PLATFORM_ORDER, (row) => row.platform).map((row) => ({
+        ...row,
+        color: row.label === "Unknown" ? PLATFORM_UNKNOWN_FILL : CHART_CATEGORY_FILL,
+      })),
+    [timeframeScopedRows],
+  );
+
+  const platformBarScale = useMemo(
+    () => horizontalBarScale(platformRows.map((row) => row.value)),
+    [platformRows],
+  );
+
+  const severityChartRows = useMemo(
+    () =>
+      countByLabel(timeframeScopedRows, SEVERITY_CHART_ORDER, (row) => row.severity).map((row) => ({
+        ...row,
+        color: SEV_BAR[row.label as DiscoverySeverity],
+      })),
+    [timeframeScopedRows],
+  );
+
+  const severityBarScale = useMemo(
+    () => horizontalBarScale(severityChartRows.map((row) => row.value)),
+    [severityChartRows],
+  );
+
+  const patchSegments = useMemo(
+    () =>
+      countByLabel(timeframeScopedRows, PATCH_STATUS_ORDER, (row) => row.patchStatus).map((row) => ({
+        label: row.label,
+        value: row.value,
+        color: PATCH_COLORS[row.label as PatchStatus],
+      })),
+    [timeframeScopedRows],
+  );
+
+  const patchDeviceTotal = useMemo(
+    () => patchSegments.reduce((sum, segment) => sum + segment.value, 0),
+    [patchSegments],
+  );
+
   const filteredRows = useMemo(
     () =>
-      DISCOVERY_ROWS.filter((row) => {
+      timeframeScopedRows.filter((row) => {
         if (platformFilter && row.platform !== platformFilter) return false;
         if (severityFilter && row.severity !== severityFilter) return false;
         if (patchFilter && row.patchStatus !== patchFilter) return false;
         if (!discoveryMatchesSearch(row, searchQuery)) return false;
         return true;
       }),
-    [platformFilter, severityFilter, patchFilter, searchQuery],
+    [timeframeScopedRows, platformFilter, severityFilter, patchFilter, searchQuery],
   );
 
   const hasActiveFilters =
@@ -612,6 +671,7 @@ export function DiscoveryContent() {
   return (
     <div className="flex shrink-0 flex-col gap-4 p-4 sm:p-5">
       <InsightCard title="New Assets Discovered Over Time">
+        <ChartZoomHint unit="Days" isChartZoomed={isChartZoomed} onReset={handleChartZoomReset} />
         <TimeSeriesBarChart
           values={dailyChart.values}
           xLabels={dailyChart.xLabels}
@@ -624,6 +684,7 @@ export function DiscoveryContent() {
           yMax={dailyChart.yMax}
           yTicks={dailyChart.yTicks}
           ariaLabel="New assets discovered over time by day"
+          onBrushCommit={(selection) => handleTimelineBrush(selection, dailyChart.buckets)}
         />
         <p className="mt-1 pl-9 text-base-small text-text-tertiary">
           {dailyChart.spikeLabel}
@@ -633,28 +694,28 @@ export function DiscoveryContent() {
       <div className="grid min-h-0 shrink-0 grid-cols-1 items-stretch gap-4 lg:grid-cols-3">
         <InsightCard title="Devices By Platform" fillHeight>
           <HorizontalBarPanel
-            rows={PLATFORM_ROWS}
+            rows={platformRows}
             selectedLabel={platformFilter}
             onBarClick={handlePlatformClick}
             filterAriaLabel={(label) => `Filter discovery events by platform ${label}`}
-            xMax={1300}
-            xTicks={[0, 300, 600, 900, 1200]}
+            xMax={platformBarScale.xMax}
+            xTicks={platformBarScale.xTicks}
           />
         </InsightCard>
         <InsightCard title="Severity ID" fillHeight>
           <HorizontalBarPanel
-            rows={SEVERITY_ROWS}
+            rows={severityChartRows}
             selectedLabel={severityFilter}
             onBarClick={handleSeverityClick}
             filterAriaLabel={(label) => `Filter discovery events by ${label} severity`}
-            xMax={3000}
-            xTicks={[0, 750, 1500, 2250, 3000]}
+            xMax={severityBarScale.xMax}
+            xTicks={severityBarScale.xTicks}
           />
         </InsightCard>
         <InsightCard title="Patch Compliance" fillHeight>
           <DonutChartPanel
-            segments={PATCH_SEGMENTS}
-            total={PATCH_DEVICE_TOTAL}
+            segments={patchSegments}
+            total={patchDeviceTotal}
             centerLabel="devices"
             selectedLabel={patchFilter}
             onSegmentClick={handlePatchClick}
@@ -668,7 +729,7 @@ export function DiscoveryContent() {
           <h2 className="text-base-semibold text-text-primary">Discovery Events</h2>
           <div className="mt-2 flex flex-wrap items-center gap-3">
             <p className="shrink-0 text-base-small text-text-secondary">
-              {filteredRows.length} of {TOTAL_DISCOVERY_RESULTS} Results
+              {filteredRows.length} of {timeframeScopedRows.length} Results
               {platformFilter ? ` · ${platformFilter}` : ""}
               {severityFilter ? ` · ${severityFilter}` : ""}
               {patchFilter ? ` · ${patchFilter}` : ""}
