@@ -61,10 +61,13 @@ function AppShell() {
     navigate(DEFAULT_ROUTE, { replace: true });
   }, [navState?.background, navigate]);
 
-  const handleSendToFsqlSearch = (query: string) => {
-    setPendingFsqlQuery(query);
-    navigate(ROUTES.search);
-  };
+  const handleSendToFsqlSearch = useCallback(
+    (query: string) => {
+      setPendingFsqlQuery(query);
+      navigate(ROUTES.search);
+    },
+    [setPendingFsqlQuery, navigate],
+  );
   return (
     <div className="flex h-full min-h-screen">
       <div className="relative flex min-h-0 min-w-0 flex-1 flex-col">

@@ -90,27 +90,27 @@ export function ConnectorsDashboard({
 
       <div className="min-h-0 flex-1 overflow-y-auto">
         <div className="flex flex-col gap-8">
-        {visibleCategories.map((category) => {
-          const categoryConnectors = connectorsByCategory.get(category.id) ?? [];
-          if (categoryConnectors.length === 0) return null;
+          {visibleCategories.map((category) => {
+            const categoryConnectors = connectorsByCategory.get(category.id) ?? [];
+            if (categoryConnectors.length === 0) return null;
 
-          return (
-            <section key={category.id}>
-              <h2 className="text-sm font-bold text-text-primary">{category.title}</h2>
-              <ul className="mt-3 grid grid-cols-1 gap-4 sm:grid-cols-2 xl:grid-cols-3 2xl:grid-cols-4">
-                {categoryConnectors.map((connector) => (
-                  <li key={connector.id}>
-                    <ConnectorCard
-                      connector={connector}
-                      onEnabledChange={(enabled) => setConnectorEnabled(connector.id, enabled)}
-                      onConfigure={onConfigureConnector ? () => onConfigureConnector(connector.id) : undefined}
-                    />
-                  </li>
-                ))}
-              </ul>
-            </section>
-          );
-        })}
+            return (
+              <section key={category.id}>
+                <h2 className="text-sm font-bold text-text-primary">{category.title}</h2>
+                <ul className="mt-3 grid grid-cols-1 gap-4 sm:grid-cols-2 xl:grid-cols-3 2xl:grid-cols-4">
+                  {categoryConnectors.map((connector) => (
+                    <li key={connector.id}>
+                      <ConnectorCard
+                        connector={connector}
+                        onEnabledChange={(enabled) => setConnectorEnabled(connector.id, enabled)}
+                        onConfigure={onConfigureConnector ? () => onConfigureConnector(connector.id) : undefined}
+                      />
+                    </li>
+                  ))}
+                </ul>
+              </section>
+            );
+          })}
         </div>
       </div>
     </div>

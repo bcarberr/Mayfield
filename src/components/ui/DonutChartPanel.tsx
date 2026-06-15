@@ -14,24 +14,24 @@ export type DonutSegment = {
   value: number;
 };
 
-function polarToCartesian(cx: number, cy: number, radius: number, angleDeg: number) {
+function polarToCartesian(centerX: number, centerY: number, radius: number, angleDeg: number) {
   const rad = ((angleDeg - 90) * Math.PI) / 180;
-  return { x: cx + radius * Math.cos(rad), y: cy + radius * Math.sin(rad) };
+  return { x: centerX + radius * Math.cos(rad), y: centerY + radius * Math.sin(rad) };
 }
 
 function donutSegmentPath(
-  cx: number,
-  cy: number,
+  centerX: number,
+  centerY: number,
   innerR: number,
   outerR: number,
   startAngle: number,
   endAngle: number,
 ) {
   const largeArc = endAngle - startAngle > 180 ? 1 : 0;
-  const outerStart = polarToCartesian(cx, cy, outerR, startAngle);
-  const outerEnd = polarToCartesian(cx, cy, outerR, endAngle);
-  const innerStart = polarToCartesian(cx, cy, innerR, endAngle);
-  const innerEnd = polarToCartesian(cx, cy, innerR, startAngle);
+  const outerStart = polarToCartesian(centerX, centerY, outerR, startAngle);
+  const outerEnd = polarToCartesian(centerX, centerY, outerR, endAngle);
+  const innerStart = polarToCartesian(centerX, centerY, innerR, endAngle);
+  const innerEnd = polarToCartesian(centerX, centerY, innerR, startAngle);
 
   return [
     `M ${outerStart.x} ${outerStart.y}`,

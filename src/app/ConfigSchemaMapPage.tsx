@@ -127,7 +127,7 @@ function ConnectionTitleLink({ connectorName }: { connectorName: string }) {
       <a
         href={isAthena ? "https://docs.aws.amazon.com/athena/" : "#"}
         target="_blank"
-        rel="noreferrer"
+        rel="noopener noreferrer"
         className="inline-flex flex-wrap items-center justify-end gap-1 text-sm leading-[18px] text-text-tertiary hover:text-text-secondary"
         onClick={isAthena ? undefined : (event) => event.preventDefault()}
       >
@@ -165,7 +165,7 @@ function StaticConnectorForm({ connectorName }: { connectorName: string }) {
         </label>
         <label className="flex flex-col gap-1.5">
           <span className="text-sm font-semibold text-text-secondary">API Key</span>
-          <Input type="password" placeholder="Enter API key or token" />
+          <Input type="password" placeholder="Enter API key or token" autoComplete="off" />
         </label>
       </div>
     </div>

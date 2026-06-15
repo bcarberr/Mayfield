@@ -115,7 +115,7 @@ function CopilotResponseBlock({
         <a
           href={block.href}
           target="_blank"
-          rel="noreferrer"
+          rel="noopener noreferrer"
           className="inline-flex text-sm font-semibold text-interactive-active hover:underline"
         >
           {block.label}

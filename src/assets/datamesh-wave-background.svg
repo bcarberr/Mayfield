@@ -1,0 +1,89 @@
+<svg width="1600" height="560" viewBox="0 0 1600 560" fill="none" xmlns="http://www.w3.org/2000/svg" role="img" aria-label="Teal data mesh wave background">
+  <defs>
+    <linearGradient id="bg" x1="0" y1="0" x2="0" y2="560" gradientUnits="userSpaceOnUse">
+      <stop offset="0" stop-color="#062B34"/>
+      <stop offset="0.48" stop-color="#041B24"/>
+      <stop offset="1" stop-color="#020B13"/>
+    </linearGradient>
+    <radialGradient id="glow" cx="50%" cy="44%" r="62%">
+      <stop offset="0" stop-color="#02E6FF" stop-opacity="0.22"/>
+      <stop offset="0.38" stop-color="#00BBD6" stop-opacity="0.10"/>
+      <stop offset="1" stop-color="#001018" stop-opacity="0"/>
+    </radialGradient>
+    <linearGradient id="line" x1="0" y1="0" x2="1600" y2="0" gradientUnits="userSpaceOnUse">
+      <stop offset="0" stop-color="#009AB5" stop-opacity="0"/>
+      <stop offset="0.18" stop-color="#00E5FF" stop-opacity="0.65"/>
+      <stop offset="0.5" stop-color="#1BFFFF" stop-opacity="0.95"/>
+      <stop offset="0.82" stop-color="#00D7F0" stop-opacity="0.65"/>
+      <stop offset="1" stop-color="#009AB5" stop-opacity="0"/>
+    </linearGradient>
+    <filter id="softGlow" x="-10%" y="-40%" width="120%" height="180%">
+      <feGaussianBlur stdDeviation="3" result="blur"/>
+      <feMerge>
+        <feMergeNode in="blur"/>
+        <feMergeNode in="SourceGraphic"/>
+      </feMerge>
+    </filter>
+    <pattern id="dotGrid" width="18" height="18" patternUnits="userSpaceOnUse">
+      <circle cx="3" cy="3" r="1.1" fill="#16E7FF" opacity="0.26"/>
+    </pattern>
+    <mask id="fadeMask">
+      <rect width="1600" height="560" fill="black"/>
+      <linearGradient id="verticalFade" x1="0" y1="110" x2="0" y2="540" gradientUnits="userSpaceOnUse">
+        <stop offset="0" stop-color="white" stop-opacity="0.12"/>
+        <stop offset="0.24" stop-color="white" stop-opacity="1"/>
+        <stop offset="0.72" stop-color="white" stop-opacity="0.9"/>
+        <stop offset="1" stop-color="white" stop-opacity="0"/>
+      </linearGradient>
+      <rect y="90" width="1600" height="450" fill="url(#verticalFade)"/>
+    </mask>
+  </defs>
+
+  <rect width="1600" height="560" fill="url(#bg)"/>
+  <rect width="1600" height="560" fill="url(#glow)"/>
+
+  <g mask="url(#fadeMask)">
+    <g opacity="0.72">
+      <path d="M-80 235 C 80 205, 165 250, 280 190 S 450 195, 560 245 S 745 195, 850 245 S 1030 275, 1145 220 S 1315 205, 1465 250 S 1625 195, 1680 225" stroke="url(#line)" stroke-width="1.4"/>
+      <path d="M-80 252 C 80 222, 165 267, 280 207 S 450 212, 560 262 S 745 212, 850 262 S 1030 292, 1145 237 S 1315 222, 1465 267 S 1625 212, 1680 242" stroke="url(#line)" stroke-width="1.1" opacity="0.9"/>
+      <path d="M-80 269 C 80 239, 165 284, 280 224 S 450 229, 560 279 S 745 229, 850 279 S 1030 309, 1145 254 S 1315 239, 1465 284 S 1625 229, 1680 259" stroke="url(#line)" stroke-width="0.95" opacity="0.78"/>
+      <path d="M-80 286 C 80 256, 165 301, 280 241 S 450 246, 560 296 S 745 246, 850 296 S 1030 326, 1145 271 S 1315 256, 1465 301 S 1625 246, 1680 276" stroke="url(#line)" stroke-width="0.85" opacity="0.62"/>
+      <path d="M-80 303 C 80 273, 165 318, 280 258 S 450 263, 560 313 S 745 263, 850 313 S 1030 343, 1145 288 S 1315 273, 1465 318 S 1625 263, 1680 293" stroke="url(#line)" stroke-width="0.75" opacity="0.45"/>
+    </g>
+
+    <g opacity="0.55">
+      <path d="M-120 300 C 25 240, 140 285, 250 350 S 430 300, 550 255 S 760 300, 890 355 S 1090 260, 1215 290 S 1405 360, 1565 285 S 1710 260, 1750 295" stroke="#05DFFE" stroke-width="0.7" opacity="0.55"/>
+      <path d="M-120 320 C 25 260, 140 305, 250 370 S 430 320, 550 275 S 760 320, 890 375 S 1090 280, 1215 310 S 1405 380, 1565 305 S 1710 280, 1750 315" stroke="#05DFFE" stroke-width="0.65" opacity="0.42"/>
+      <path d="M-120 340 C 25 280, 140 325, 250 390 S 430 340, 550 295 S 760 340, 890 395 S 1090 300, 1215 330 S 1405 400, 1565 325 S 1710 300, 1750 335" stroke="#05DFFE" stroke-width="0.55" opacity="0.28"/>
+    </g>
+
+    <g filter="url(#softGlow)">
+      <path d="M-70 252 C 80 210, 180 252, 300 174 S 465 205, 570 245 S 745 202, 860 246 S 1045 282, 1155 214 S 1330 208, 1470 258 S 1635 198, 1695 230" stroke="#23F7FF" stroke-width="2.4" opacity="0.95"/>
+      <path d="M-65 267 C 78 228, 180 270, 305 196 S 470 226, 580 260 S 750 218, 862 264 S 1048 297, 1158 236 S 1335 230, 1470 278 S 1635 218, 1695 248" stroke="#00CFEA" stroke-width="1.7" opacity="0.78"/>
+    </g>
+
+    <g opacity="0.9">
+      <path id="meshArea" d="M0 240 C 120 210, 190 250, 310 180 S 485 210, 585 250 S 750 205, 870 250 S 1040 290, 1160 225 S 1330 215, 1470 260 S 1600 220, 1600 560 L0 560 Z" fill="url(#dotGrid)" opacity="0.72"/>
+    </g>
+
+    <g opacity="0.32">
+      <path d="M0 300 C 135 238, 270 230, 400 280 S 645 360, 800 300 S 1055 210, 1230 275 S 1460 380, 1600 305" stroke="#16E7FF" stroke-width="0.55" stroke-dasharray="2 9"/>
+      <path d="M0 325 C 135 263, 270 255, 400 305 S 645 385, 800 325 S 1055 235, 1230 300 S 1460 405, 1600 330" stroke="#16E7FF" stroke-width="0.5" stroke-dasharray="2 10" opacity="0.7"/>
+      <path d="M0 350 C 135 288, 270 280, 400 330 S 645 410, 800 350 S 1055 260, 1230 325 S 1460 430, 1600 355" stroke="#16E7FF" stroke-width="0.45" stroke-dasharray="2 11" opacity="0.45"/>
+    </g>
+
+    <g opacity="0.58">
+      <circle cx="250" cy="325" r="1.3" fill="#22F6FF"/>
+      <circle cx="270" cy="338" r="1" fill="#22F6FF"/>
+      <circle cx="315" cy="300" r="1.2" fill="#22F6FF"/>
+      <circle cx="535" cy="292" r="1.2" fill="#22F6FF"/>
+      <circle cx="560" cy="310" r="1" fill="#22F6FF"/>
+      <circle cx="770" cy="275" r="1.4" fill="#22F6FF"/>
+      <circle cx="805" cy="290" r="1" fill="#22F6FF"/>
+      <circle cx="950" cy="332" r="1.1" fill="#22F6FF"/>
+      <circle cx="1185" cy="280" r="1.25" fill="#22F6FF"/>
+      <circle cx="1340" cy="285" r="1.15" fill="#22F6FF"/>
+      <circle cx="1495" cy="315" r="1.2" fill="#22F6FF"/>
+    </g>
+  </g>
+</svg>
