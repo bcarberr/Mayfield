@@ -16,6 +16,7 @@ import dataMobilitySvg from "../assets/nav-v4/data-mobility.svg?raw";
 import searchSvg from "../assets/nav-v4/search.svg?raw";
 import settingsSvg from "../assets/nav-v4/settings.svg?raw";
 import summaryInsightsSvg from "../assets/nav-v4/summary-insights.svg?raw";
+import { ThemeToggle } from "./ThemeToggle";
 
 const cx = (...c: (string | false | undefined)[]) => c.filter(Boolean).join(" ");
 
@@ -201,6 +202,7 @@ export function V4NavThinner({
 
       <div className="min-h-0 flex-1" aria-hidden />
 
+      <ThemeToggle />
       <NavSlot title="Chat">
         <NavSvgInline svg={chatIntercomSvg} className="size-[18px]" />
       </NavSlot>

@@ -9,7 +9,6 @@ import {
 import { Button } from "../components/ui/Button";
 import { Input } from "../components/ui/Input";
 import { Switch } from "../components/ui/Switch";
-import { ThemeToggle } from "../components/ThemeToggle";
 import type { ConnectorSetupTarget } from "../components/connectors/connectorPlatformTypes";
 import { isDynamicSchemaCategory } from "../components/connectors/connectorPlatformTypes";
 import { SHOW_ATHENA_CONNECTOR_STEP_3 } from "./navRailConfig";
@@ -464,7 +463,6 @@ export function ConnectorSetupPanel({ onClose, onSave, connector }: ConnectorSet
               </Button>
             </div>
           ) : null}
-          <ThemeToggle className="ring-offset-surface-modal" />
           <Button
             variant="ghost"
             className="rounded-2xl p-1"

@@ -1,7 +1,6 @@
 import type { ReactNode } from "react";
 import { Icon } from "../design-system";
 import { Button } from "./ui/Button";
-import { ThemeToggle } from "./ThemeToggle";
 import { CopilotSparkMark } from "./SearchCopilotPanel";
 import { useCopilot } from "../context/CopilotContext";
 
@@ -12,7 +11,7 @@ export type SearchTopHeaderProps = {
   title?: string;
   /** Content rendered 32px right of the page title (e.g. search field, filter controls). */
   headerAfterTitle?: ReactNode;
-  /** Page actions rendered 32px left of the theme toggle (e.g. primary buttons). */
+  /** Page actions rendered 32px left of the help icons (e.g. primary buttons). */
   titleTrailing?: ReactNode;
   /** Content rendered after the account avatar (e.g. copilot trigger). */
   accountTrailing?: ReactNode;
@@ -23,7 +22,7 @@ export type SearchTopHeaderProps = {
 
 /**
  * Search workspace chrome — Figma Config-Schema-v2 node `7876-102758`.
- * Left: page title + optional search; right: actions, theme, help, alerts, divider, account.
+ * Left: page title + optional search; right: actions, help, alerts, divider, account.
  */
 export function SearchTopHeader({
   title = "Federated Search",
@@ -41,7 +40,6 @@ export function SearchTopHeader({
   const headerActions = (
     <>
       {titleTrailing ? <div className="mr-0 flex shrink-0 items-center lg:mr-8">{titleTrailing}</div> : null}
-      <ThemeToggle />
       <div className="flex items-center gap-0 sm:gap-1">
         <Button
           variant="ghost"
