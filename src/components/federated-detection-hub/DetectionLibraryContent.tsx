@@ -854,7 +854,7 @@ function LibraryDetectionsTable({
 }
 
 export function DetectionLibraryContent({ onSlideOverChange }: { onSlideOverChange: (state: ContentAreaSlideOverState | null) => void }) {
-  const [tableTool, setTableTool] = useState<FilterColumnPanelTool | null>("filter");
+  const [tableTool, setTableTool] = useState<FilterColumnPanelTool | null>(null);
   const [searchQuery, setSearchQuery] = useState("");
   const [expandedIds, setExpandedIds] = useState<Set<string>>(() => new Set());
   const [drawerDetectionId, setDrawerDetectionId] = useState<string | null>(null);
@@ -931,7 +931,7 @@ export function DetectionLibraryContent({ onSlideOverChange }: { onSlideOverChan
         <LibraryStatCard
           label="Total Detections"
           value={summaryStats.total}
-          selected={statFilter == null}
+          selected={false}
           onClick={() => setStatFilter(null)}
         />
         <LibraryStatCard
