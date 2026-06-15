@@ -150,7 +150,9 @@ function ReviewStatCard({
       onClick={onClick}
       className={cx(
         "rounded-[4px] border bg-datavis-card-bg px-6 py-5 text-left shadow-datavis-card transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-interactive-active",
-        selected ? "border-interactive-active" : "border-border-container",
+        selected
+          ? "border-interactive-active hover:bg-overlay-subtle"
+          : "border-border-container hover:border-border-rule hover:bg-overlay-subtle",
       )}
     >
       <p
