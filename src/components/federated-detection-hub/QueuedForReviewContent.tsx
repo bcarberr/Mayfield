@@ -870,7 +870,7 @@ export function QueuedForReviewContent({ onSlideOverChange }: { onSlideOverChang
         <ReviewStatCard
           label="Pending Review"
           value={summaryStats.pending}
-          selected={statFilter == null}
+          selected={false}
           onClick={() => setStatFilter(null)}
         />
         <ReviewStatCard
