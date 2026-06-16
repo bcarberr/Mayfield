@@ -97,6 +97,9 @@
   --color-feedback-positive: #17ae81;
   --color-feedback-negative: #ff604a;
   --color-feedback-caution: #fac354;
+  --color-feedback-bg-positive: #1b5845;
+  --color-feedback-bg-caution: #60502e;
+  --color-feedback-bg-neutral: #515151;
   /* hover overlay applied on top of any surface — kept low-alpha */
   --color-overlay-subtle: rgba(255, 255, 255, 0.05);
   --color-overlay-scrim: rgba(0, 0, 0, 0.6);

@@ -294,6 +294,7 @@ export function getPipelineSummaryStats(rows: readonly DataPipelineRow[]) {
     active,
     paused,
     highestRecordsLabel: highestRecords?.records ?? "—",
+    highestRecordsNumeric: highestRecords?.recordsNumeric ?? 0,
   };
 }
 

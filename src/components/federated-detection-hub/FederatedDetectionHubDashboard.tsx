@@ -1,4 +1,4 @@
-import { Fragment, useEffect, useMemo, useState } from "react";
+import { Fragment, useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { Checkbox, Icon, Switch, type SeverityShapeIconName } from "../../design-system";
 import { Button } from "../ui/Button";
 import { ColumnHeaderMenu } from "../ui/ColumnHeaderMenu";
@@ -13,12 +13,17 @@ import { Input } from "../ui/Input";
 import { DataGridExportButton } from "../ui/DataGridExportButton";
 import { SeverityTableIcon } from "../ui/SeverityTableIcon";
 import { Modal } from "../ui/Modal";
-import { type ContentAreaSlideOverState } from "../ui/SlideOver";
+import {
+  PageSlideOver,
+  FORM_CONTENT_SLIDE_OVER_PANEL_CLASS,
+  type ContentAreaSlideOverState,
+} from "../ui/SlideOver";
 import { TruncatedText } from "../ui/TruncatedText";
 import { DonutChartPanel } from "../ui/DonutChartPanel";
 import { useResizableColumns } from "../ui/useResizableColumns";
 import { InsightCard } from "../summary-insights/datavisCard";
 import { HorizontalBarPanel } from "../summary-insights/horizontalBarPanel";
+import { CreateDetectionSlideOver } from "./CreateDetectionSlideOver";
 import { DetectionHistoryContent } from "./DetectionHistoryContent";
 import { DetectionLibraryContent } from "./DetectionLibraryContent";
 import { QueuedForReviewContent } from "./QueuedForReviewContent";
@@ -1274,16 +1279,49 @@ export function FederatedDetectionHubDashboard({
   onSlideOverChange: (state: ContentAreaSlideOverState | null) => void;
 }) {
   const [activeTab, setActiveTab] = useState<HubTab>("Manage Detections");
+  const [createDetectionOpen, setCreateDetectionOpen] = useState(false);
+  const createDetectionOpenRef = useRef(createDetectionOpen);
+  createDetectionOpenRef.current = createDetectionOpen;
+
+  const handleChildSlideOverChange = useCallback(
+    (state: ContentAreaSlideOverState | null) => {
+      if (!createDetectionOpenRef.current) {
+        onSlideOverChange(state);
+      }
+    },
+    [onSlideOverChange],
+  );
+
+  const handleCloseCreateDetection = useCallback(() => {
+    setCreateDetectionOpen(false);
+  }, []);
 
   useEffect(() => {
     onSlideOverChange(null);
+    setCreateDetectionOpen(false);
   }, [activeTab, onSlideOverChange]);
 
   return (
-    <div className="flex min-h-0 flex-1 flex-col overflow-hidden pt-6">
+    <>
+      <PageSlideOver
+        open={createDetectionOpen}
+        onClose={handleCloseCreateDetection}
+        ariaLabel="Create New Detection"
+        panelClassName={FORM_CONTENT_SLIDE_OVER_PANEL_CLASS}
+        hideCloseChevron
+      >
+        <CreateDetectionSlideOver onClose={handleCloseCreateDetection} />
+      </PageSlideOver>
+
+      <div className="flex min-h-0 flex-1 flex-col overflow-hidden pt-6">
       <div className="flex shrink-0 items-end justify-between gap-4 px-6">
         <HubTabs active={activeTab} onChange={setActiveTab} />
-        <Button type="button" variant="secondary" className="mb-3 h-8 shrink-0 ring-offset-surface-page">
+        <Button
+          type="button"
+          variant="secondary"
+          className="mb-3 h-8 shrink-0 ring-offset-surface-page"
+          onClick={() => setCreateDetectionOpen(true)}
+        >
           <Icon
             name="action-add"
             size={12}
@@ -1296,11 +1334,11 @@ export function FederatedDetectionHubDashboard({
 
       <div className="flex min-h-0 flex-1 flex-col gap-4 overflow-y-auto px-6 py-4 sm:py-5">
         {activeTab === "Manage Detections" ? (
-          <ManageDetectionsContent onSlideOverChange={onSlideOverChange} />
+          <ManageDetectionsContent onSlideOverChange={handleChildSlideOverChange} />
         ) : activeTab === "Detection Library" ? (
-          <DetectionLibraryContent onSlideOverChange={onSlideOverChange} />
+          <DetectionLibraryContent onSlideOverChange={handleChildSlideOverChange} />
         ) : activeTab === "Queued For Review" ? (
-          <QueuedForReviewContent onSlideOverChange={onSlideOverChange} />
+          <QueuedForReviewContent onSlideOverChange={handleChildSlideOverChange} />
         ) : activeTab === "Detection History" ? (
           <DetectionHistoryContent />
         ) : (
@@ -1310,5 +1348,6 @@ export function FederatedDetectionHubDashboard({
         )}
       </div>
     </div>
+    </>
   );
 }
