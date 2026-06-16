@@ -1,24 +1,32 @@
 import { Fragment, useMemo, useState } from "react";
-import { Checkbox, Icon } from "../../design-system";
+import { Checkbox, Icon, Switch } from "../../design-system";
 import { Button } from "../ui/Button";
 import { ColumnHeaderMenu } from "../ui/ColumnHeaderMenu";
-import { compareNumbers, compareStrings, useColumnSort } from "../ui/useColumnSort";
+import { compareBooleans, compareNumbers, compareStrings, useColumnSort } from "../ui/useColumnSort";
 import { FilterColumnPanel, type FilterColumnPanelTool } from "../ui/FilterColumnPanel";
 import { DataGridExportButton } from "../ui/DataGridExportButton";
 import { TruncatedText } from "../ui/TruncatedText";
 import { useResizableColumns } from "../ui/useResizableColumns";
 import { DatavisGridlineRule } from "../summary-insights/datavisCard";
-import {
-  DATA_PIPELINE_ROWS,
-  getPipelineSummaryStats,
-  pipelineMatchesSearch,
-  type DataPipelineRow,
-  type PipelineState,
-} from "./dataPipelinesData";
+import { DATA_PIPELINE_ROWS, pipelineMatchesSearch, type DataPipelineRow } from "./dataPipelinesData";
+
+function pipelineIsActive(row: DataPipelineRow, activeById: Record<string, boolean>): boolean {
+  return activeById[row.id] ?? row.state === "Active";
+}
+
+function buildInitialActiveById() {
+  return Object.fromEntries(DATA_PIPELINE_ROWS.map((row) => [row.id, row.state === "Active"]));
+}
 
 const cx = (...c: (string | false | undefined)[]) => c.filter(Boolean).join(" ");
 
-type PipelineStatFilter = "active" | "paused";
+type PipelineStatFilter = "active" | "paused" | "highest-records";
+
+const PIPELINE_STAT_FILTER_LABELS: Record<PipelineStatFilter, string> = {
+  active: "Active",
+  paused: "Paused",
+  "highest-records": "Highest Number of Records",
+};
 
 const PIPELINE_EXPAND_COL_WIDTH = 40;
 const PIPELINE_COLUMN_COUNT = 8;
@@ -62,9 +70,9 @@ function PipelineStatCard({
       ? "focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-interactive-active"
       : "",
     selected
-      ? "border-interactive-active"
+      ? "border-interactive-active hover:bg-overlay-subtle"
       : "border-border-container",
-    onClick ? "hover:border-border-rule hover:bg-overlay-subtle" : "",
+    onClick && !selected ? "hover:border-border-rule hover:bg-overlay-subtle" : "",
   );
 
   const content = (
@@ -145,22 +153,6 @@ function PipelineExpandedRow({
   );
 }
 
-function PipelineStateBadge({ state }: { state: PipelineState }) {
-  if (state === "Paused") {
-    return (
-      <span className="inline-flex items-center rounded-[3px] bg-[#60502e] px-2 py-0.5 text-[11px] font-bold uppercase tracking-wide text-text-primary">
-        Paused
-      </span>
-    );
-  }
-
-  return (
-    <span className="inline-flex items-center rounded-[3px] bg-[#1b5845] px-2 py-0.5 text-[11px] font-bold uppercase tracking-wide text-text-primary">
-      Active
-    </span>
-  );
-}
-
 type PipelineSortColumn = "name" | "source" | "destination" | "state" | "records" | "lastRun";
 
 function PipelinesTable({
@@ -175,6 +167,8 @@ function PipelinesTable({
   hasActiveFilters,
   eventLogEnabledByPipeline,
   onEventLogToggle,
+  activeById,
+  onActiveChange,
 }: {
   rows: DataPipelineRow[];
   tableTool: FilterColumnPanelTool | null;
@@ -187,6 +181,8 @@ function PipelinesTable({
   hasActiveFilters: boolean;
   eventLogEnabledByPipeline: Record<string, Record<string, boolean>>;
   onEventLogToggle: (pipelineId: string, logId: string, enabled: boolean) => void;
+  activeById: Record<string, boolean>;
+  onActiveChange: (id: string, active: boolean) => void;
 }) {
   const {
     containerRef,
@@ -215,11 +211,12 @@ function PipelinesTable({
       name: (a, b) => compareStrings(a.name, b.name),
       source: (a, b) => compareStrings(a.source, b.source),
       destination: (a, b) => compareStrings(a.destination, b.destination),
-      state: (a, b) => compareStrings(a.state, b.state),
+      state: (a, b) =>
+        compareBooleans(pipelineIsActive(a, activeById), pipelineIsActive(b, activeById)),
       records: (a, b) => compareNumbers(a.recordsNumeric, b.recordsNumeric),
       lastRun: (a, b) => compareStrings(a.lastRun, b.lastRun),
     }),
-    [],
+    [activeById],
   );
   const { sortedRows, getSortProps } = useColumnSort(sortComparators);
   const displayRows = sortedRows(rows);
@@ -366,7 +363,11 @@ function PipelinesTable({
                         <TruncatedText className="w-full">{row.destination}</TruncatedText>
                       </td>
                       <td style={colStyle(4)} className={tdClass}>
-                        <PipelineStateBadge state={row.state} />
+                        <Switch
+                          checked={pipelineIsActive(row, activeById)}
+                          onCheckedChange={(checked) => onActiveChange(row.id, checked)}
+                          aria-label={`Toggle ${row.name}`}
+                        />
                       </td>
                       <td style={colStyle(5)} className={tdClass}>
                         <span className="font-semibold tabular-nums text-text-primary">{row.records}</span>
@@ -415,24 +416,43 @@ export type DataPipelinesDashboardProps = {
 };
 
 export function DataPipelinesDashboard({ searchQuery, onSearchQueryChange }: DataPipelinesDashboardProps) {
-  const [tableTool, setTableTool] = useState<FilterColumnPanelTool | null>("filter");
+  const [tableTool, setTableTool] = useState<FilterColumnPanelTool | null>(null);
   const [expandedIds, setExpandedIds] = useState<Set<string>>(() => new Set());
   const [statFilter, setStatFilter] = useState<PipelineStatFilter | null>(null);
 
   const [eventLogEnabledByPipeline, setEventLogEnabledByPipeline] = useState(buildInitialEventLogState);
+  const [activeById, setActiveById] = useState<Record<string, boolean>>(buildInitialActiveById);
 
-  const summaryStats = useMemo(() => getPipelineSummaryStats(DATA_PIPELINE_ROWS), []);
+  const summaryStats = useMemo(() => {
+    const active = DATA_PIPELINE_ROWS.filter((row) => pipelineIsActive(row, activeById)).length;
+    const paused = DATA_PIPELINE_ROWS.length - active;
+    const highestRecords = DATA_PIPELINE_ROWS.reduce(
+      (best, row) => (row.recordsNumeric > best.recordsNumeric ? row : best),
+      DATA_PIPELINE_ROWS[0],
+    );
+
+    return {
+      total: DATA_PIPELINE_ROWS.length,
+      active,
+      paused,
+      highestRecordsLabel: highestRecords?.records ?? "—",
+      highestRecordsNumeric: highestRecords?.recordsNumeric ?? 0,
+    };
+  }, [activeById]);
 
   const filteredRows = useMemo(() => {
     return DATA_PIPELINE_ROWS.filter((row) => {
-      if (statFilter === "active" && row.state !== "Active") return false;
-      if (statFilter === "paused" && row.state !== "Paused") return false;
+      const active = pipelineIsActive(row, activeById);
+      if (statFilter === "active" && !active) return false;
+      if (statFilter === "paused" && active) return false;
+      if (statFilter === "highest-records" && row.recordsNumeric !== summaryStats.highestRecordsNumeric) {
+        return false;
+      }
       return pipelineMatchesSearch(row, searchQuery);
     });
-  }, [searchQuery, statFilter]);
+  }, [searchQuery, statFilter, summaryStats.highestRecordsNumeric, activeById]);
 
-  const statFilterLabel =
-    statFilter === "active" ? "Active" : statFilter === "paused" ? "Paused" : null;
+  const statFilterLabel = statFilter ? PIPELINE_STAT_FILTER_LABELS[statFilter] : null;
 
   const hasActiveFilters = searchQuery.trim().length > 0 || statFilter != null;
 
@@ -486,11 +506,8 @@ export function DataPipelinesDashboard({ searchQuery, onSearchQueryChange }: Dat
         <PipelineStatCard
           label="Total Pipelines"
           value={summaryStats.total}
-          selected={statFilter == null && !searchQuery.trim()}
-          onClick={() => {
-            setStatFilter(null);
-            onSearchQueryChange("");
-          }}
+          selected={false}
+          onClick={() => setStatFilter(null)}
         />
         <PipelineStatCard
           label="Active Pipelines"
@@ -504,7 +521,12 @@ export function DataPipelinesDashboard({ searchQuery, onSearchQueryChange }: Dat
           selected={statFilter === "paused"}
           onClick={() => handleStatFilterClick("paused")}
         />
-        <PipelineStatCard label="Highest Number of Records" value={summaryStats.highestRecordsLabel} />
+        <PipelineStatCard
+          label="Highest Number of Records"
+          value={summaryStats.highestRecordsLabel}
+          selected={statFilter === "highest-records"}
+          onClick={() => handleStatFilterClick("highest-records")}
+        />
       </div>
 
       <PipelinesTable
@@ -519,6 +541,8 @@ export function DataPipelinesDashboard({ searchQuery, onSearchQueryChange }: Dat
         hasActiveFilters={hasActiveFilters}
         eventLogEnabledByPipeline={eventLogEnabledByPipeline}
         onEventLogToggle={toggleEventLog}
+        activeById={activeById}
+        onActiveChange={(id, active) => setActiveById((current) => ({ ...current, [id]: active }))}
       />
     </div>
   );
