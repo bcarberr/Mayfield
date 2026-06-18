@@ -6,13 +6,13 @@ const disabledLabel =
 
 /** Descendant SVGs (e.g. `Icon`) render at the default 18×18 slot inside every button. */
 const base =
-  "inline-flex items-center justify-center gap-2 rounded font-semibold text-sm tracking-[0.4px] transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-interactive-active focus-visible:ring-offset-2 focus-visible:ring-offset-surface-page disabled:pointer-events-none disabled:cursor-not-allowed [&_svg]:!size-[18px] [&_svg]:shrink-0";
+  "inline-flex items-center justify-center gap-2 rounded font-semibold text-sm tracking-[0.4px] transition-colors focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-interactive-active disabled:pointer-events-none disabled:cursor-not-allowed [&_svg]:!size-[18px] [&_svg]:shrink-0";
 
 const secondaryBase = `box-border gap-1 rounded-[4px] border bg-transparent px-3 leading-[14px] text-interactive-active transition-[background-color,border-color,color,opacity] hover:bg-interactive-secondary-hover hover:border-interactive-active active:border-interactive-secondary-pressed active:bg-interactive-secondary-pressed disabled:!border-border-rule disabled:opacity-100 disabled:bg-transparent disabled:hover:!border-border-rule disabled:hover:!bg-transparent ${disabledLabel}`;
 
 const variants = {
   primary:
-    "bg-interactive-active px-3 py-2 text-text-on-primary hover:opacity-90 active:opacity-100 disabled:opacity-50",
+    "h-8 bg-interactive-active px-3 py-2 text-text-on-primary hover:opacity-90 active:opacity-100 disabled:opacity-50",
   tertiary: `gap-1 px-1 py-2 text-text-secondary hover:bg-overlay-subtle disabled:!opacity-100 ${disabledLabel}`,
   ghost: `gap-1 rounded-full p-1 text-text-primary hover:bg-overlay-subtle disabled:!opacity-100 ${disabledLabel}`,
 } as const;

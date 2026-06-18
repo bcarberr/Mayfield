@@ -1,4 +1,4 @@
-import { createContext, useContext, useMemo, useState, type ReactNode } from "react";
+import { createContext, useCallback, useContext, useMemo, useState, type ReactNode } from "react";
 
 export type TimeframeRange = {
   from: Date;
@@ -25,19 +25,75 @@ export function formatTimeframeLabel(from: Date, to: Date): string {
   return `${formatter.format(from)} to ${formatter.format(to)}`;
 }
 
+function cloneTimeframeRange(range: TimeframeRange): TimeframeRange {
+  return { from: new Date(range.from), to: new Date(range.to) };
+}
+
 type TimeframeContextValue = {
   range: TimeframeRange;
+  /** Unzoomed range for Federated Analytics — shared across all analytics dashboards. */
+  analyticsBaselineRange: TimeframeRange;
+  isAnalyticsChartZoomed: boolean;
   setRange: (range: TimeframeRange) => void;
+  /** Header timeframe picker — updates range, baseline, and clears chart zoom. */
+  commitAnalyticsTimeframe: (range: TimeframeRange) => void;
+  applyAnalyticsChartZoom: (range: TimeframeRange) => void;
+  resetAnalyticsChartZoom: () => void;
 };
 
 const TimeframeContext = createContext<TimeframeContextValue | null>(null);
 
 export function TimeframeProvider({ children }: { children: ReactNode }) {
-  const [range, setRange] = useState<TimeframeRange>(() =>
+  const [range, setRangeState] = useState<TimeframeRange>(() =>
     normalizeTimeframeRange(DEFAULT_TIMEFRAME_FROM, DEFAULT_TIMEFRAME_TO),
   );
+  const [analyticsBaselineRange, setAnalyticsBaselineRange] = useState<TimeframeRange>(() =>
+    cloneTimeframeRange(normalizeTimeframeRange(DEFAULT_TIMEFRAME_FROM, DEFAULT_TIMEFRAME_TO)),
+  );
+  const [isAnalyticsChartZoomed, setIsAnalyticsChartZoomed] = useState(false);
 
-  const value = useMemo(() => ({ range, setRange }), [range]);
+  const setRange = useCallback((next: TimeframeRange) => {
+    setRangeState(next);
+    setIsAnalyticsChartZoomed(false);
+  }, []);
+
+  const commitAnalyticsTimeframe = useCallback((next: TimeframeRange) => {
+    const normalized = cloneTimeframeRange(next);
+    setRangeState(normalized);
+    setAnalyticsBaselineRange(normalized);
+    setIsAnalyticsChartZoomed(false);
+  }, []);
+
+  const applyAnalyticsChartZoom = useCallback((next: TimeframeRange) => {
+    setRangeState(cloneTimeframeRange(next));
+    setIsAnalyticsChartZoomed(true);
+  }, []);
+
+  const resetAnalyticsChartZoom = useCallback(() => {
+    setRangeState(cloneTimeframeRange(analyticsBaselineRange));
+    setIsAnalyticsChartZoomed(false);
+  }, [analyticsBaselineRange]);
+
+  const value = useMemo(
+    () => ({
+      range,
+      analyticsBaselineRange,
+      isAnalyticsChartZoomed,
+      setRange,
+      commitAnalyticsTimeframe,
+      applyAnalyticsChartZoom,
+      resetAnalyticsChartZoom,
+    }),
+    [
+      range,
+      analyticsBaselineRange,
+      isAnalyticsChartZoomed,
+      setRange,
+      commitAnalyticsTimeframe,
+      applyAnalyticsChartZoom,
+      resetAnalyticsChartZoom,
+    ],
+  );
 
   return <TimeframeContext.Provider value={value}>{children}</TimeframeContext.Provider>;
 }

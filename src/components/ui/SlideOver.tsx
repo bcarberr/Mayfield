@@ -47,48 +47,31 @@ export function SlideOverHeaderBackButton({
   );
 }
 
-/** Left-edge chevron dismiss control shared by all slide-over shells. */
-export function SlideOverCloseChevron({ onClose }: { onClose: () => void }) {
-  return (
-    <button
-      type="button"
-      onClick={(event) => {
-        event.stopPropagation();
-        onClose();
-      }}
-      aria-label="Close panel"
-      title="Close"
-      className={cx(
-        "pointer-events-auto absolute top-1/2 left-0 z-50 flex h-16 w-8 -translate-x-1/2 -translate-y-1/2 flex-col items-center justify-center",
-        "rounded-md border border-border-rule bg-surface-modal text-text-secondary shadow-md",
-        "transition-colors hover:bg-overlay-subtle hover:text-text-primary",
-        "focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-interactive-active focus-visible:ring-offset-2 focus-visible:ring-offset-surface-modal",
-      )}
-    >
-      <Icon name="navi-chevron-left" size={20} aria-hidden />
-    </button>
-  );
-}
-
 function SlideOverPanelFrame({
-  onClose,
   children,
   className,
 }: {
-  onClose: () => void;
   children: ReactNode;
   className?: string;
 }) {
   return (
     <div className={cx("relative flex h-full min-h-0 flex-col overflow-visible", className)}>
-      <div className="flex min-h-0 flex-1 flex-col overflow-hidden">{children}</div>
-      <SlideOverCloseChevron onClose={onClose} />
+      <div className="flex h-0 min-h-0 flex-1 flex-col overflow-hidden">{children}</div>
     </div>
   );
 }
 
 /** Panel width for connector setup / add flows — full content column (viewport minus `w-10` nav rail). */
 export const CONNECTOR_PAGE_SLIDE_OVER_PANEL_CLASS = "w-[calc(100vw-2.5rem)] max-w-none shrink-0";
+
+/** Full viewport width — panel and scrim cover nav rail and entire screen. */
+export const FULL_VIEWPORT_SLIDE_OVER_PANEL_CLASS = "w-screen max-w-none shrink-0";
+
+/** Three-quarter viewport width — full-viewport scrim with panel aligned right (~75%). */
+export const THREE_QUARTER_VIEWPORT_SLIDE_OVER_PANEL_CLASS = "w-[75vw] max-w-none shrink-0";
+
+/** max-w-2xl form column (42rem) + 24px horizontal padding on each side (48px total). */
+export const FORM_CONTENT_SLIDE_OVER_PANEL_CLASS = "w-[calc(42rem+48px)] max-w-none shrink-0";
 
 /**
  * Full-viewport modal drawer — scrim covers nav + page header; panel slides in from the right at full height.
@@ -129,7 +112,7 @@ export function PageSlideOver({
           panelClassName ?? CONNECTOR_PAGE_SLIDE_OVER_PANEL_CLASS,
         )}
       >
-        <SlideOverPanelFrame onClose={onClose}>{children}</SlideOverPanelFrame>
+        <SlideOverPanelFrame>{children}</SlideOverPanelFrame>
       </aside>
     </div>,
     document.body,
@@ -158,7 +141,7 @@ export function ContentAreaSlideOverHost({
 
   return (
     <div className="relative flex min-h-0 flex-1 overflow-hidden">
-      <div className="relative min-h-0 min-w-0 flex-1 overflow-hidden">
+      <div className="relative flex min-h-0 min-w-0 flex-1 flex-col overflow-y-auto">
         {children}
         {slideOver ? (
           <button
@@ -179,7 +162,7 @@ export function ContentAreaSlideOverHost({
             slideOver.panelClassName ?? "w-[min(100%,480px)]",
           )}
         >
-          <SlideOverPanelFrame onClose={slideOver.onClose}>{slideOver.panel}</SlideOverPanelFrame>
+          <SlideOverPanelFrame>{slideOver.panel}</SlideOverPanelFrame>
         </aside>
       ) : null}
     </div>
@@ -235,7 +218,7 @@ export function SlideOver({
             panelClassName,
           )}
         >
-          <SlideOverPanelFrame onClose={onClose}>{children}</SlideOverPanelFrame>
+          <SlideOverPanelFrame>{children}</SlideOverPanelFrame>
         </div>
       </div>
     </>
