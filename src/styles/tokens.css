@@ -157,6 +157,11 @@
   --color-feedback-caution: var(--dark-feedback-caution);
   --color-feedback-positive: var(--dark-feedback-positive);
   --color-feedback-info: var(--dark-feedback-info);
+  --color-feedback-bg-negative: var(--dark-feedback-bg-negative);
+  --color-feedback-bg-caution: var(--dark-feedback-bg-caution);
+  --color-feedback-bg-positive: var(--dark-feedback-bg-positive);
+  --color-feedback-bg-info: var(--dark-feedback-bg-info);
+  --color-feedback-bg-neutral: var(--dark-feedback-bg-neutral);
 
   --color-datavis-data-peanut-orange: var(--dark-datavis-data-peanut-orange);
   --color-datavis-data-smalt-green-20: var(--dark-datavis-data-smalt-green-20);
@@ -210,6 +215,11 @@
   --color-feedback-caution: var(--light-feedback-caution);
   --color-feedback-positive: var(--light-feedback-positive);
   --color-feedback-info: var(--light-feedback-info);
+  --color-feedback-bg-negative: var(--light-feedback-bg-negative);
+  --color-feedback-bg-caution: var(--light-feedback-bg-caution);
+  --color-feedback-bg-positive: var(--light-feedback-bg-positive);
+  --color-feedback-bg-info: var(--light-feedback-bg-info);
+  --color-feedback-bg-neutral: var(--light-feedback-bg-neutral);
 
   --color-datavis-data-peanut-orange: var(--light-datavis-data-peanut-orange);
   --color-datavis-data-smalt-green-20: var(--light-datavis-data-smalt-green-20);

@@ -42,12 +42,7 @@ export function Switch({ checked, disabled, label, onCheckedChange, className, i
             "bg-interactive-active",
             "enabled:group-hover:bg-[var(--color-primary-hover)] enabled:group-active:bg-[var(--color-primary-pressed)]",
           ),
-        !disabled &&
-          !checked &&
-          cx(
-            "border border-solid border-text-tertiary bg-transparent",
-            "enabled:group-hover:border-[var(--color-primary-hover)] enabled:group-active:border-[var(--color-primary-pressed)]",
-          ),
+        !disabled && !checked && "bg-text-tertiary",
       )}
     />
   );
@@ -60,12 +55,7 @@ export function Switch({ checked, disabled, label, onCheckedChange, className, i
         disabled && checked && "left-[21px] bg-[var(--color-switch-thumb-on-disabled)]",
         disabled && !checked && "left-1 bg-[var(--color-switch-off-disabled)]",
         !disabled && checked && "left-[21px] bg-text-on-primary",
-        !disabled &&
-          !checked &&
-          cx(
-            "left-1 bg-text-tertiary",
-            "enabled:group-hover:bg-[var(--color-primary-hover)] enabled:group-active:bg-[var(--color-primary-pressed)]",
-          ),
+        !disabled && !checked && "left-1 bg-text-primary",
       )}
     />
   );
@@ -81,7 +71,7 @@ export function Switch({ checked, disabled, label, onCheckedChange, className, i
       onClick={toggle}
       className={cx(
         "group relative h-[18px] w-9 shrink-0 overflow-hidden rounded-[9px] p-0 outline-none",
-        "focus-visible:ring-2 focus-visible:ring-interactive-active focus-visible:ring-offset-2 focus-visible:ring-offset-surface-modal",
+        "focus-visible:ring-1 focus-visible:ring-interactive-active",
         interactive ? "cursor-pointer" : "cursor-default",
       )}
     >

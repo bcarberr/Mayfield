@@ -1,20 +1,27 @@
 import { createContext, useContext, useState, type ReactNode } from "react";
 
+export type PendingFsqlSearchRequest = {
+  query: string;
+  autoExecute?: boolean;
+  /** Set when opening search from Federated Detection Hub findings. */
+  detectionName?: string;
+};
+
 type CopilotContextValue = {
   open: boolean;
   setOpen: (open: boolean | ((prev: boolean) => boolean)) => void;
-  /** Non-null when the copilot has sent an FSQL query to the search page. SearchLandingPage consumes and clears it. */
-  pendingFsqlQuery: string | null;
-  setPendingFsqlQuery: (query: string | null) => void;
+  /** Non-null when navigating to search with a prefilled FSQL query. SearchLandingPage consumes and clears it. */
+  pendingFsqlSearch: PendingFsqlSearchRequest | null;
+  setPendingFsqlSearch: (request: PendingFsqlSearchRequest | null) => void;
 };
 
 const CopilotContext = createContext<CopilotContextValue | null>(null);
 
 export function CopilotProvider({ children }: { children: ReactNode }) {
   const [open, setOpen] = useState(false);
-  const [pendingFsqlQuery, setPendingFsqlQuery] = useState<string | null>(null);
+  const [pendingFsqlSearch, setPendingFsqlSearch] = useState<PendingFsqlSearchRequest | null>(null);
   return (
-    <CopilotContext.Provider value={{ open, setOpen, pendingFsqlQuery, setPendingFsqlQuery }}>
+    <CopilotContext.Provider value={{ open, setOpen, pendingFsqlSearch, setPendingFsqlSearch }}>
       {children}
     </CopilotContext.Provider>
   );
