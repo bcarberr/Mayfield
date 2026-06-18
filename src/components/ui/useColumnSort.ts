@@ -57,6 +57,8 @@ export function useColumnSort<Row, ColumnId extends string>(
           if (current.direction === "asc") return { column, direction: "desc" };
           return null;
         }),
+      onSortSet: (direction: ColumnSortDirection | null) =>
+        setSort(direction ? { column, direction } : null),
     }),
     [sort],
   );
