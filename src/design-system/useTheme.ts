@@ -22,6 +22,7 @@ function applyTheme(theme: Theme) {
   if (typeof document === "undefined") return;
   document.documentElement.setAttribute("data-theme", theme);
   document.documentElement.style.colorScheme = theme;
+  document.documentElement.classList.toggle("dark", theme === "dark");
 }
 
 /** Apply stored / preferred theme before React mounts to avoid a blank flash. */
