@@ -15,7 +15,7 @@ import {
   PageSlideOver,
   SlideOverHeaderBackButton,
 } from "../components/ui/SlideOver";
-import { Button } from "../components/ui/Button";
+import { Button } from "@/components/shadcn/button";
 import { Input } from "../components/ui/Input";
 import { V4NavThinner } from "../components/V4NavThinner";
 import { NAV_RAIL_TARGETS } from "./navRailTargets";
@@ -146,7 +146,7 @@ export function ConnectorsPanelSlideOver({ open, onClose }: ConnectorsPanelSlide
             </Button>
           </div>
         </header>
-        <main className="flex min-h-0 flex-1 flex-col overflow-hidden px-5 pb-6 pt-6">
+        <main className="flex min-h-0 flex-1 flex-col overflow-hidden px-6 pb-6 pt-6">
           <ConnectorsWorkspace chromeSurface="modal" />
         </main>
       </div>
@@ -160,6 +160,7 @@ export function ConnectorsPanelSlideOver({ open, onClose }: ConnectorsPanelSlide
  */
 export function ConnectorsPage() {
   const { openAddConnector, openSetup, setupSlideOver } = useConnectorsSetupSlideOver();
+  const [connectorSearch, setConnectorSearch] = useState("");
 
   useEffect(() => {
     const previous = document.title;
@@ -186,8 +187,11 @@ export function ConnectorsPage() {
                 <Input
                   variant="search"
                   placeholder="Search"
+                  value={connectorSearch}
+                  onChange={(e) => setConnectorSearch(e.target.value)}
+                  onClear={() => setConnectorSearch("")}
+                  startAdornment={null}
                   className="!bg-surface-container"
-                  startAdornment={<Icon name="search" size={18} aria-hidden />}
                   aria-label="Search connectors"
                 />
               </div>
@@ -197,14 +201,14 @@ export function ConnectorsPage() {
             <div className="flex items-center gap-4" role="toolbar" aria-label="Connector actions">
               <Button
                 type="button"
-                variant="secondary"
+                variant="secondary-outline"
                 className="h-8 shrink-0 ring-offset-surface-page"
                 onClick={openAddConnector}
               >
                 <Icon name="action-add" size={6} className="size-1.5 shrink-0 text-current [&>svg]:!size-[6px]" aria-hidden />
                 Add Connector
               </Button>
-              <Button type="button" variant="secondary" className="h-8 shrink-0 ring-offset-surface-page">
+              <Button type="button" variant="secondary-outline" className="h-8 shrink-0 ring-offset-surface-page">
                 <Icon name="action-file-upload" size={12} className="size-3 shrink-0 text-current [&>svg]:!size-[12px]" aria-hidden />
                 Export Connectors
               </Button>
@@ -212,7 +216,7 @@ export function ConnectorsPage() {
           }
         />
 
-        <main className="flex min-h-0 flex-1 flex-col overflow-hidden px-5 pb-6 pt-6">
+        <main className="flex min-h-0 flex-1 flex-col overflow-hidden px-6 pb-6 pt-6">
           <ConnectorsDashboard onConfigureConnector={openSetup} />
         </main>
       </div>

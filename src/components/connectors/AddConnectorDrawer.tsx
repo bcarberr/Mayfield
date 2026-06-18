@@ -1,6 +1,6 @@
 import { useMemo } from "react";
 import { Icon } from "../../design-system";
-import { Button } from "../ui/Button";
+import { Button } from "@/components/shadcn/button";
 import { Input } from "../ui/Input";
 import { ConnectorFilters } from "./ConnectorFilters";
 import { SlideOverHeaderBackButton } from "../ui/SlideOver";
@@ -90,8 +90,8 @@ export function AddConnectorDrawer({ onClose, onSelectPlatform }: AddConnectorDr
                 placeholder="Search"
                 value={query}
                 onChange={(event) => setQuery(event.target.value)}
+                onClear={() => setQuery("")}
                 className="!bg-surface-container"
-                startAdornment={<Icon name="search" size={18} aria-hidden />}
                 aria-label="Search connector types"
               />
             </div>

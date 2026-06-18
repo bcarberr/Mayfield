@@ -37,7 +37,6 @@ export function DataPipelinesPage() {
                 value={searchQuery}
                 onChange={(event) => setSearchQuery(event.target.value)}
                 className="!bg-surface-container"
-                startAdornment={<Icon name="search" size={18} aria-hidden />}
                 aria-label="Search pipelines"
               />
             </div>
