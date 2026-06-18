@@ -10,12 +10,74 @@ function pad2(value: number): string {
   return String(value).padStart(2, "0");
 }
 
+export function formatBucketDateLabel(date: Date): string {
+  return new Intl.DateTimeFormat("en-US", { month: "short", day: "numeric" }).format(date);
+}
+
 export function formatBucketTimeLabel(date: Date, includeDate = false): string {
   const time = `${pad2(date.getHours())}:${pad2(date.getMinutes())}`;
   if (!includeDate) return time;
 
-  const datePart = new Intl.DateTimeFormat("en-US", { month: "short", day: "numeric" }).format(date);
-  return `${datePart} ${time}`;
+  return `${formatBucketDateLabel(date)} ${time}`;
+}
+
+/** True when the committed range covers more than one local calendar day. */
+export function timeframeSpansMultipleDays({ from, to }: TimeframeRange): boolean {
+  const startDay = new Date(from);
+  startDay.setHours(0, 0, 0, 0);
+  const endDay = new Date(to);
+  endDay.setHours(0, 0, 0, 0);
+  return endDay.getTime() > startDay.getTime();
+}
+
+/** Per-bucket x-axis labels include the date when the range is long or multi-day. */
+export function shouldIncludeDateInBucketLabels(range: TimeframeRange): boolean {
+  return (
+    timeframeSpansMultipleDays(range) || range.to.getTime() - range.from.getTime() > 36 * 3_600_000
+  );
+}
+
+export type DayBoundaryMarker = {
+  /** Bucket index where the new calendar day begins (local midnight). */
+  index: number;
+  label: string;
+};
+
+export type DayLabelPosition = {
+  label: string;
+  /** Horizontal center of the calendar day span, as a percentage of plot width. */
+  centerPercent: number;
+};
+
+/** Center each day label under its bucket span (midnight to next midnight or chart end). */
+export function buildDayLabelPositions(
+  markers: readonly DayBoundaryMarker[],
+  bucketCount: number,
+): DayLabelPosition[] {
+  if (bucketCount <= 0 || markers.length === 0) return [];
+
+  return markers.map((marker, markerIdx) => {
+    const segmentEnd = markerIdx < markers.length - 1 ? markers[markerIdx + 1].index : bucketCount;
+    const centerIndex = (marker.index + segmentEnd) / 2;
+    return {
+      label: marker.label,
+      centerPercent: (centerIndex / bucketCount) * 100,
+    };
+  });
+}
+
+/** Midnight bucket starts after the first bucket — one marker per day rollover. */
+export function buildDayBoundaryMarkers(buckets: readonly HourBucket[]): DayBoundaryMarker[] {
+  const markers: DayBoundaryMarker[] = [];
+
+  for (let index = 1; index < buckets.length; index++) {
+    const { start } = buckets[index];
+    if (start.getHours() === 0 && start.getMinutes() === 0 && start.getSeconds() === 0) {
+      markers.push({ index, label: formatBucketDateLabel(start) });
+    }
+  }
+
+  return markers;
 }
 
 /** One bucket per clock hour that overlaps the committed timeframe. */
@@ -60,7 +122,9 @@ export function buildHourlyAxisTicks(
   range: TimeframeRange,
 ): { indices: number[]; labels: string[] } {
   const count = buckets.length;
-  const includeDate = range.to.getTime() - range.from.getTime() > 36 * 3_600_000;
+  const spansDays = timeframeSpansMultipleDays(range);
+  const includeDateOnMiddle =
+    spansDays || range.to.getTime() - range.from.getTime() > 36 * 3_600_000;
 
   const indices =
     count <= 5
@@ -74,6 +138,9 @@ export function buildHourlyAxisTicks(
         ];
 
   const labels = indices.map((index, tickIdx) => {
+    // Multi-day charts show dates on a separate day-label row — keep this row time-only.
+    const includeDate = spansDays ? false : tickIdx === 0 || tickIdx === indices.length - 1 ? false : includeDateOnMiddle;
+
     if (tickIdx === 0) return formatBucketTimeLabel(range.from, includeDate);
     if (tickIdx === indices.length - 1) return formatBucketTimeLabel(range.to, includeDate);
     return formatBucketTimeLabel(buckets[index].start, includeDate);
