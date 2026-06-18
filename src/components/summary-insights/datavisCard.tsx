@@ -1,6 +1,11 @@
 import type { ReactNode } from "react";
 import { Icon } from "../../design-system";
 import { Button } from "../ui/Button";
+import {
+  Tooltip,
+  TooltipContent,
+  TooltipTrigger,
+} from "@/components/shadcn/tooltip";
 
 export const cx = (...c: (string | false | undefined)[]) => c.filter(Boolean).join(" ");
 
@@ -17,7 +22,7 @@ export function InsightCard({
   compact = false,
   stretch = false,
 }: {
-  title: string;
+  title?: string;
   children: ReactNode;
   headerActions?: ReactNode;
   /** When true, card stretches to fill a grid/flex parent (e.g. findings chart row). */
@@ -35,20 +40,32 @@ export function InsightCard({
         fillHeight ? "min-h-0 flex-1 lg:h-full" : stretch ? "h-full" : "shrink-0",
       )}
     >
-      <header
-        className={cx(
-          "flex shrink-0 items-center justify-between gap-3 bg-datavis-card-bg px-4 sm:px-5",
-          compact ? "py-2.5" : "py-3",
-        )}
-      >
-        <h2 className="min-w-0 truncate text-base-semibold text-text-primary">{title}</h2>
-        {headerActions ?? (
-          <Button variant="ghost" className="shrink-0 p-1 text-text-tertiary hover:text-text-primary" aria-label="Chart options">
-            <Icon name="navi-more-vert" />
-          </Button>
-        )}
-      </header>
-      <DatavisGridlineRule />
+      {title || headerActions ? (
+        <>
+          <header
+            className={cx(
+              "flex shrink-0 items-center gap-3 bg-datavis-card-bg px-4 sm:px-5",
+              title ? "justify-between" : "justify-end",
+              compact ? "py-2.5" : "py-3",
+            )}
+          >
+            {title ? (
+              <h2 className="min-w-0 truncate text-base-semibold text-text-primary">{title}</h2>
+            ) : null}
+            {headerActions ?? (
+              <Tooltip>
+                <TooltipTrigger asChild>
+                  <Button variant="ghost" className="shrink-0 p-1 text-text-tertiary hover:text-text-primary" aria-label="Chart options">
+                    <Icon name="navi-more-vert" />
+                  </Button>
+                </TooltipTrigger>
+                <TooltipContent>Chart options</TooltipContent>
+              </Tooltip>
+            )}
+          </header>
+          <DatavisGridlineRule />
+        </>
+      ) : null}
       <div
         className={cx(
           "flex flex-col bg-datavis-card-bg sm:px-4",
