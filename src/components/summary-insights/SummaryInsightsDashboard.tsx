@@ -1,5 +1,14 @@
 import { useCallback, useMemo, useState } from "react";
-import { DATA_GRID_HEADER_ROW_CLASS, DATA_GRID_PAGE_SCROLL_INNER_CLASS, DATA_GRID_PAGE_SCROLL_OUTER_CLASS, DATA_GRID_TABLE_CLASS, DATA_GRID_TABLE_SCROLL_CLASS, DATA_GRID_THEAD_CLASS } from "../ui/dataGridTableStyles";
+import {
+  DATA_GRID_ABOVE_SECTION_CLASS,
+  DATA_GRID_HEADER_ROW_CLASS,
+  DATA_GRID_PAGE_SCROLL_INNER_CLASS,
+  DATA_GRID_PAGE_SCROLL_OUTER_CLASS,
+  DATA_GRID_RESULTS_SEARCH_PLACEHOLDER,
+  DATA_GRID_TABLE_CLASS,
+  DATA_GRID_TABLE_SCROLL_CLASS,
+  DATA_GRID_THEAD_CLASS,
+} from "../ui/dataGridTableStyles";
 import { useNavigate } from "react-router-dom";
 import { Checkbox, Icon } from "../../design-system";
 import { DonutChartPanel } from "../ui/DonutChartPanel";
@@ -10,7 +19,6 @@ import { ColumnHeaderMenu } from "../ui/ColumnHeaderMenu";
 import { compareStrings } from "../ui/useColumnSort";
 import { useSortedDataGridPagination } from "../ui/useSortedDataGridPagination";
 import { DataGridSection } from "../ui/DataGridSection";
-import { DATA_GRID_ABOVE_SECTION_CLASS } from "../ui/dataGridTableStyles";
 import { DataGridPaginationFooter } from "../ui/DataGridTableLayout";
 import { Input } from "../ui/Input";
 import { DataGridExportButton } from "../ui/DataGridExportButton";
@@ -1130,9 +1138,10 @@ export function SummaryInsightsDashboard() {
                         <div className="w-[300px] shrink-0">
                           <Input
                             variant="search"
-                            placeholder="Search"
+                            placeholder={DATA_GRID_RESULTS_SEARCH_PLACEHOLDER}
                             value={searchQuery}
                             onChange={(event) => setSearchQuery(event.target.value)}
+                            onClear={() => setSearchQuery("")}
                             className="!bg-datavis-card-bg"
                             aria-label="Search findings"
                           />

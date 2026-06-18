@@ -2,6 +2,7 @@ import { useMemo, useState } from "react";
 import {
   DATA_GRID_ABOVE_SECTION_CLASS,
   DATA_GRID_HEADER_ROW_CLASS,
+  DATA_GRID_RESULTS_SEARCH_PLACEHOLDER,
   DATA_GRID_TABLE_CLASS,
   DATA_GRID_TABLE_SCROLL_CLASS,
   DATA_GRID_THEAD_CLASS,
@@ -892,9 +893,10 @@ function EntitiesAggregatedPanel({ rows }: { rows: AggregatedEntityRow[] }) {
             <div className="w-[300px] shrink-0">
               <Input
                 variant="search"
-                placeholder="Search"
+                placeholder={DATA_GRID_RESULTS_SEARCH_PLACEHOLDER}
                 value={searchQuery}
                 onChange={(event) => setSearchQuery(event.target.value)}
+                onClear={() => setSearchQuery("")}
                 className="!bg-datavis-card-bg"
                 aria-label="Search aggregated entities"
               />
