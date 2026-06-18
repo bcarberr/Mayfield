@@ -1,5 +1,5 @@
 import { Icon } from "../../design-system";
-import { Button } from "./Button";
+import { Button } from "@/components/shadcn/button";
 
 const cx = (...c: (string | false | undefined)[]) => c.filter(Boolean).join(" ");
 
@@ -12,8 +12,13 @@ export function DataGridExportButton({
   className?: string;
 }) {
   return (
-    <Button type="button" variant="secondary" className={cx("ml-auto shrink-0 gap-1.5", className)}>
-      <Icon name="action-file-download" size={18} aria-hidden />
+    <Button type="button" variant="secondary-outline" className={cx("ml-auto shrink-0 gap-1.5", className)}>
+      <Icon
+        name="action-file-download"
+        size={12}
+        className="size-3 shrink-0 text-current [&>svg]:!size-[12px]"
+        aria-hidden
+      />
       {label}
     </Button>
   );

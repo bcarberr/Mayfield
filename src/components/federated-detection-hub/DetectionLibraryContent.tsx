@@ -1,8 +1,14 @@
 import { Fragment, useMemo, useState } from "react";
 import {
+  DATA_GRID_BODY_CELL_CENTER_CLASS,
+  DATA_GRID_BODY_CELL_CLASS,
+  DATA_GRID_BODY_ROW_CLASS,
+  DATA_GRID_EXPANDED_CELL_CLASS,
   DATA_GRID_EXPANDED_ROW_CLASS,
   DATA_GRID_FILTER_ROW_CLASS,
   DATA_GRID_HEADER_ROW_CLASS,
+  DATA_GRID_ROW_EXPAND_BTN_CLASS,
+  DATA_GRID_ROW_EXPAND_ICON_SIZE,
   DATA_GRID_SECTION_CLASS,
   DATA_GRID_TABLE_CLASS,
   DATA_GRID_TABLE_SCROLL_CLASS,
@@ -11,7 +17,7 @@ import {
 } from "../ui/dataGridTableStyles";
 import { useDataGridStickyToolbar } from "../ui/useDataGridStickyToolbar";
 import { Checkbox, Icon, Switch, type SeverityShapeIconName } from "../../design-system";
-import { Button } from "../ui/Button";
+import { Button } from "@/components/shadcn/button";
 import { ColumnHeaderMenu } from "../ui/ColumnHeaderMenu";
 import {
   compareBooleans,
@@ -366,7 +372,8 @@ function LibraryCopyAction({ name, onClick }: { name: string; onClick: () => voi
     <Button
       type="button"
       variant="ghost"
-      className="size-7 shrink-0 p-0 text-text-tertiary hover:text-text-primary [&_svg]:!size-3 [&_svg]:!h-3 [&_svg]:!w-3"
+      size="icon-sm"
+      className="shrink-0 p-0 text-text-tertiary hover:text-text-primary [&_svg]:!size-3 [&_svg]:!h-3 [&_svg]:!w-3"
       aria-label={`Copy ${name}`}
       onClick={onClick}
     >
@@ -492,8 +499,8 @@ function LibraryDetectionsTable({
   };
 
   const thClass =
-    "relative h-10 border-r border-datavis-gridlines px-2 py-0 align-middle text-xs font-bold uppercase tracking-wide text-text-primary";
-  const tdClass = "h-10 px-2 py-0 align-middle text-sm text-text-secondary";
+    "relative border-r border-datavis-gridlines px-2 py-0 align-middle text-xs font-bold uppercase tracking-wide text-text-primary";
+  const tdClass = cx(DATA_GRID_BODY_CELL_CLASS, "text-sm text-text-secondary");
   const hasActiveFilters = searchQuery.trim().length > 0 || statFilterLabel != null;
   const allExpanded = rows.length > 0 && rows.every((row) => expandedIds.has(row.id));
   const sortComparators = useMemo(
@@ -598,7 +605,7 @@ function LibraryDetectionsTable({
             </colgroup>
             <thead className={DATA_GRID_THEAD_CLASS}>
               <tr className={DATA_GRID_HEADER_ROW_CLASS}>
-                <th scope="col" style={colStyle(0)} className="relative h-10 border-r border-datavis-gridlines px-0 py-0 align-middle">
+                <th scope="col" style={colStyle(0)} className="relative border-r border-datavis-gridlines px-0 py-0 align-middle">
                   <div className="flex items-center justify-center">
                     <Checkbox
                       checked={allSelected}
@@ -684,7 +691,7 @@ function LibraryDetectionsTable({
                   />
                   {resizeHandle(9)}
                 </th>
-                <th scope="col" style={colStyle(10)} className="relative h-10 px-2 py-0 align-middle text-xs font-bold uppercase tracking-wide text-text-primary">
+                <th scope="col" style={colStyle(10)} className="relative px-2 py-0 align-middle text-xs font-bold uppercase tracking-wide text-text-primary">
                   <span className="block translate-y-px truncate">Actions</span>
                   {resizeHandle(10)}
                 </th>
@@ -697,9 +704,9 @@ function LibraryDetectionsTable({
                 const inactiveCellClass = !enabled ? "opacity-70" : "";
                 return (
                   <Fragment key={row.id}>
-                    <tr className="h-10 border-b border-datavis-gridlines hover:bg-overlay-subtle">
-                      <td style={colStyle(0)} className={cx("h-10 px-0 py-0 align-middle", inactiveCellClass)}>
-                        <div className="flex items-center justify-center">
+                    <tr className={DATA_GRID_BODY_ROW_CLASS}>
+                      <td style={colStyle(0)} className={cx("px-0 py-0 align-middle", inactiveCellClass)}>
+                        <div className={DATA_GRID_BODY_CELL_CENTER_CLASS}>
                           <Checkbox
                             checked={selected.has(row.id)}
                             onCheckedChange={(checked) => toggleRow(row.id, checked)}
@@ -707,11 +714,11 @@ function LibraryDetectionsTable({
                           />
                         </div>
                       </td>
-                      <td style={colStyle(1)} className={cx("h-10 px-0 py-0 align-middle", inactiveCellClass)}>
-                        <div className="flex justify-center">
+                      <td style={colStyle(1)} className={cx("px-0 py-0 align-middle", inactiveCellClass)}>
+                        <div className={DATA_GRID_BODY_CELL_CENTER_CLASS}>
                           <button
                             type="button"
-                            className="p-1 text-text-tertiary hover:text-text-primary"
+                            className={DATA_GRID_ROW_EXPAND_BTN_CLASS}
                             aria-expanded={expanded}
                             aria-label={
                               expanded ? `Collapse description for ${row.name}` : `Expand description for ${row.name}`
@@ -720,7 +727,7 @@ function LibraryDetectionsTable({
                           >
                             <Icon
                               name="navi-arrow-drop-down"
-                              size={32}
+                              size={DATA_GRID_ROW_EXPAND_ICON_SIZE}
                               className={cx("block transition-transform", expanded ? "rotate-0" : "-rotate-90")}
                               aria-hidden
                             />
@@ -728,7 +735,7 @@ function LibraryDetectionsTable({
                         </div>
                       </td>
                       <td style={colStyle(2)} className={cx(tdClass, "min-w-0", inactiveCellClass)}>
-                        <div className="flex min-w-0 items-center gap-2">
+                        <div className="flex min-w-0 items-center gap-2 overflow-hidden">
                           <Icon
                             name="nav-detections"
                             size={16}
@@ -772,7 +779,6 @@ function LibraryDetectionsTable({
                           findings={row.findings}
                           detectionId={row.id}
                           detectionName={row.name}
-                          enabled={enabled}
                         />
                       </td>
                       <td style={colStyle(9)} className={cx(tdClass, inactiveCellClass)}>
@@ -786,7 +792,7 @@ function LibraryDetectionsTable({
                       <tr
                         className={cx(DATA_GRID_EXPANDED_ROW_CLASS, !enabled && "opacity-70")}
                       >
-                        <td colSpan={LIBRARY_COLUMN_COUNT} className="px-4 py-3 align-top">
+                        <td colSpan={LIBRARY_COLUMN_COUNT} className={DATA_GRID_EXPANDED_CELL_CLASS}>
                           <DetectionExpandedDetails
                             description={row.description}
                             detectionId={row.id}

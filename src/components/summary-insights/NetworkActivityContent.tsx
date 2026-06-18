@@ -1,7 +1,7 @@
 import { useMemo, useState } from "react";
 import { DATA_GRID_ABOVE_SECTION_CLASS, DATA_GRID_HEADER_ROW_CLASS, DATA_GRID_RESULTS_SEARCH_PLACEHOLDER, DATA_GRID_TABLE_CLASS, DATA_GRID_TABLE_SCROLL_CLASS, DATA_GRID_THEAD_CLASS } from "../ui/dataGridTableStyles";
 import { Checkbox, Icon, type SeverityShapeIconName } from "../../design-system";
-import { Button } from "../ui/Button";
+import { Button } from "@/components/shadcn/button";
 import { ColumnHeaderMenu } from "../ui/ColumnHeaderMenu";
 import { FilterColumnPanel, type FilterColumnPanelTool } from "../ui/FilterColumnPanel";
 import { Input } from "../ui/Input";
@@ -127,7 +127,7 @@ const NETWORK_ACTIVITY_ROWS: NetworkActivityRow[] = [
     severity: "Critical",
     time: "14:22:08",
     eventType: "DNS Activity",
-    title: "DNS tunneling pattern observed on outbound resolver…",
+    title: "DNS tunneling pattern observed on outbound resolver",
     activity: "Traffic",
     status: "Failure",
     trafficType: "DNS",
@@ -140,7 +140,7 @@ const NETWORK_ACTIVITY_ROWS: NetworkActivityRow[] = [
     severity: "High",
     time: "13:05:41",
     eventType: "HTTP Activity",
-    title: "HTTP response handling anomaly on edge gateway…",
+    title: "HTTP response handling anomaly on edge gateway",
     activity: "Update",
     status: "Success",
     trafficType: "HTTP",
@@ -153,7 +153,7 @@ const NETWORK_ACTIVITY_ROWS: NetworkActivityRow[] = [
     severity: "Medium",
     time: "11:40:12",
     eventType: "Email Activity",
-    title: "Unusual SMTP relay volume from internal mail host…",
+    title: "Unusual SMTP relay volume from internal mail host",
     activity: "Open",
     status: "Success",
     trafficType: "Email",
@@ -166,7 +166,7 @@ const NETWORK_ACTIVITY_ROWS: NetworkActivityRow[] = [
     severity: "Low",
     time: "09:12:00",
     eventType: "FTP Activity",
-    title: "FTP session opened to external file transfer node…",
+    title: "FTP session opened to external file transfer node",
     activity: "Refuse",
     status: "Failure",
     trafficType: "FTP",
@@ -179,7 +179,7 @@ const NETWORK_ACTIVITY_ROWS: NetworkActivityRow[] = [
     severity: "Informational",
     time: "22:18:55",
     eventType: "SSH Activity",
-    title: "SSH session established from bastion host…",
+    title: "SSH session established from bastion host",
     activity: "Traffic",
     status: "Success",
     trafficType: "SSH",
@@ -192,7 +192,7 @@ const NETWORK_ACTIVITY_ROWS: NetworkActivityRow[] = [
     severity: "High",
     time: "18:00:03",
     eventType: "DNS Activity",
-    title: "Repeated NXDOMAIN responses to rare TLD queries…",
+    title: "Repeated NXDOMAIN responses to rare TLD queries",
     activity: "Traffic",
     status: "Success",
     trafficType: "DNS",
@@ -205,7 +205,7 @@ const NETWORK_ACTIVITY_ROWS: NetworkActivityRow[] = [
     severity: "Critical",
     time: "16:44:19",
     eventType: "HTTP Activity",
-    title: "Suspicious POST burst to newly registered domain…",
+    title: "Suspicious POST burst to newly registered domain",
     activity: "Traffic",
     status: "Failure",
     trafficType: "HTTP",
@@ -218,7 +218,7 @@ const NETWORK_ACTIVITY_ROWS: NetworkActivityRow[] = [
     severity: "Medium",
     time: "12:01:47",
     eventType: "HTTP Activity",
-    title: "TLS downgrade attempt on internal API endpoint…",
+    title: "TLS downgrade attempt on internal API endpoint",
     activity: "Update",
     status: "Success",
     trafficType: "HTTP",
@@ -231,7 +231,7 @@ const NETWORK_ACTIVITY_ROWS: NetworkActivityRow[] = [
     severity: "Low",
     time: "09:33:22",
     eventType: "Email Activity",
-    title: "Outbound message flagged for suspicious attachment…",
+    title: "Outbound message flagged for suspicious attachment",
     activity: "Open",
     status: "Success",
     trafficType: "Email",
@@ -244,7 +244,7 @@ const NETWORK_ACTIVITY_ROWS: NetworkActivityRow[] = [
     severity: "High",
     time: "21:15:08",
     eventType: "FTP Activity",
-    title: "Large file upload over cleartext FTP channel…",
+    title: "Large file upload over cleartext FTP channel",
     activity: "Traffic",
     status: "Failure",
     trafficType: "FTP",
@@ -472,7 +472,7 @@ function NetworkActivityTable({ displayRows, getSortProps }: { displayRows: Netw
         </colgroup>
         <thead className={DATA_GRID_THEAD_CLASS}>
           <tr className={DATA_GRID_HEADER_ROW_CLASS}>
-            <th scope="col" style={colStyle(0)} className="relative h-10 border-r border-datavis-gridlines px-0 py-0 align-middle">
+            <th scope="col" style={colStyle(0)} className="relative border-r border-datavis-gridlines px-0 py-0 align-middle">
               <div className="flex items-center justify-center">
                 <Checkbox
                   checked={allSelected}
@@ -486,7 +486,7 @@ function NetworkActivityTable({ displayRows, getSortProps }: { displayRows: Netw
             <th
               scope="col"
               style={colStyle(1)}
-              className="relative h-10 border-r border-datavis-gridlines px-2 py-0 align-middle text-xs font-bold uppercase tracking-wide text-text-primary"
+              className="relative border-r border-datavis-gridlines px-2 py-0 align-middle text-xs font-bold uppercase tracking-wide text-text-primary"
             >
               <ColumnHeaderMenu label="Severity" menuLabel="Severity column options" {...getSortProps("severity")} />
               {resizeHandle(1)}
@@ -494,7 +494,7 @@ function NetworkActivityTable({ displayRows, getSortProps }: { displayRows: Netw
             <th
               scope="col"
               style={colStyle(2)}
-              className="relative h-10 border-r border-datavis-gridlines px-2 py-0 align-middle text-xs font-bold uppercase tracking-wide text-text-primary"
+              className="relative border-r border-datavis-gridlines px-2 py-0 align-middle text-xs font-bold uppercase tracking-wide text-text-primary"
             >
               <ColumnHeaderMenu label="Time" menuLabel="Time column options" {...getSortProps("time")} />
               {resizeHandle(2)}
@@ -502,7 +502,7 @@ function NetworkActivityTable({ displayRows, getSortProps }: { displayRows: Netw
             <th
               scope="col"
               style={colStyle(3)}
-              className="relative h-10 border-r border-datavis-gridlines px-2 py-0 align-middle text-xs font-bold uppercase tracking-wide text-text-primary"
+              className="relative border-r border-datavis-gridlines px-2 py-0 align-middle text-xs font-bold uppercase tracking-wide text-text-primary"
             >
               <ColumnHeaderMenu label="Type" menuLabel="Type column options" {...getSortProps("eventType")} />
               {resizeHandle(3)}
@@ -510,7 +510,7 @@ function NetworkActivityTable({ displayRows, getSortProps }: { displayRows: Netw
             <th
               scope="col"
               style={colStyle(4)}
-              className="relative h-10 border-r border-datavis-gridlines px-2 py-0 align-middle text-xs font-bold uppercase tracking-wide text-text-primary"
+              className="relative border-r border-datavis-gridlines px-2 py-0 align-middle text-xs font-bold uppercase tracking-wide text-text-primary"
             >
               <ColumnHeaderMenu label="Title" menuLabel="Title column options" {...getSortProps("title")} />
               {resizeHandle(4)}
@@ -518,7 +518,7 @@ function NetworkActivityTable({ displayRows, getSortProps }: { displayRows: Netw
             <th
               scope="col"
               style={colStyle(5)}
-              className="relative h-10 border-r border-datavis-gridlines px-2 py-0 align-middle text-xs font-bold uppercase tracking-wide text-text-primary"
+              className="relative border-r border-datavis-gridlines px-2 py-0 align-middle text-xs font-bold uppercase tracking-wide text-text-primary"
             >
               <ColumnHeaderMenu label="Activity" menuLabel="Activity column options" {...getSortProps("activity")} />
               {resizeHandle(5)}
@@ -526,7 +526,7 @@ function NetworkActivityTable({ displayRows, getSortProps }: { displayRows: Netw
             <th
               scope="col"
               style={colStyle(6)}
-              className="relative h-10 border-r border-datavis-gridlines px-2 py-0 align-middle text-xs font-bold uppercase tracking-wide text-text-primary"
+              className="relative border-r border-datavis-gridlines px-2 py-0 align-middle text-xs font-bold uppercase tracking-wide text-text-primary"
             >
               <ColumnHeaderMenu label="Status" menuLabel="Status column options" {...getSortProps("status")} />
               {resizeHandle(6)}
@@ -534,7 +534,7 @@ function NetworkActivityTable({ displayRows, getSortProps }: { displayRows: Netw
             <th
               scope="col"
               style={colStyle(7)}
-              className="relative h-10 px-2 py-0 align-middle text-xs font-bold uppercase tracking-wide text-text-primary"
+              className="relative px-2 py-0 align-middle text-xs font-bold uppercase tracking-wide text-text-primary"
             >
               <ColumnHeaderMenu label="Connectors" menuLabel="Connectors column options" {...getSortProps("connector")} />
               {resizeHandle(7)}
@@ -543,8 +543,8 @@ function NetworkActivityTable({ displayRows, getSortProps }: { displayRows: Netw
         </thead>
         <tbody>
           {displayRows.map((row) => (
-            <tr key={row.id} className="h-10 border-b border-datavis-gridlines hover:bg-overlay-subtle">
-              <td style={colStyle(0)} className="h-10 px-0 py-0 align-middle">
+            <tr key={row.id} className="border-b border-datavis-gridlines hover:bg-overlay-subtle">
+              <td style={colStyle(0)} className="px-0 py-0 align-middle">
                 <div className="flex items-center justify-center">
                   <Checkbox
                     checked={selected.has(row.id)}
@@ -553,16 +553,16 @@ function NetworkActivityTable({ displayRows, getSortProps }: { displayRows: Netw
                   />
                 </div>
               </td>
-              <td style={colStyle(1)} className="h-10 px-2 py-0 align-middle">
+              <td style={colStyle(1)} className="px-2 py-0 align-middle">
                 <span className="inline-flex items-center gap-2">
                   <SeverityTableIcon name={SEV_ICONS[row.severity]} color={SEV_BAR[row.severity]} />
                   <span className="text-sm text-text-secondary">{row.severity}</span>
                 </span>
               </td>
-              <td style={colStyle(2)} className="h-10 min-w-0 px-2 py-0 align-middle tabular-nums">
+              <td style={colStyle(2)} className="min-w-0 px-2 py-0 align-middle tabular-nums">
                 <TruncatedText className="text-sm text-text-secondary">{row.time}</TruncatedText>
               </td>
-              <td style={colStyle(3)} className="h-10 min-w-0 overflow-hidden px-2 py-0 align-middle">
+              <td style={colStyle(3)} className="min-w-0 overflow-hidden px-2 py-0 align-middle">
                 <span className="flex w-full min-w-0 items-center gap-2">
                   <Icon
                     name="ocsf-network-activity"
@@ -575,7 +575,7 @@ function NetworkActivityTable({ displayRows, getSortProps }: { displayRows: Netw
                   </TruncatedText>
                 </span>
               </td>
-              <td style={colStyle(4)} className="h-10 min-w-0 px-2 py-0 align-middle">
+              <td style={colStyle(4)} className="min-w-0 px-2 py-0 align-middle">
                 <TruncatedText
                   as="button"
                   className="w-full text-left text-sm font-semibold text-interactive-active hover:underline focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-interactive-active"
@@ -583,13 +583,13 @@ function NetworkActivityTable({ displayRows, getSortProps }: { displayRows: Netw
                   {row.title}
                 </TruncatedText>
               </td>
-              <td style={colStyle(5)} className="h-10 min-w-0 px-2 py-0 align-middle">
+              <td style={colStyle(5)} className="min-w-0 px-2 py-0 align-middle">
                 <TruncatedText className="text-sm text-text-secondary">{row.activity}</TruncatedText>
               </td>
-              <td style={colStyle(6)} className="h-10 min-w-0 px-2 py-0 align-middle">
+              <td style={colStyle(6)} className="min-w-0 px-2 py-0 align-middle">
                 <TruncatedText className="text-sm text-text-secondary">{row.status}</TruncatedText>
               </td>
-              <td style={colStyle(7)} className="h-10 min-w-0 px-2 py-0 align-middle">
+              <td style={colStyle(7)} className="min-w-0 px-2 py-0 align-middle">
                 <ConnectorTableCell name={row.connector} />
               </td>
             </tr>

@@ -3,6 +3,7 @@ import { matchPath, Route, Routes, useLocation, useNavigate } from "react-router
 import { TimeframeProvider } from "../context/TimeframeContext";
 import { CopilotProvider, useCopilot } from "../context/CopilotContext";
 import { SearchProvider } from "../context/SearchContext";
+import { DetectionHubProvider } from "../context/DetectionHubContext";
 import { SearchCopilotSidePanel } from "../components/SearchCopilotPanel";
 import { DEFAULT_ROUTE, ROUTES, type ConnectorsLocationState } from "./routes";
 import { SHOW_AI_AGENTS_PAGE } from "./navRailConfig";
@@ -108,7 +109,9 @@ export function App() {
     <TimeframeProvider>
       <CopilotProvider>
         <SearchProvider>
-          <AppShell />
+          <DetectionHubProvider>
+            <AppShell />
+          </DetectionHubProvider>
         </SearchProvider>
       </CopilotProvider>
     </TimeframeProvider>

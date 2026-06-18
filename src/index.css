@@ -21,6 +21,14 @@
   letter-spacing: 0.4px;
 }
 
+/** Figma “Tbl/Head”: Lato 12px bold — table headers and uppercase column labels. */
+@utility text-tbl-head {
+  font-size: 0.75rem;
+  font-weight: 700;
+  line-height: 0.875rem;
+  letter-spacing: 0.4px;
+}
+
 /** Figma page title — matches `typography.sectionTitle` (Lato 20 bold / 24 leading). */
 @utility text-page-title {
   font-size: 1.25rem;
@@ -77,12 +85,12 @@
   animation: overlay-scrim-in 200ms ease-out both;
 }
 
-/** Figma `02 dp` elevation — Datavis widget cards (`7671:8911`). */
+/** Card/datagrid elevation — no top shadow, very light sides, slightly darker bottom (~10%). */
 @utility shadow-datavis-card {
   box-shadow:
-    0 1px 5px 0 #00000033,
-    0 3px 1px 0 #0000001f,
-    0 2px 2px 0 #00000024;
+    0 6px 8px -5px rgba(0, 0, 0, 0.14),
+    1px 0 3px -1px rgba(0, 0, 0, 0.12),
+    -1px 0 3px -1px rgba(0, 0, 0, 0.12);
 }
 
 @theme {
@@ -120,6 +128,7 @@
   --color-datavis-data-pop-teal-20: #a9e7f3;
   --color-datavis-card-bg: #1e1e1e;
   --color-datavis-gridlines: #424242;
+  --color-datagrid-row-bg: #1e1e1e;
   --color-feedback-positive: #17ae81;
   --color-feedback-negative: #ff604a;
   --color-feedback-caution: #fac354;
@@ -235,6 +244,43 @@ body {
 @layer base {
   [data-slot] {
     @apply border-border outline-ring/50;
+  }
+}
+
+@layer components {
+  /*
+   * Data grid row height — `height` on `<td>` alone does not cap row layout; enforce on
+   * `<tr>` + `box-border` cells with overflow clipping (see dataGridTableStyles.ts).
+   */
+  table.data-grid-table tbody > tr:not(.data-grid-expanded-row) {
+    height: 40px;
+    max-height: 40px;
+  }
+
+  table.data-grid-table tbody > tr:not(.data-grid-expanded-row) > td {
+    box-sizing: border-box;
+    height: 40px;
+    max-height: 40px;
+    padding-block: 0;
+    overflow: hidden;
+    vertical-align: middle;
+  }
+
+  table.data-grid-table tbody > tr:not(.data-grid-expanded-row) > td > * {
+    max-height: 40px;
+  }
+
+  table.data-grid-table thead > tr {
+    height: 40px;
+    max-height: 40px;
+  }
+
+  table.data-grid-table thead > tr > th {
+    box-sizing: border-box;
+    height: 40px;
+    max-height: 40px;
+    padding-block: 0;
+    vertical-align: middle;
   }
 }
 

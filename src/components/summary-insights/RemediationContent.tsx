@@ -1,7 +1,7 @@
 import { useMemo, useState } from "react";
 import { DATA_GRID_ABOVE_SECTION_CLASS, DATA_GRID_HEADER_ROW_CLASS, DATA_GRID_RESULTS_SEARCH_PLACEHOLDER, DATA_GRID_TABLE_CLASS, DATA_GRID_TABLE_SCROLL_CLASS, DATA_GRID_THEAD_CLASS } from "../ui/dataGridTableStyles";
 import { Checkbox, Icon, type SeverityShapeIconName } from "../../design-system";
-import { Button } from "../ui/Button";
+import { Button } from "@/components/shadcn/button";
 import { ColumnHeaderMenu } from "../ui/ColumnHeaderMenu";
 import { DonutChartPanel } from "../ui/DonutChartPanel";
 import { FilterColumnPanel, type FilterColumnPanelTool } from "../ui/FilterColumnPanel";
@@ -114,7 +114,7 @@ const REMEDIATION_ROW_TEMPLATES: RemediationRow[] = [
   {
     id: "1",
     severity: "Critical",
-    title: "Isolate host failed — endpoint unreachable during response window…",
+    title: "Isolate host failed — endpoint unreachable during response window",
     time: "10:31:02",
     activity: "Isolate",
     eventClass: "Network Remediation Activity",
@@ -126,7 +126,7 @@ const REMEDIATION_ROW_TEMPLATES: RemediationRow[] = [
   {
     id: "2",
     severity: "High",
-    title: "Quarantine malicious file blocked by policy on shared endpoint…",
+    title: "Quarantine malicious file blocked by policy on shared endpoint",
     time: "09:58:41",
     activity: "Quarantine",
     eventClass: "File Remediation Activity",
@@ -138,7 +138,7 @@ const REMEDIATION_ROW_TEMPLATES: RemediationRow[] = [
   {
     id: "3",
     severity: "High",
-    title: "Kill process action completed for suspicious PowerShell child…",
+    title: "Kill process action completed for suspicious PowerShell child process",
     time: "09:40:12",
     activity: "Kill Process",
     eventClass: "Process Remediation Activity",
@@ -150,7 +150,7 @@ const REMEDIATION_ROW_TEMPLATES: RemediationRow[] = [
   {
     id: "4",
     severity: "Medium",
-    title: "Block outbound connection to known C2 address pending approval…",
+    title: "Block outbound connection to known C2 address pending approval",
     time: "08:12:00",
     activity: "Block",
     eventClass: "Network Remediation Activity",
@@ -162,7 +162,7 @@ const REMEDIATION_ROW_TEMPLATES: RemediationRow[] = [
   {
     id: "5",
     severity: "Low",
-    title: "Remediation ticket updated with containment playbook reference…",
+    title: "Remediation ticket updated with containment playbook reference",
     time: "22:18:55",
     activity: "Update",
     eventClass: "Remediation Activity",
@@ -174,7 +174,7 @@ const REMEDIATION_ROW_TEMPLATES: RemediationRow[] = [
   {
     id: "6",
     severity: "Informational",
-    title: "Automated file delete succeeded on staging share artifact…",
+    title: "Automated file delete succeeded on staging share artifact",
     time: "18:00:03",
     activity: "Update",
     eventClass: "File Remediation Activity",
@@ -186,7 +186,7 @@ const REMEDIATION_ROW_TEMPLATES: RemediationRow[] = [
   {
     id: "7",
     severity: "Critical",
-    title: "Network isolation rollback failed — host still routing externally…",
+    title: "Network isolation rollback failed — host still routing externally",
     time: "16:44:19",
     activity: "Isolate",
     eventClass: "Network Remediation Activity",
@@ -198,7 +198,7 @@ const REMEDIATION_ROW_TEMPLATES: RemediationRow[] = [
   {
     id: "8",
     severity: "High",
-    title: "Process termination queued for unsigned service binary…",
+    title: "Process termination queued for unsigned service binary",
     time: "12:01:47",
     activity: "Kill Process",
     eventClass: "Process Remediation Activity",
@@ -210,7 +210,7 @@ const REMEDIATION_ROW_TEMPLATES: RemediationRow[] = [
   {
     id: "9",
     severity: "Medium",
-    title: "File hash block rule pushed to edge firewall policy set…",
+    title: "File hash block rule pushed to edge firewall policy set",
     time: "09:33:22",
     activity: "Block",
     eventClass: "File Remediation Activity",
@@ -222,7 +222,7 @@ const REMEDIATION_ROW_TEMPLATES: RemediationRow[] = [
   {
     id: "10",
     severity: "Low",
-    title: "Remediation workflow marked complete after host compliance check…",
+    title: "Remediation workflow marked complete after host compliance check",
     time: "21:15:08",
     activity: "Update",
     eventClass: "Remediation Activity",
@@ -362,7 +362,7 @@ function RemediationEventsTable({ displayRows, getSortProps }: { displayRows: Re
         </colgroup>
         <thead className={DATA_GRID_THEAD_CLASS}>
           <tr className={DATA_GRID_HEADER_ROW_CLASS}>
-            <th scope="col" style={colStyle(0)} className="relative h-10 border-r border-datavis-gridlines px-0 py-0 align-middle">
+            <th scope="col" style={colStyle(0)} className="relative border-r border-datavis-gridlines px-0 py-0 align-middle">
               <div className="flex items-center justify-center">
                 <Checkbox
                   checked={allSelected}
@@ -376,7 +376,7 @@ function RemediationEventsTable({ displayRows, getSortProps }: { displayRows: Re
             <th
               scope="col"
               style={colStyle(1)}
-              className="relative h-10 border-r border-datavis-gridlines px-2 py-0 align-middle text-xs font-bold uppercase tracking-wide text-text-primary"
+              className="relative border-r border-datavis-gridlines px-2 py-0 align-middle text-xs font-bold uppercase tracking-wide text-text-primary"
             >
               <ColumnHeaderMenu label="Severity" menuLabel="Severity column options" {...getSortProps("severity")} />
               {resizeHandle(1)}
@@ -384,7 +384,7 @@ function RemediationEventsTable({ displayRows, getSortProps }: { displayRows: Re
             <th
               scope="col"
               style={colStyle(2)}
-              className="relative h-10 border-r border-datavis-gridlines px-2 py-0 align-middle text-xs font-bold uppercase tracking-wide text-text-primary"
+              className="relative border-r border-datavis-gridlines px-2 py-0 align-middle text-xs font-bold uppercase tracking-wide text-text-primary"
             >
               <ColumnHeaderMenu label="Title" menuLabel="Title column options" {...getSortProps("title")} />
               {resizeHandle(2)}
@@ -392,7 +392,7 @@ function RemediationEventsTable({ displayRows, getSortProps }: { displayRows: Re
             <th
               scope="col"
               style={colStyle(3)}
-              className="relative h-10 border-r border-datavis-gridlines px-2 py-0 align-middle text-xs font-bold uppercase tracking-wide text-text-primary"
+              className="relative border-r border-datavis-gridlines px-2 py-0 align-middle text-xs font-bold uppercase tracking-wide text-text-primary"
             >
               <ColumnHeaderMenu label="Time" menuLabel="Time column options" {...getSortProps("time")} />
               {resizeHandle(3)}
@@ -400,7 +400,7 @@ function RemediationEventsTable({ displayRows, getSortProps }: { displayRows: Re
             <th
               scope="col"
               style={colStyle(4)}
-              className="relative h-10 border-r border-datavis-gridlines px-2 py-0 align-middle text-xs font-bold uppercase tracking-wide text-text-primary"
+              className="relative border-r border-datavis-gridlines px-2 py-0 align-middle text-xs font-bold uppercase tracking-wide text-text-primary"
             >
               <ColumnHeaderMenu label="Activity" menuLabel="Activity column options" {...getSortProps("activity")} />
               {resizeHandle(4)}
@@ -408,7 +408,7 @@ function RemediationEventsTable({ displayRows, getSortProps }: { displayRows: Re
             <th
               scope="col"
               style={colStyle(5)}
-              className="relative h-10 border-r border-datavis-gridlines px-2 py-0 align-middle text-xs font-bold uppercase tracking-wide text-text-primary"
+              className="relative border-r border-datavis-gridlines px-2 py-0 align-middle text-xs font-bold uppercase tracking-wide text-text-primary"
             >
               <ColumnHeaderMenu label="Class" menuLabel="Class column options" {...getSortProps("eventClass")} />
               {resizeHandle(5)}
@@ -416,7 +416,7 @@ function RemediationEventsTable({ displayRows, getSortProps }: { displayRows: Re
             <th
               scope="col"
               style={colStyle(6)}
-              className="relative h-10 border-r border-datavis-gridlines px-2 py-0 align-middle text-xs font-bold uppercase tracking-wide text-text-primary"
+              className="relative border-r border-datavis-gridlines px-2 py-0 align-middle text-xs font-bold uppercase tracking-wide text-text-primary"
             >
               <ColumnHeaderMenu label="Entity" menuLabel="Entity column options" {...getSortProps("entity")} />
               {resizeHandle(6)}
@@ -424,7 +424,7 @@ function RemediationEventsTable({ displayRows, getSortProps }: { displayRows: Re
             <th
               scope="col"
               style={colStyle(7)}
-              className="relative h-10 border-r border-datavis-gridlines px-2 py-0 align-middle text-xs font-bold uppercase tracking-wide text-text-primary"
+              className="relative border-r border-datavis-gridlines px-2 py-0 align-middle text-xs font-bold uppercase tracking-wide text-text-primary"
             >
               <ColumnHeaderMenu label="Status" menuLabel="Status column options" {...getSortProps("status")} />
               {resizeHandle(7)}
@@ -432,7 +432,7 @@ function RemediationEventsTable({ displayRows, getSortProps }: { displayRows: Re
             <th
               scope="col"
               style={colStyle(8)}
-              className="relative h-10 px-2 py-0 align-middle text-xs font-bold uppercase tracking-wide text-text-primary"
+              className="relative px-2 py-0 align-middle text-xs font-bold uppercase tracking-wide text-text-primary"
             >
               <ColumnHeaderMenu label="Connectors" menuLabel="Connectors column options" {...getSortProps("connector")} />
               {resizeHandle(8)}
@@ -441,8 +441,8 @@ function RemediationEventsTable({ displayRows, getSortProps }: { displayRows: Re
         </thead>
         <tbody>
           {displayRows.map((row) => (
-            <tr key={row.id} className="h-10 border-b border-datavis-gridlines hover:bg-overlay-subtle">
-              <td style={colStyle(0)} className="h-10 px-0 py-0 align-middle">
+            <tr key={row.id} className="border-b border-datavis-gridlines hover:bg-overlay-subtle">
+              <td style={colStyle(0)} className="px-0 py-0 align-middle">
                 <div className="flex items-center justify-center">
                   <Checkbox
                     checked={selected.has(row.id)}
@@ -451,13 +451,13 @@ function RemediationEventsTable({ displayRows, getSortProps }: { displayRows: Re
                   />
                 </div>
               </td>
-              <td style={colStyle(1)} className="h-10 px-2 py-0 align-middle">
+              <td style={colStyle(1)} className="px-2 py-0 align-middle">
                 <span className="inline-flex items-center gap-2">
                   <SeverityTableIcon name={SEV_ICONS[row.severity]} color={SEV_BAR[row.severity]} />
                   <span className="text-sm text-text-secondary">{row.severity}</span>
                 </span>
               </td>
-              <td style={colStyle(2)} className="h-10 min-w-0 px-2 py-0 align-middle">
+              <td style={colStyle(2)} className="min-w-0 px-2 py-0 align-middle">
                 <TruncatedText
                   as="button"
                   className="w-full text-left text-sm font-semibold text-interactive-active hover:underline focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-interactive-active"
@@ -465,13 +465,13 @@ function RemediationEventsTable({ displayRows, getSortProps }: { displayRows: Re
                   {row.title}
                 </TruncatedText>
               </td>
-              <td style={colStyle(3)} className="h-10 min-w-0 px-2 py-0 align-middle tabular-nums">
+              <td style={colStyle(3)} className="min-w-0 px-2 py-0 align-middle tabular-nums">
                 <TruncatedText className="text-sm text-text-secondary">{row.time}</TruncatedText>
               </td>
-              <td style={colStyle(4)} className="h-10 min-w-0 px-2 py-0 align-middle">
+              <td style={colStyle(4)} className="min-w-0 px-2 py-0 align-middle">
                 <TruncatedText className="text-sm text-text-secondary">{row.activity}</TruncatedText>
               </td>
-              <td style={colStyle(5)} className="h-10 min-w-0 overflow-hidden px-2 py-0 align-middle">
+              <td style={colStyle(5)} className="min-w-0 overflow-hidden px-2 py-0 align-middle">
                 <span className="flex w-full min-w-0 items-center gap-2">
                   <Icon
                     name="ocsf-remediation"
@@ -484,15 +484,15 @@ function RemediationEventsTable({ displayRows, getSortProps }: { displayRows: Re
                   </TruncatedText>
                 </span>
               </td>
-              <td style={colStyle(6)} className="h-10 min-w-0 px-2 py-0 align-middle">
+              <td style={colStyle(6)} className="min-w-0 px-2 py-0 align-middle">
                 <TruncatedText className="text-sm text-text-secondary">{row.entity}</TruncatedText>
               </td>
-              <td style={colStyle(7)} className="h-10 min-w-0 px-2 py-0 align-middle">
+              <td style={colStyle(7)} className="min-w-0 px-2 py-0 align-middle">
                 <TruncatedText className={cx("text-sm font-semibold", statusClassName(row.status))}>
                   {row.status}
                 </TruncatedText>
               </td>
-              <td style={colStyle(8)} className="h-10 min-w-0 px-2 py-0 align-middle">
+              <td style={colStyle(8)} className="min-w-0 px-2 py-0 align-middle">
                 <ConnectorTableCell name={row.connector} />
               </td>
             </tr>

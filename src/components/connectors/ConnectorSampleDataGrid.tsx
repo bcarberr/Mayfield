@@ -22,14 +22,14 @@ export function ConnectorSampleDataGrid({ rows }: { rows: readonly ConnectorSamp
     <div className="min-h-0 h-full w-full overflow-auto">
       <table className="w-max min-w-full border-collapse text-left">
         <caption className="sr-only">Preview sample data rows from the connected data table</caption>
-        <thead className="sticky top-0 z-10 bg-surface-container">
+        <thead className="sticky top-0 z-10 bg-surface-table-row-header">
           <tr>
             {DEMO_CONNECTOR_SAMPLE_COLUMNS.map(({ id, header }) => (
               <th
                 key={id}
                 scope="col"
                 style={{ minWidth: COLUMN_MIN_WIDTH[id] }}
-                className="border border-border-rule px-4 py-2.5 text-left text-xs font-bold uppercase tracking-wide whitespace-nowrap text-text-primary"
+                className="h-[40px] max-h-[40px] border border-border-rule px-4 py-0 align-middle text-left text-xs font-bold uppercase tracking-wide whitespace-nowrap text-text-primary"
               >
                 {header}
               </th>
@@ -38,12 +38,12 @@ export function ConnectorSampleDataGrid({ rows }: { rows: readonly ConnectorSamp
         </thead>
         <tbody>
           {rows.map((row) => (
-            <tr key={row.previewRowId} className="bg-surface-modal hover:bg-surface-container/50">
+            <tr key={row.previewRowId} className="h-[40px] max-h-[40px] bg-surface-modal hover:bg-surface-container/50">
               {DEMO_CONNECTOR_SAMPLE_COLUMNS.map(({ id }) => (
                 <td
                   key={id}
                   style={{ minWidth: COLUMN_MIN_WIDTH[id] }}
-                  className="border border-border-rule px-4 py-2.5 text-sm whitespace-nowrap text-text-primary"
+                  className="h-[40px] max-h-[40px] border border-border-rule px-4 py-0 align-middle text-sm whitespace-nowrap text-text-primary"
                 >
                   {row[id]}
                 </td>

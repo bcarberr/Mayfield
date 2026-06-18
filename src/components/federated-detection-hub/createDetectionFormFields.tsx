@@ -1,7 +1,7 @@
 import { useId, useRef, useState, type ComponentProps, type KeyboardEvent, type ReactNode } from "react";
 import { Icon, Switch, type SeverityShapeIconName } from "../../design-system";
 import { Badge } from "@/components/shadcn/badge";
-import { Button } from "../ui/Button";
+import { Button } from "@/components/shadcn/button";
 import {
   Collapsible,
   CollapsibleContent,
@@ -432,7 +432,7 @@ export function MessageTemplateVariablePill({
   onInsert: (variable: string) => void;
 }) {
   return (
-    <Button type="button" variant="secondary" size="small" onClick={() => onInsert(variable)}>
+    <Button type="button" variant="secondary-outline" size="sm" onClick={() => onInsert(variable)}>
       {variable}
     </Button>
   );

@@ -90,7 +90,8 @@ export function ConnectorCard({ connector, onEnabledChange, onConfigure }: Conne
             ref={buttonRef}
             type="button"
             variant="ghost"
-            className="size-7 shrink-0 p-0 text-text-tertiary hover:text-text-primary [&_svg]:!size-4"
+            size="icon-sm"
+            className="shrink-0 p-0 text-text-tertiary hover:text-text-primary [&_svg]:!size-4"
             aria-label={`Actions for ${connector.instanceName}`}
             aria-expanded={menuOpen}
             aria-haspopup="menu"

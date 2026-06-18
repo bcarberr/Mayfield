@@ -9,7 +9,6 @@ import {
 } from "../data/searchEntityOptions";
 import { getFieldsForCategory } from "../data/ocsfEventFields";
 import { SearchCriteriaSelect } from "./SearchCriteriaSelect";
-import { Button as UiButton } from "./ui/Button";
 import { Button } from "@/components/shadcn/button";
 import { Checkbox } from "@/components/shadcn/checkbox";
 import {
@@ -27,7 +26,7 @@ const SMALL_OUTLINE_BUTTON_CLASS =
   "h-auto gap-1 rounded-[4px] border-interactive-secondary-pressed bg-transparent px-2 py-1 text-xs font-semibold text-interactive-active shadow-none hover:bg-interactive-secondary-hover hover:text-interactive-active";
 
 const ICON_GHOST_BUTTON_CLASS =
-  "size-8 shrink-0 text-text-tertiary hover:bg-overlay-subtle hover:text-text-primary disabled:opacity-40";
+  "shrink-0 text-text-tertiary hover:bg-overlay-subtle hover:text-text-primary disabled:opacity-40";
 
 const CHIP_INPUT_CLASS =
   "h-auto min-w-[80px] flex-1 border-0 bg-transparent px-0 py-0 text-sm leading-5 shadow-none focus-visible:ring-0 placeholder:font-normal placeholder:italic placeholder:text-text-tertiary dark:bg-transparent";
@@ -494,15 +493,15 @@ function EventBlockComp({
         ))}
 
         {/* Add Condition (adds a new group) */}
-        <UiButton
+        <Button
           type="button"
-          variant="secondary"
+          variant="secondary-outline"
           className="self-start"
           onClick={() => onUpdate({ ...block, groups: [...block.groups, makeEmptyGroup()] })}
         >
           <Icon name="action-add" size={9} className="shrink-0 text-current [&>svg]:!size-[9px]" aria-hidden />
           Add Condition
-        </UiButton>
+        </Button>
       </div>
     </div>
   );
@@ -880,15 +879,15 @@ function EntityBlockComp({
             onDelete={() => deleteGroup(group.id)}
           />
         ))}
-        <UiButton
+        <Button
           type="button"
-          variant="secondary"
+          variant="secondary-outline"
           className="self-start"
           onClick={() => onUpdate({ ...block, groups: [...block.groups, makeEmptyEntityGroup()] })}
         >
           <Icon name="action-add" size={9} className="shrink-0 text-current [&>svg]:!size-[9px]" aria-hidden />
           Add Condition
-        </UiButton>
+        </Button>
       </div>
     </div>
   );
@@ -1063,14 +1062,14 @@ export function SearchQueryBuilder({
       <div className="flex flex-wrap items-center gap-3">
         {/* Add Entity */}
         <div className="relative">
-          <UiButton
+          <Button
             type="button"
-            variant="secondary"
+            variant="secondary-outline"
             onClick={() => setShowEntityPicker((v) => !v)}
           >
             <Icon name="action-add" size={9} className="shrink-0 text-current [&>svg]:!size-[9px]" aria-hidden />
             Add Entity
-          </UiButton>
+          </Button>
           {showEntityPicker && (
             <EntityPickerPopover
               onSelect={(option) => {
@@ -1083,14 +1082,14 @@ export function SearchQueryBuilder({
 
         {/* Add Event */}
         <div className="relative">
-          <UiButton
+          <Button
             type="button"
-            variant="secondary"
+            variant="secondary-outline"
             onClick={() => setShowEventPicker((v) => !v)}
           >
             <Icon name="action-add" size={9} className="shrink-0 text-current [&>svg]:!size-[9px]" aria-hidden />
             Add Event
-          </UiButton>
+          </Button>
 
           {showEventPicker && (
             <EventPickerPopover

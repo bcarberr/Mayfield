@@ -1,9 +1,9 @@
-import { useEffect } from "react";
+import { useEffect, type ReactNode } from "react";
 import { createPortal } from "react-dom";
 
 export type SnackbarProps = {
   open: boolean;
-  message: string;
+  message: ReactNode;
   onClose: () => void;
   /** Milliseconds before auto-dismiss. Defaults to 4000. Set to 0 to disable. */
   autoHideDuration?: number;

@@ -9,7 +9,7 @@ import {
 } from "../ui/dataGridTableStyles";
 import { Checkbox, Icon, type SeverityShapeIconName } from "../../design-system";
 import { type TimeframeRange } from "../../context/TimeframeContext";
-import { Button } from "../ui/Button";
+import { Button } from "@/components/shadcn/button";
 import { ColumnHeaderMenu } from "../ui/ColumnHeaderMenu";
 import { FilterColumnPanel, type FilterColumnPanelTool } from "../ui/FilterColumnPanel";
 import { Input } from "../ui/Input";
@@ -247,7 +247,7 @@ function EntityCardHeaderActions() {
     <div className="flex shrink-0 items-center gap-1">
       <Tooltip>
         <TooltipTrigger asChild>
-          <Button variant="ghost" className="size-6 p-0 text-text-tertiary hover:text-text-primary" aria-label="Pivot search">
+          <Button variant="ghost" size="icon-xs" className="p-0 text-text-tertiary hover:text-text-primary" aria-label="Pivot search">
             <Icon name="action-search" size={16} />
           </Button>
         </TooltipTrigger>
@@ -255,7 +255,7 @@ function EntityCardHeaderActions() {
       </Tooltip>
       <Tooltip>
         <TooltipTrigger asChild>
-          <Button variant="ghost" className="size-6 p-0 text-text-tertiary hover:text-text-primary" aria-label="Expand widget">
+          <Button variant="ghost" size="icon-xs" className="p-0 text-text-tertiary hover:text-text-primary" aria-label="Expand widget">
             <Icon name="nav-expand" size={16} />
           </Button>
         </TooltipTrigger>
@@ -263,7 +263,7 @@ function EntityCardHeaderActions() {
       </Tooltip>
       <DropdownMenu>
         <DropdownMenuTrigger asChild>
-          <Button variant="ghost" className="size-6 p-0 text-text-tertiary hover:text-text-primary" aria-label="Widget options">
+          <Button variant="ghost" size="icon-xs" className="p-0 text-text-tertiary hover:text-text-primary" aria-label="Widget options">
             <Icon name="navi-more-vert" size={16} />
           </Button>
         </DropdownMenuTrigger>
@@ -322,11 +322,11 @@ function EntityCategoryCard({ data }: { data: EntityCategoryCardData }) {
           ))}
         </ol>
         <div className="mt-3 flex items-center justify-end gap-2 text-base-small text-text-primary">
-          <Button variant="ghost" className="size-6 p-0 text-text-tertiary hover:text-text-primary" aria-label="Previous page">
+          <Button variant="ghost" size="icon-xs" className="p-0 text-text-tertiary hover:text-text-primary" aria-label="Previous page">
             <Icon name="navi-chevron-left" size={12} />
           </Button>
           <span className="tabular-nums tracking-[0.4px]">1-5 of {data.totalCount}</span>
-          <Button variant="ghost" className="size-6 p-0 text-text-tertiary hover:text-text-primary" aria-label="Next page">
+          <Button variant="ghost" size="icon-xs" className="p-0 text-text-tertiary hover:text-text-primary" aria-label="Next page">
             <Icon name="navi-chevron-right" size={12} />
           </Button>
         </div>
@@ -712,7 +712,7 @@ function EntitiesAggregatedTable({ displayRows, getSortProps }: { displayRows: A
         </colgroup>
         <thead className={DATA_GRID_THEAD_CLASS}>
           <tr className={DATA_GRID_HEADER_ROW_CLASS}>
-            <th scope="col" style={colStyle(0)} className="relative h-10 border-r border-datavis-gridlines px-0 py-0 align-middle">
+            <th scope="col" style={colStyle(0)} className="relative border-r border-datavis-gridlines px-0 py-0 align-middle">
               <div className="flex items-center justify-center">
                 <Checkbox
                   checked={allSelected}
@@ -726,7 +726,7 @@ function EntitiesAggregatedTable({ displayRows, getSortProps }: { displayRows: A
             <th
               scope="col"
               style={colStyle(1)}
-              className="relative h-10 border-r border-datavis-gridlines px-2 py-0 align-middle text-xs font-bold uppercase tracking-wide text-text-primary"
+              className="relative border-r border-datavis-gridlines px-2 py-0 align-middle text-xs font-bold uppercase tracking-wide text-text-primary"
             >
               <ColumnHeaderMenu label="Risk" menuLabel="Risk column options" {...getSortProps("risk")} />
               {resizeHandle(1)}
@@ -734,7 +734,7 @@ function EntitiesAggregatedTable({ displayRows, getSortProps }: { displayRows: A
             <th
               scope="col"
               style={colStyle(2)}
-              className="relative h-10 border-r border-datavis-gridlines px-2 py-0 align-middle text-xs font-bold uppercase tracking-wide text-text-primary"
+              className="relative border-r border-datavis-gridlines px-2 py-0 align-middle text-xs font-bold uppercase tracking-wide text-text-primary"
             >
               <ColumnHeaderMenu label="Entity" menuLabel="Entity column options" {...getSortProps("entity")} />
               {resizeHandle(2)}
@@ -742,7 +742,7 @@ function EntitiesAggregatedTable({ displayRows, getSortProps }: { displayRows: A
             <th
               scope="col"
               style={colStyle(3)}
-              className="relative h-10 border-r border-datavis-gridlines px-2 py-0 align-middle text-xs font-bold uppercase tracking-wide text-text-primary"
+              className="relative border-r border-datavis-gridlines px-2 py-0 align-middle text-xs font-bold uppercase tracking-wide text-text-primary"
             >
               <ColumnHeaderMenu label="Type" menuLabel="Type column options" {...getSortProps("type")} />
               {resizeHandle(3)}
@@ -750,7 +750,7 @@ function EntitiesAggregatedTable({ displayRows, getSortProps }: { displayRows: A
             <th
               scope="col"
               style={colStyle(4)}
-              className="relative h-10 border-r border-datavis-gridlines px-2 py-0 align-middle text-xs font-bold uppercase tracking-wide text-text-primary"
+              className="relative border-r border-datavis-gridlines px-2 py-0 align-middle text-xs font-bold uppercase tracking-wide text-text-primary"
             >
               <ColumnHeaderMenu label="Last Seen" menuLabel="Last seen column options" {...getSortProps("lastSeen")} />
               {resizeHandle(4)}
@@ -758,7 +758,7 @@ function EntitiesAggregatedTable({ displayRows, getSortProps }: { displayRows: A
             <th
               scope="col"
               style={colStyle(5)}
-              className="relative h-10 border-r border-datavis-gridlines px-2 py-0 align-middle text-xs font-bold uppercase tracking-wide text-text-primary"
+              className="relative border-r border-datavis-gridlines px-2 py-0 align-middle text-xs font-bold uppercase tracking-wide text-text-primary"
             >
               <ColumnHeaderMenu label="# Events" menuLabel="Events column options" {...getSortProps("eventCount")} />
               {resizeHandle(5)}
@@ -766,7 +766,7 @@ function EntitiesAggregatedTable({ displayRows, getSortProps }: { displayRows: A
             <th
               scope="col"
               style={colStyle(6)}
-              className="relative h-10 border-r border-datavis-gridlines px-2 py-0 align-middle text-xs font-bold uppercase tracking-wide text-text-primary"
+              className="relative border-r border-datavis-gridlines px-2 py-0 align-middle text-xs font-bold uppercase tracking-wide text-text-primary"
             >
               <ColumnHeaderMenu
                 label="Categories Involved"
@@ -778,7 +778,7 @@ function EntitiesAggregatedTable({ displayRows, getSortProps }: { displayRows: A
             <th
               scope="col"
               style={colStyle(7)}
-              className="relative h-10 px-2 py-0 align-middle text-xs font-bold uppercase tracking-wide text-text-primary"
+              className="relative px-2 py-0 align-middle text-xs font-bold uppercase tracking-wide text-text-primary"
             >
               <ColumnHeaderMenu label="Connectors" menuLabel="Connectors column options" {...getSortProps("connector")} />
               {resizeHandle(7)}
@@ -787,8 +787,8 @@ function EntitiesAggregatedTable({ displayRows, getSortProps }: { displayRows: A
         </thead>
         <tbody>
           {displayRows.map((row) => (
-            <tr key={row.id} className="h-10 border-b border-datavis-gridlines hover:bg-overlay-subtle">
-              <td style={colStyle(0)} className="h-10 px-0 py-0 align-middle">
+            <tr key={row.id} className="border-b border-datavis-gridlines hover:bg-overlay-subtle">
+              <td style={colStyle(0)} className="px-0 py-0 align-middle">
                 <div className="flex items-center justify-center">
                   <Checkbox
                     checked={selected.has(row.id)}
@@ -797,13 +797,13 @@ function EntitiesAggregatedTable({ displayRows, getSortProps }: { displayRows: A
                   />
                 </div>
               </td>
-              <td style={colStyle(1)} className="h-10 px-2 py-0 align-middle">
+              <td style={colStyle(1)} className="px-2 py-0 align-middle">
                 <span className="inline-flex items-center gap-2">
                   <SeverityTableIcon name={ENTITY_RISK_ICONS[row.risk]} color={ENTITY_RISK_BAR[row.risk]} />
                   <span className="text-sm text-text-secondary">{row.risk}</span>
                 </span>
               </td>
-              <td style={colStyle(2)} className="h-10 min-w-0 px-2 py-0 align-middle">
+              <td style={colStyle(2)} className="min-w-0 px-2 py-0 align-middle">
                 <TruncatedText
                   as="button"
                   className="w-full text-left text-sm font-semibold text-interactive-active hover:underline focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-interactive-active"
@@ -811,19 +811,19 @@ function EntitiesAggregatedTable({ displayRows, getSortProps }: { displayRows: A
                   {row.entity}
                 </TruncatedText>
               </td>
-              <td style={colStyle(3)} className="h-10 min-w-0 px-2 py-0 align-middle">
+              <td style={colStyle(3)} className="min-w-0 px-2 py-0 align-middle">
                 <TruncatedText className="text-sm text-text-secondary">{row.type}</TruncatedText>
               </td>
-              <td style={colStyle(4)} className="h-10 min-w-0 px-2 py-0 align-middle tabular-nums">
+              <td style={colStyle(4)} className="min-w-0 px-2 py-0 align-middle tabular-nums">
                 <TruncatedText className="text-sm text-text-secondary">{row.lastSeen}</TruncatedText>
               </td>
-              <td style={colStyle(5)} className="h-10 min-w-0 px-2 py-0 align-middle tabular-nums">
+              <td style={colStyle(5)} className="min-w-0 px-2 py-0 align-middle tabular-nums">
                 <TruncatedText className="text-sm text-text-secondary">{formatCount(row.eventCount)}</TruncatedText>
               </td>
-              <td style={colStyle(6)} className="h-10 min-w-0 px-2 py-0 align-middle">
+              <td style={colStyle(6)} className="min-w-0 px-2 py-0 align-middle">
                 <TruncatedText className="text-sm text-text-secondary">{row.categories}</TruncatedText>
               </td>
-              <td style={colStyle(7)} className="h-10 min-w-0 overflow-hidden px-2 py-0 align-middle">
+              <td style={colStyle(7)} className="min-w-0 overflow-hidden px-2 py-0 align-middle">
                 <ConnectorTableCell
                   name={row.connector}
                   className="w-full"

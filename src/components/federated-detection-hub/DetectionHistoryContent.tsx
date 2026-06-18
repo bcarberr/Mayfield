@@ -1,9 +1,15 @@
 import { Fragment, useMemo, useState } from "react";
 import {
   DATA_GRID_ABOVE_SECTION_CLASS,
+  DATA_GRID_BODY_CELL_CENTER_CLASS,
+  DATA_GRID_BODY_CELL_CLASS,
+  DATA_GRID_BODY_ROW_CLASS,
+  DATA_GRID_EXPANDED_CELL_CLASS,
   DATA_GRID_EXPANDED_ROW_CLASS,
   DATA_GRID_FILTER_ROW_CLASS,
   DATA_GRID_HEADER_ROW_CLASS,
+  DATA_GRID_ROW_EXPAND_BTN_CLASS,
+  DATA_GRID_ROW_EXPAND_ICON_SIZE,
   DATA_GRID_SECTION_CLASS,
   DATA_GRID_TABLE_CLASS,
   DATA_GRID_TABLE_SCROLL_CLASS,
@@ -12,7 +18,7 @@ import {
 } from "../ui/dataGridTableStyles";
 import { useDataGridStickyToolbar } from "../ui/useDataGridStickyToolbar";
 import { Checkbox, Icon, type SeverityShapeIconName } from "../../design-system";
-import { Button } from "../ui/Button";
+import { Button } from "@/components/shadcn/button";
 import { ColumnHeaderMenu } from "../ui/ColumnHeaderMenu";
 import { compareStrings, useColumnSort } from "../ui/useColumnSort";
 import { FilterColumnPanel, type FilterColumnPanelTool } from "../ui/FilterColumnPanel";
@@ -26,6 +32,7 @@ import { useResizableColumns } from "../ui/useResizableColumns";
 import { useDataGridPagination } from "../ui/useDataGridPagination";
 import { InsightCard } from "../summary-insights/datavisCard";
 import { HorizontalBarPanel } from "../summary-insights/horizontalBarPanel";
+import { FindingsSearchCell, type DetectionFindings } from "./FindingsSearchCell";
 
 const cx = (...c: (string | false | undefined)[]) => c.filter(Boolean).join(" ");
 
@@ -462,11 +469,10 @@ function RunStatusCell({ status }: { status: RunStatus }) {
   return <span className="text-sm font-semibold text-feedback-positive">Success</span>;
 }
 
-function FindingsGeneratedCell({ value }: { value: number | null }) {
-  if (value == null) {
-    return <span className="text-sm text-text-secondary">—</span>;
-  }
-  return <span className="text-sm font-semibold tabular-nums text-text-primary">{value}</span>;
+function runHistoryFindings(findingsGenerated: number | null, status: RunStatus): DetectionFindings {
+  if (status === "Error") return "error";
+  if (findingsGenerated == null) return "none";
+  return findingsGenerated;
 }
 
 type RunHistorySortColumn =
@@ -554,8 +560,8 @@ function RunHistoryTable({
   };
 
   const thClass =
-    "relative h-10 border-r border-datavis-gridlines px-2 py-0 align-middle text-xs font-bold uppercase tracking-wide text-text-primary";
-  const tdClass = "h-10 px-2 py-0 align-middle text-sm text-text-secondary";
+    "relative border-r border-datavis-gridlines px-2 py-0 align-middle text-xs font-bold uppercase tracking-wide text-text-primary";
+  const tdClass = cx(DATA_GRID_BODY_CELL_CLASS, "text-sm text-text-secondary");
 
   const sortComparators = useMemo(
     (): Record<RunHistorySortColumn, (a: RunHistoryRow, b: RunHistoryRow) => number> => ({
@@ -611,7 +617,7 @@ function RunHistoryTable({
         </colgroup>
         <thead className={DATA_GRID_THEAD_CLASS}>
           <tr className={DATA_GRID_HEADER_ROW_CLASS}>
-            <th scope="col" style={colStyle(0)} className="relative h-10 border-r border-datavis-gridlines px-0 py-0 align-middle">
+            <th scope="col" style={colStyle(0)} className="relative border-r border-datavis-gridlines px-0 py-0 align-middle">
               <div className="flex items-center justify-center">
                 <Checkbox
                   checked={allSelected}
@@ -685,9 +691,9 @@ function RunHistoryTable({
             const expanded = expandedIds.has(row.id);
             return (
               <Fragment key={row.id}>
-                <tr className="h-10 border-b border-datavis-gridlines hover:bg-overlay-subtle">
-                  <td style={colStyle(0)} className="h-10 px-0 py-0 align-middle">
-                    <div className="flex items-center justify-center">
+                <tr className={DATA_GRID_BODY_ROW_CLASS}>
+                  <td style={colStyle(0)} className="px-0 py-0 align-middle">
+                    <div className={DATA_GRID_BODY_CELL_CENTER_CLASS}>
                       <Checkbox
                         checked={selected.has(row.id)}
                         onCheckedChange={(checked) => toggleRow(row.id, checked)}
@@ -695,11 +701,11 @@ function RunHistoryTable({
                       />
                     </div>
                   </td>
-                  <td style={colStyle(1)} className="h-10 px-0 py-0 align-middle">
-                    <div className="flex justify-center">
+                  <td style={colStyle(1)} className="px-0 py-0 align-middle">
+                    <div className={DATA_GRID_BODY_CELL_CENTER_CLASS}>
                       <button
                         type="button"
-                        className="p-1 text-text-tertiary hover:text-text-primary"
+                        className={DATA_GRID_ROW_EXPAND_BTN_CLASS}
                         aria-expanded={expanded}
                         aria-label={
                           expanded ? `Collapse run details for ${row.detectionName}` : `Expand run details for ${row.detectionName}`
@@ -708,7 +714,7 @@ function RunHistoryTable({
                       >
                         <Icon
                           name="navi-arrow-drop-down"
-                          size={32}
+                          size={DATA_GRID_ROW_EXPAND_ICON_SIZE}
                           className={cx("block transition-transform", expanded ? "rotate-0" : "-rotate-90")}
                           aria-hidden
                         />
@@ -731,7 +737,11 @@ function RunHistoryTable({
                     <RunStatusCell status={row.status} />
                   </td>
                   <td style={colStyle(6)} className={tdClass}>
-                    <FindingsGeneratedCell value={row.findingsGenerated} />
+                    <FindingsSearchCell
+                      findings={runHistoryFindings(row.findingsGenerated, row.status)}
+                      detectionId={row.id}
+                      detectionName={row.detectionName}
+                    />
                   </td>
                   <td style={colStyle(7)} className={tdClass}>
                     {row.duration ?? "—"}
@@ -742,7 +752,7 @@ function RunHistoryTable({
                 </tr>
                 {expanded ? (
                   <tr className={DATA_GRID_EXPANDED_ROW_CLASS}>
-                    <td colSpan={RUN_HISTORY_COLUMN_COUNT} className="px-4 py-3 align-top">
+                    <td colSpan={RUN_HISTORY_COLUMN_COUNT} className={cx(DATA_GRID_EXPANDED_CELL_CLASS, "!pb-4")}>
                       <p className="text-sm leading-relaxed text-text-secondary">{row.details}</p>
                     </td>
                   </tr>

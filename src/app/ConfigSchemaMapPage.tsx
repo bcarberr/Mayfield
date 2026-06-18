@@ -6,7 +6,13 @@ import {
   connectorSampleRowsAsJson,
   DEMO_CONNECTOR_SAMPLE_DATA,
 } from "../components/connectors/connectorDemoSchema";
-import { Button } from "../components/ui/Button";
+import { Button } from "@/components/shadcn/button";
+import {
+  SLIDE_OVER_FLOATING_FOOTER_PANEL_CLASS,
+  SLIDE_OVER_FLOATING_FOOTER_WRAPPER_CLASS,
+  SLIDE_OVER_FOOTER_BUTTON_CLASS,
+  SLIDE_OVER_FOOTER_GHOST_BUTTON_CLASS,
+} from "../components/ui/SlideOver";
 import { Input } from "../components/ui/Input";
 import { Switch } from "../components/ui/Switch";
 import type { ConnectorSetupTarget } from "../components/connectors/connectorPlatformTypes";
@@ -279,7 +285,7 @@ function PreviewImportFieldsStep({
             Load a sample preview from{" "}
             <span className="font-semibold text-text-primary">{dataTableName}</span>.
           </p>
-          <Button variant="secondary" className="mt-4" onClick={loadPreview}>
+          <Button variant="secondary-outline" className="mt-4" onClick={loadPreview}>
             Preview Schema
           </Button>
         </div>
@@ -297,7 +303,7 @@ function PreviewImportFieldsStep({
           <p className="text-sm font-semibold text-text-secondary">
             Data Table: <span className="text-text-primary">{dataTableName}</span>
           </p>
-          <Button variant="secondary" className="h-8 shrink-0 ring-offset-surface-modal" onClick={refetchSample}>
+          <Button variant="secondary-outline" className="h-8 shrink-0 ring-offset-surface-modal" onClick={refetchSample}>
             Re-fetch schema
           </Button>
         </div>
@@ -334,22 +340,22 @@ function FloatingActions({
   nextDisabled?: boolean;
 }) {
   return (
-    <div className="pointer-events-none absolute bottom-0 right-0 z-20 flex justify-end p-4">
-      <div className="pointer-events-auto flex items-center gap-2 rounded-tl-lg rounded-bl-lg bg-surface-container/80 px-3 py-2.5 shadow-lg ring-1 ring-border-container backdrop-blur-sm">
-        <Button type="button" variant="tertiary" className="text-text-secondary hover:text-text-primary" onClick={onCancel}>
+    <div className={SLIDE_OVER_FLOATING_FOOTER_WRAPPER_CLASS}>
+      <div className={SLIDE_OVER_FLOATING_FOOTER_PANEL_CLASS}>
+        <Button type="button" variant="ghost" className={SLIDE_OVER_FOOTER_GHOST_BUTTON_CLASS} onClick={onCancel}>
           Cancel
         </Button>
         {showPreviewJson ? (
-          <Button variant="tertiary" className="text-text-secondary hover:text-text-primary">
+          <Button variant="ghost" className={SLIDE_OVER_FOOTER_GHOST_BUTTON_CLASS}>
             Preview JSON
           </Button>
         ) : null}
         {showBack ? (
-          <Button variant="secondary" onClick={onBack}>
+          <Button variant="secondary-outline" className={SLIDE_OVER_FOOTER_BUTTON_CLASS} onClick={onBack}>
             Back
           </Button>
         ) : null}
-        <Button variant="primary" onClick={onNext} disabled={nextDisabled}>
+        <Button variant="default" className={SLIDE_OVER_FOOTER_BUTTON_CLASS} onClick={onNext} disabled={nextDisabled}>
           {nextLabel}
         </Button>
       </div>

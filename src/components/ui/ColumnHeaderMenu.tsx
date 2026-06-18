@@ -1,5 +1,5 @@
 import { Icon, type IconName } from "../../design-system";
-import { Button } from "./Button";
+import { Button } from "@/components/shadcn/button";
 import type { ColumnSortDirection } from "./useColumnSort";
 import {
   DropdownMenu,
@@ -60,7 +60,8 @@ export function ColumnHeaderMenu({
           <Button
             type="button"
             variant="ghost"
-            className="size-7 shrink-0 p-0 text-text-tertiary hover:text-text-primary [&_svg]:!size-4"
+            size="icon-sm"
+            className="shrink-0 p-0 text-text-tertiary hover:text-text-primary [&_svg]:!size-4"
             aria-label={menuLabel}
           >
             <Icon name="extra-menu" size={16} />

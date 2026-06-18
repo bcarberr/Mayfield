@@ -22,7 +22,7 @@ export const DATA_GRID_ABOVE_SECTION_CLASS = cx(
 
 /** Card shell for a full data grid section (title, table, pagination). */
 export const DATA_GRID_SECTION_CLASS = cx(
-  "relative z-0 isolate mx-0 mb-0 flex min-w-0 flex-col rounded-[4px] border border-border-container bg-datavis-card-bg shadow-[0_1px_5px_rgba(0,0,0,0.2)]",
+  "relative z-0 isolate mx-0 mb-0 flex min-w-0 flex-col rounded-[4px] border border-border-container bg-datavis-card-bg shadow-datavis-card",
 );
 
 /** Inner padding for the section title / search toolbar row. */
@@ -47,37 +47,51 @@ export const DATA_GRID_PAGE_SCROLL_INNER_CLASS = "absolute inset-0 overflow-x-au
 /** Table scrollport sizing only — no overflow here; it breaks page-level sticky `th` (use page scroll for x). */
 export const DATA_GRID_TABLE_SCROLL_CLASS = cx("relative z-0 min-h-0 w-full min-w-0 overflow-clip");
 
+/** Expand/collapse toggle in body rows — no extra padding; row height enforced by `.data-grid-table`. */
+export const DATA_GRID_ROW_EXPAND_BTN_CLASS = "p-0 text-text-tertiary hover:text-text-primary";
+export const DATA_GRID_ROW_EXPAND_ICON_SIZE = 32;
+
 /** `border-separate` is required for reliable sticky table headers (not `border-collapse`). */
 export const DATA_GRID_TABLE_CLASS = cx(
+  "data-grid-table",
   "relative z-0 table-fixed border-separate border-spacing-0 text-left text-sm",
-  "[&_tbody_tr]:relative [&_tbody_tr]:z-0 [&_tbody_tr]:h-10 [&_tbody_tr]:max-h-10",
+  "[&_tbody_tr:not(.data-grid-expanded-row)]:relative [&_tbody_tr:not(.data-grid-expanded-row)]:z-0",
   // Row borders must live on cells — `border-separate` ignores `<tr>` borders.
   "[&_tbody_td]:border-b [&_tbody_td]:border-datavis-gridlines",
-  "[&_tbody_td]:h-10 [&_tbody_td]:max-h-10 [&_tbody_td]:py-0 [&_tbody_td]:align-middle",
-  "[&_tbody_td]:bg-datavis-card-bg [&_tbody_tr:hover_td]:bg-overlay-subtle",
+  "[&_tbody_td]:bg-datagrid-row-bg [&_tbody_tr:not(.data-grid-expanded-row):hover_td]:bg-overlay-subtle",
 );
 
 /** Marker on `<thead>` — sticky on `th` cells; top aligns with filter rail row (same band, not below rail height). */
 export const DATA_GRID_THEAD_CLASS = cx(
   "[&_th]:sticky [&_th]:top-[var(--data-grid-toolbar-height,0px)] [&_th]:z-[3] [&_th]:bg-surface-table-row-header",
-  "[&_th]:h-10 [&_th]:max-h-10 [&_th]:py-0 [&_th]:align-middle",
   "[&_th]:border-b [&_th]:border-datavis-gridlines",
 );
 
 export const DATA_GRID_HEADER_ROW_CLASS = cx(
-  "h-10 max-h-10 bg-surface-table-row-header",
+  "bg-surface-table-row-header",
 );
 
-/** Default body data row — 40px. */
-export const DATA_GRID_BODY_ROW_CLASS = "h-10 max-h-10";
+/** Default body data row — 40px (height enforced by `.data-grid-table` in `index.css`). */
+export const DATA_GRID_BODY_ROW_CLASS = "data-grid-body-row";
 
-/** Default body cell — 40px with vertical centering (add horizontal padding per column). */
-export const DATA_GRID_BODY_CELL_CLASS = "h-10 max-h-10 py-0 align-middle";
+/** Default body cell — add horizontal padding per column; height enforced by `.data-grid-table`. */
+export const DATA_GRID_BODY_CELL_CLASS = "overflow-hidden px-2 py-0 align-middle";
+
+/** Inner wrapper for icon/checkbox/expand controls centered in a 40px row. */
+export const DATA_GRID_BODY_CELL_CENTER_CLASS =
+  "flex items-center justify-center overflow-hidden";
 
 /** Expandable detail row — clears the fixed 40px height from {@link DATA_GRID_TABLE_CLASS}. */
 export const DATA_GRID_EXPANDED_ROW_CLASS = cx(
-  "!h-auto !max-h-none border-b border-datavis-gridlines bg-surface-table-row-header [&_td]:!h-auto [&_td]:!max-h-none",
+  "data-grid-expanded-row",
+  "!h-auto !max-h-none border-b border-datavis-gridlines bg-surface-table-row-header [&_td]:!h-auto [&_td]:!max-h-none [&_td]:!overflow-visible",
 );
+
+/** Expanded row cell — 16px space below the parent row before detail content. */
+export const DATA_GRID_EXPANDED_CELL_CLASS = "px-4 !pt-4 pb-3 align-top";
+
+/** Wider horizontal padding variant for expanded row cells. */
+export const DATA_GRID_EXPANDED_CELL_WIDE_CLASS = "px-6 !pt-4 pb-4 align-top";
 
 /** Sticky offset for filter rail controls — same top as thead (horizontal band below toolbar). */
 export const DATA_GRID_FILTER_RAIL_STICKY_CLASS = cx(
