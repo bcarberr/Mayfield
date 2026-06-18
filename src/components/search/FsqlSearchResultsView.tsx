@@ -1,17 +1,28 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import {
+  DATA_GRID_ABOVE_SECTION_CLASS,
+  DATA_GRID_HEADER_ROW_CLASS,
+  DATA_GRID_PAGE_SCROLL_INNER_CLASS,
+  DATA_GRID_PAGE_SCROLL_OUTER_CLASS,
+  DATA_GRID_TABLE_CLASS,
+  DATA_GRID_TABLE_SCROLL_CLASS,
+  DATA_GRID_THEAD_CLASS,
+} from "../ui/dataGridTableStyles";
 import { Icon } from "../../design-system";
 import { useTimeframe, type TimeframeRange } from "../../context/TimeframeContext";
-import { FilterColumnPanel, type FilterColumnPanelTool } from "../ui/FilterColumnPanel";
+import { useSearch } from "../../context/SearchContext";
+import { FilterColumnPanel } from "../ui/FilterColumnPanel";
 import { SeverityTableIcon } from "../ui/SeverityTableIcon";
 import { DataGridExportButton } from "../ui/DataGridExportButton";
 import { ColumnHeaderMenu } from "../ui/ColumnHeaderMenu";
-import { compareStrings, useColumnSort } from "../ui/useColumnSort";
-import { Input } from "../ui/Input";
-import { Button } from "../ui/Button";
+import { compareStrings } from "../ui/useColumnSort";
+import { useSortedDataGridPagination } from "../ui/useSortedDataGridPagination";
+import { DataGridSection } from "../ui/DataGridSection";
+import { DataGridPaginationFooter } from "../ui/DataGridTableLayout";
 import { TruncatedText } from "../ui/TruncatedText";
+import { ConnectorTableCell } from "../ui/ConnectorTableCell";
 import { useResizableColumns } from "../ui/useResizableColumns";
-import { Checkbox } from "../uiCheckbox";
-import { cx, DatavisGridlineRule, InsightCard } from "../summary-insights/datavisCard";
+import { cx, InsightCard } from "../summary-insights/datavisCard";
 import { TimeSeriesBarChart } from "../summary-insights/timeSeriesBarChart";
 import {
   buildFsqlResultsTimeline,
@@ -20,8 +31,10 @@ import {
   type FsqlSearchResultRow,
 } from "./fsqlSearchResultsData";
 import { timeframeFromBucketSelection } from "../summary-insights/timeframeChartUtils";
-
-const RESULTS_PAGE_SIZE = 20;
+import { Button } from "@/components/shadcn/button";
+import { Checkbox } from "@/components/shadcn/checkbox";
+import { Input } from "@/components/shadcn/input";
+import { cn } from "@/lib/utils";
 
 const SEV_CRITICAL = "#ff604a";
 
@@ -39,21 +52,38 @@ const EVENT_TYPE_ICON: Record<
   },
 };
 
-function connectorSwatch(connector: string) {
-  if (connector.startsWith("Prod")) return "bg-feedback-negative";
-  if (connector.startsWith("AWS")) return "bg-feedback-info";
-  if (connector.startsWith("GCP")) return "bg-datavis-data-smalt-green-40";
-  if (connector.includes("Athena")) return "bg-interactive-active";
-  return "bg-datavis-data-pop-teal-20";
-}
-
 const SELECT_COL_WIDTH = 40;
 const COL_DEFAULTS: readonly number[] = [SELECT_COL_WIDTH, 108, 280, 168, 88, 112, 132, 140];
 const COL_MINS: readonly number[] = [SELECT_COL_WIDTH, 72, 120, 120, 56, 72, 96, 96];
 
 type SortColumn = "severity" | "title" | "time" | "activity" | "status" | "eventType" | "connector";
 
-function FsqlSearchResultsTable({ rows }: { rows: FsqlSearchResultRow[] }) {
+export function useFsqlSearchTableGrid(
+  rows: FsqlSearchResultRow[],
+  paginationConfig?: Parameters<typeof useSortedDataGridPagination<FsqlSearchResultRow, SortColumn>>[2],
+) {
+  const sortComparators = useMemo(
+    (): Record<SortColumn, (a: FsqlSearchResultRow, b: FsqlSearchResultRow) => number> => ({
+      severity: (a, b) => a.severity.localeCompare(b.severity),
+      title: (a, b) => compareStrings(a.title, b.title),
+      time: (a, b) => compareStrings(a.time, b.time),
+      activity: (a, b) => compareStrings(a.activity, b.activity),
+      status: (a, b) => compareStrings(a.status, b.status),
+      eventType: (a, b) => compareStrings(a.eventType, b.eventType),
+      connector: (a, b) => compareStrings(a.connector, b.connector),
+    }),
+    [],
+  );
+  return useSortedDataGridPagination(rows, sortComparators, paginationConfig);
+}
+
+function FsqlSearchResultsTable({
+  displayRows,
+  getSortProps,
+}: {
+  displayRows: FsqlSearchResultRow[];
+  getSortProps: ReturnType<typeof useFsqlSearchTableGrid>["getSortProps"];
+}) {
   const [selected, setSelected] = useState<Set<string>>(() => new Set());
   const {
     containerRef,
@@ -70,7 +100,7 @@ function FsqlSearchResultsTable({ rows }: { rows: FsqlSearchResultRow[] }) {
     colMins: COL_MINS,
   });
 
-  const allIds = useMemo(() => rows.map((row) => row.id), [rows]);
+  const allIds = useMemo(() => displayRows.map((row) => row.id), [displayRows]);
   const total = allIds.length;
   const selectedOnPage = useMemo(() => allIds.filter((id) => selected.has(id)).length, [allIds, selected]);
   const allSelected = total > 0 && selectedOnPage === total;
@@ -89,25 +119,10 @@ function FsqlSearchResultsTable({ rows }: { rows: FsqlSearchResultRow[] }) {
     });
   };
 
-  const sortComparators = useMemo(
-    (): Record<SortColumn, (a: FsqlSearchResultRow, b: FsqlSearchResultRow) => number> => ({
-      severity: (a, b) => a.severity.localeCompare(b.severity),
-      title: (a, b) => compareStrings(a.title, b.title),
-      time: (a, b) => compareStrings(a.time, b.time),
-      activity: (a, b) => compareStrings(a.activity, b.activity),
-      status: (a, b) => compareStrings(a.status, b.status),
-      eventType: (a, b) => compareStrings(a.eventType, b.eventType),
-      connector: (a, b) => compareStrings(a.connector, b.connector),
-    }),
-    [],
-  );
-  const { sortedRows, getSortProps } = useColumnSort(sortComparators);
-  const displayRows = sortedRows(rows);
-
   return (
-    <div ref={containerRef} className={cx("min-h-0 w-full min-w-0", isResizing && "select-none")}>
+    <div ref={containerRef} className={cx(DATA_GRID_TABLE_SCROLL_CLASS, isResizing && "select-none")}>
       <table
-        className="table-fixed border-collapse text-left text-sm"
+        className={DATA_GRID_TABLE_CLASS}
         style={{
           width: tableFillsContainer ? "100%" : baseTotal,
           minWidth: Math.max(minTableWidth, baseTotal),
@@ -119,8 +134,8 @@ function FsqlSearchResultsTable({ rows }: { rows: FsqlSearchResultRow[] }) {
             <col key={index} style={{ width }} />
           ))}
         </colgroup>
-        <thead>
-          <tr className="h-10 border-b border-datavis-gridlines bg-surface-table-row-header">
+        <thead className={DATA_GRID_THEAD_CLASS}>
+          <tr className={DATA_GRID_HEADER_ROW_CLASS}>
             <th
               scope="col"
               style={colStyle(0)}
@@ -128,9 +143,8 @@ function FsqlSearchResultsTable({ rows }: { rows: FsqlSearchResultRow[] }) {
             >
               <div className="flex items-center justify-center">
                 <Checkbox
-                  checked={allSelected}
-                  indeterminate={someSelected}
-                  onCheckedChange={toggleAll}
+                  checked={someSelected ? "indeterminate" : allSelected}
+                  onCheckedChange={(value) => toggleAll(value === true)}
                   aria-label="Select all rows"
                 />
               </div>
@@ -175,7 +189,7 @@ function FsqlSearchResultsTable({ rows }: { rows: FsqlSearchResultRow[] }) {
                   <div className="flex items-center justify-center">
                     <Checkbox
                       checked={selected.has(row.id)}
-                      onCheckedChange={(checked) => toggleRow(row.id, checked)}
+                      onCheckedChange={(checked) => toggleRow(row.id, checked === true)}
                       aria-label={`Select result ${row.id}`}
                     />
                   </div>
@@ -212,15 +226,7 @@ function FsqlSearchResultsTable({ rows }: { rows: FsqlSearchResultRow[] }) {
                   </span>
                 </td>
                 <td style={colStyle(7)} className="h-10 min-w-0 px-2 py-0 align-middle">
-                  <span className="inline-flex min-w-0 items-center gap-2">
-                    <span
-                      className={cx("size-2.5 shrink-0 rounded-sm", connectorSwatch(row.connector))}
-                      aria-hidden
-                    />
-                    <TruncatedText className="text-sm text-text-secondary" wrapperClassName="min-w-0 flex-1">
-                      {row.connector}
-                    </TruncatedText>
-                  </span>
+                  <ConnectorTableCell name={row.connector} />
                 </td>
               </tr>
             );
@@ -234,16 +240,24 @@ function FsqlSearchResultsTable({ rows }: { rows: FsqlSearchResultRow[] }) {
 export function FsqlSearchResultsView({
   isSearching,
   searchInitialTimeframe,
+  detectionName,
 }: {
   isSearching?: boolean;
   searchInitialTimeframe: TimeframeRange | null;
+  detectionName?: string | null;
 }) {
   const { range: timeframe, setRange } = useTimeframe();
-  const [searchQuery, setSearchQuery] = useState("");
-  const [page, setPage] = useState(0);
-  const [tableTool, setTableTool] = useState<FilterColumnPanelTool | null>(null);
+  const {
+    resultsFilterQuery,
+    setResultsFilterQuery,
+    resultsTableTool,
+    setResultsTableTool,
+    resultsChartZoomed,
+    setResultsChartZoomed,
+    resultsPage,
+    setResultsPage,
+  } = useSearch();
   const [timeframeRefreshing, setTimeframeRefreshing] = useState(false);
-  const [isChartZoomed, setIsChartZoomed] = useState(false);
   const isFirstTimeframeRender = useRef(true);
 
   const resultRows = useMemo(() => buildFsqlSearchResults(timeframe), [timeframe]);
@@ -253,10 +267,10 @@ export function FsqlSearchResultsView({
     ({ startIndex, endIndex }: { startIndex: number; endIndex: number }) => {
       const nextRange = timeframeFromBucketSelection(timeframe, timeline.buckets, startIndex, endIndex);
       if (!nextRange) return;
-      setIsChartZoomed(true);
+      setResultsChartZoomed(true);
       setRange(nextRange);
     },
-    [timeframe, timeline.buckets, setRange],
+    [timeframe, timeline.buckets, setRange, setResultsChartZoomed],
   );
 
   const handleChartZoomReset = useCallback(() => {
@@ -265,12 +279,12 @@ export function FsqlSearchResultsView({
       from: new Date(searchInitialTimeframe.from),
       to: new Date(searchInitialTimeframe.to),
     });
-    setIsChartZoomed(false);
-  }, [searchInitialTimeframe, setRange]);
+    setResultsChartZoomed(false);
+  }, [searchInitialTimeframe, setRange, setResultsChartZoomed]);
 
   useEffect(() => {
-    setIsChartZoomed(false);
-  }, [searchInitialTimeframe?.from.getTime(), searchInitialTimeframe?.to.getTime()]);
+    setResultsChartZoomed(false);
+  }, [searchInitialTimeframe?.from.getTime(), searchInitialTimeframe?.to.getTime(), setResultsChartZoomed]);
 
   useEffect(() => {
     if (isFirstTimeframeRender.current) {
@@ -283,125 +297,103 @@ export function FsqlSearchResultsView({
   }, [timeframe.from.getTime(), timeframe.to.getTime()]);
 
   const filteredRows = useMemo(
-    () => resultRows.filter((row) => fsqlResultMatchesSearch(row, searchQuery)),
-    [resultRows, searchQuery],
-  );
-
-  useEffect(() => {
-    setPage(0);
-  }, [searchQuery, timeframe.from.getTime(), timeframe.to.getTime(), filteredRows.length]);
-
-  const pageCount = Math.max(1, Math.ceil(filteredRows.length / RESULTS_PAGE_SIZE));
-  const safePage = Math.min(page, pageCount - 1);
-  const pageStart = safePage * RESULTS_PAGE_SIZE;
-  const displayedRows = useMemo(
-    () => filteredRows.slice(pageStart, pageStart + RESULTS_PAGE_SIZE),
-    [filteredRows, pageStart],
+    () => resultRows.filter((row) => fsqlResultMatchesSearch(row, resultsFilterQuery)),
+    [resultRows, resultsFilterQuery],
   );
 
   const showTableLoading = Boolean(isSearching || timeframeRefreshing);
   const showChartLoading = Boolean(isSearching);
-  const showPagination = filteredRows.length > RESULTS_PAGE_SIZE;
+  const resultsTitle = detectionName ? `Total Results: ${detectionName}` : "Total Results";
+  const tableGrid = useFsqlSearchTableGrid(filteredRows, {
+    page: resultsPage,
+    onPageChange: setResultsPage,
+  });
 
   return (
-    <div className="flex min-h-0 flex-1 flex-col overflow-y-auto bg-surface-container p-4 sm:p-5">
-      <InsightCard title="Total Results">
-        <div className="flex min-h-0 flex-col">
-          <p className="mb-2 pl-9 text-base-small text-text-tertiary">
-            Hours · drag to zoom
-            {isChartZoomed && searchInitialTimeframe ? (
-              <>
-                {" · "}
-                <button
-                  type="button"
-                  className="font-semibold text-feedback-caution hover:underline"
-                  onClick={handleChartZoomReset}
-                >
-                  Reset
-                </button>
-              </>
-            ) : null}
-          </p>
-          {showChartLoading ? (
-            <div className="flex h-[140px] items-center justify-center text-sm text-text-tertiary">Searching…</div>
-          ) : (
-            <TimeSeriesBarChart
-              values={timeline.values}
-              xLabels={timeline.xLabels}
-              barColor={timeline.barColor}
-              yMax={timeline.yMax}
-              yTicks={timeline.yTicks}
-              height={140}
-              ariaLabel="Total search results per hour"
-              onBrushCommit={handleTimelineBrush}
-            />
-          )}
-        </div>
-      </InsightCard>
-
-      <section className="mt-4 flex min-h-[420px] min-w-0 flex-1 flex-col overflow-hidden rounded-[4px] border border-border-container bg-datavis-card-bg shadow-[0_1px_5px_rgba(0,0,0,0.2)]">
-        <div className="shrink-0 bg-datavis-card-bg pb-3 pl-4 pr-[20px] pt-3 sm:pl-5">
-          <div className="flex flex-wrap items-center gap-3">
-            <p className="shrink-0 text-base-small text-text-secondary">
-              {displayedRows.length} of {filteredRows.length} Results
-              {searchQuery.trim() ? ` · “${searchQuery.trim()}”` : ""}
+    <div className={cx(DATA_GRID_PAGE_SCROLL_OUTER_CLASS, "bg-surface-container")}>
+      <div className={cx(DATA_GRID_PAGE_SCROLL_INNER_CLASS, "px-6 pt-2 pb-4 sm:pt-3 sm:pb-5")}>
+      <div className="flex shrink-0 flex-col gap-4">
+        <div className={DATA_GRID_ABOVE_SECTION_CLASS}>
+          <InsightCard title={resultsTitle}>
+          <div className="flex shrink-0 flex-col">
+            <p className="mb-2 pl-9 text-base-small text-text-tertiary">
+              Hours · drag to zoom
+              {resultsChartZoomed && searchInitialTimeframe ? (
+                <>
+                  {" · "}
+                  <Button
+                    type="button"
+                    variant="link"
+                    className="h-auto p-0 font-semibold text-feedback-caution hover:text-feedback-caution"
+                    onClick={handleChartZoomReset}
+                  >
+                    Reset
+                  </Button>
+                </>
+              ) : null}
             </p>
-            <div className="w-[300px] shrink-0">
-              <Input
-                variant="search"
-                placeholder="Search results…"
-                value={searchQuery}
-                onChange={(event) => setSearchQuery(event.target.value)}
-                className="!bg-datavis-card-bg"
-                aria-label="Filter search results"
-              />
-            </div>
-            <DataGridExportButton />
-          </div>
-        </div>
-        <DatavisGridlineRule inset={false} />
-        <div className="flex min-h-0 flex-1 overflow-auto bg-datavis-card-bg">
-          <FilterColumnPanel
-            active={tableTool}
-            onFilterClick={() => setTableTool(tableTool === "filter" ? null : "filter")}
-            onColumnsClick={() => setTableTool(tableTool === "columns" ? null : "columns")}
-          />
-          <div className="min-h-0 min-w-0 flex-1 pb-3">
-            {showTableLoading ? (
-              <div className="flex h-40 items-center justify-center text-sm text-text-tertiary">Loading results…</div>
+            {showChartLoading ? (
+              <div className="flex h-[140px] items-center justify-center text-sm text-text-tertiary">Searching…</div>
             ) : (
-              <FsqlSearchResultsTable rows={displayedRows} />
+              <TimeSeriesBarChart
+                values={timeline.values}
+                xLabels={timeline.xLabels}
+                barColor={timeline.barColor}
+                yMax={timeline.yMax}
+                yTicks={timeline.yTicks}
+                height={140}
+                ariaLabel="Total search results per hour"
+                bucketStarts={timeline.buckets.map((bucket) => bucket.start)}
+                onBrushCommit={handleTimelineBrush}
+              />
             )}
           </div>
+        </InsightCard>
         </div>
-        {showPagination && !showTableLoading ? (
-          <div className="flex shrink-0 flex-wrap items-center justify-between gap-3 border-t border-datavis-gridlines px-4 py-2.5 sm:px-5">
-            <p className="text-base-small text-text-tertiary">
-              Page {safePage + 1} of {pageCount}
-            </p>
-            <div className="flex items-center gap-2">
-              <Button
-                type="button"
-                variant="secondary"
-                className="h-8 px-3"
-                disabled={safePage === 0}
-                onClick={() => setPage((current) => Math.max(0, current - 1))}
-              >
-                Previous
-              </Button>
-              <Button
-                type="button"
-                variant="secondary"
-                className="h-8 px-3"
-                disabled={safePage >= pageCount - 1}
-                onClick={() => setPage((current) => Math.min(pageCount - 1, current + 1))}
-              >
-                Next
-              </Button>
-            </div>
-          </div>
-        ) : null}
-      </section>
+
+        <DataGridSection
+          header={
+            <>
+              <div className="flex flex-wrap items-center gap-3">
+                <p className="shrink-0 text-base-small text-text-secondary">
+                  {filteredRows.length} Results
+                  {resultsFilterQuery.trim() ? ` · “${resultsFilterQuery.trim()}”` : ""}
+                </p>
+                <div className="w-[300px] shrink-0">
+                  <Input
+                    type="search"
+                    placeholder="Search results…"
+                    value={resultsFilterQuery}
+                    onChange={(event) => setResultsFilterQuery(event.target.value)}
+                    className={cn(
+                      "h-8 border-border-rule bg-datavis-card-bg text-sm font-semibold shadow-none",
+                      "placeholder:font-semibold placeholder:italic placeholder:text-text-tertiary dark:bg-datavis-card-bg",
+                    )}
+                    aria-label="Filter search results"
+                  />
+                </div>
+                <DataGridExportButton />
+              </div>
+            </>
+          }
+          filterPanel={
+            <FilterColumnPanel
+              active={resultsTableTool}
+              onFilterClick={() => setResultsTableTool(resultsTableTool === "filter" ? null : "filter")}
+              onColumnsClick={() => setResultsTableTool(resultsTableTool === "columns" ? null : "columns")}
+            />
+          }
+          table={
+            showTableLoading ? (
+              <div className="flex h-40 items-center justify-center text-sm text-text-tertiary">Loading results…</div>
+            ) : (
+              <FsqlSearchResultsTable displayRows={tableGrid.displayRows} getSortProps={tableGrid.getSortProps} />
+            )
+          }
+          footer={showTableLoading ? null : <DataGridPaginationFooter grid={tableGrid} />}
+        />
+      </div>
+      </div>
     </div>
   );
 }

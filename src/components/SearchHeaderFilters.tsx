@@ -1,14 +1,48 @@
-import { useState, type ReactNode } from "react";
+import type { ReactNode } from "react";
 import { useLocation, useNavigate } from "react-router-dom";
 import { Icon, type IconName } from "../design-system";
 import { connectorsPanelLocationState, ROUTES } from "../app/routes";
 import { ConnectorSelectionCountText } from "./connectors/ConnectorSelectionCountText";
 import { TimeframeFilterDropdown } from "./TimeframeFilterDropdown";
+import { Badge } from "@/components/shadcn/badge";
+import { Button } from "@/components/shadcn/button";
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuLabel,
+  DropdownMenuSeparator,
+  DropdownMenuTrigger,
+} from "@/components/shadcn/dropdown-menu";
+import { cn } from "@/lib/utils";
 
-const cx = (...c: (string | false | undefined)[]) => c.filter(Boolean).join(" ");
+const HEADER_FILTER_TRIGGER_CLASS =
+  "h-auto max-w-full gap-1.5 rounded px-0 py-0.5 font-semibold text-interactive-active hover:bg-transparent hover:text-[var(--color-primary-hover)] active:text-[var(--color-primary-pressed)] lg:inline-flex lg:w-auto";
 
-const HEADER_FILTER_INTERACTIVE =
-  "text-interactive-active transition-colors group-hover:text-[var(--color-primary-hover)] group-active:text-[var(--color-primary-pressed)]";
+const HEADER_FILTER_ICON_CLASS = "size-4 shrink-0 text-current [&_svg]:!size-4";
+
+type HeaderFilterTriggerProps = {
+  icon: IconName;
+  label: string;
+  value?: ReactNode;
+};
+
+function HeaderFilterTrigger({ icon, label, value }: HeaderFilterTriggerProps) {
+  return (
+    <>
+      <Icon name={icon} size={16} className={HEADER_FILTER_ICON_CLASS} aria-hidden />
+      <span className="inline-flex shrink-0 items-center gap-1 text-sm font-semibold">{label}</span>
+      {value ? (
+        <Badge
+          variant="secondary"
+          className="ml-0.5 h-auto max-w-[12rem] truncate rounded px-2 py-1 text-sm font-semibold text-text-primary lg:max-w-none"
+        >
+          {value}
+        </Badge>
+      ) : null}
+    </>
+  );
+}
 
 type SearchHeaderFilterDropdownProps = {
   icon: IconName;
@@ -19,7 +53,6 @@ type SearchHeaderFilterDropdownProps = {
   onActivate?: () => void;
 };
 
-/** Generic header filter trigger — menu content to be defined later. */
 function SearchHeaderFilterDropdown({
   icon,
   label,
@@ -27,33 +60,51 @@ function SearchHeaderFilterDropdown({
   value,
   onActivate,
 }: SearchHeaderFilterDropdownProps) {
-  const [open, setOpen] = useState(false);
+  if (onActivate) {
+    return (
+      <Button
+        type="button"
+        variant="ghost"
+        className={cn(HEADER_FILTER_TRIGGER_CLASS, "w-full justify-start text-left lg:w-auto")}
+        aria-label={`${menuLabel} filter`}
+        onClick={onActivate}
+      >
+        <HeaderFilterTrigger icon={icon} label={label} value={value} />
+      </Button>
+    );
+  }
 
   return (
-    <button
-      type="button"
-      aria-haspopup={onActivate ? undefined : "menu"}
-      aria-expanded={onActivate ? undefined : open}
-      aria-label={`${menuLabel} filter`}
-      className="group flex w-full max-w-full items-center gap-1.5 rounded py-0.5 text-left transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-interactive-active focus-visible:ring-offset-2 focus-visible:ring-offset-surface-container lg:inline-flex lg:w-auto"
-      onClick={() => {
-        if (onActivate) {
-          onActivate();
-          return;
-        }
-        setOpen((current) => !current);
-      }}
-    >
-      <Icon name={icon} size={16} className={cx("shrink-0", HEADER_FILTER_INTERACTIVE)} aria-hidden />
-      <span className={cx("inline-flex shrink-0 items-center gap-1 text-sm font-semibold", HEADER_FILTER_INTERACTIVE)}>
-        {label}
-      </span>
-      {value ? (
-        <span className="ml-0.5 shrink-0 rounded bg-surface-container px-2 py-1 text-sm font-semibold text-text-primary">
-          {value}
-        </span>
-      ) : null}
-    </button>
+    <DropdownMenu>
+      <DropdownMenuTrigger asChild>
+        <Button
+          type="button"
+          variant="ghost"
+          className={cn(HEADER_FILTER_TRIGGER_CLASS, "w-full justify-start text-left lg:w-auto")}
+          aria-label={`${menuLabel} filter`}
+        >
+          <HeaderFilterTrigger icon={icon} label={label} value={value} />
+        </Button>
+      </DropdownMenuTrigger>
+      <DropdownMenuContent
+        align="start"
+        className="min-w-[220px] border-border-container bg-surface-modal text-text-primary"
+      >
+        <DropdownMenuLabel className="text-xs font-bold uppercase tracking-[0.4px] text-text-tertiary">
+          {menuLabel}
+        </DropdownMenuLabel>
+        <DropdownMenuSeparator className="bg-border-container" />
+        <DropdownMenuItem className="cursor-pointer text-text-secondary focus:bg-overlay-subtle focus:text-text-primary">
+          Recent search one
+        </DropdownMenuItem>
+        <DropdownMenuItem className="cursor-pointer text-text-secondary focus:bg-overlay-subtle focus:text-text-primary">
+          Recent search two
+        </DropdownMenuItem>
+        <DropdownMenuItem className="cursor-pointer text-text-secondary focus:bg-overlay-subtle focus:text-text-primary">
+          Saved search
+        </DropdownMenuItem>
+      </DropdownMenuContent>
+    </DropdownMenu>
   );
 }
 

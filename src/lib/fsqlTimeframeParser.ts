@@ -86,3 +86,40 @@ export function parseFsqlTimeframe(query: string, reference = new Date()): Timef
 
   return normalizeTimeframeRange(from, to);
 }
+
+function removeClause(query: string, keyword: "SINCE" | "UNTIL"): string {
+  const pattern = new RegExp(`\\s*\\b${keyword}\\s+[^\\n]*`, "gi");
+  return query.replace(pattern, "");
+}
+
+function formatRelativeDuration(ms: number): string {
+  const safeMs = Math.max(ms, 60_000);
+  const minutes = Math.round(safeMs / 60_000);
+  if (minutes < 60) return `${minutes}m`;
+  const hours = Math.round(safeMs / 3_600_000);
+  if (hours < 48) return `${hours}hrs`;
+  const days = Math.round(safeMs / 86_400_000);
+  if (days < 14) return `${days}d`;
+  const weeks = Math.round(days / 7);
+  return `${weeks}w`;
+}
+
+/** Rewrite `SINCE` / `UNTIL` clauses so the query matches the header timeframe picker. */
+export function applyTimeframeToFsqlQuery(
+  query: string,
+  range: TimeframeRange,
+  reference = new Date(),
+): string {
+  const trimmed = removeClause(removeClause(query.trim(), "SINCE"), "UNTIL").replace(/\n{3,}/g, "\n\n").trim();
+  const now = reference.getTime();
+  const sinceMs = now - range.from.getTime();
+  const untilMs = now - range.to.getTime();
+  const sinceClause = `SINCE ${formatRelativeDuration(sinceMs)}`;
+  const needsUntil = untilMs > 5 * 60_000;
+  const untilClause = needsUntil ? `\nUNTIL ${formatRelativeDuration(untilMs)}` : "";
+  return `${trimmed}\n${sinceClause}${untilClause}`.trim();
+}
+
+export function timeframeRangesEqual(a: TimeframeRange, b: TimeframeRange): boolean {
+  return a.from.getTime() === b.from.getTime() && a.to.getTime() === b.to.getTime();
+}

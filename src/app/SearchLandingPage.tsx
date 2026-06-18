@@ -1,5 +1,4 @@
-import { useEffect, useId, useRef, useState } from "react";
-import { createPortal } from "react-dom";
+import { useEffect, useRef } from "react";
 import { Icon } from "../design-system";
 import { FsqlSearchTextarea } from "../components/FsqlSearchTextarea";
 import { FsqlSearchResultsView } from "../components/search/FsqlSearchResultsView";
@@ -7,109 +6,38 @@ import { SearchQueryBuilder } from "../components/SearchQueryBuilder";
 import { SearchHeaderFilters } from "../components/SearchHeaderFilters";
 import { SearchTopHeader } from "../components/SearchTopHeader";
 import { V4NavThinner } from "../components/V4NavThinner";
-import { Button } from "../components/ui/Button";
+import { Button as UiButton } from "../components/ui/Button";
 import connectionAbstractUrl from "../assets/connection-abstract.svg";
-import { useTimeframe, type TimeframeRange } from "../context/TimeframeContext";
+import { useTimeframe } from "../context/TimeframeContext";
 import { useCopilot } from "../context/CopilotContext";
-import { parseFsqlTimeframe } from "../lib/fsqlTimeframeParser";
+import { useSearch, type SearchCriteriaMode } from "../context/SearchContext";
+import { parseFsqlTimeframe, applyTimeframeToFsqlQuery, timeframeRangesEqual } from "../lib/fsqlTimeframeParser";
+import { FsqlSearchLoadingPanel } from "../components/search/FsqlSearchLoadingPanel";
+import { Button } from "@/components/shadcn/button";
+import {
+  Collapsible,
+  CollapsibleContent,
+  CollapsibleTrigger,
+} from "@/components/shadcn/collapsible";
+import { Label } from "@/components/shadcn/label";
+import { RadioGroup, RadioGroupItem } from "@/components/shadcn/radio-group";
+import { Separator } from "@/components/shadcn/separator";
+import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/shadcn/tooltip";
+import { cn } from "@/lib/utils";
 import { NAV_RAIL_TARGETS } from "./navRailTargets";
 
-const toolbarBtnRing = "ring-offset-surface-container";
-const cx = (...c: (string | false | undefined)[]) => c.filter(Boolean).join(" ");
-
-function cloneTimeframeRange(range: TimeframeRange): TimeframeRange {
-  return { from: new Date(range.from), to: new Date(range.to) };
-}
-
-export type SearchCriteriaMode = "query-builder" | "fsql";
+const toolbarBtnRing = "focus-visible:ring-offset-surface-container";
+const TOOLBAR_PRIMARY_BUTTON_CLASS =
+  "bg-interactive-active text-text-on-primary hover:bg-interactive-active/90 focus-visible:ring-interactive-active";
 
 const SEARCH_CRITERIA_MODE_OPTIONS: readonly {
   id: SearchCriteriaMode;
   label: string;
   tooltip?: string;
 }[] = [
-  { id: "query-builder", label: "Query Builder" },
   { id: "fsql", label: "FSQL", tooltip: "Federated Search Query Language" },
+  { id: "query-builder", label: "Query Builder" },
 ];
-
-function SearchCriteriaRadioOption({
-  groupName,
-  option,
-  checked,
-  onSelect,
-}: {
-  groupName: string;
-  option: (typeof SEARCH_CRITERIA_MODE_OPTIONS)[number];
-  checked: boolean;
-  onSelect: () => void;
-}) {
-  const labelRef = useRef<HTMLLabelElement>(null);
-  const [isHovered, setIsHovered] = useState(false);
-  const [popoverStyle, setPopoverStyle] = useState<{ top: number; left: number } | null>(null);
-
-  useEffect(() => {
-    if (!isHovered || !option.tooltip || !labelRef.current) {
-      setPopoverStyle(null);
-      return;
-    }
-
-    const updatePosition = () => {
-      const rect = labelRef.current?.getBoundingClientRect();
-      if (!rect) return;
-      setPopoverStyle({
-        top: rect.top - 8,
-        left: rect.left,
-      });
-    };
-
-    updatePosition();
-    window.addEventListener("scroll", updatePosition, true);
-    window.addEventListener("resize", updatePosition);
-    return () => {
-      window.removeEventListener("scroll", updatePosition, true);
-      window.removeEventListener("resize", updatePosition);
-    };
-  }, [isHovered, option.tooltip]);
-
-  const showPopover = Boolean(option.tooltip && isHovered && popoverStyle);
-
-  return (
-    <>
-      <label
-        ref={labelRef}
-        className="inline-flex cursor-pointer items-center gap-2 text-sm font-semibold leading-5 tracking-[0.4px] text-text-primary"
-        onMouseEnter={() => setIsHovered(true)}
-        onMouseLeave={() => setIsHovered(false)}
-        onFocus={() => setIsHovered(true)}
-        onBlur={() => setIsHovered(false)}
-      >
-        <input
-          type="radio"
-          name={groupName}
-          value={option.id}
-          checked={checked}
-          onChange={onSelect}
-          className="size-4 shrink-0 accent-interactive-active"
-          aria-describedby={option.tooltip ? `${groupName}-${option.id}-tooltip` : undefined}
-        />
-        {option.label}
-      </label>
-      {showPopover
-        ? createPortal(
-            <div
-              id={`${groupName}-${option.id}-tooltip`}
-              role="tooltip"
-              className="pointer-events-none fixed z-[100] max-w-xs -translate-y-full rounded bg-[#424242] px-2 py-1.5 text-xs font-semibold leading-snug text-[#f5f5f5] shadow-[0_2px_8px_rgba(0,0,0,0.35)]"
-              style={{ top: popoverStyle!.top, left: popoverStyle!.left }}
-            >
-              {option.tooltip}
-            </div>,
-            document.body,
-          )
-        : null}
-    </>
-  );
-}
 
 function SearchCriteriaModeRadios({
   value,
@@ -118,20 +46,41 @@ function SearchCriteriaModeRadios({
   value: SearchCriteriaMode;
   onChange: (next: SearchCriteriaMode) => void;
 }) {
-  const groupName = useId();
-
   return (
-    <div role="radiogroup" aria-label="Search criteria mode" className="flex flex-wrap items-center gap-4">
-      {SEARCH_CRITERIA_MODE_OPTIONS.map((option) => (
-        <SearchCriteriaRadioOption
-          key={option.id}
-          groupName={groupName}
-          option={option}
-          checked={value === option.id}
-          onSelect={() => onChange(option.id)}
-        />
-      ))}
-    </div>
+    <RadioGroup
+      value={value}
+      onValueChange={(next) => onChange(next as SearchCriteriaMode)}
+      aria-label="Search criteria mode"
+      className="flex flex-wrap items-center gap-4"
+    >
+      {SEARCH_CRITERIA_MODE_OPTIONS.map((option) => {
+        const fieldId = `search-criteria-mode-${option.id}`;
+        const optionControl = (
+          <div className="flex items-center gap-2">
+            <RadioGroupItem value={option.id} id={fieldId} />
+            <Label
+              htmlFor={fieldId}
+              className="cursor-pointer text-sm font-semibold leading-5 tracking-[0.4px] text-text-primary"
+            >
+              {option.label}
+            </Label>
+          </div>
+        );
+
+        if (!option.tooltip) {
+          return <div key={option.id}>{optionControl}</div>;
+        }
+
+        return (
+          <Tooltip key={option.id}>
+            <TooltipTrigger asChild>{optionControl}</TooltipTrigger>
+            <TooltipContent side="top" className="max-w-xs font-semibold">
+              {option.tooltip}
+            </TooltipContent>
+          </Tooltip>
+        );
+      })}
+    </RadioGroup>
   );
 }
 
@@ -148,6 +97,7 @@ function SearchToolbarActions({
   onClearSearch,
   onFsqlSearch,
   onConvertToFsql,
+  fsqlSearching,
 }: {
   criteriaMode: SearchCriteriaMode;
   onCriteriaModeChange: (mode: SearchCriteriaMode) => void;
@@ -161,41 +111,53 @@ function SearchToolbarActions({
   onClearSearch: () => void;
   onFsqlSearch: () => void;
   onConvertToFsql: (query: string) => void;
+  fsqlSearching: boolean;
 }) {
   const isFsql = criteriaMode === "fsql";
   const hasFsqlQuery = fsqlQuery.trim().length > 0;
   const canSearch = isFsql ? hasFsqlQuery : queryBuilderValid;
 
   return (
-    <div className="flex shrink-0 flex-col bg-surface-container">
+    <Collapsible
+      open={criteriaOpen}
+      onOpenChange={onCriteriaOpenChange}
+      className="relative z-50 flex shrink-0 flex-col bg-surface-container"
+    >
       <div
         className="flex flex-wrap items-center justify-between gap-3 px-5 py-3"
         role="toolbar"
         aria-label="Search actions"
       >
         <div className="flex flex-wrap items-center gap-4">
-          <button
-            type="button"
-            aria-expanded={criteriaOpen}
-            aria-controls="search-criteria-panel"
-            className="flex items-center gap-2 rounded py-1 pr-1 text-left text-sm font-semibold leading-5 tracking-[0.4px] text-text-primary transition-colors hover:bg-overlay-subtle focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-interactive-active focus-visible:ring-offset-2 focus-visible:ring-offset-surface-container"
-            onClick={() => onCriteriaOpenChange(!criteriaOpen)}
-          >
-            <Icon
-              name="chevron-down"
-              size={18}
-              className={cx("shrink-0 transition-transform duration-200", criteriaOpen ? "rotate-0" : "-rotate-90")}
-              aria-hidden
-            />
-            Search Criteria
-          </button>
+          <CollapsibleTrigger asChild>
+            <Button
+              type="button"
+              variant="ghost"
+              className={cn(
+                "h-auto gap-2 rounded px-1 py-1 font-semibold tracking-[0.4px] text-text-primary hover:bg-overlay-subtle",
+                toolbarBtnRing,
+              )}
+              aria-controls="search-criteria-panel"
+            >
+              <Icon
+                name="chevron-down"
+                size={18}
+                className={cn(
+                  "shrink-0 transition-transform duration-200",
+                  criteriaOpen ? "rotate-0" : "-rotate-90",
+                )}
+                aria-hidden
+              />
+              Search Criteria
+            </Button>
+          </CollapsibleTrigger>
           <SearchCriteriaModeRadios value={criteriaMode} onChange={onCriteriaModeChange} />
         </div>
 
         <div className="flex flex-wrap justify-end gap-3">
           {isFsql ? (
             <>
-              <Button
+              <UiButton
                 type="button"
                 variant="secondary"
                 className={toolbarBtnRing}
@@ -204,18 +166,17 @@ function SearchToolbarActions({
               >
                 <Icon name="action-cancel-clear" className="shrink-0 text-current" aria-hidden />
                 Clear Search
-              </Button>
-              <Button type="button" variant="secondary" className={toolbarBtnRing} disabled={!hasFsqlQuery}>
+              </UiButton>
+              <UiButton type="button" variant="secondary" className={toolbarBtnRing} disabled={!hasFsqlQuery}>
                 Create New Detection
-              </Button>
-              <Button type="button" variant="secondary" className={toolbarBtnRing} disabled={!hasFsqlQuery}>
+              </UiButton>
+              <UiButton type="button" variant="secondary" className={toolbarBtnRing} disabled={!hasFsqlQuery}>
                 <Icon name="action-saved-search" className="shrink-0 text-current" aria-hidden />
                 Save Search
-              </Button>
+              </UiButton>
               <Button
                 type="button"
-                variant="primary"
-                className={toolbarBtnRing}
+                className={cn(TOOLBAR_PRIMARY_BUTTON_CLASS, toolbarBtnRing)}
                 disabled={!hasFsqlQuery}
                 onClick={onFsqlSearch}
               >
@@ -225,7 +186,7 @@ function SearchToolbarActions({
             </>
           ) : (
             <>
-              <Button
+              <UiButton
                 type="button"
                 variant="secondary"
                 className={toolbarBtnRing}
@@ -234,15 +195,15 @@ function SearchToolbarActions({
               >
                 <Icon name="action-cancel-clear" className="shrink-0 text-current" aria-hidden />
                 Clear Search
-              </Button>
-              <Button type="button" variant="secondary" className={toolbarBtnRing} disabled={!queryBuilderValid}>
+              </UiButton>
+              <UiButton type="button" variant="secondary" className={toolbarBtnRing} disabled={!queryBuilderValid}>
                 Create New Detection
-              </Button>
-              <Button type="button" variant="secondary" className={toolbarBtnRing} disabled={!queryBuilderValid}>
+              </UiButton>
+              <UiButton type="button" variant="secondary" className={toolbarBtnRing} disabled={!queryBuilderValid}>
                 <Icon name="action-saved-search" className="shrink-0 text-current" aria-hidden />
                 Save Search
-              </Button>
-              <Button type="button" variant="primary" className={toolbarBtnRing} disabled={!canSearch}>
+              </UiButton>
+              <Button type="button" className={cn(TOOLBAR_PRIMARY_BUTTON_CLASS, toolbarBtnRing)} disabled={!canSearch}>
                 <Icon name="action-search" className="shrink-0 text-current" aria-hidden />
                 Search
               </Button>
@@ -251,26 +212,27 @@ function SearchToolbarActions({
         </div>
       </div>
 
-      {criteriaOpen ? (
-        <div
-          id="search-criteria-panel"
-          role="region"
-          aria-label="Search criteria options"
-          className="px-5 py-4"
-        >
-          {isFsql ? (
-            <FsqlSearchTextarea value={fsqlQuery} onChange={onFsqlQueryChange} onSearch={onFsqlSearch} />
-          ) : (
-            <SearchQueryBuilder
-              key={queryBuilderKey}
-              onValidityChange={onQueryBuilderValidChange}
-              onConvertToFsql={onConvertToFsql}
-            />
-          )}
-        </div>
-      ) : null}
-      <div className="mx-[20px] h-px shrink-0 bg-border-rule" aria-hidden />
-    </div>
+      <CollapsibleContent
+        id="search-criteria-panel"
+        role="region"
+        aria-label="Search criteria options"
+        className="px-5 py-4 data-[state=closed]:py-0"
+      >
+        {isFsql ? (
+          <FsqlSearchTextarea value={fsqlQuery} onChange={onFsqlQueryChange} onSearch={onFsqlSearch} />
+        ) : (
+          <SearchQueryBuilder
+            key={queryBuilderKey}
+            onValidityChange={onQueryBuilderValidChange}
+            onConvertToFsql={onConvertToFsql}
+          />
+        )}
+      </CollapsibleContent>
+      <div className="pl-5 pr-6">
+        <Separator className="bg-border-rule" />
+      </div>
+      {fsqlSearching ? <FsqlSearchLoadingPanel /> : null}
+    </Collapsible>
   );
 }
 
@@ -279,77 +241,117 @@ function SearchToolbarActions({
  */
 export function SearchLandingPage() {
   const { range: timeframe, setRange: setTimeframeRange } = useTimeframe();
-  const { pendingFsqlQuery, setPendingFsqlQuery } = useCopilot();
-  const [criteriaMode, setCriteriaMode] = useState<SearchCriteriaMode>("query-builder");
-  const [criteriaOpen, setCriteriaOpen] = useState(true);
-  const [fsqlQuery, setFsqlQuery] = useState("");
-  const [queryBuilderKey, setQueryBuilderKey] = useState(0);
-  const [queryBuilderValid, setQueryBuilderValid] = useState(false);
-  const [fsqlSearchExecuted, setFsqlSearchExecuted] = useState(false);
-  const [fsqlSearching, setFsqlSearching] = useState(false);
-  const [searchInitialTimeframe, setSearchInitialTimeframe] = useState<TimeframeRange | null>(null);
-  const searchTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const { pendingFsqlSearch, setPendingFsqlSearch } = useCopilot();
+  const {
+    criteriaMode,
+    setCriteriaMode,
+    criteriaOpen,
+    setCriteriaOpen,
+    fsqlQuery,
+    setFsqlQuery,
+    queryBuilderKey,
+    queryBuilderValid,
+    setQueryBuilderValid,
+    fsqlSearchExecuted,
+    fsqlSearching,
+    searchInitialTimeframe,
+    fsqlSearchDetectionName,
+    setFsqlSearchDetectionName,
+    beginFsqlSearch,
+    clearSearch,
+  } = useSearch();
+  const skipTimeframeToFsqlSyncRef = useRef(false);
+  const fsqlQueryRef = useRef(fsqlQuery);
+  fsqlQueryRef.current = fsqlQuery;
 
   useEffect(() => {
-    return () => {
-      if (searchTimerRef.current) clearTimeout(searchTimerRef.current);
-    };
-  }, []);
-
-  useEffect(() => {
-    if (!pendingFsqlQuery) return;
-    setFsqlQuery(pendingFsqlQuery);
-    const parsedTimeframe = parseFsqlTimeframe(pendingFsqlQuery);
-    if (parsedTimeframe) setTimeframeRange(parsedTimeframe);
+    if (!pendingFsqlSearch) return;
+    const { query, autoExecute, detectionName } = pendingFsqlSearch;
+    setFsqlQuery(query);
+    setFsqlSearchDetectionName(detectionName ?? null);
+    const parsedTimeframe = parseFsqlTimeframe(query);
+    const searchTimeframe = parsedTimeframe ?? timeframe;
+    if (parsedTimeframe) {
+      skipTimeframeToFsqlSyncRef.current = true;
+      setTimeframeRange(parsedTimeframe);
+    }
     setCriteriaMode("fsql");
     setCriteriaOpen(true);
-    setPendingFsqlQuery(null);
-  }, [pendingFsqlQuery, setPendingFsqlQuery, setTimeframeRange]);
+    setPendingFsqlSearch(null);
+
+    if (autoExecute && query.trim()) {
+      beginFsqlSearch(query, searchTimeframe);
+    } else {
+      clearSearch("fsql");
+      setFsqlQuery(query);
+      setFsqlSearchDetectionName(detectionName ?? null);
+    }
+  }, [
+    pendingFsqlSearch,
+    setPendingFsqlSearch,
+    setTimeframeRange,
+    timeframe,
+    beginFsqlSearch,
+    clearSearch,
+    setCriteriaMode,
+    setCriteriaOpen,
+    setFsqlQuery,
+    setFsqlSearchDetectionName,
+  ]);
 
   const executeFsqlSearch = () => {
     if (!fsqlQuery.trim()) return;
+    setFsqlSearchDetectionName(null);
     const parsedTimeframe = parseFsqlTimeframe(fsqlQuery);
     const searchTimeframe = parsedTimeframe ?? timeframe;
-    if (parsedTimeframe) setTimeframeRange(parsedTimeframe);
-    setSearchInitialTimeframe(cloneTimeframeRange(searchTimeframe));
-    if (searchTimerRef.current) clearTimeout(searchTimerRef.current);
-    setFsqlSearchExecuted(true);
-    setFsqlSearching(true);
-    searchTimerRef.current = setTimeout(() => {
-      setFsqlSearching(false);
-      setCriteriaOpen(false);
-      searchTimerRef.current = null;
-    }, 450);
+    if (parsedTimeframe) {
+      skipTimeframeToFsqlSyncRef.current = true;
+      setTimeframeRange(parsedTimeframe);
+    }
+    beginFsqlSearch(fsqlQuery, searchTimeframe);
   };
 
   const handleFsqlQueryChange = (query: string) => {
     setFsqlQuery(query);
     const parsedTimeframe = parseFsqlTimeframe(query);
-    if (parsedTimeframe) setTimeframeRange(parsedTimeframe);
+    if (parsedTimeframe) {
+      skipTimeframeToFsqlSyncRef.current = true;
+      setTimeframeRange(parsedTimeframe);
+    }
   };
+
+  useEffect(() => {
+    if (criteriaMode !== "fsql") return;
+    const query = fsqlQueryRef.current;
+    if (!query.trim()) return;
+    if (skipTimeframeToFsqlSyncRef.current) {
+      skipTimeframeToFsqlSyncRef.current = false;
+      return;
+    }
+
+    const parsedFromQuery = parseFsqlTimeframe(query);
+    if (parsedFromQuery && timeframeRangesEqual(parsedFromQuery, timeframe)) return;
+
+    const nextQuery = applyTimeframeToFsqlQuery(query, timeframe);
+    if (nextQuery !== query) {
+      skipTimeframeToFsqlSyncRef.current = true;
+      setFsqlQuery(nextQuery);
+    }
+  }, [criteriaMode, timeframe.from.getTime(), timeframe.to.getTime(), timeframe]);
 
   const handleConvertToFsql = (query: string) => {
     setFsqlQuery(query);
     const parsedTimeframe = parseFsqlTimeframe(query);
-    if (parsedTimeframe) setTimeframeRange(parsedTimeframe);
+    if (parsedTimeframe) {
+      skipTimeframeToFsqlSyncRef.current = true;
+      setTimeframeRange(parsedTimeframe);
+    }
     setCriteriaMode("fsql");
     setCriteriaOpen(true);
   };
 
   const handleClearSearch = () => {
-    if (criteriaMode === "fsql") {
-      setFsqlQuery("");
-      setFsqlSearchExecuted(false);
-      setFsqlSearching(false);
-      setSearchInitialTimeframe(null);
-      if (searchTimerRef.current) {
-        clearTimeout(searchTimerRef.current);
-        searchTimerRef.current = null;
-      }
-      return;
-    }
-    setQueryBuilderKey((key) => key + 1);
-    setQueryBuilderValid(false);
+    clearSearch(criteriaMode);
   };
 
   const handleCriteriaModeChange = (mode: SearchCriteriaMode) => {
@@ -358,6 +360,7 @@ export function SearchLandingPage() {
   };
 
   return (
+    <TooltipProvider>
     <div className="flex h-full min-h-0 bg-surface-container text-text-primary">
       <V4NavThinner variant="federated-search" activeSection="search" navTargets={NAV_RAIL_TARGETS} />
 
@@ -379,14 +382,15 @@ export function SearchLandingPage() {
             onClearSearch={handleClearSearch}
             onFsqlSearch={executeFsqlSearch}
             onConvertToFsql={handleConvertToFsql}
+            fsqlSearching={fsqlSearching}
           />
 
           <div className="relative flex min-h-0 flex-1 overflow-hidden">
             {criteriaMode === "fsql" ? (
-              fsqlSearchExecuted ? (
+              fsqlSearchExecuted && !fsqlSearching ? (
                 <FsqlSearchResultsView
-                  isSearching={fsqlSearching}
                   searchInitialTimeframe={searchInitialTimeframe}
+                  detectionName={fsqlSearchDetectionName}
                 />
               ) : (
                 <div className="min-h-0 min-w-0 flex-1 bg-surface-container" aria-label="FSQL search workspace" />
@@ -453,5 +457,6 @@ export function SearchLandingPage() {
       </div>
 
     </div>
+    </TooltipProvider>
   );
 }

@@ -5,6 +5,7 @@ import {
   findSpikeBucketIndex,
   hourlyEventMultiplier,
 } from "../summary-insights/timeframeChartUtils";
+import { DEMO_TABLE_CONNECTOR_NAMES } from "../connectors/demoTableConnectors";
 import { TIME_SERIES_BAR_FILL } from "../summary-insights/horizontalBarPanel";
 
 export type FsqlSearchEventType = "OSINT Inventory" | "Vulnerability";
@@ -20,13 +21,7 @@ export type FsqlSearchResultRow = {
   connector: string;
 };
 
-const CONNECTORS = [
-  "Prod-SentinelOne",
-  "AWS-Crowdstrike Falcon",
-  "GCP-Carbon Black Cloud",
-  "Corp-Amazon Athena",
-  "Dev-Microsoft Defender",
-] as const;
+const CONNECTORS = DEMO_TABLE_CONNECTOR_NAMES;
 
 const TITLES = [
   "Port scan was detected from 10.0.4.12 targeting internal subnet",

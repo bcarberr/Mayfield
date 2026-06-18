@@ -1,8 +1,8 @@
 import { type KeyboardEvent, useEffect, useRef } from "react";
 import { Icon } from "../design-system";
-import { Button } from "./ui/Button";
-
-const cx = (...c: (string | false | undefined)[]) => c.filter(Boolean).join(" ");
+import { Button } from "@/components/shadcn/button";
+import { Textarea } from "@/components/shadcn/textarea";
+import { cn } from "@/lib/utils";
 
 const MIN_HEIGHT_PX = 40;
 const MAX_HEIGHT_PX = 240;
@@ -43,7 +43,7 @@ export function FsqlSearchTextarea({
 
   return (
     <div className="relative">
-      <textarea
+      <Textarea
         ref={textareaRef}
         value={value}
         onChange={(event) => onChange(event.target.value)}
@@ -55,16 +55,20 @@ export function FsqlSearchTextarea({
         }}
         rows={1}
         placeholder="Search using our FSQL"
-        className="min-h-10 w-full resize-none rounded border border-border-rule bg-surface-modal px-3 py-2.5 pr-12 text-sm leading-relaxed text-text-primary outline-none transition-[border-color,box-shadow] placeholder:italic placeholder:text-text-tertiary focus:border-interactive-active focus:ring-1 focus:ring-interactive-active"
+        className={cn(
+          "field-sizing-fixed min-h-10 max-h-60 resize-none rounded border-border-rule bg-surface-modal px-3 py-2.5 pr-12 text-sm leading-relaxed text-text-primary shadow-none",
+          "placeholder:italic placeholder:text-text-tertiary focus-visible:border-interactive-active focus-visible:ring-1 focus-visible:ring-interactive-active dark:bg-surface-modal",
+        )}
       />
       <Button
         type="button"
         variant="ghost"
-        className={cx(
-          "absolute bottom-3 right-3 size-7 p-0 transition-colors",
+        size="icon-sm"
+        className={cn(
+          "absolute bottom-3 right-3 size-7",
           hasValue
-            ? "text-interactive-active hover:text-interactive-active"
-            : "text-text-tertiary hover:text-text-tertiary",
+            ? "text-interactive-active hover:bg-overlay-subtle hover:text-interactive-active"
+            : "text-text-tertiary hover:bg-transparent hover:text-text-tertiary",
         )}
         aria-label="Run FSQL search"
         disabled={!hasValue}
