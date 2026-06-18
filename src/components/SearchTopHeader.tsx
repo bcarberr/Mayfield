@@ -1,10 +1,15 @@
 import type { ReactNode } from "react";
 import { Icon } from "../design-system";
-import { Button } from "./ui/Button";
 import { CopilotSparkMark } from "./SearchCopilotPanel";
 import { useCopilot } from "../context/CopilotContext";
+import { Button } from "@/components/shadcn/button";
+import { Separator } from "@/components/shadcn/separator";
+import { cn } from "@/lib/utils";
 
-const cx = (...c: (string | false | undefined)[]) => c.filter(Boolean).join(" ");
+/** Top-header action glyphs: ~10% larger and brighter than the default 18px / disabled tone. */
+const HEADER_ACTION_ICON_SIZE = 20;
+const HEADER_ACTION_ICON_CLASS = "brightness-110 [&_svg]:!size-5";
+const HEADER_COPILOT_ICON_CLASS = "h-[1.925rem] w-[1.925rem] brightness-110";
 
 export type SearchTopHeaderProps = {
   /** Page title (defaults to Federated Search). */
@@ -42,57 +47,66 @@ export function SearchTopHeader({
       {titleTrailing ? <div className="mr-0 flex shrink-0 items-center lg:mr-8">{titleTrailing}</div> : null}
       <div className="flex items-center gap-0 sm:gap-1">
         <Button
+          type="button"
           variant="ghost"
-          className={cx(
+          size="icon"
+          className={cn(
             "text-text-disabled hover:bg-overlay-subtle hover:text-text-disabled [&_svg]:text-current",
             ringOffset,
           )}
           aria-label="Help"
         >
-          <Icon name="nav-quick-help" />
+          <Icon name="nav-quick-help" size={HEADER_ACTION_ICON_SIZE} className={HEADER_ACTION_ICON_CLASS} />
         </Button>
         <Button
+          type="button"
           variant="ghost"
-          className={cx(
+          size="icon"
+          className={cn(
             "text-text-disabled hover:bg-overlay-subtle hover:text-text-disabled [&_svg]:text-current",
             ringOffset,
           )}
           aria-label="Notifications"
         >
-          <Icon name="nav-notifications" />
+          <Icon name="nav-notifications" size={HEADER_ACTION_ICON_SIZE} className={HEADER_ACTION_ICON_CLASS} />
         </Button>
       </div>
-      <span className="h-6 w-px shrink-0 bg-border-container" aria-hidden />
-      <button
+      <Separator orientation="vertical" className="h-6 bg-border-container" />
+      <Button
         type="button"
-        className={cx(
-          "flex size-9 shrink-0 items-center justify-center rounded-full border border-border-container bg-nav-highlight text-xs font-bold tracking-[0.4px] text-text-primary [html[data-theme=light]_&]:text-text-on-primary transition-colors hover:bg-interactive-secondary-pressed/80 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-interactive-active focus-visible:ring-offset-2",
+        variant="outline"
+        size="icon-lg"
+        className={cn(
+          "size-9 shrink-0 rounded-full border-border-container bg-nav-highlight text-xs font-bold tracking-[0.4px] text-text-primary [html[data-theme=light]_&]:text-text-on-primary hover:bg-interactive-secondary-pressed/80",
           ringOffset,
         )}
         aria-label="Account menu"
       >
         BC
-      </button>
-      <button
+      </Button>
+      <Button
         type="button"
-        className={cx(
-          "group flex size-9 shrink-0 items-center justify-center rounded-full focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-interactive-active focus-visible:ring-offset-2",
-          ringOffset,
-        )}
+        variant="ghost"
+        size="icon-lg"
+        className={cn("group size-9 shrink-0 rounded-full", ringOffset)}
         aria-label={copilotOpen ? "Close assistant panel" : "Open AI Copilot & Agents"}
         aria-expanded={copilotOpen}
         onClick={() => setCopilotOpen((open) => !open)}
       >
         <CopilotSparkMark
-          className={cx("h-7 transition-[filter] duration-150 group-hover:brightness-125", copilotOpen && "brightness-110")}
+          className={cn(
+            HEADER_COPILOT_ICON_CLASS,
+            "transition-[filter] duration-150 group-hover:brightness-125",
+            copilotOpen && "brightness-[1.21]",
+          )}
         />
-      </button>
+      </Button>
       {accountTrailing ? <div className="flex shrink-0 items-center">{accountTrailing}</div> : null}
     </>
   );
 
   return (
-    <header className={cx("shrink-0", bg, className)}>
+    <header className={cn("shrink-0", bg, className)}>
       <div className="flex flex-col gap-4 px-5 py-2 lg:min-h-12 lg:flex-row lg:items-center lg:justify-between lg:gap-4">
         <div className="flex w-full min-w-0 flex-col gap-4 lg:flex-1 lg:flex-row lg:items-center lg:gap-8">
           <div className="flex w-full min-w-0 items-center justify-between gap-3 lg:w-auto lg:shrink-0">
@@ -107,7 +121,7 @@ export function SearchTopHeader({
 
         <div className="hidden shrink-0 items-center gap-2 sm:gap-3 lg:flex">{headerActions}</div>
       </div>
-      <div className="mx-5 h-px shrink-0 bg-border-rule" aria-hidden />
+      <Separator className="mx-5 bg-border-rule" />
     </header>
   );
 }

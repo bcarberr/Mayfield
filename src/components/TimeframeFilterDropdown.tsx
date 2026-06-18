@@ -1,4 +1,4 @@
-import { useEffect, useId, useRef, useState } from "react";
+import { useState } from "react";
 import { Icon } from "../design-system";
 import {
   DEFAULT_TIMEFRAME_FROM,
@@ -7,13 +7,21 @@ import {
   normalizeTimeframeRange,
   useTimeframe,
 } from "../context/TimeframeContext";
-import { Button } from "./ui/Button";
+import { Button } from "@/components/shadcn/button";
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuTrigger,
+} from "@/components/shadcn/dropdown-menu";
+import { Button as DsButton } from "./ui/Button";
 import { Input } from "./ui/Input";
+import { cn } from "@/lib/utils";
 
-const cx = (...c: (string | false | undefined)[]) => c.filter(Boolean).join(" ");
+const HEADER_FILTER_TRIGGER_CLASS =
+  "h-auto max-w-full gap-1.5 rounded px-0 py-0.5 font-semibold text-interactive-active hover:bg-transparent hover:text-[var(--color-primary-hover)] active:text-[var(--color-primary-pressed)] lg:inline-flex lg:w-auto";
 
-const HEADER_FILTER_INTERACTIVE =
-  "text-interactive-active transition-colors group-hover:text-[var(--color-primary-hover)] group-active:text-[var(--color-primary-pressed)]";
+const TIMEFRAME_INPUT_CLASS =
+  "mt-1.5 h-8 !border-border-rule !bg-surface-container [&_input]:font-normal [&_input]:text-text-primary [&_input]:[color-scheme:dark] [html[data-theme=light]_&]:[&_input]:[color-scheme:light]";
 
 function pad2(value: number): string {
   return String(value).padStart(2, "0");
@@ -31,41 +39,24 @@ function fromDatetimeLocalValue(value: string): Date | null {
 
 /** Federated Search header control — choose a from/to datetime range. */
 export function TimeframeFilterDropdown() {
-  const { range, setRange } = useTimeframe();
-  const panelId = useId();
-  const containerRef = useRef<HTMLDivElement>(null);
+  const { range, commitAnalyticsTimeframe } = useTimeframe();
   const [open, setOpen] = useState(false);
   const [draftFrom, setDraftFrom] = useState(() => toDatetimeLocalValue(DEFAULT_TIMEFRAME_FROM));
   const [draftTo, setDraftTo] = useState(() => toDatetimeLocalValue(DEFAULT_TIMEFRAME_TO));
 
-  useEffect(() => {
-    function onPointerDown(event: PointerEvent) {
-      if (!containerRef.current?.contains(event.target as Node)) setOpen(false);
+  const handleOpenChange = (nextOpen: boolean) => {
+    if (nextOpen) {
+      setDraftFrom(toDatetimeLocalValue(range.from));
+      setDraftTo(toDatetimeLocalValue(range.to));
     }
-    document.addEventListener("pointerdown", onPointerDown);
-    return () => document.removeEventListener("pointerdown", onPointerDown);
-  }, []);
-
-  useEffect(() => {
-    if (!open) return;
-    function onKey(event: KeyboardEvent) {
-      if (event.key === "Escape") setOpen(false);
-    }
-    document.addEventListener("keydown", onKey);
-    return () => document.removeEventListener("keydown", onKey);
-  }, [open]);
-
-  const openPanel = () => {
-    setDraftFrom(toDatetimeLocalValue(range.from));
-    setDraftTo(toDatetimeLocalValue(range.to));
-    setOpen(true);
+    setOpen(nextOpen);
   };
 
   const applyRange = () => {
     const from = fromDatetimeLocalValue(draftFrom);
     const to = fromDatetimeLocalValue(draftTo);
     if (!from || !to) return;
-    setRange(normalizeTimeframeRange(from, to));
+    commitAnalyticsTimeframe(normalizeTimeframeRange(from, to));
     setOpen(false);
   };
 
@@ -74,70 +65,63 @@ export function TimeframeFilterDropdown() {
   const canApply = draftFromDate != null && draftToDate != null;
 
   return (
-    <div ref={containerRef} className="relative w-full min-w-0 lg:w-auto">
-      <button
-        type="button"
-        aria-haspopup="dialog"
-        aria-expanded={open}
-        aria-controls={panelId}
-        aria-label="Timeframe filter"
-        className="group flex w-full max-w-full items-center gap-1.5 rounded py-0.5 text-left transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-interactive-active focus-visible:ring-offset-2 focus-visible:ring-offset-surface-container lg:inline-flex lg:w-auto"
-        onClick={() => (open ? setOpen(false) : openPanel())}
-      >
-        <Icon name="action-time" size={16} className={cx("shrink-0", HEADER_FILTER_INTERACTIVE)} aria-hidden />
-        <span className={cx("inline-flex shrink-0 items-center gap-1 text-sm font-semibold", HEADER_FILTER_INTERACTIVE)}>
-          Timeframe
-        </span>
-        <span className="ml-0.5 min-w-0 max-w-[12rem] truncate rounded bg-surface-container px-2 py-1 text-sm font-normal text-text-primary lg:max-w-none lg:whitespace-nowrap">
-          {formatTimeframeLabel(range.from, range.to)}
-        </span>
-      </button>
-
-      {open ? (
-        <div
-          id={panelId}
-          role="dialog"
-          aria-label="Choose timeframe"
-          className="absolute left-0 top-[calc(100%+4px)] z-50 w-[min(360px,calc(100vw-2.5rem))] rounded-[4px] border border-border-container bg-surface-modal p-4 shadow-[0_3px_14px_2px_rgba(0,0,0,0.12),0_8px_10px_1px_rgba(0,0,0,0.14),0_5px_5px_-3px_rgba(0,0,0,0.2)]"
+    <DropdownMenu open={open} onOpenChange={handleOpenChange} modal={false}>
+      <DropdownMenuTrigger asChild>
+        <Button
+          type="button"
+          variant="ghost"
+          className={cn(HEADER_FILTER_TRIGGER_CLASS, "w-full justify-start text-left lg:w-auto")}
+          aria-label="Timeframe filter"
         >
-          <div className="space-y-3">
-            <label className="block">
-              <span className="text-xs font-bold uppercase tracking-wide text-text-tertiary">From</span>
-              <Input
-                type="datetime-local"
-                value={draftFrom}
-                onChange={(event) => setDraftFrom(event.target.value)}
-                className="mt-1.5 h-8 !bg-surface-container [&_input]:font-normal"
-                aria-label="Timeframe from"
-              />
-            </label>
-            <label className="block">
-              <span className="text-xs font-bold uppercase tracking-wide text-text-tertiary">To</span>
-              <Input
-                type="datetime-local"
-                value={draftTo}
-                onChange={(event) => setDraftTo(event.target.value)}
-                className="mt-1.5 h-8 !bg-surface-container [&_input]:font-normal"
-                aria-label="Timeframe to"
-              />
-            </label>
-          </div>
-          <div className="mt-4 flex justify-end gap-2">
-            <Button type="button" variant="secondary" className="h-8 ring-offset-surface-modal" onClick={() => setOpen(false)}>
-              Cancel
-            </Button>
-            <Button
-              type="button"
-              variant="primary"
-              className="h-8"
-              disabled={!canApply}
-              onClick={applyRange}
-            >
-              Apply
-            </Button>
-          </div>
+          <Icon
+            name="action-time"
+            size={16}
+            className="size-4 shrink-0 text-current [&_svg]:!size-4"
+            aria-hidden
+          />
+          <span className="inline-flex shrink-0 items-center gap-1 text-sm font-semibold">Timeframe</span>
+          <span className="ml-0.5 min-w-0 max-w-[12rem] truncate rounded bg-surface-container px-2 py-1 text-sm font-normal text-text-primary lg:max-w-none lg:whitespace-nowrap">
+            {formatTimeframeLabel(range.from, range.to)}
+          </span>
+        </Button>
+      </DropdownMenuTrigger>
+      <DropdownMenuContent
+        align="start"
+        className="w-[min(360px,calc(100vw-2.5rem))] rounded-[4px] border border-border-container bg-surface-modal p-4 text-text-primary shadow-[0_3px_14px_2px_rgba(0,0,0,0.12),0_8px_10px_1px_rgba(0,0,0,0.14),0_5px_5px_-3px_rgba(0,0,0,0.2)] ring-0"
+        onCloseAutoFocus={(event) => event.preventDefault()}
+        onPointerDown={(event) => event.stopPropagation()}
+      >
+        <div className="space-y-3" role="dialog" aria-label="Choose timeframe">
+          <label className="block">
+            <span className="text-xs font-bold uppercase tracking-wide text-text-tertiary">From</span>
+            <Input
+              type="datetime-local"
+              value={draftFrom}
+              onChange={(event) => setDraftFrom(event.target.value)}
+              className={TIMEFRAME_INPUT_CLASS}
+              aria-label="Timeframe from"
+            />
+          </label>
+          <label className="block">
+            <span className="text-xs font-bold uppercase tracking-wide text-text-tertiary">To</span>
+            <Input
+              type="datetime-local"
+              value={draftTo}
+              onChange={(event) => setDraftTo(event.target.value)}
+              className={TIMEFRAME_INPUT_CLASS}
+              aria-label="Timeframe to"
+            />
+          </label>
         </div>
-      ) : null}
-    </div>
+        <div className="mt-4 flex justify-end gap-2">
+          <DsButton type="button" variant="secondary" className="h-8 ring-offset-surface-modal" onClick={() => setOpen(false)}>
+            Cancel
+          </DsButton>
+          <DsButton type="button" variant="primary" className="h-8" disabled={!canApply} onClick={applyRange}>
+            Apply
+          </DsButton>
+        </div>
+      </DropdownMenuContent>
+    </DropdownMenu>
   );
 }
