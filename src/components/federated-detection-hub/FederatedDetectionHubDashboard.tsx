@@ -964,9 +964,10 @@ function DetectionsTable({
             <div className="w-[300px] shrink-0">
               <Input
                 variant="search"
-                placeholder="Search"
+                placeholder="Search detections"
                 value={searchQuery}
                 onChange={(event) => onSearchQueryChange(event.target.value)}
+                onClear={() => onSearchQueryChange("")}
                 className="!bg-datavis-card-bg"
                 aria-label="Search detections"
               />
