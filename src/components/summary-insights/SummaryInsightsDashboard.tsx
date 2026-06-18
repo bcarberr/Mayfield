@@ -1,26 +1,46 @@
-import { useCallback, useEffect, useMemo, useRef, useState, type CSSProperties } from "react";
-import { createPortal } from "react-dom";
+import { useCallback, useMemo, useState } from "react";
+import { DATA_GRID_HEADER_ROW_CLASS, DATA_GRID_PAGE_SCROLL_INNER_CLASS, DATA_GRID_PAGE_SCROLL_OUTER_CLASS, DATA_GRID_TABLE_CLASS, DATA_GRID_TABLE_SCROLL_CLASS, DATA_GRID_THEAD_CLASS } from "../ui/dataGridTableStyles";
 import { useNavigate } from "react-router-dom";
-import { Icon } from "../../design-system";
+import { Checkbox, Icon } from "../../design-system";
 import { DonutChartPanel } from "../ui/DonutChartPanel";
 import { FilterColumnPanel, type FilterColumnPanelTool } from "../ui/FilterColumnPanel";
 import { SeverityTableIcon } from "../ui/SeverityTableIcon";
-import { SlideOver } from "../ui/SlideOver";
 import { Button } from "../ui/Button";
 import { ColumnHeaderMenu } from "../ui/ColumnHeaderMenu";
-import { compareStrings, useColumnSort } from "../ui/useColumnSort";
+import { compareStrings } from "../ui/useColumnSort";
+import { useSortedDataGridPagination } from "../ui/useSortedDataGridPagination";
+import { DataGridSection } from "../ui/DataGridSection";
+import { DATA_GRID_ABOVE_SECTION_CLASS } from "../ui/dataGridTableStyles";
+import { DataGridPaginationFooter } from "../ui/DataGridTableLayout";
 import { Input } from "../ui/Input";
 import { DataGridExportButton } from "../ui/DataGridExportButton";
 import { TruncatedText } from "../ui/TruncatedText";
+import { demoTableConnector } from "../connectors/demoTableConnectors";
+import { ConnectorTableCell } from "../ui/ConnectorTableCell";
 import { useResizableColumns } from "../ui/useResizableColumns";
-import { Checkbox } from "../uiCheckbox";
 import { ROUTES } from "../../app/routes";
+import { useCopilot } from "../../context/CopilotContext";
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuTrigger,
+} from "@/components/shadcn/dropdown-menu";
+import { TooltipProvider } from "@/components/shadcn/tooltip";
+import {
+  Dialog,
+  DialogContent,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+} from "@/components/shadcn/dialog";
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/shadcn/tabs";
 import { useTimeframe, type TimeframeRange } from "../../context/TimeframeContext";
 import { EntitiesOverviewContent } from "./EntitiesOverviewContent";
 import { NetworkActivityContent } from "./NetworkActivityContent";
 import { cx, DatavisGridlineRule, InsightCard } from "./datavisCard";
 import {
-  FederatedAnalyticsBreadcrumb,
+  FEDERATED_ANALYTICS_TABS,
   federatedViewLabel,
   isComingSoonFederatedView,
   readDefaultFederatedView,
@@ -32,12 +52,14 @@ import { DiscoveryContent } from "./DiscoveryContent";
 import { IdentityAccessContent } from "./IdentityAccessContent";
 import { RemediationContent } from "./RemediationContent";
 import { SystemActivityContent } from "./SystemActivityContent";
+import { ChartZoomHint } from "./federatedAnalyticsZoom";
 import { TimeSeriesAreaChart } from "./timeSeriesAreaChart";
 import {
   buildHourlyAxisTicks,
   buildHourlyBuckets,
   findSpikeBucketIndex,
   formatBucketTimeLabel,
+  shouldIncludeDateInBucketLabels,
   hourlyEventMultiplier,
   hourlySeverityValues,
   SPIKE_CLOCK_HOUR,
@@ -122,12 +144,6 @@ const SEVERITY_ICON: Record<
   Low: "severity-low",
   Informational: "severity-info",
 };
-
-function connectorSwatch(connector: string) {
-  if (connector.startsWith("BCs")) return "bg-feedback-info";
-  if (connector.includes("Athena")) return "bg-interactive-active";
-  return "bg-feedback-negative";
-}
 
 function findingMatchesSearch(row: FindingRow, query: string): boolean {
   const q = query.trim().toLowerCase();
@@ -266,165 +282,138 @@ const FINDING_EVENTS_COL_MINS: readonly number[] = [
 
 const ROW_ACTION_ITEMS = ["Action one", "Action two", "Action three"] as const;
 
+const ANALYTICS_TAB_CONTENT_CLASS = "mt-0 min-h-0 flex-1 focus-visible:outline-none";
+
 function RowActionsMenu({ rowId }: { rowId: string }) {
-  const [open, setOpen] = useState(false);
-  const [menuStyle, setMenuStyle] = useState<CSSProperties>({});
-  const buttonRef = useRef<HTMLButtonElement>(null);
-
-  useEffect(() => {
-    if (!open || !buttonRef.current) return;
-
-    const updatePosition = () => {
-      const rect = buttonRef.current!.getBoundingClientRect();
-      setMenuStyle({
-        position: "fixed",
-        top: rect.bottom + 4,
-        left: rect.right,
-        transform: "translateX(-100%)",
-      });
-    };
-
-    updatePosition();
-    window.addEventListener("scroll", updatePosition, true);
-    window.addEventListener("resize", updatePosition);
-    return () => {
-      window.removeEventListener("scroll", updatePosition, true);
-      window.removeEventListener("resize", updatePosition);
-    };
-  }, [open]);
-
-  useEffect(() => {
-    if (!open) return;
-    const onDocClick = (e: MouseEvent) => {
-      if (buttonRef.current && !buttonRef.current.contains(e.target as Node)) {
-        const menu = document.getElementById(`finding-actions-menu-${rowId}`);
-        if (menu && menu.contains(e.target as Node)) return;
-        setOpen(false);
-      }
-    };
-    const onKey = (e: KeyboardEvent) => {
-      if (e.key === "Escape") setOpen(false);
-    };
-    document.addEventListener("mousedown", onDocClick);
-    document.addEventListener("keydown", onKey);
-    return () => {
-      document.removeEventListener("mousedown", onDocClick);
-      document.removeEventListener("keydown", onKey);
-    };
-  }, [open, rowId]);
-
   return (
-    <div className="relative flex justify-start">
-      <Button
-        ref={buttonRef}
-        type="button"
-        variant="ghost"
-        className="size-7 shrink-0 p-0 text-text-tertiary hover:text-text-primary [&_svg]:!size-4"
-        aria-label={`Actions for finding ${rowId}`}
-        aria-expanded={open}
-        aria-haspopup="menu"
-        onClick={() => setOpen((value) => !value)}
-      >
-        <Icon name="navi-more-vert" size={16} />
-      </Button>
-      {open
-        ? createPortal(
-            <div
-              id={`finding-actions-menu-${rowId}`}
-              role="menu"
-              aria-label={`Actions for finding ${rowId}`}
-              style={menuStyle}
-              className="z-50 min-w-[9rem] rounded border border-border-container bg-surface-modal py-1 shadow-[0_4px_12px_rgba(0,0,0,0.35)]"
-            >
-              {ROW_ACTION_ITEMS.map((label) => (
-                <button
-                  key={label}
-                  type="button"
-                  role="menuitem"
-                  className="block w-full px-3 py-1.5 text-left text-sm text-text-secondary transition-colors hover:bg-overlay-subtle hover:text-text-primary"
-                  onClick={() => setOpen(false)}
-                >
-                  {label}
-                </button>
-              ))}
-            </div>,
-            document.body,
-          )
-        : null}
-    </div>
-  );
-}
-
-function FindingDetailPanel({ row, onClose }: { row: FindingRow; onClose: () => void }) {
-  const eventType = EVENT_TYPE_ICON[row.eventType];
-
-  return (
-    <div className="flex h-full min-h-0 flex-col text-text-primary">
-      <header className="flex shrink-0 items-start justify-between gap-3 border-b border-border-rule px-5 py-4">
-        <div className="min-w-0">
-          <p className="text-xs font-bold uppercase tracking-wide text-text-tertiary">Finding</p>
-          <h2 className="mt-1 text-page-title text-text-primary">{row.title}</h2>
-        </div>
+    <DropdownMenu>
+      <DropdownMenuTrigger asChild>
         <Button
           type="button"
           variant="ghost"
-          className="shrink-0 p-1 text-text-tertiary hover:text-text-primary"
-          aria-label="Close finding details"
-          onClick={onClose}
+          className="size-7 shrink-0 p-0 text-text-tertiary hover:text-text-primary [&_svg]:!size-4"
+          aria-label={`Actions for finding ${rowId}`}
         >
-          <Icon name="close" size={20} />
+          <Icon name="navi-more-vert" size={16} />
         </Button>
-      </header>
-      <div className="min-h-0 flex-1 overflow-y-auto px-5 py-4">
-        <div className="flex flex-wrap items-center gap-2">
-          <SeverityTableIcon name={SEVERITY_ICON[row.severity]} color={SEV_BAR[row.severity]} />
-          <span className="text-sm font-semibold text-text-primary">{row.severity}</span>
-          <span className="text-sm text-text-tertiary">·</span>
-          <Icon
-            name={eventType.name}
-            size={16}
-            className={cx("size-4 shrink-0 [&_svg]:!size-4", eventType.className)}
-            aria-hidden
-          />
-          <span className="text-sm text-text-secondary">{row.eventType}</span>
-        </div>
-        <p className="mt-4 text-sm leading-relaxed text-text-secondary">{row.description}</p>
-        <dl className="mt-6 space-y-3 border-t border-border-rule pt-4 text-sm">
-          <div className="flex gap-3">
-            <dt className="w-28 shrink-0 text-text-tertiary">Time</dt>
-            <dd className="text-text-secondary">{row.time}</dd>
-          </div>
-          <div className="flex gap-3">
-            <dt className="w-28 shrink-0 text-text-tertiary">Activity</dt>
-            <dd className="text-text-secondary">{row.activity}</dd>
-          </div>
-          <div className="flex gap-3">
-            <dt className="w-28 shrink-0 text-text-tertiary">Status</dt>
-            <dd className="text-text-secondary">{row.status}</dd>
-          </div>
-          <div className="flex gap-3">
-            <dt className="w-28 shrink-0 text-text-tertiary">Connector</dt>
-            <dd className="text-text-secondary">{row.connector}</dd>
-          </div>
-        </dl>
-      </div>
-      <footer className="flex shrink-0 justify-end gap-2 border-t border-border-rule px-5 py-4">
-        <Button type="button" variant="secondary" onClick={onClose}>
-          Close
-        </Button>
-        <Button type="button" variant="primary">
-          View event
-        </Button>
-      </footer>
-    </div>
+      </DropdownMenuTrigger>
+      <DropdownMenuContent
+        align="end"
+        className="min-w-[9rem] rounded border border-border-container bg-surface-modal py-1 shadow-[0_4px_12px_rgba(0,0,0,0.35)]"
+      >
+        {ROW_ACTION_ITEMS.map((label) => (
+          <DropdownMenuItem key={label} className="cursor-pointer text-text-secondary focus:bg-overlay-subtle focus:text-text-primary">
+            {label}
+          </DropdownMenuItem>
+        ))}
+      </DropdownMenuContent>
+    </DropdownMenu>
   );
 }
 
+function FindingDetailDialog({
+  row,
+  open,
+  onClose,
+}: {
+  row: FindingRow | undefined;
+  open: boolean;
+  onClose: () => void;
+}) {
+  if (!row) return null;
+
+  const eventType = EVENT_TYPE_ICON[row.eventType];
+
+  return (
+    <Dialog open={open} onOpenChange={(isOpen) => { if (!isOpen) onClose(); }}>
+      <DialogContent
+        showCloseButton={false}
+        className="flex max-h-[min(85vh,720px)] w-full max-w-lg flex-col gap-0 overflow-hidden border border-border-rule bg-surface-modal p-0 text-text-primary ring-0 shadow-xl"
+      >
+        <DialogHeader className="flex-row items-start justify-between gap-3 border-b border-border-rule px-5 py-4">
+          <div className="min-w-0 text-left">
+            <p className="text-xs font-bold uppercase tracking-wide text-text-tertiary">Finding</p>
+            <DialogTitle className="mt-1 text-left text-page-title font-bold text-text-primary">{row.title}</DialogTitle>
+          </div>
+          <Button
+            type="button"
+            variant="ghost"
+            className="h-auto shrink-0 p-1 text-text-tertiary hover:text-text-primary"
+            aria-label="Close finding details"
+            onClick={onClose}
+          >
+            <Icon name="close" size={20} />
+          </Button>
+        </DialogHeader>
+        <div className="min-h-0 flex-1 overflow-y-auto px-5 py-4">
+          <div className="flex flex-wrap items-center gap-2">
+            <SeverityTableIcon name={SEVERITY_ICON[row.severity]} color={SEV_BAR[row.severity]} />
+            <span className="text-sm font-semibold text-text-primary">{row.severity}</span>
+            <span className="text-sm text-text-tertiary">·</span>
+            <Icon
+              name={eventType.name}
+              size={16}
+              className={cx("size-4 shrink-0 [&_svg]:!size-4", eventType.className)}
+              aria-hidden
+            />
+            <span className="text-sm text-text-secondary">{row.eventType}</span>
+          </div>
+          <p className="mt-4 text-sm leading-relaxed text-text-secondary">{row.description}</p>
+          <dl className="mt-6 space-y-3 border-t border-border-rule pt-4 text-sm">
+            <div className="flex gap-3">
+              <dt className="w-28 shrink-0 text-text-tertiary">Time</dt>
+              <dd className="text-text-secondary">{row.time}</dd>
+            </div>
+            <div className="flex gap-3">
+              <dt className="w-28 shrink-0 text-text-tertiary">Activity</dt>
+              <dd className="text-text-secondary">{row.activity}</dd>
+            </div>
+            <div className="flex gap-3">
+              <dt className="w-28 shrink-0 text-text-tertiary">Status</dt>
+              <dd className="text-text-secondary">{row.status}</dd>
+            </div>
+            <div className="flex gap-3">
+              <dt className="w-28 shrink-0 text-text-tertiary">Connector</dt>
+              <dd className="text-text-secondary">{row.connector}</dd>
+            </div>
+          </dl>
+        </div>
+        <DialogFooter className="mx-0 mb-0 shrink-0 gap-2 rounded-none border-t border-border-rule bg-transparent px-5 py-4 sm:flex-row sm:justify-end">
+          <Button type="button" variant="secondary" onClick={onClose}>
+            Close
+          </Button>
+          <Button type="button" variant="primary">
+            View event
+          </Button>
+        </DialogFooter>
+      </DialogContent>
+    </Dialog>
+  );
+}
+
+export function useFindingEventsTableGrid(rows: readonly Parameters<typeof FindingEventsTable>[0]["displayRows"][number][]) {
+  const sortComparators = useMemo(
+    (): Record<FindingSortColumn, (a: FindingRow, b: FindingRow) => number> => ({
+      severity: (a, b) => FINDING_SEVERITY_ORDER[a.severity] - FINDING_SEVERITY_ORDER[b.severity],
+      title: (a, b) => compareStrings(a.title, b.title),
+      time: (a, b) => compareStrings(a.time, b.time),
+      activity: (a, b) => compareStrings(a.activity, b.activity),
+      status: (a, b) => compareStrings(a.status, b.status),
+      eventType: (a, b) => compareStrings(a.eventType, b.eventType),
+      connector: (a, b) => compareStrings(a.connector, b.connector),
+    }),
+    [],
+  );
+  return useSortedDataGridPagination(rows, sortComparators);
+}
+
 function FindingEventsTable({
-  rows,
+  displayRows,
+  getSortProps,
   onOpenFinding,
 }: {
-  rows: FindingRow[];
+  displayRows: FindingRow[];
+  getSortProps: ReturnType<typeof useFindingEventsTableGrid>["getSortProps"];
   onOpenFinding: (id: string) => void;
 }) {
   const [selected, setSelected] = useState<Set<string>>(() => new Set());
@@ -443,7 +432,7 @@ function FindingEventsTable({
     colMins: FINDING_EVENTS_COL_MINS,
   });
 
-  const allIds = useMemo(() => rows.map((r) => r.id), [rows]);
+  const allIds = useMemo(() => displayRows.map((r) => r.id), [displayRows]);
   const total = allIds.length;
   const selectedOnPage = useMemo(() => allIds.filter((id) => selected.has(id)).length, [allIds, selected]);
   const allSelected = total > 0 && selectedOnPage === total;
@@ -462,25 +451,12 @@ function FindingEventsTable({
     });
   };
 
-  const sortComparators = useMemo(
-    (): Record<FindingSortColumn, (a: FindingRow, b: FindingRow) => number> => ({
-      severity: (a, b) => FINDING_SEVERITY_ORDER[a.severity] - FINDING_SEVERITY_ORDER[b.severity],
-      title: (a, b) => compareStrings(a.title, b.title),
-      time: (a, b) => compareStrings(a.time, b.time),
-      activity: (a, b) => compareStrings(a.activity, b.activity),
-      status: (a, b) => compareStrings(a.status, b.status),
-      eventType: (a, b) => compareStrings(a.eventType, b.eventType),
-      connector: (a, b) => compareStrings(a.connector, b.connector),
-    }),
-    [],
-  );
-  const { sortedRows, getSortProps } = useColumnSort(sortComparators);
-  const displayRows = sortedRows(rows);
+
 
   return (
-    <div ref={containerRef} className={cx("min-h-0 w-full min-w-0", isResizing && "select-none")}>
+    <div ref={containerRef} className={cx(DATA_GRID_TABLE_SCROLL_CLASS, isResizing && "select-none")}>
       <table
-        className="table-fixed border-collapse text-left text-sm"
+        className={DATA_GRID_TABLE_CLASS}
         style={{
           width: tableFillsContainer ? "100%" : baseTotal,
           minWidth: Math.max(minTableWidth, baseTotal),
@@ -492,8 +468,8 @@ function FindingEventsTable({
           <col key={i} style={{ width: w }} />
         ))}
       </colgroup>
-      <thead>
-        <tr className="h-10 border-b border-datavis-gridlines bg-surface-table-row-header">
+      <thead className={DATA_GRID_THEAD_CLASS}>
+        <tr className={DATA_GRID_HEADER_ROW_CLASS}>
           <th scope="col" style={colStyle(0)} className="relative h-10 border-r border-datavis-gridlines px-0 py-0 align-middle">
             <div className="flex items-center justify-center">
               <Checkbox
@@ -634,15 +610,7 @@ function FindingEventsTable({
                 <RowActionsMenu rowId={row.id} />
               </td>
               <td style={colStyle(8)} className="h-10 min-w-0 px-2 py-0 align-middle">
-                <span className="inline-flex min-w-0 items-center gap-2">
-                  <span
-                    className={cx("size-2.5 shrink-0 rounded-sm", connectorSwatch(row.connector))}
-                    aria-hidden
-                  />
-                  <TruncatedText className="text-sm text-text-secondary" wrapperClassName="min-w-0 flex-1">
-                    {row.connector}
-                  </TruncatedText>
-                </span>
+                <ConnectorTableCell name={row.connector} />
               </td>
             </tr>
           );
@@ -664,11 +632,15 @@ function FederatedAnalyticsComingSoon({ view }: { view: FederatedViewId }) {
 
 export function SummaryInsightsDashboard() {
   const navigate = useNavigate();
-  const { range: timeframe, setRange } = useTimeframe();
+  const { setPendingFsqlSearch } = useCopilot();
+  const {
+    range: timeframe,
+    analyticsBaselineRange,
+    isAnalyticsChartZoomed,
+    applyAnalyticsChartZoom,
+    resetAnalyticsChartZoom,
+  } = useTimeframe();
   const [activeView, setActiveView] = useState<FederatedViewId>(readDefaultFederatedView);
-  const [findingsInitialTimeframe, setFindingsInitialTimeframe] = useState<TimeframeRange | null>(null);
-  const [isFindingsChartZoomed, setIsFindingsChartZoomed] = useState(false);
-  const previousActiveViewRef = useRef(activeView);
   const [severityFilter, setSeverityFilter] = useState<SeverityLevel | null>(null);
   const [categoryFilter, setCategoryFilter] = useState<FindingCategory | null>(null);
   const [statusFilter, setStatusFilter] = useState<FindingStatus | null>(null);
@@ -689,7 +661,7 @@ export function SummaryInsightsDashboard() {
         status: "Failure",
         findingStatus: "New",
         eventType: "HTTP Activity",
-        connector: "BCs1",
+        connector: demoTableConnector(0),
       },
       {
         id: "2",
@@ -703,7 +675,7 @@ export function SummaryInsightsDashboard() {
         status: "Unknown",
         findingStatus: "New",
         eventType: "HTTP Activity",
-        connector: "BC-CS-Athena",
+        connector: demoTableConnector(1),
       },
       {
         id: "3",
@@ -717,7 +689,7 @@ export function SummaryInsightsDashboard() {
         status: "Other",
         findingStatus: "In Progress",
         eventType: "Vulnerability",
-        connector: "BC-CS",
+        connector: demoTableConnector(2),
       },
       {
         id: "4",
@@ -731,7 +703,7 @@ export function SummaryInsightsDashboard() {
         status: "New",
         findingStatus: "New",
         eventType: "HTTP Activity",
-        connector: "BCs1",
+        connector: demoTableConnector(3),
       },
       {
         id: "5",
@@ -745,7 +717,7 @@ export function SummaryInsightsDashboard() {
         status: "In Progress",
         findingStatus: "In Progress",
         eventType: "Vulnerability",
-        connector: "BC-CS-Athena",
+        connector: demoTableConnector(4),
       },
       {
         id: "6",
@@ -759,7 +731,7 @@ export function SummaryInsightsDashboard() {
         status: "Suppressed",
         findingStatus: "Suppressed",
         eventType: "Vulnerability",
-        connector: "BCs1",
+        connector: demoTableConnector(5),
       },
       {
         id: "7",
@@ -773,7 +745,7 @@ export function SummaryInsightsDashboard() {
         status: "Failure",
         findingStatus: "New",
         eventType: "HTTP Activity",
-        connector: "BC-CS-Athena",
+        connector: demoTableConnector(6),
       },
       {
         id: "8",
@@ -787,7 +759,7 @@ export function SummaryInsightsDashboard() {
         status: "Unknown",
         findingStatus: "In Progress",
         eventType: "Vulnerability",
-        connector: "BC-CS",
+        connector: demoTableConnector(7),
       },
       {
         id: "9",
@@ -801,7 +773,7 @@ export function SummaryInsightsDashboard() {
         status: "New",
         findingStatus: "New",
         eventType: "HTTP Activity",
-        connector: "BCs1",
+        connector: demoTableConnector(8),
       },
       {
         id: "10",
@@ -815,7 +787,7 @@ export function SummaryInsightsDashboard() {
         status: "In Progress",
         findingStatus: "In Progress",
         eventType: "Vulnerability",
-        connector: "BC-CS-Athena",
+        connector: demoTableConnector(9),
       },
       {
         id: "11",
@@ -829,7 +801,7 @@ export function SummaryInsightsDashboard() {
         status: "Failure",
         findingStatus: "New",
         eventType: "Vulnerability",
-        connector: "BC-CS",
+        connector: demoTableConnector(10),
       },
       {
         id: "12",
@@ -843,7 +815,7 @@ export function SummaryInsightsDashboard() {
         status: "Suppressed",
         findingStatus: "Suppressed",
         eventType: "Vulnerability",
-        connector: "BCs1",
+        connector: demoTableConnector(11),
       },
       {
         id: "13",
@@ -857,7 +829,7 @@ export function SummaryInsightsDashboard() {
         status: "Unknown",
         findingStatus: "New",
         eventType: "HTTP Activity",
-        connector: "BC-CS-Athena",
+        connector: demoTableConnector(12),
       },
       {
         id: "14",
@@ -871,31 +843,16 @@ export function SummaryInsightsDashboard() {
         status: "Other",
         findingStatus: "Resolved",
         eventType: "HTTP Activity",
-        connector: "BC-CS",
+        connector: demoTableConnector(13),
       },
     ],
     [],
   );
 
-  useEffect(() => {
-    const enteredFindings = activeView === "findings" && previousActiveViewRef.current !== "findings";
-    previousActiveViewRef.current = activeView;
-
-    if (activeView !== "findings") return;
-
-    if (enteredFindings || findingsInitialTimeframe === null) {
-      setFindingsInitialTimeframe({
-        from: new Date(timeframe.from),
-        to: new Date(timeframe.to),
-      });
-      setIsFindingsChartZoomed(false);
-    }
-  }, [activeView, timeframe, findingsInitialTimeframe]);
 
   const tableRows = useMemo(() => {
-    if (!findingsInitialTimeframe) return [];
-    return buildFindingRowsForTimeframe(findingRowTemplates, findingsInitialTimeframe);
-  }, [findingRowTemplates, findingsInitialTimeframe]);
+    return buildFindingRowsForTimeframe(findingRowTemplates, analyticsBaselineRange);
+  }, [findingRowTemplates, analyticsBaselineRange]);
 
   const timeframeScopedRows = useMemo(
     () => tableRows.filter((row) => findingRowInTimeframe(row, timeframe)),
@@ -947,7 +904,7 @@ export function SummaryInsightsDashboard() {
     }));
   }, [timeframeScopedRows]);
 
-  const filteredTableRows = useMemo(
+    const filteredTableRows = useMemo(
     () =>
       timeframeScopedRows.filter((row) => {
         if (categoryFilter && row.category !== categoryFilter) return false;
@@ -958,6 +915,7 @@ export function SummaryInsightsDashboard() {
       }),
     [timeframeScopedRows, categoryFilter, severityFilter, statusFilter, searchQuery],
   );
+  const tableGrid = useFindingEventsTableGrid(filteredTableRows);
 
   const hasActiveFilters =
     categoryFilter != null || severityFilter != null || statusFilter != null || searchQuery.trim().length > 0;
@@ -985,7 +943,7 @@ export function SummaryInsightsDashboard() {
   const eventsPerHourChart = useMemo(() => {
     const buckets = buildHourlyBuckets(timeframe);
     const spikeIndex = findSpikeBucketIndex(buckets, timeframe.to);
-    const includeDate = timeframe.to.getTime() - timeframe.from.getTime() > 36 * 3_600_000;
+    const includeDate = shouldIncludeDateInBucketLabels(timeframe);
     const xLabels = buckets.map((bucket) => formatBucketTimeLabel(bucket.start, includeDate));
     const { indices: xTickIndices, labels: xTickLabels } = buildHourlyAxisTicks(buckets, timeframe);
 
@@ -1030,184 +988,204 @@ export function SummaryInsightsDashboard() {
         endIndex,
       );
       if (!nextRange) return;
-      setIsFindingsChartZoomed(true);
-      setRange(nextRange);
+      applyAnalyticsChartZoom(nextRange);
     },
-    [timeframe, eventsPerHourChart.buckets, setRange],
+    [timeframe, eventsPerHourChart.buckets, applyAnalyticsChartZoom],
   );
 
-  const handleFindingsChartZoomReset = useCallback(() => {
-    if (!findingsInitialTimeframe) return;
-    setRange({
-      from: new Date(findingsInitialTimeframe.from),
-      to: new Date(findingsInitialTimeframe.to),
-    });
-    setIsFindingsChartZoomed(false);
-  }, [findingsInitialTimeframe, setRange]);
-
   return (
+    <TooltipProvider>
     <div className="relative flex min-h-0 flex-1 flex-col overflow-hidden">
-      <div className="flex min-h-0 flex-1 flex-col overflow-y-auto bg-surface-page">
-      <div className="flex shrink-0 flex-wrap items-center justify-between gap-3 px-4 py-2.5 sm:px-5">
-        <FederatedAnalyticsBreadcrumb activeView={activeView} onViewChange={setActiveView} />
-        <Button
-          type="button"
-          variant="secondary"
-          className="shrink-0"
-          onClick={() => void navigate(ROUTES.search)}
-        >
-          Start a New Search
-        </Button>
-      </div>
-      <DatavisGridlineRule />
-
-      {activeView === "entities-overview" ? (
-        <EntitiesOverviewContent />
-      ) : activeView === "system-activity" ? (
-        <SystemActivityContent />
-      ) : activeView === "identity-access" ? (
-        <IdentityAccessContent />
-      ) : activeView === "network-activity" ? (
-        <NetworkActivityContent />
-      ) : activeView === "discovery" ? (
-        <DiscoveryContent />
-      ) : activeView === "application-activity" ? (
-        <ApplicationActivityContent />
-      ) : activeView === "remediation" ? (
-        <RemediationContent />
-      ) : isComingSoonFederatedView(activeView) ? (
-        <FederatedAnalyticsComingSoon view={activeView} />
-      ) : (
-        <div className="flex shrink-0 flex-col gap-4 p-4 sm:p-5">
-      <InsightCard title="Finding Events Per Hour By Severity">
-        <p className="mb-2 pl-9 text-base-small text-text-tertiary">
-          Hours · drag to zoom
-          {isFindingsChartZoomed && findingsInitialTimeframe ? (
-            <>
-              {" · "}
-              <button
-                type="button"
-                className="font-semibold text-feedback-caution hover:underline"
-                onClick={handleFindingsChartZoomReset}
+      <Tabs
+        value={activeView}
+        onValueChange={(value) => setActiveView(value as FederatedViewId)}
+        className="flex min-h-0 flex-1 flex-col"
+      >
+        <div className="sticky top-0 z-20 flex shrink-0 items-end justify-between gap-4 bg-surface-page px-6 pt-4">
+          <TabsList
+            variant="line"
+            className="h-auto w-auto gap-6 rounded-none bg-transparent p-0"
+            aria-label="Federated analytics views"
+          >
+            {FEDERATED_ANALYTICS_TABS.map((tab) => (
+              <TabsTrigger
+                key={tab.id}
+                value={tab.id}
+                className="h-auto flex-none rounded-none border-0 px-0 pb-3 text-sm font-semibold text-text-tertiary transition-colors hover:text-text-secondary [&::after]:hidden before:absolute before:inset-x-0 before:bottom-0 before:h-[2px] before:bg-transparent before:transition-colors data-active:!bg-transparent data-active:before:bg-interactive-active data-active:text-text-primary data-active:shadow-none"
               >
-                Reset
-              </button>
-            </>
-          ) : null}
-        </p>
-        <TimeSeriesAreaChart
-          series={eventsPerHourChart.series}
-          xLabels={eventsPerHourChart.xLabels}
-          xTickIndices={eventsPerHourChart.xTickIndices}
-          xTickLabels={eventsPerHourChart.xTickLabels}
-          spikeHighlight={eventsPerHourChart.spikeHighlight}
-          ariaLabel="Finding events per hour by severity"
-          selectedSeriesId={severityFilter}
-          onSeriesClick={handleSeverityBarClick}
-          onBrushCommit={handleFindingsTimelineBrush}
-        />
-      </InsightCard>
+                {tab.tabLabel}
+              </TabsTrigger>
+            ))}
+          </TabsList>
+          <Button
+            type="button"
+            variant="secondary"
+            className="mb-3 h-8 shrink-0 ring-offset-surface-page"
+            onClick={() => {
+              setPendingFsqlSearch({ query: "" });
+              void navigate(ROUTES.search);
+            }}
+          >
+            Start a New Search
+          </Button>
+        </div>
 
-      <div className="grid min-h-0 shrink-0 grid-cols-1 items-stretch gap-4 lg:grid-cols-3">
-        <InsightCard title="Finding Event Classes" fillHeight>
-          <HorizontalBarPanel
-            rows={categoryRows}
-            selectedLabel={categoryFilter}
-            onBarClick={handleCategoryBarClick}
-            filterAriaLabel={(label) => `Filter findings by ${label}`}
-            axisLabel="Findings"
-            xMax={categoryBarScale.xMax}
-            xTicks={categoryBarScale.xTicks}
-          />
-        </InsightCard>
-        <InsightCard title="Findings Severity ID" fillHeight>
-          <HorizontalBarPanel
-            rows={severityRows}
-            selectedLabel={severityFilter}
-            onBarClick={handleSeverityBarClick}
-            filterAriaLabel={(label) => `Filter findings by ${label} severity`}
-            axisLabel="Findings"
-            xMax={severityBarScale.xMax}
-            xTicks={severityBarScale.xTicks}
-          />
-        </InsightCard>
-        <InsightCard title="Findings By Status" fillHeight>
-          <DonutChartPanel
-            segments={findingStatusSegments}
-            total={timeframeScopedRows.length}
-            centerLabel="findings"
-            selectedLabel={statusFilter}
-            onSegmentClick={handleStatusClick}
-            ariaLabel="Findings by status"
-          />
-        </InsightCard>
-      </div>
+        <div className={cx(DATA_GRID_PAGE_SCROLL_OUTER_CLASS, "bg-surface-page")}>
+          <div className={cx(DATA_GRID_PAGE_SCROLL_INNER_CLASS)}>
+          <DatavisGridlineRule />
 
-      <section className="mx-0 mb-0 flex min-h-0 min-w-0 flex-1 flex-col overflow-hidden rounded-[4px] border border-border-container bg-datavis-card-bg shadow-[0_1px_5px_rgba(0,0,0,0.2)]">
-        <div className="shrink-0 bg-datavis-card-bg pb-3 pl-4 pr-[20px] pt-3 sm:pl-5">
-          <h2 className="text-base-semibold text-text-primary">Finding Events</h2>
-          <div className="mt-2 flex flex-wrap items-center gap-3">
-            <p className="shrink-0 text-base-small text-text-secondary">
-              {filteredTableRows.length} of {timeframeScopedRows.length} Results
-              {categoryFilter ? ` · ${categoryFilter}` : ""}
-              {severityFilter ? ` · ${severityFilter}` : ""}
-              {statusFilter ? ` · ${statusFilter}` : ""}
-              {searchQuery.trim() ? ` · “${searchQuery.trim()}”` : ""}
-            </p>
-            <div className="w-[300px] shrink-0">
-              <Input
-                variant="search"
-                placeholder="Search"
-                value={searchQuery}
-                onChange={(event) => setSearchQuery(event.target.value)}
-                className="!bg-datavis-card-bg"
-                aria-label="Search findings"
-              />
-            </div>
-            {hasActiveFilters ? (
-              <Button
-                type="button"
-                variant="ghost"
-                className="h-8 shrink-0 gap-1.5 px-2 text-base-small text-text-tertiary hover:text-text-primary [&_svg]:!h-2 [&_svg]:!w-3"
-                onClick={() => {
-                  setCategoryFilter(null);
-                  setSeverityFilter(null);
-                  setStatusFilter(null);
-                  setSearchQuery("");
-                }}
-              >
-                <Icon name="action-filter-list" size={12} aria-hidden />
-                Clear all filters
-              </Button>
-            ) : null}
-            <DataGridExportButton />
+          <TabsContent value="entities-overview" className={ANALYTICS_TAB_CONTENT_CLASS}>
+            <EntitiesOverviewContent />
+          </TabsContent>
+          <TabsContent value="system-activity" className={ANALYTICS_TAB_CONTENT_CLASS}>
+            <SystemActivityContent />
+          </TabsContent>
+          <TabsContent value="identity-access" className={ANALYTICS_TAB_CONTENT_CLASS}>
+            <IdentityAccessContent />
+          </TabsContent>
+          <TabsContent value="network-activity" className={ANALYTICS_TAB_CONTENT_CLASS}>
+            <NetworkActivityContent />
+          </TabsContent>
+          <TabsContent value="discovery" className={ANALYTICS_TAB_CONTENT_CLASS}>
+            <DiscoveryContent />
+          </TabsContent>
+          <TabsContent value="application-activity" className={ANALYTICS_TAB_CONTENT_CLASS}>
+            <ApplicationActivityContent />
+          </TabsContent>
+          <TabsContent value="remediation" className={ANALYTICS_TAB_CONTENT_CLASS}>
+            <RemediationContent />
+          </TabsContent>
+          <TabsContent value="findings" className={ANALYTICS_TAB_CONTENT_CLASS}>
+            {isComingSoonFederatedView("findings") ? (
+              <FederatedAnalyticsComingSoon view="findings" />
+            ) : (
+              <div className="flex shrink-0 flex-col gap-4 p-4 sm:p-5">
+                <div className={DATA_GRID_ABOVE_SECTION_CLASS}>
+                <InsightCard title="Finding Events Per Hour By Severity">
+                  <ChartZoomHint
+                    unit="Hours"
+                    isChartZoomed={isAnalyticsChartZoomed}
+                    onReset={resetAnalyticsChartZoom}
+                  />
+                  <TimeSeriesAreaChart
+                    series={eventsPerHourChart.series}
+                    xLabels={eventsPerHourChart.xLabels}
+                    xTickIndices={eventsPerHourChart.xTickIndices}
+                    xTickLabels={eventsPerHourChart.xTickLabels}
+                    bucketStarts={eventsPerHourChart.buckets.map((bucket) => bucket.start)}
+                    spikeHighlight={eventsPerHourChart.spikeHighlight}
+                    ariaLabel="Finding events per hour by severity"
+                    selectedSeriesId={severityFilter}
+                    onSeriesClick={handleSeverityBarClick}
+                    onBrushCommit={handleFindingsTimelineBrush}
+                  />
+                </InsightCard>
+
+                <div className="grid min-h-0 shrink-0 grid-cols-1 items-stretch gap-4 lg:grid-cols-3">
+                  <InsightCard title="Finding Event Classes" fillHeight>
+                    <HorizontalBarPanel
+                      rows={categoryRows}
+                      selectedLabel={categoryFilter}
+                      onBarClick={handleCategoryBarClick}
+                      filterAriaLabel={(label) => `Filter findings by ${label}`}
+                      xMax={categoryBarScale.xMax}
+                      xTicks={categoryBarScale.xTicks}
+                    />
+                  </InsightCard>
+                  <InsightCard title="Findings Severity ID" fillHeight>
+                    <HorizontalBarPanel
+                      rows={severityRows}
+                      selectedLabel={severityFilter}
+                      onBarClick={handleSeverityBarClick}
+                      filterAriaLabel={(label) => `Filter findings by ${label} severity`}
+                      xMax={severityBarScale.xMax}
+                      xTicks={severityBarScale.xTicks}
+                    />
+                  </InsightCard>
+                  <InsightCard title="Findings By Status" fillHeight>
+                    <DonutChartPanel
+                      segments={findingStatusSegments}
+                      total={timeframeScopedRows.length}
+                      centerLabel="findings"
+                      selectedLabel={statusFilter}
+                      onSegmentClick={handleStatusClick}
+                      ariaLabel="Findings by status"
+                    />
+                  </InsightCard>
+                </div>
+                </div>
+
+                <DataGridSection
+                  header={
+                    <>
+                      <h2 className="text-base-semibold text-text-primary">Finding Events</h2>
+                      <div className="mt-2 flex flex-wrap items-center gap-3">
+                        <p className="shrink-0 text-base-small text-text-secondary">
+                          {filteredTableRows.length} of {timeframeScopedRows.length} Results
+                          {categoryFilter ? ` · ${categoryFilter}` : ""}
+                          {severityFilter ? ` · ${severityFilter}` : ""}
+                          {statusFilter ? ` · ${statusFilter}` : ""}
+                          {searchQuery.trim() ? ` · “${searchQuery.trim()}”` : ""}
+                        </p>
+                        <div className="w-[300px] shrink-0">
+                          <Input
+                            variant="search"
+                            placeholder="Search"
+                            value={searchQuery}
+                            onChange={(event) => setSearchQuery(event.target.value)}
+                            className="!bg-datavis-card-bg"
+                            aria-label="Search findings"
+                          />
+                        </div>
+                        {hasActiveFilters ? (
+                          <Button
+                            type="button"
+                            variant="ghost"
+                            className="h-8 shrink-0 gap-1.5 px-2 text-base-small text-text-tertiary hover:text-text-primary [&_svg]:!h-2 [&_svg]:!w-3"
+                            onClick={() => {
+                              setCategoryFilter(null);
+                              setSeverityFilter(null);
+                              setStatusFilter(null);
+                              setSearchQuery("");
+                            }}
+                          >
+                            <Icon name="action-filter-list" size={12} aria-hidden />
+                            Clear all filters
+                          </Button>
+                        ) : null}
+                        <DataGridExportButton />
+                      </div>
+                    </>
+                  }
+                  filterPanel={
+                    <FilterColumnPanel
+                      active={tableTool}
+                      onFilterClick={() => setTableTool(tableTool === "filter" ? null : "filter")}
+                      onColumnsClick={() => setTableTool(tableTool === "columns" ? null : "columns")}
+                    />
+                  }
+                  table={
+                    <FindingEventsTable
+                      displayRows={tableGrid.displayRows}
+                      getSortProps={tableGrid.getSortProps}
+                      onOpenFinding={setDrawerFindingId}
+                    />
+                  }
+                  footer={<DataGridPaginationFooter grid={tableGrid} />}
+                />
+              </div>
+            )}
+          </TabsContent>
           </div>
         </div>
-        <DatavisGridlineRule inset={false} />
-        <div className="flex min-h-0 flex-1 overflow-auto bg-datavis-card-bg">
-          <FilterColumnPanel
-            active={tableTool}
-            onFilterClick={() => setTableTool(tableTool === "filter" ? null : "filter")}
-            onColumnsClick={() => setTableTool(tableTool === "columns" ? null : "columns")}
-          />
-          <div className="min-h-0 min-w-0 flex-1 pb-3">
-            <FindingEventsTable rows={filteredTableRows} onOpenFinding={setDrawerFindingId} />
-          </div>
-        </div>
-      </section>
-        </div>
-      )}
-      </div>
-      {activeView === "findings" && drawerRow ? (
-        <SlideOver
-          open
-          onClose={() => setDrawerFindingId(null)}
-          ariaLabel={`Finding: ${drawerRow.title}`}
-          panelClassName="max-w-[480px]"
-        >
-          <FindingDetailPanel row={drawerRow} onClose={() => setDrawerFindingId(null)} />
-        </SlideOver>
-      ) : null}
+      </Tabs>
+
+      <FindingDetailDialog
+        row={drawerRow}
+        open={drawerFindingId != null && activeView === "findings"}
+        onClose={() => setDrawerFindingId(null)}
+      />
     </div>
+    </TooltipProvider>
   );
 }
