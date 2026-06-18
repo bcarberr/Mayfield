@@ -1,4 +1,4 @@
-import { useCallback, useState } from "react";
+import { useCallback } from "react";
 import { useTimeframe, type TimeframeRange } from "../../context/TimeframeContext";
 import {
   buildDailyBuckets,
@@ -136,12 +136,13 @@ export function topCountsByLabel<T>(
 }
 
 export function useFederatedAnalyticsTimeframeZoom(mode: "hourly" | "daily" = "hourly") {
-  const { range: timeframe, setRange } = useTimeframe();
-  const [initialTimeframe] = useState<TimeframeRange>(() => ({
-    from: new Date(timeframe.from),
-    to: new Date(timeframe.to),
-  }));
-  const [isChartZoomed, setIsChartZoomed] = useState(false);
+  const {
+    range: timeframe,
+    analyticsBaselineRange: initialTimeframe,
+    isAnalyticsChartZoomed: isChartZoomed,
+    applyAnalyticsChartZoom,
+    resetAnalyticsChartZoom,
+  } = useTimeframe();
 
   const handleTimelineBrush = useCallback(
     (selection: TimeSeriesBrushSelection, buckets: readonly HourBucket[]) => {
@@ -150,26 +151,17 @@ export function useFederatedAnalyticsTimeframeZoom(mode: "hourly" | "daily" = "h
           ? timeframeFromDailyBucketSelection(timeframe, buckets, selection.startIndex, selection.endIndex)
           : timeframeFromBucketSelection(timeframe, buckets, selection.startIndex, selection.endIndex);
       if (!nextRange) return;
-      setIsChartZoomed(true);
-      setRange(nextRange);
+      applyAnalyticsChartZoom(nextRange);
     },
-    [mode, timeframe, setRange],
+    [mode, timeframe, applyAnalyticsChartZoom],
   );
-
-  const handleChartZoomReset = useCallback(() => {
-    setRange({
-      from: new Date(initialTimeframe.from),
-      to: new Date(initialTimeframe.to),
-    });
-    setIsChartZoomed(false);
-  }, [initialTimeframe, setRange]);
 
   return {
     timeframe,
     initialTimeframe,
     isChartZoomed,
     handleTimelineBrush,
-    handleChartZoomReset,
+    handleChartZoomReset: resetAnalyticsChartZoom,
   };
 }
 

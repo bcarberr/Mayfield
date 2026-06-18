@@ -32,7 +32,6 @@ export function HorizontalBarPanel({
   filterAriaLabel = (label) => `Filter by ${label}`,
   xMax = DEFAULT_X_MAX,
   xTicks = DEFAULT_X_TICKS,
-  axisLabel,
   chartHeight,
   dense = false,
   denseRowGap,
@@ -43,7 +42,6 @@ export function HorizontalBarPanel({
   filterAriaLabel?: (label: string) => string;
   xMax?: number;
   xTicks?: readonly number[];
-  axisLabel?: string;
   /** Override plot height — use when fewer rows should match another chart's row density. */
   chartHeight?: number;
   /** Tighter row spacing and smaller bars — for compact dashboard widgets. */
@@ -140,21 +138,6 @@ export function HorizontalBarPanel({
           })}
         </div>
       </div>
-      <div className={cx("shrink-0 px-[20px]", dense ? "mt-3" : "mt-4")}>
-        <div className="h-px shrink-0 bg-datavis-gridlines" aria-hidden />
-      </div>
-      <div className={cx("flex shrink-0 justify-between px-[20px] text-base-small text-text-tertiary", dense ? "pt-1" : "pt-2")}>
-        {xTicks.map((t) => (
-          <span key={t} className="w-8 shrink-0 text-center tabular-nums first:w-6 first:text-left last:text-right">
-            {t}
-          </span>
-        ))}
-      </div>
-      {axisLabel ? (
-        <p className={cx("shrink-0 text-center text-base-semibold text-text-primary", dense ? "mt-0.5" : "mt-1")}>
-          {axisLabel}
-        </p>
-      ) : null}
     </div>
   );
 }
