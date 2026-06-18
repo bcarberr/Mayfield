@@ -875,9 +875,10 @@ export function DetectionHistoryContent() {
             <div className="w-[300px] shrink-0">
               <Input
                 variant="search"
-                placeholder="Search"
+                placeholder="Search detections"
                 value={searchQuery}
                 onChange={(event) => setSearchQuery(event.target.value)}
+                onClear={() => setSearchQuery("")}
                 className="!bg-datavis-card-bg"
                 aria-label="Search detection run history"
               />
