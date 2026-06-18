@@ -2,6 +2,9 @@ import type { CSSProperties } from "react";
 
 const cx = (...classes: (string | false | undefined)[]) => classes.filter(Boolean).join(" ");
 
+/** Placeholder for results datagrid toolbar search inputs. */
+export const DATA_GRID_RESULTS_SEARCH_PLACEHOLDER = "Search results";
+
 /** CSS variable set on grid sections — height of sticky title/toolbar block (incl. divider). */
 export const DATA_GRID_TOOLBAR_HEIGHT_VAR = "--data-grid-toolbar-height";
 
