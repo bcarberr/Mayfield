@@ -1,4 +1,15 @@
 import { Fragment, useEffect, useMemo, useState } from "react";
+import {
+  DATA_GRID_EXPANDED_ROW_CLASS,
+  DATA_GRID_FILTER_ROW_CLASS,
+  DATA_GRID_HEADER_ROW_CLASS,
+  DATA_GRID_SECTION_CLASS,
+  DATA_GRID_TABLE_CLASS,
+  DATA_GRID_TABLE_SCROLL_CLASS,
+  DATA_GRID_THEAD_CLASS,
+  DATA_GRID_TOOLBAR_STICKY_CLASS,
+} from "../ui/dataGridTableStyles";
+import { useDataGridStickyToolbar } from "../ui/useDataGridStickyToolbar";
 import { Checkbox, Icon, Switch, type SeverityShapeIconName } from "../../design-system";
 import { Button } from "../ui/Button";
 import { ColumnHeaderMenu } from "../ui/ColumnHeaderMenu";
@@ -11,30 +22,48 @@ import {
 import { FilterColumnPanel, type FilterColumnPanelTool } from "../ui/FilterColumnPanel";
 import { Input } from "../ui/Input";
 import { DataGridExportButton } from "../ui/DataGridExportButton";
+import { DataGridPagination } from "../ui/DataGridPagination";
 import { SeverityTableIcon } from "../ui/SeverityTableIcon";
-import { Modal } from "../ui/Modal";
 import { type ContentAreaSlideOverState } from "../ui/SlideOver";
 import { TruncatedText } from "../ui/TruncatedText";
 import { useResizableColumns } from "../ui/useResizableColumns";
+import { useDataGridPagination } from "../ui/useDataGridPagination";
+import {
+  DetectionConnectorsRunPanel,
+  DetectionExpandedDetails,
+  getLastRunConnectorsForDetection,
+} from "./detectionRunConnectors";
+import { FindingsSearchCell } from "./FindingsSearchCell";
+import {
+  type DetectionSeverity,
+  type QueuedDetectionRow,
+} from "./detectionQueue";
+import { getDetectionEnabled } from "./detectionEnabledState";
+import {
+  Dialog,
+  DialogContent,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+} from "@/components/shadcn/dialog";
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuTrigger,
+} from "@/components/shadcn/dropdown-menu";
+import {
+  Tooltip,
+  TooltipContent,
+  TooltipProvider,
+  TooltipTrigger,
+} from "@/components/shadcn/tooltip";
 
 const cx = (...c: (string | false | undefined)[]) => c.filter(Boolean).join(" ");
 
 function DatavisGridlineRule({ inset = true }: { inset?: boolean }) {
   return <div className={cx("h-px shrink-0 bg-datavis-gridlines", inset && "mx-[20px]")} aria-hidden />;
 }
-
-type DetectionSeverity = "Critical" | "High" | "Medium" | "Low";
-
-type QueuedDetectionRow = {
-  id: string;
-  name: string;
-  description: string;
-  enabled: boolean;
-  queuedBy: string;
-  queuedDate: string;
-  severity: DetectionSeverity;
-  findings: number | "error" | "none";
-};
 
 const SEV_COLORS: Record<DetectionSeverity, string> = {
   Critical: "var(--color-feedback-negative)",
@@ -49,64 +78,6 @@ const SEV_ICONS: Record<DetectionSeverity, SeverityShapeIconName> = {
   Medium: "severity-medium",
   Low: "severity-low",
 };
-
-const QUEUED_DETECTION_ROWS: QueuedDetectionRow[] = [
-  {
-    id: "review-1",
-    name: "Active Ransomware Campaign Detected",
-    description:
-      "Correlates endpoint encryption bursts, shadow copy deletion, and ransom-note file creation across multiple hosts in the finance segment.",
-    enabled: true,
-    queuedBy: "Admin User",
-    queuedDate: "Oct 12, 2025",
-    severity: "High",
-    findings: 3,
-  },
-  {
-    id: "review-2",
-    name: "Unusual Network Traffic Pattern",
-    description:
-      "Flags sustained outbound connections to rare destinations with elevated byte counts inconsistent with baseline peer behavior.",
-    enabled: true,
-    queuedBy: "Security Team",
-    queuedDate: "Oct 11, 2025",
-    severity: "High",
-    findings: 7,
-  },
-  {
-    id: "review-3",
-    name: "Privileged Account Misuse",
-    description:
-      "Detects privileged account activity executing sensitive commands outside approved maintenance windows or jump host paths.",
-    enabled: true,
-    queuedBy: "Admin User",
-    queuedDate: "Oct 10, 2025",
-    severity: "Critical",
-    findings: 2,
-  },
-  {
-    id: "review-4",
-    name: "Abnormal SaaS OAuth Grant",
-    description:
-      "Monitors third-party OAuth applications receiving broad mail or directory scopes on executive mailboxes without change approval.",
-    enabled: false,
-    queuedBy: "Security Team",
-    queuedDate: "Oct 9, 2025",
-    severity: "High",
-    findings: 5,
-  },
-  {
-    id: "review-5",
-    name: "Excessive Failed Auth Attempts",
-    description:
-      "Surfaces authentication failure spikes against VPN and identity providers from distributed source addresses within short intervals.",
-    enabled: false,
-    queuedBy: "Analyst Team",
-    queuedDate: "Oct 8, 2025",
-    severity: "Critical",
-    findings: 1,
-  },
-];
 
 function queuedMatchesSearch(row: QueuedDetectionRow, query: string, enabled: boolean): boolean {
   const q = query.trim().toLowerCase();
@@ -176,116 +147,131 @@ const REVIEW_STAT_FILTER_LABELS: Record<ReviewStatFilter, string> = {
   critical: "Critical Severity",
 };
 
-function ReviewFindingsCell({ findings }: { findings: QueuedDetectionRow["findings"] }) {
-  if (findings === "error") {
-    return (
-      <span className="inline-flex items-center gap-1.5 text-sm font-semibold text-feedback-negative">
-        <Icon name="error-outline" size={16} aria-hidden />
-        Error
-      </span>
-    );
-  }
-  if (findings === "none") {
-    return <span className="text-sm text-text-secondary">—</span>;
-  }
-  return (
-    <span className="inline-flex items-center gap-1.5 text-sm font-semibold text-interactive-active">
-      <Icon name="search" size={14} aria-hidden />
-      <span className="tabular-nums">{findings}</span>
-    </span>
-  );
-}
 
-function defaultCopyDetectionName(name: string): string {
-  return `${name} copy`;
-}
-
-function nextQueuedDetectionId(rows: QueuedDetectionRow[]): string {
-  const numericIds = rows
-    .map((row) => {
-      const match = /^review-(\d+)$/.exec(row.id);
-      return match ? Number.parseInt(match[1], 10) : Number.NaN;
-    })
-    .filter((id) => !Number.isNaN(id));
-  const maxId = numericIds.length > 0 ? Math.max(...numericIds) : 0;
-  return `review-${maxId + 1}`;
-}
-
-function DuplicateQueuedDetectionModal({
+function DeleteConfirmationModal({
   open,
-  name,
-  onNameChange,
   onClose,
   onConfirm,
 }: {
   open: boolean;
-  name: string;
-  onNameChange: (name: string) => void;
   onClose: () => void;
   onConfirm: () => void;
 }) {
-  const trimmedName = name.trim();
-
   return (
-    <Modal
-      open={open}
-      title="Duplicate Detection"
-      onClose={onClose}
-      footer={
-        <div className="flex justify-end gap-2">
+    <Dialog open={open} onOpenChange={(o) => { if (!o) onClose(); }}>
+      <DialogContent
+        showCloseButton={false}
+        className="gap-0 border border-border-rule bg-surface-modal p-0 text-text-primary ring-0 shadow-xl sm:max-w-sm"
+      >
+        <DialogHeader className="flex-row items-start justify-between gap-3 border-b border-border-rule px-4 py-3">
+          <DialogTitle className="text-base font-bold leading-normal tracking-wide text-text-primary">
+            Remove from queue
+          </DialogTitle>
+          <Button
+            type="button"
+            variant="ghost"
+            className="h-auto shrink-0 p-0 text-text-tertiary hover:text-text-primary"
+            aria-label="Close dialog"
+            onClick={onClose}
+          >
+            <Icon name="close" size={20} />
+          </Button>
+        </DialogHeader>
+        <div className="px-4 py-6 text-sm text-text-secondary">
+          Remove this detection from the review queue? It will remain in Manage Detections.
+        </div>
+        <DialogFooter className="mx-0 mb-0 gap-2 rounded-b-xl border-t border-border-rule bg-transparent px-4 py-3 sm:flex-row sm:justify-end">
           <Button type="button" variant="secondary" onClick={onClose}>
             Cancel
           </Button>
-          <Button type="button" variant="primary" disabled={!trimmedName} onClick={onConfirm}>
-            Duplicate
+          <Button
+            type="button"
+            variant="primary"
+            onClick={onConfirm}
+          >
+            Remove from queue
           </Button>
-        </div>
-      }
-    >
-      <label className="block">
-        <span className="text-sm font-semibold text-text-primary">Detection name</span>
-        <Input
-          value={name}
-          onChange={(event) => onNameChange(event.target.value)}
-          className="mt-2"
-          autoFocus
-        />
-      </label>
-    </Modal>
+        </DialogFooter>
+      </DialogContent>
+    </Dialog>
   );
 }
 
 function ReviewActions({
   name,
   onEdit,
+  onRunNow,
   onCopy,
   onDelete,
+  onQueueForReview,
 }: {
   name: string;
   onEdit: () => void;
+  onRunNow: () => void;
   onCopy: () => void;
   onDelete: () => void;
+  onQueueForReview: () => void;
 }) {
   const actionBtn =
     "size-7 shrink-0 p-0 text-text-tertiary hover:text-text-primary [&_svg]:!size-3 [&_svg]:!h-3 [&_svg]:!w-3";
+  const actionBtnLg =
+    "size-7 shrink-0 p-0 text-text-tertiary hover:text-text-primary [&_svg]:!size-4 [&_svg]:!h-4 [&_svg]:!w-4";
   const moreBtn =
     "size-7 shrink-0 p-0 text-text-tertiary hover:text-text-primary [&_svg]:!size-4 [&_svg]:!h-4 [&_svg]:!w-4";
 
   return (
-    <div className="flex items-center justify-start gap-0.5">
-      <Button type="button" variant="ghost" className={actionBtn} aria-label={`Edit ${name}`} onClick={onEdit}>
-        <Icon name="action-edit" size={12} />
-      </Button>
-      <Button type="button" variant="ghost" className={actionBtn} aria-label={`Copy ${name}`} onClick={onCopy}>
-        <Icon name="action-content-copy" size={12} />
-      </Button>
-      <Button type="button" variant="ghost" className={actionBtn} aria-label={`Delete ${name}`} onClick={onDelete}>
-        <Icon name="action-delete" size={12} />
-      </Button>
-      <Button type="button" variant="ghost" className={moreBtn} aria-label={`More actions for ${name}`}>
-        <Icon name="navi-more-vert" size={16} />
-      </Button>
-    </div>
+    <TooltipProvider>
+      <div className="flex items-center justify-start gap-0.5">
+        <Tooltip>
+          <TooltipTrigger asChild>
+            <Button type="button" variant="ghost" className={actionBtn} aria-label="Edit detection" onClick={onEdit}>
+              <Icon name="action-edit" size={12} />
+            </Button>
+          </TooltipTrigger>
+          <TooltipContent>Edit detection</TooltipContent>
+        </Tooltip>
+
+        <Tooltip>
+          <TooltipTrigger asChild>
+            <Button type="button" variant="ghost" className={actionBtnLg} aria-label="Run now" onClick={onRunNow}>
+              <Icon name="navi-double-chevron" size={16} />
+            </Button>
+          </TooltipTrigger>
+          <TooltipContent>Run now</TooltipContent>
+        </Tooltip>
+
+        <Tooltip>
+          <TooltipTrigger asChild>
+            <Button
+              type="button"
+              variant="ghost"
+              className={actionBtn}
+              aria-label="Clear from review"
+              onClick={onDelete}
+            >
+              <Icon name="action-clear" size={12} />
+            </Button>
+          </TooltipTrigger>
+          <TooltipContent>Clear from review</TooltipContent>
+        </Tooltip>
+
+        <DropdownMenu>
+          <DropdownMenuTrigger asChild>
+            <Button type="button" variant="ghost" className={moreBtn} aria-label={`More actions for ${name}`}>
+              <Icon name="navi-more-vert" size={16} />
+            </Button>
+          </DropdownMenuTrigger>
+          <DropdownMenuContent align="end">
+            <DropdownMenuItem onClick={onCopy}>
+              Create copy
+            </DropdownMenuItem>
+            <DropdownMenuItem onClick={onQueueForReview}>
+              Queued for review
+            </DropdownMenuItem>
+          </DropdownMenuContent>
+        </DropdownMenu>
+      </div>
+    </TooltipProvider>
   );
 }
 
@@ -327,6 +313,12 @@ function QueuedDetectionDetailPanel({
           <span className="text-sm text-text-secondary">{enabled ? "Active" : "Inactive"}</span>
         </div>
         <p className="mt-4 text-sm leading-relaxed text-text-secondary">{row.description}</p>
+        <div className="mt-4">
+          <DetectionConnectorsRunPanel
+            connectors={getLastRunConnectorsForDetection(row.id)}
+            variant="last-run"
+          />
+        </div>
         <dl className="mt-6 space-y-3 border-t border-border-rule pt-4 text-sm">
           <div className="flex gap-3">
             <dt className="w-28 shrink-0 text-text-tertiary">Queued by</dt>
@@ -339,7 +331,12 @@ function QueuedDetectionDetailPanel({
           <div className="flex gap-3">
             <dt className="w-28 shrink-0 text-text-tertiary">Findings</dt>
             <dd>
-              <ReviewFindingsCell findings={row.findings} />
+              <FindingsSearchCell
+                findings={row.findings}
+                detectionId={row.id}
+                detectionName={row.name}
+                enabled={enabled}
+              />
             </dd>
           </div>
         </dl>
@@ -402,7 +399,8 @@ function QueuedReviewTable({
   onEditDetection,
   onCopyDetection,
   onDeleteDetection,
-  enabledById,
+  onRunNow,
+  enabledByName,
   onEnabledChange,
   searchQuery,
   onSearchQueryChange,
@@ -420,8 +418,9 @@ function QueuedReviewTable({
   onEditDetection: (id: string) => void;
   onCopyDetection: (id: string) => void;
   onDeleteDetection: (id: string) => void;
-  enabledById: Record<string, boolean>;
-  onEnabledChange: (id: string, enabled: boolean) => void;
+  onRunNow: (name: string) => void;
+  enabledByName: Record<string, boolean>;
+  onEnabledChange: (name: string, enabled: boolean) => void;
   searchQuery: string;
   onSearchQueryChange: (query: string) => void;
   totalCount: number;
@@ -473,20 +472,41 @@ function QueuedReviewTable({
     (): Record<QueuedSortColumn, (a: QueuedDetectionRow, b: QueuedDetectionRow) => number> => ({
       name: (a, b) => compareStrings(a.name, b.name),
       state: (a, b) =>
-        compareBooleans(enabledById[a.id] ?? a.enabled, enabledById[b.id] ?? b.enabled),
+        compareBooleans(
+          getDetectionEnabled(a.name, a.enabled, enabledByName),
+          getDetectionEnabled(b.name, b.enabled, enabledByName),
+        ),
       queuedBy: (a, b) => compareStrings(a.queuedBy, b.queuedBy),
       queuedDate: (a, b) => compareStrings(a.queuedDate, b.queuedDate),
       severity: (a, b) => QUEUED_SEVERITY_ORDER[a.severity] - QUEUED_SEVERITY_ORDER[b.severity],
       findings: (a, b) => compareFindings(a.findings, b.findings),
     }),
-    [enabledById],
+    [enabledByName],
   );
   const { sortedRows, getSortProps } = useColumnSort(sortComparators);
-  const displayRows = sortedRows(rows);
+  const sorted = sortedRows(rows);
+  const {
+    page,
+    setPage,
+    pageCount,
+    pagedItems: displayRows,
+    pageSize,
+    setPageSize,
+    pageSizeOptions,
+    showPagination,
+    showPageControls,
+    itemCount,
+  } = useDataGridPagination(sorted);
+
+  const { toolbarRef, sectionStyle } = useDataGridStickyToolbar();
 
   return (
-    <section className="flex min-h-0 min-w-0 flex-1 flex-col overflow-hidden rounded-[4px] border border-border-container bg-datavis-card-bg shadow-datavis-card">
-      <div className="shrink-0 bg-datavis-card-bg pb-3 pl-4 pr-[20px] pt-3 sm:pl-5">
+    <section
+      className={DATA_GRID_SECTION_CLASS}
+      style={sectionStyle}
+    >
+      <div ref={toolbarRef} className={DATA_GRID_TOOLBAR_STICKY_CLASS}>
+        <div className="shrink-0 bg-datavis-card-bg pb-3 pl-4 pr-[20px] pt-3 sm:pl-5">
         <h2 className="text-base-semibold text-text-primary">Queued For Review</h2>
         <div className="mt-2 flex flex-wrap items-center gap-3">
           <p className="shrink-0 text-base-small text-text-secondary">
@@ -520,8 +540,9 @@ function QueuedReviewTable({
           <DataGridExportButton />
         </div>
       </div>
-      <DatavisGridlineRule inset={false} />
-      <div className="flex min-h-0 flex-1 overflow-auto bg-datavis-card-bg">
+        <DatavisGridlineRule inset={false} />
+      </div>
+      <div className={DATA_GRID_FILTER_ROW_CLASS}>
         <FilterColumnPanel
           active={tableTool}
           onFilterClick={() => onTableToolChange(tableTool === "filter" ? null : "filter")}
@@ -529,10 +550,10 @@ function QueuedReviewTable({
         />
         <div
           ref={containerRef}
-          className={cx("min-h-0 min-w-0 flex-1 overflow-x-auto pb-3", isResizing && "select-none")}
+          className={cx(DATA_GRID_TABLE_SCROLL_CLASS, isResizing && "select-none")}
         >
           <table
-            className="table-fixed border-collapse text-left text-sm"
+            className={DATA_GRID_TABLE_CLASS}
             style={{
               width: tableFillsContainer ? "100%" : baseTotal,
               minWidth: Math.max(minTableWidth, baseTotal),
@@ -544,8 +565,8 @@ function QueuedReviewTable({
                 <col key={i} style={{ width: w }} />
               ))}
             </colgroup>
-            <thead>
-              <tr className="h-10 border-b border-datavis-gridlines bg-surface-table-row-header">
+            <thead className={DATA_GRID_THEAD_CLASS}>
+              <tr className={DATA_GRID_HEADER_ROW_CLASS}>
                 <th scope="col" style={colStyle(0)} className="relative h-10 border-r border-datavis-gridlines px-0 py-0 align-middle">
                   <div className="flex items-center justify-center">
                     <Checkbox
@@ -628,16 +649,12 @@ function QueuedReviewTable({
             <tbody>
               {displayRows.map((row) => {
                 const expanded = expandedIds.has(row.id);
-                const enabled = enabledById[row.id] ?? row.enabled;
+                const enabled = getDetectionEnabled(row.name, row.enabled, enabledByName);
+                const inactiveCellClass = !enabled ? "opacity-70" : "";
                 return (
                   <Fragment key={row.id}>
-                    <tr
-                      className={cx(
-                        "h-10 border-b border-datavis-gridlines hover:bg-overlay-subtle",
-                        !enabled && "opacity-70",
-                      )}
-                    >
-                      <td style={colStyle(0)} className="h-10 px-0 py-0 align-middle">
+                    <tr className="h-10 border-b border-datavis-gridlines hover:bg-overlay-subtle">
+                      <td style={colStyle(0)} className={cx("h-10 px-0 py-0 align-middle", inactiveCellClass)}>
                         <div className="flex items-center justify-center">
                           <Checkbox
                             checked={selected.has(row.id)}
@@ -646,7 +663,7 @@ function QueuedReviewTable({
                           />
                         </div>
                       </td>
-                      <td style={colStyle(1)} className="h-10 px-0 py-0 align-middle">
+                      <td style={colStyle(1)} className={cx("h-10 px-0 py-0 align-middle", inactiveCellClass)}>
                         <div className="flex justify-center">
                           <button
                             type="button"
@@ -666,7 +683,7 @@ function QueuedReviewTable({
                           </button>
                         </div>
                       </td>
-                      <td style={colStyle(2)} className={cx(tdClass, "min-w-0")}>
+                      <td style={colStyle(2)} className={cx(tdClass, "min-w-0", inactiveCellClass)}>
                         <TruncatedText
                           as="button"
                           className="w-full text-left font-semibold text-interactive-active hover:underline focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-interactive-active"
@@ -675,46 +692,50 @@ function QueuedReviewTable({
                           {row.name}
                         </TruncatedText>
                       </td>
-                      <td style={colStyle(3)} className={tdClass}>
+                      <td style={colStyle(3)} className={cx(tdClass, inactiveCellClass)}>
                         <Switch
-                          checked={enabledById[row.id] ?? row.enabled}
-                          onCheckedChange={(checked) => onEnabledChange(row.id, checked)}
+                          checked={getDetectionEnabled(row.name, row.enabled, enabledByName)}
+                          onCheckedChange={(checked) => onEnabledChange(row.name, checked)}
                           aria-label={`Toggle ${row.name}`}
                         />
                       </td>
-                      <td style={colStyle(4)} className={tdClass}>
+                      <td style={colStyle(4)} className={cx(tdClass, inactiveCellClass)}>
                         {row.queuedBy}
                       </td>
-                      <td style={colStyle(5)} className={cx(tdClass, "tabular-nums")}>
+                      <td style={colStyle(5)} className={cx(tdClass, "tabular-nums", inactiveCellClass)}>
                         {row.queuedDate}
                       </td>
-                      <td style={colStyle(6)} className={tdClass}>
+                      <td style={colStyle(6)} className={cx(tdClass, inactiveCellClass)}>
                         <span className="inline-flex items-center gap-2">
                           <SeverityTableIcon name={SEV_ICONS[row.severity]} color={SEV_COLORS[row.severity]} />
                           <span>{row.severity}</span>
                         </span>
                       </td>
-                      <td style={colStyle(7)} className={tdClass}>
-                        <ReviewFindingsCell findings={row.findings} />
+                      <td style={colStyle(7)} className={cx(tdClass, inactiveCellClass)}>
+                        <FindingsSearchCell
+                          findings={row.findings}
+                          detectionId={row.id}
+                          detectionName={row.name}
+                          enabled={enabled}
+                        />
                       </td>
                       <td style={colStyle(8)} className={tdClass}>
                         <ReviewActions
                           name={row.name}
                           onEdit={() => onEditDetection(row.id)}
+                          onRunNow={() => onRunNow(row.name)}
                           onCopy={() => onCopyDetection(row.id)}
                           onDelete={() => onDeleteDetection(row.id)}
+                          onQueueForReview={() => {}}
                         />
                       </td>
                     </tr>
                     {expanded ? (
                       <tr
-                        className={cx(
-                          "border-b border-datavis-gridlines bg-surface-table-row-header",
-                          !enabled && "opacity-70",
-                        )}
+                        className={cx(DATA_GRID_EXPANDED_ROW_CLASS, !enabled && "opacity-70")}
                       >
                         <td colSpan={REVIEW_COLUMN_COUNT} className="px-4 py-3 align-top">
-                          <p className="text-sm leading-relaxed text-text-secondary">{row.description}</p>
+                          <DetectionExpandedDetails description={row.description} detectionId={row.id} />
                         </td>
                       </tr>
                     ) : null}
@@ -725,22 +746,52 @@ function QueuedReviewTable({
           </table>
         </div>
       </div>
+      {showPagination ? (
+        <DataGridPagination
+          page={page}
+          pageCount={pageCount}
+          itemCount={itemCount}
+          pageSize={pageSize}
+          pageSizeOptions={pageSizeOptions}
+          showPageControls={showPageControls}
+          onPageChange={setPage}
+          onPageSizeChange={setPageSize}
+        />
+      ) : null}
     </section>
   );
 }
 
-export function QueuedForReviewContent({ onSlideOverChange }: { onSlideOverChange: (state: ContentAreaSlideOverState | null) => void }) {
+type CopyDetectionValues = {
+  name: string;
+  description: string;
+  severity: DetectionSeverity;
+  enabled: boolean;
+};
+
+export function QueuedForReviewContent({
+  onSlideOverChange,
+  onRunNow,
+  onCopyDetection,
+  queuedRows,
+  onClearFromReview,
+  enabledByName,
+  onEnabledChange,
+}: {
+  onSlideOverChange: (state: ContentAreaSlideOverState | null) => void;
+  onRunNow?: (name: string) => void;
+  onCopyDetection?: (values: CopyDetectionValues) => void;
+  queuedRows: QueuedDetectionRow[];
+  onClearFromReview: (id: string) => void;
+  enabledByName: Record<string, boolean>;
+  onEnabledChange: (name: string, enabled: boolean) => void;
+}) {
   const [tableTool, setTableTool] = useState<FilterColumnPanelTool | null>("filter");
   const [searchQuery, setSearchQuery] = useState("");
   const [expandedIds, setExpandedIds] = useState<Set<string>>(() => new Set());
-  const [queuedRows, setQueuedRows] = useState<QueuedDetectionRow[]>(() => [...QUEUED_DETECTION_ROWS]);
   const [drawerDetectionId, setDrawerDetectionId] = useState<string | null>(null);
   const [drawerMode, setDrawerMode] = useState<"view" | "edit">("view");
-  const [copySourceId, setCopySourceId] = useState<string | null>(null);
-  const [copyName, setCopyName] = useState("");
-  const [enabledById, setEnabledById] = useState<Record<string, boolean>>(() =>
-    Object.fromEntries(QUEUED_DETECTION_ROWS.map((r) => [r.id, r.enabled])),
-  );
+  const [deleteTargetId, setDeleteTargetId] = useState<string | null>(null);
   const [statFilter, setStatFilter] = useState<ReviewStatFilter | null>(null);
 
   const handleStatFilterClick = (filter: ReviewStatFilter) => {
@@ -752,78 +803,50 @@ export function QueuedForReviewContent({ onSlideOverChange }: { onSlideOverChang
     setDrawerMode(mode);
   };
 
-  const handleDeleteDetection = (id: string) => {
-    setQueuedRows((rows) => rows.filter((row) => row.id !== id));
-    setDrawerDetectionId((current) => (current === id ? null : current));
+  const confirmDelete = () => {
+    if (!deleteTargetId) return;
+    onClearFromReview(deleteTargetId);
+    setDrawerDetectionId((current) => (current === deleteTargetId ? null : current));
     setExpandedIds((current) => {
       const next = new Set(current);
-      next.delete(id);
+      next.delete(deleteTargetId);
       return next;
     });
+    setDeleteTargetId(null);
   };
 
   const handleOpenCopyDetection = (id: string) => {
     const source = queuedRows.find((row) => row.id === id);
-    if (!source) return;
-    setCopySourceId(id);
-    setCopyName(defaultCopyDetectionName(source.name));
-  };
-
-  const handleCloseCopyDetection = () => {
-    setCopySourceId(null);
-    setCopyName("");
-  };
-
-  const handleConfirmCopyDetection = () => {
-    const trimmedName = copyName.trim();
-    if (!copySourceId || !trimmedName) return;
-
-    const source = queuedRows.find((row) => row.id === copySourceId);
-    if (!source) {
-      handleCloseCopyDetection();
-      return;
-    }
-
-    const newId = nextQueuedDetectionId(queuedRows);
-    const duplicate: QueuedDetectionRow = {
-      ...source,
-      id: newId,
-      name: trimmedName,
-    };
-
-    setQueuedRows((rows) => {
-      const sourceIndex = rows.findIndex((row) => row.id === copySourceId);
-      if (sourceIndex === -1) return [...rows, duplicate];
-      const next = [...rows];
-      next.splice(sourceIndex + 1, 0, duplicate);
-      return next;
+    if (!source || !onCopyDetection) return;
+    onCopyDetection({
+      name: source.name,
+      description: source.description,
+      severity: source.severity,
+      enabled: getDetectionEnabled(source.name, source.enabled, enabledByName),
     });
-    setEnabledById((current) => ({
-      ...current,
-      [newId]: source.enabled,
-    }));
-    handleCloseCopyDetection();
   };
 
   const filteredRows = useMemo(() => {
     return queuedRows.filter((row) => {
-      const enabled = enabledById[row.id] ?? row.enabled;
+      const enabled = getDetectionEnabled(row.name, row.enabled, enabledByName);
       if (statFilter === "active" && !enabled) return false;
       if (statFilter === "high-findings" && row.severity !== "High") return false;
       if (statFilter === "critical" && row.severity !== "Critical") return false;
       return queuedMatchesSearch(row, searchQuery, enabled);
     });
-  }, [queuedRows, searchQuery, enabledById, statFilter]);
+  }, [queuedRows, searchQuery, enabledByName, statFilter]);
 
   const summaryStats = useMemo(() => {
     const pending = queuedRows.length;
-    const active = queuedRows.filter((row) => enabledById[row.id] ?? row.enabled).length;
+    const active = queuedRows.filter(
+      (row) => getDetectionEnabled(row.name, row.enabled, enabledByName),
+    ).length;
     const highFindings = queuedRows.filter((row) => row.severity === "High").reduce((sum, row) => {
       return sum + (typeof row.findings === "number" ? row.findings : 0);
     }, 0);
     const criticalSeverity = queuedRows.filter((row) => row.severity === "Critical").length;
     return { pending, active, highFindings, criticalSeverity };
-  }, [queuedRows, enabledById]);
+  }, [queuedRows, enabledByName]);
 
   const drawerRow = drawerDetectionId
     ? queuedRows.find((row) => row.id === drawerDetectionId) ?? null
@@ -838,7 +861,7 @@ export function QueuedForReviewContent({ onSlideOverChange }: { onSlideOverChang
             panel: (
               <QueuedDetectionDetailPanel
                 row={drawerRow}
-                enabled={enabledById[drawerRow.id] ?? drawerRow.enabled}
+                enabled={getDetectionEnabled(drawerRow.name, drawerRow.enabled, enabledByName)}
                 mode={drawerMode}
                 onClose={() => setDrawerDetectionId(null)}
               />
@@ -847,7 +870,7 @@ export function QueuedForReviewContent({ onSlideOverChange }: { onSlideOverChang
         : null,
     );
     return () => onSlideOverChange(null);
-  }, [drawerRow, drawerMode, enabledById, onSlideOverChange]);
+  }, [drawerRow, drawerMode, enabledByName, onSlideOverChange]);
 
   const toggleExpand = (id: string) => {
     setExpandedIds((prev) => {
@@ -867,7 +890,7 @@ export function QueuedForReviewContent({ onSlideOverChange }: { onSlideOverChang
   };
 
   return (
-    <>
+    <div className="flex flex-col gap-4">
       <div className="grid shrink-0 grid-cols-1 gap-4 sm:grid-cols-2 xl:grid-cols-4">
         <ReviewStatCard
           label="Pending Review"
@@ -905,9 +928,10 @@ export function QueuedForReviewContent({ onSlideOverChange }: { onSlideOverChang
         onOpenDetection={(id) => openDetectionPanel(id, "view")}
         onEditDetection={(id) => openDetectionPanel(id, "edit")}
         onCopyDetection={handleOpenCopyDetection}
-        onDeleteDetection={handleDeleteDetection}
-        enabledById={enabledById}
-        onEnabledChange={(id, enabled) => setEnabledById((prev) => ({ ...prev, [id]: enabled }))}
+        onDeleteDetection={(id) => setDeleteTargetId(id)}
+        onRunNow={(name) => onRunNow?.(name)}
+        enabledByName={enabledByName}
+        onEnabledChange={onEnabledChange}
         searchQuery={searchQuery}
         onSearchQueryChange={setSearchQuery}
         totalCount={queuedRows.length}
@@ -918,13 +942,11 @@ export function QueuedForReviewContent({ onSlideOverChange }: { onSlideOverChang
         }}
       />
 
-      <DuplicateQueuedDetectionModal
-        open={copySourceId != null}
-        name={copyName}
-        onNameChange={setCopyName}
-        onClose={handleCloseCopyDetection}
-        onConfirm={handleConfirmCopyDetection}
+      <DeleteConfirmationModal
+        open={deleteTargetId != null}
+        onClose={() => setDeleteTargetId(null)}
+        onConfirm={confirmDelete}
       />
-    </>
+    </div>
   );
 }

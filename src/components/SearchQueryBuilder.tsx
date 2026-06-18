@@ -1,5 +1,5 @@
 import { useEffect, useId, useRef, useState } from "react";
-import { Checkbox, Icon } from "../design-system";
+import { Icon } from "../design-system";
 import {
   SEARCH_ENTITY_COLUMNS,
   SEARCH_EVENT_CATEGORIES,
@@ -9,9 +9,28 @@ import {
 } from "../data/searchEntityOptions";
 import { getFieldsForCategory } from "../data/ocsfEventFields";
 import { SearchCriteriaSelect } from "./SearchCriteriaSelect";
-import { Button } from "./ui/Button";
+import { Button as UiButton } from "./ui/Button";
+import { Button } from "@/components/shadcn/button";
+import { Checkbox } from "@/components/shadcn/checkbox";
+import {
+  Collapsible,
+  CollapsibleContent,
+  CollapsibleTrigger,
+} from "@/components/shadcn/collapsible";
+import { Field, FieldLabel } from "@/components/shadcn/field";
+import { Input } from "@/components/shadcn/input";
+import { cn } from "@/lib/utils";
 
 const cx = (...c: (string | false | undefined)[]) => c.filter(Boolean).join(" ");
+
+const SMALL_OUTLINE_BUTTON_CLASS =
+  "h-auto gap-1 rounded-[4px] border-interactive-secondary-pressed bg-transparent px-2 py-1 text-xs font-semibold text-interactive-active shadow-none hover:bg-interactive-secondary-hover hover:text-interactive-active";
+
+const ICON_GHOST_BUTTON_CLASS =
+  "size-8 shrink-0 text-text-tertiary hover:bg-overlay-subtle hover:text-text-primary disabled:opacity-40";
+
+const CHIP_INPUT_CLASS =
+  "h-auto min-w-[80px] flex-1 border-0 bg-transparent px-0 py-0 text-sm leading-5 shadow-none focus-visible:ring-0 placeholder:font-normal placeholder:italic placeholder:text-text-tertiary dark:bg-transparent";
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 
@@ -158,9 +177,11 @@ function ValueChipInput({
           className="flex shrink-0 items-center gap-1 rounded bg-surface-modal px-2 py-0.5 text-xs font-semibold text-text-primary"
         >
           {value}
-          <button
+          <Button
             type="button"
-            className="shrink-0 text-text-secondary transition-colors hover:text-text-primary focus-visible:outline-none"
+            variant="ghost"
+            size="icon-xs"
+            className="size-auto shrink-0 p-0 text-text-secondary hover:bg-transparent hover:text-text-primary"
             onClick={(e) => {
               e.stopPropagation();
               onValuesChange(values.filter((_, j) => j !== i));
@@ -168,10 +189,10 @@ function ValueChipInput({
             aria-label={`Remove ${value}`}
           >
             <Icon name="action-clear" size={12} aria-hidden />
-          </button>
+          </Button>
         </span>
       ))}
-      <input
+      <Input
         ref={inputRef}
         type="text"
         value={draft}
@@ -186,7 +207,7 @@ function ValueChipInput({
         }}
         onBlur={() => draft.trim() && commit(draft)}
         placeholder={values.length === 0 ? "Type and press Enter…" : ""}
-        className="min-w-[80px] flex-1 bg-transparent text-sm leading-5 text-text-primary outline-none placeholder:font-normal placeholder:italic placeholder:text-text-tertiary"
+        className={CHIP_INPUT_CLASS}
       />
     </div>
   );
@@ -204,20 +225,22 @@ function OrAndToggle({
   return (
     <div className="flex overflow-hidden rounded border border-border-rule">
       {(["or", "and"] as const).map((opt, i) => (
-        <button
+        <Button
           key={opt}
           type="button"
+          variant="ghost"
+          size="xs"
           className={cx(
-            "px-3 py-1 text-xs font-bold tracking-[0.4px] transition-colors focus-visible:outline-none",
+            "h-auto rounded-none px-3 py-1 text-xs font-bold tracking-[0.4px]",
             i > 0 && "border-l border-border-rule",
             value === opt
-              ? "bg-interactive-active text-text-on-primary"
-              : "bg-surface-container text-text-secondary hover:bg-overlay-subtle",
+              ? "bg-interactive-active text-text-on-primary hover:bg-interactive-active hover:text-text-on-primary"
+              : "bg-surface-container text-text-secondary hover:bg-overlay-subtle hover:text-text-secondary",
           )}
           onClick={() => onChange(opt)}
         >
           {opt.toUpperCase()}
-        </button>
+        </Button>
       ))}
     </div>
   );
@@ -291,30 +314,42 @@ function ConditionRow({
 
       {/* Case-sensitive + actions */}
       <div className="flex shrink-0 items-center gap-1.5 pt-1">
-        <Checkbox
-          checked={condition.caseSensitive}
-          onCheckedChange={(caseSensitive) => onUpdate({ ...condition, caseSensitive })}
-          label="Case-sensitive"
-          labelClassName="text-xs font-semibold text-text-secondary whitespace-nowrap"
-        />
-        <button
+        <Field orientation="horizontal" className="w-auto items-center gap-2">
+          <Checkbox
+            id={`case-sensitive-${condition.id}`}
+            checked={condition.caseSensitive}
+            onCheckedChange={(caseSensitive) =>
+              onUpdate({ ...condition, caseSensitive: caseSensitive === true })
+            }
+          />
+          <FieldLabel
+            htmlFor={`case-sensitive-${condition.id}`}
+            className="text-xs font-semibold text-text-secondary whitespace-nowrap"
+          >
+            Case-sensitive
+          </FieldLabel>
+        </Field>
+        <Button
           type="button"
-          className="rounded p-1 text-text-tertiary transition-colors hover:bg-overlay-subtle hover:text-text-primary focus-visible:outline-none disabled:pointer-events-none disabled:opacity-40"
+          variant="ghost"
+          size="icon-sm"
+          className={ICON_GHOST_BUTTON_CLASS}
           disabled={!canDelete}
           onClick={onDelete}
           aria-label="Remove condition"
         >
           <Icon name="action-delete" size={18} aria-hidden />
-        </button>
-        {/* Add row below */}
-        <button
+        </Button>
+        <Button
           type="button"
-          className="flex items-center gap-1 rounded border border-interactive-secondary-pressed px-2 py-1 text-xs font-semibold text-interactive-active transition-colors hover:bg-interactive-secondary-hover focus-visible:outline-none"
+          variant="outline"
+          size="xs"
+          className={SMALL_OUTLINE_BUTTON_CLASS}
           onClick={onAddBelow}
           aria-label="Add condition"
         >
-          <Icon name="action-add" size={12} aria-hidden />
-        </button>
+          <Icon name="action-add" size={6} className="[&>svg]:!size-[6px]" aria-hidden />
+        </Button>
       </div>
     </div>
   );
@@ -359,15 +394,17 @@ function ConditionGroup({
       <div className="flex items-center gap-2 px-3 py-2">
         <OrAndToggle value={group.logic} onChange={(logic) => onUpdate({ ...group, logic })} />
         <div className="flex-1" />
-        <button
+        <Button
           type="button"
-          className="rounded p-1 text-text-tertiary transition-colors hover:bg-overlay-subtle hover:text-text-primary focus-visible:outline-none disabled:pointer-events-none disabled:opacity-40"
+          variant="ghost"
+          size="icon-sm"
+          className={ICON_GHOST_BUTTON_CLASS}
           disabled={!canDelete}
           onClick={onDelete}
           aria-label="Remove group"
         >
           <Icon name="action-delete" size={18} aria-hidden />
-        </button>
+        </Button>
         <span className="cursor-grab p-1 text-text-tertiary">
           <Icon name="action-drag-indicator" size={18} aria-hidden />
         </span>
@@ -431,14 +468,16 @@ function EventBlockComp({
         />
         <span className="text-sm font-semibold text-text-primary">{block.eventOption.label}</span>
         <div className="flex-1" />
-        <button
+        <Button
           type="button"
-          className="rounded p-1 text-text-tertiary transition-colors hover:bg-overlay-subtle hover:text-text-primary focus-visible:outline-none"
+          variant="ghost"
+          size="icon-sm"
+          className={ICON_GHOST_BUTTON_CLASS}
           onClick={onDelete}
           aria-label={`Remove ${block.eventOption.label}`}
         >
           <Icon name="action-delete" size={18} aria-hidden />
-        </button>
+        </Button>
       </div>
 
       {/* Condition groups */}
@@ -455,14 +494,15 @@ function EventBlockComp({
         ))}
 
         {/* Add Condition (adds a new group) */}
-        <button
+        <UiButton
           type="button"
-          className="flex items-center gap-1.5 self-start rounded-[4px] border border-interactive-secondary-pressed px-3 py-1.5 text-sm font-semibold text-interactive-active transition-colors hover:bg-interactive-secondary-hover focus-visible:outline-none"
+          variant="secondary"
+          className="self-start"
           onClick={() => onUpdate({ ...block, groups: [...block.groups, makeEmptyGroup()] })}
         >
-          <Icon name="action-add" size={14} aria-hidden />
+          <Icon name="action-add" size={9} className="shrink-0 text-current [&>svg]:!size-[9px]" aria-hidden />
           Add Condition
-        </button>
+        </UiButton>
       </div>
     </div>
   );
@@ -513,21 +553,20 @@ function EventPickerPopover({
         </p>
         <div className="pb-2 pt-1">
           {SEARCH_EVENT_CATEGORIES.map((cat) => (
-            <button
+            <Button
               key={cat.id}
               type="button"
-              className={cx(
-                "flex h-9 w-full items-center gap-2 px-4 text-left text-sm font-semibold text-text-primary transition-colors focus-visible:outline-none",
-                cat.id === activeCategoryId
-                  ? "bg-interactive-secondary-hover"
-                  : "hover:bg-interactive-secondary-hover",
+              variant="ghost"
+              className={cn(
+                "h-9 w-full justify-start gap-2 rounded-none px-4 text-left text-sm font-semibold text-text-primary hover:bg-interactive-secondary-hover",
+                cat.id === activeCategoryId && "bg-interactive-secondary-hover",
               )}
               onMouseEnter={() => setActiveCategoryId(cat.id)}
               onClick={() => setActiveCategoryId(cat.id)}
             >
               <Icon name={cat.icon} size={16} className={cx("shrink-0", cat.iconClassName)} aria-hidden />
               <span className="min-w-0 truncate">{cat.label}</span>
-            </button>
+            </Button>
           ))}
         </div>
       </div>
@@ -541,10 +580,11 @@ function EventPickerPopover({
           )}
         >
           {activeCategory.events.map((event) => (
-            <button
+            <Button
               key={event.id}
               type="button"
-              className="flex h-8 w-full min-w-0 items-center gap-2 rounded px-1 text-left transition-colors hover:bg-interactive-secondary-hover focus-visible:outline-none"
+              variant="ghost"
+              className="h-8 w-full min-w-0 justify-start gap-2 rounded px-1 text-left hover:bg-interactive-secondary-hover"
               onClick={() => {
                 onSelect(event);
                 onClose();
@@ -559,7 +599,7 @@ function EventPickerPopover({
               <span className="min-w-0 truncate text-sm font-semibold text-text-secondary">
                 {event.label}
               </span>
-            </button>
+            </Button>
           ))}
         </div>
       </div>
@@ -608,10 +648,11 @@ function EntityPickerPopover({
         {SEARCH_ENTITY_COLUMNS.map((column, colIdx) => (
           <div key={colIdx} className="min-w-0">
             {column.map((option) => (
-              <button
+              <Button
                 key={option.id}
                 type="button"
-                className="flex h-8 w-full min-w-0 items-center gap-2 rounded px-1 text-left transition-colors hover:bg-interactive-secondary-hover focus-visible:outline-none"
+                variant="ghost"
+                className="h-8 w-full min-w-0 justify-start gap-2 rounded px-1 text-left hover:bg-interactive-secondary-hover"
                 onClick={() => {
                   onSelect(option);
                   onClose();
@@ -626,7 +667,7 @@ function EntityPickerPopover({
                 <span className="min-w-0 truncate text-sm font-semibold leading-8 tracking-[0.4px] text-text-secondary">
                   {option.label}
                 </span>
-              </button>
+              </Button>
             ))}
           </div>
         ))}
@@ -674,29 +715,42 @@ function EntityConditionRowComp({
         onValuesChange={(values) => onUpdate({ ...condition, values })}
       />
       <div className="flex shrink-0 items-center gap-1.5 pt-1">
-        <Checkbox
-          checked={condition.caseSensitive}
-          onCheckedChange={(caseSensitive) => onUpdate({ ...condition, caseSensitive })}
-          label="Case-sensitive"
-          labelClassName="text-xs font-semibold text-text-secondary whitespace-nowrap"
-        />
-        <button
+        <Field orientation="horizontal" className="w-auto items-center gap-2">
+          <Checkbox
+            id={`entity-case-sensitive-${condition.id}`}
+            checked={condition.caseSensitive}
+            onCheckedChange={(caseSensitive) =>
+              onUpdate({ ...condition, caseSensitive: caseSensitive === true })
+            }
+          />
+          <FieldLabel
+            htmlFor={`entity-case-sensitive-${condition.id}`}
+            className="text-xs font-semibold text-text-secondary whitespace-nowrap"
+          >
+            Case-sensitive
+          </FieldLabel>
+        </Field>
+        <Button
           type="button"
-          className="rounded p-1 text-text-tertiary transition-colors hover:bg-overlay-subtle hover:text-text-primary focus-visible:outline-none disabled:pointer-events-none disabled:opacity-40"
+          variant="ghost"
+          size="icon-sm"
+          className={ICON_GHOST_BUTTON_CLASS}
           disabled={!canDelete}
           onClick={onDelete}
           aria-label="Remove condition"
         >
           <Icon name="action-delete" size={18} aria-hidden />
-        </button>
-        <button
+        </Button>
+        <Button
           type="button"
-          className="flex items-center gap-1 rounded border border-interactive-secondary-pressed px-2 py-1 text-xs font-semibold text-interactive-active transition-colors hover:bg-interactive-secondary-hover focus-visible:outline-none"
+          variant="outline"
+          size="xs"
+          className={SMALL_OUTLINE_BUTTON_CLASS}
           onClick={onAddBelow}
           aria-label="Add condition"
         >
-          <Icon name="action-add" size={12} aria-hidden />
-        </button>
+          <Icon name="action-add" size={6} className="[&>svg]:!size-[6px]" aria-hidden />
+        </Button>
       </div>
     </div>
   );
@@ -738,15 +792,17 @@ function EntityConditionGroup({
       <div className="flex items-center gap-2 px-3 py-2">
         <OrAndToggle value={group.logic} onChange={(logic) => onUpdate({ ...group, logic })} />
         <div className="flex-1" />
-        <button
+        <Button
           type="button"
-          className="rounded p-1 text-text-tertiary transition-colors hover:bg-overlay-subtle hover:text-text-primary focus-visible:outline-none disabled:pointer-events-none disabled:opacity-40"
+          variant="ghost"
+          size="icon-sm"
+          className={ICON_GHOST_BUTTON_CLASS}
           disabled={!canDelete}
           onClick={onDelete}
           aria-label="Remove group"
         >
           <Icon name="action-delete" size={18} aria-hidden />
-        </button>
+        </Button>
         <span className="cursor-grab p-1 text-text-tertiary">
           <Icon name="action-drag-indicator" size={18} aria-hidden />
         </span>
@@ -803,14 +859,16 @@ function EntityBlockComp({
         />
         <span className="text-sm font-semibold text-text-primary">{block.entityOption.label}</span>
         <div className="flex-1" />
-        <button
+        <Button
           type="button"
-          className="rounded p-1 text-text-tertiary transition-colors hover:bg-overlay-subtle hover:text-text-primary focus-visible:outline-none"
+          variant="ghost"
+          size="icon-sm"
+          className={ICON_GHOST_BUTTON_CLASS}
           onClick={onDelete}
           aria-label={`Remove ${block.entityOption.label}`}
         >
           <Icon name="action-delete" size={18} aria-hidden />
-        </button>
+        </Button>
       </div>
       <div className="space-y-3 p-4">
         {block.groups.map((group) => (
@@ -822,14 +880,15 @@ function EntityBlockComp({
             onDelete={() => deleteGroup(group.id)}
           />
         ))}
-        <button
+        <UiButton
           type="button"
-          className="flex items-center gap-1.5 self-start rounded-[4px] border border-interactive-secondary-pressed px-3 py-1.5 text-sm font-semibold text-interactive-active transition-colors hover:bg-interactive-secondary-hover focus-visible:outline-none"
+          variant="secondary"
+          className="self-start"
           onClick={() => onUpdate({ ...block, groups: [...block.groups, makeEmptyEntityGroup()] })}
         >
-          <Icon name="action-add" size={14} aria-hidden />
+          <Icon name="action-add" size={9} className="shrink-0 text-current [&>svg]:!size-[9px]" aria-hidden />
           Add Condition
-        </button>
+        </UiButton>
       </div>
     </div>
   );
@@ -841,23 +900,27 @@ function AdvancedOptions() {
   const [open, setOpen] = useState(false);
 
   return (
-    <div className="border-t border-border-rule pt-3">
-      <button
-        type="button"
-        className="flex items-center gap-1.5 text-sm font-semibold text-text-secondary transition-colors hover:text-text-primary focus-visible:outline-none"
-        onClick={() => setOpen((v) => !v)}
-        aria-expanded={open}
-      >
-        Advanced Options
-        <Icon name="action-info" size={16} className="text-text-tertiary" aria-hidden />
-      </button>
+    <Collapsible open={open} onOpenChange={setOpen}>
+      <div className="border-t border-border-rule pt-3">
+        <CollapsibleTrigger asChild>
+          <Button
+            type="button"
+            variant="ghost"
+            className="h-auto gap-1.5 px-0 text-sm font-semibold text-text-secondary hover:bg-transparent hover:text-text-primary"
+            aria-expanded={open}
+          >
+            Advanced Options
+            <Icon name="action-info" size={16} className="text-text-tertiary" aria-hidden />
+          </Button>
+        </CollapsibleTrigger>
 
-      {open && (
-        <div className="mt-3 rounded-[4px] border border-border-rule bg-surface-container p-4 text-sm text-text-secondary">
-          Advanced search options will appear here.
-        </div>
-      )}
-    </div>
+        <CollapsibleContent>
+          <div className="mt-3 rounded-[4px] border border-border-rule bg-surface-container p-4 text-sm text-text-secondary">
+            Advanced search options will appear here.
+          </div>
+        </CollapsibleContent>
+      </div>
+    </Collapsible>
   );
 }
 
@@ -954,20 +1017,23 @@ export function SearchQueryBuilder({
             { id: "all" as const, label: "Match ALL of the conditions below" },
           ] as const
         ).map((opt) => (
-          <label
-            key={opt.id}
-            className="inline-flex cursor-pointer items-center gap-2 text-sm font-semibold leading-5 tracking-[0.4px] text-text-primary"
-          >
+          <Field key={opt.id} orientation="horizontal" className="w-auto items-center gap-2">
             <input
               type="radio"
+              id={`${matchLogicGroupName}-${opt.id}`}
               name={matchLogicGroupName}
               value={opt.id}
               checked={matchLogic === opt.id}
               onChange={() => setMatchLogic(opt.id)}
               className="size-4 shrink-0 accent-interactive-active"
             />
-            {opt.label}
-          </label>
+            <FieldLabel
+              htmlFor={`${matchLogicGroupName}-${opt.id}`}
+              className="cursor-pointer text-sm font-semibold leading-5 tracking-[0.4px] text-text-primary"
+            >
+              {opt.label}
+            </FieldLabel>
+          </Field>
         ))}
       </div>
 
@@ -997,14 +1063,14 @@ export function SearchQueryBuilder({
       <div className="flex flex-wrap items-center gap-3">
         {/* Add Entity */}
         <div className="relative">
-          <button
+          <UiButton
             type="button"
-            className="flex items-center gap-1.5 rounded-[4px] border border-interactive-secondary-pressed px-3 py-1.5 text-sm font-semibold text-interactive-active transition-colors hover:bg-interactive-secondary-hover focus-visible:outline-none"
+            variant="secondary"
             onClick={() => setShowEntityPicker((v) => !v)}
           >
-            <Icon name="action-add" size={14} aria-hidden />
+            <Icon name="action-add" size={9} className="shrink-0 text-current [&>svg]:!size-[9px]" aria-hidden />
             Add Entity
-          </button>
+          </UiButton>
           {showEntityPicker && (
             <EntityPickerPopover
               onSelect={(option) => {
@@ -1017,14 +1083,14 @@ export function SearchQueryBuilder({
 
         {/* Add Event */}
         <div className="relative">
-          <button
+          <UiButton
             type="button"
-            className="flex items-center gap-1.5 rounded-[4px] border border-interactive-secondary-pressed px-3 py-1.5 text-sm font-semibold text-interactive-active transition-colors hover:bg-interactive-secondary-hover focus-visible:outline-none"
+            variant="secondary"
             onClick={() => setShowEventPicker((v) => !v)}
           >
-            <Icon name="action-add" size={14} aria-hidden />
+            <Icon name="action-add" size={9} className="shrink-0 text-current [&>svg]:!size-[9px]" aria-hidden />
             Add Event
-          </button>
+          </UiButton>
 
           {showEventPicker && (
             <EventPickerPopover
@@ -1040,9 +1106,8 @@ export function SearchQueryBuilder({
         {isValid && onConvertToFsql && (
           <Button
             type="button"
-            variant="tertiary"
-            size="small"
-            className="ml-auto"
+            variant="ghost"
+            className="ml-auto h-auto gap-1 px-1 py-2 font-semibold text-text-secondary hover:bg-overlay-subtle"
             onClick={handleConvertToFsql}
           >
             Convert to FSQL

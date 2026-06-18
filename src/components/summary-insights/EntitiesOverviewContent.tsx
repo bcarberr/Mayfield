@@ -1,5 +1,12 @@
 import { useMemo, useState } from "react";
-import { Icon, type SeverityShapeIconName } from "../../design-system";
+import {
+  DATA_GRID_ABOVE_SECTION_CLASS,
+  DATA_GRID_HEADER_ROW_CLASS,
+  DATA_GRID_TABLE_CLASS,
+  DATA_GRID_TABLE_SCROLL_CLASS,
+  DATA_GRID_THEAD_CLASS,
+} from "../ui/dataGridTableStyles";
+import { Checkbox, Icon, type SeverityShapeIconName } from "../../design-system";
 import { type TimeframeRange } from "../../context/TimeframeContext";
 import { Button } from "../ui/Button";
 import { ColumnHeaderMenu } from "../ui/ColumnHeaderMenu";
@@ -7,10 +14,25 @@ import { FilterColumnPanel, type FilterColumnPanelTool } from "../ui/FilterColum
 import { Input } from "../ui/Input";
 import { DataGridExportButton } from "../ui/DataGridExportButton";
 import { SeverityTableIcon } from "../ui/SeverityTableIcon";
-import { compareStrings, useColumnSort } from "../ui/useColumnSort";
+import { compareStrings } from "../ui/useColumnSort";
+import { useSortedDataGridPagination } from "../ui/useSortedDataGridPagination";
+import { DataGridSection } from "../ui/DataGridSection";
+import { DataGridPaginationFooter } from "../ui/DataGridTableLayout";
 import { useResizableColumns } from "../ui/useResizableColumns";
 import { TruncatedText } from "../ui/TruncatedText";
-import { Checkbox } from "../uiCheckbox";
+import { demoTableConnector } from "../connectors/demoTableConnectors";
+import { ConnectorTableCell } from "../ui/ConnectorTableCell";
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuTrigger,
+} from "@/components/shadcn/dropdown-menu";
+import {
+  Tooltip,
+  TooltipContent,
+  TooltipTrigger,
+} from "@/components/shadcn/tooltip";
 import {
   buildDailyEventRows,
   ChartZoomHint,
@@ -21,7 +43,7 @@ import {
   useFederatedAnalyticsTimeframeZoom,
 } from "./federatedAnalyticsZoom";
 import { CHART_CATEGORY_FILL, HorizontalBarPanel } from "./horizontalBarPanel";
-import { cx, DatavisGridlineRule, InsightCard } from "./datavisCard";
+import { cx, InsightCard } from "./datavisCard";
 import { TimeSeriesBarChart } from "./timeSeriesBarChart";
 import { buildDailyBuckets, type HourBucket } from "./timeframeChartUtils";
 
@@ -222,15 +244,33 @@ function formatCount(value: number): string {
 function EntityCardHeaderActions() {
   return (
     <div className="flex shrink-0 items-center gap-1">
-      <Button variant="ghost" className="size-6 p-0 text-text-tertiary hover:text-text-primary" aria-label="Pivot search">
-        <Icon name="action-search" size={16} />
-      </Button>
-      <Button variant="ghost" className="size-6 p-0 text-text-tertiary hover:text-text-primary" aria-label="Expand widget">
-        <Icon name="nav-expand" size={16} />
-      </Button>
-      <Button variant="ghost" className="size-6 p-0 text-text-tertiary hover:text-text-primary" aria-label="Widget options">
-        <Icon name="navi-more-vert" size={16} />
-      </Button>
+      <Tooltip>
+        <TooltipTrigger asChild>
+          <Button variant="ghost" className="size-6 p-0 text-text-tertiary hover:text-text-primary" aria-label="Pivot search">
+            <Icon name="action-search" size={16} />
+          </Button>
+        </TooltipTrigger>
+        <TooltipContent>Pivot search</TooltipContent>
+      </Tooltip>
+      <Tooltip>
+        <TooltipTrigger asChild>
+          <Button variant="ghost" className="size-6 p-0 text-text-tertiary hover:text-text-primary" aria-label="Expand widget">
+            <Icon name="nav-expand" size={16} />
+          </Button>
+        </TooltipTrigger>
+        <TooltipContent>Expand widget</TooltipContent>
+      </Tooltip>
+      <DropdownMenu>
+        <DropdownMenuTrigger asChild>
+          <Button variant="ghost" className="size-6 p-0 text-text-tertiary hover:text-text-primary" aria-label="Widget options">
+            <Icon name="navi-more-vert" size={16} />
+          </Button>
+        </DropdownMenuTrigger>
+        <DropdownMenuContent align="end" className="min-w-[9rem] border-border-container bg-surface-modal">
+          <DropdownMenuItem>Export widget</DropdownMenuItem>
+          <DropdownMenuItem>Pin to dashboard</DropdownMenuItem>
+        </DropdownMenuContent>
+      </DropdownMenu>
     </div>
   );
 }
@@ -345,7 +385,7 @@ const AGGREGATED_ENTITY_ROWS: AggregatedEntityRow[] = [
     lastSeen: "14:22:08",
     eventCount: 1410,
     categories: "Authentication, Network Activity, Findings",
-    connector: "BC-CS-Athena",
+    connector: demoTableConnector(0),
   },
   {
     id: "2",
@@ -355,7 +395,7 @@ const AGGREGATED_ENTITY_ROWS: AggregatedEntityRow[] = [
     lastSeen: "13:05:41",
     eventCount: 3402,
     categories: "System Activity, Account Change, Discovery",
-    connector: "BCs1",
+    connector: demoTableConnector(1),
   },
   {
     id: "3",
@@ -365,7 +405,7 @@ const AGGREGATED_ENTITY_ROWS: AggregatedEntityRow[] = [
     lastSeen: "11:40:12",
     eventCount: 2587,
     categories: "Identity & Access, System Activity",
-    connector: "BC-CS",
+    connector: demoTableConnector(2),
   },
   {
     id: "4",
@@ -375,7 +415,7 @@ const AGGREGATED_ENTITY_ROWS: AggregatedEntityRow[] = [
     lastSeen: "09:12:00",
     eventCount: 1994,
     categories: "Network Activity, Discovery",
-    connector: "BC-CS-Athena",
+    connector: demoTableConnector(3),
   },
   {
     id: "5",
@@ -385,7 +425,7 @@ const AGGREGATED_ENTITY_ROWS: AggregatedEntityRow[] = [
     lastSeen: "22:18:55",
     eventCount: 872,
     categories: "Discovery, Findings",
-    connector: "BCs1",
+    connector: demoTableConnector(4),
   },
   {
     id: "6",
@@ -395,7 +435,7 @@ const AGGREGATED_ENTITY_ROWS: AggregatedEntityRow[] = [
     lastSeen: "18:00:03",
     eventCount: 654,
     categories: "Discovery, System Activity",
-    connector: "BC-CS",
+    connector: demoTableConnector(5),
   },
   {
     id: "7",
@@ -405,7 +445,7 @@ const AGGREGATED_ENTITY_ROWS: AggregatedEntityRow[] = [
     lastSeen: "16:44:19",
     eventCount: 512,
     categories: "Authentication, Identity & Access",
-    connector: "BCs1",
+    connector: demoTableConnector(6),
   },
   {
     id: "8",
@@ -415,7 +455,7 @@ const AGGREGATED_ENTITY_ROWS: AggregatedEntityRow[] = [
     lastSeen: "12:01:47",
     eventCount: 1188,
     categories: "System Activity, Findings",
-    connector: "BC-CS-Athena",
+    connector: demoTableConnector(7),
   },
   {
     id: "9",
@@ -425,7 +465,7 @@ const AGGREGATED_ENTITY_ROWS: AggregatedEntityRow[] = [
     lastSeen: "10:33:22",
     eventCount: 743,
     categories: "Network Activity, System Activity",
-    connector: "BC-CS",
+    connector: demoTableConnector(8),
   },
   {
     id: "10",
@@ -435,7 +475,7 @@ const AGGREGATED_ENTITY_ROWS: AggregatedEntityRow[] = [
     lastSeen: "08:15:09",
     eventCount: 965,
     categories: "Authentication, Account Change",
-    connector: "BCs1",
+    connector: demoTableConnector(9),
   },
   {
     id: "11",
@@ -445,7 +485,7 @@ const AGGREGATED_ENTITY_ROWS: AggregatedEntityRow[] = [
     lastSeen: "07:42:18",
     eventCount: 421,
     categories: "Network Activity",
-    connector: "BC-CS-Athena",
+    connector: demoTableConnector(10),
   },
   {
     id: "12",
@@ -455,7 +495,7 @@ const AGGREGATED_ENTITY_ROWS: AggregatedEntityRow[] = [
     lastSeen: "06:58:44",
     eventCount: 2104,
     categories: "Identity & Access, Findings",
-    connector: "BC-CS",
+    connector: demoTableConnector(11),
   },
   {
     id: "13",
@@ -465,7 +505,7 @@ const AGGREGATED_ENTITY_ROWS: AggregatedEntityRow[] = [
     lastSeen: "05:21:31",
     eventCount: 1336,
     categories: "Discovery, Network Activity",
-    connector: "BCs1",
+    connector: demoTableConnector(12),
   },
   {
     id: "14",
@@ -475,7 +515,7 @@ const AGGREGATED_ENTITY_ROWS: AggregatedEntityRow[] = [
     lastSeen: "04:09:57",
     eventCount: 588,
     categories: "Authentication, Identity & Access",
-    connector: "BC-CS-Athena",
+    connector: demoTableConnector(13),
   },
   {
     id: "15",
@@ -485,7 +525,7 @@ const AGGREGATED_ENTITY_ROWS: AggregatedEntityRow[] = [
     lastSeen: "03:44:12",
     eventCount: 302,
     categories: "System Activity",
-    connector: "BC-CS",
+    connector: demoTableConnector(14),
   },
   {
     id: "16",
@@ -495,7 +535,7 @@ const AGGREGATED_ENTITY_ROWS: AggregatedEntityRow[] = [
     lastSeen: "02:18:06",
     eventCount: 877,
     categories: "Authentication, Findings",
-    connector: "BCs1",
+    connector: demoTableConnector(15),
   },
   {
     id: "17",
@@ -505,7 +545,7 @@ const AGGREGATED_ENTITY_ROWS: AggregatedEntityRow[] = [
     lastSeen: "01:55:33",
     eventCount: 467,
     categories: "Discovery, System Activity",
-    connector: "BC-CS-Athena",
+    connector: demoTableConnector(16),
   },
   {
     id: "18",
@@ -515,7 +555,7 @@ const AGGREGATED_ENTITY_ROWS: AggregatedEntityRow[] = [
     lastSeen: "00:41:28",
     eventCount: 1542,
     categories: "Identity & Access, System Activity, Findings",
-    connector: "BC-CS",
+    connector: demoTableConnector(17),
   },
   {
     id: "19",
@@ -525,7 +565,7 @@ const AGGREGATED_ENTITY_ROWS: AggregatedEntityRow[] = [
     lastSeen: "23:12:04",
     eventCount: 198,
     categories: "Network Activity, Discovery",
-    connector: "BCs1",
+    connector: demoTableConnector(18),
   },
   {
     id: "20",
@@ -535,11 +575,9 @@ const AGGREGATED_ENTITY_ROWS: AggregatedEntityRow[] = [
     lastSeen: "21:07:51",
     eventCount: 629,
     categories: "Account Change, Identity & Access",
-    connector: "BC-CS-Athena",
+    connector: demoTableConnector(19),
   },
 ];
-
-const AGGREGATED_PAGE_SIZE = 20;
 
 function topEntitiesByEventVolume(rows: readonly AggregatedEntityRow[], limit: number) {
   const totals = new Map<string, number>();
@@ -551,12 +589,6 @@ function topEntitiesByEventVolume(rows: readonly AggregatedEntityRow[], limit: n
     .sort((a, b) => b[1] - a[1])
     .slice(0, limit)
     .map(([label, value]) => ({ label, value, color: TOP_ENTITY_VOLUME_BAR }));
-}
-
-function connectorSwatch(connector: string) {
-  if (connector.startsWith("BCs")) return "bg-feedback-info";
-  if (connector.includes("Athena")) return "bg-interactive-active";
-  return "bg-feedback-negative";
 }
 
 function aggregatedMatchesSearch(row: AggregatedEntityRow, query: string): boolean {
@@ -608,7 +640,23 @@ const AGGREGATED_COL_MINS: readonly number[] = [
   88,
 ];
 
-function EntitiesAggregatedTable({ rows }: { rows: AggregatedEntityRow[] }) {
+export function useEntitiesAggregatedTableGrid(rows: readonly Parameters<typeof EntitiesAggregatedTable>[0]["displayRows"][number][]) {
+  const sortComparators = useMemo(
+    (): Record<AggregatedSortColumn, (a: AggregatedEntityRow, b: AggregatedEntityRow) => number> => ({
+      risk: (a, b) => ENTITY_RISK_ORDER[a.risk] - ENTITY_RISK_ORDER[b.risk],
+      entity: (a, b) => compareStrings(a.entity, b.entity),
+      type: (a, b) => compareStrings(a.type, b.type),
+      lastSeen: (a, b) => compareStrings(a.lastSeen, b.lastSeen),
+      eventCount: (a, b) => a.eventCount - b.eventCount,
+      categories: (a, b) => compareStrings(a.categories, b.categories),
+      connector: (a, b) => compareStrings(a.connector, b.connector),
+    }),
+    [],
+  );
+  return useSortedDataGridPagination(rows, sortComparators);
+}
+
+function EntitiesAggregatedTable({ displayRows, getSortProps }: { displayRows: AggregatedEntityRow[]; getSortProps: ReturnType<typeof useEntitiesAggregatedTableGrid>["getSortProps"] }) {
   const [selected, setSelected] = useState<Set<string>>(() => new Set());
   const {
     containerRef,
@@ -625,7 +673,7 @@ function EntitiesAggregatedTable({ rows }: { rows: AggregatedEntityRow[] }) {
     colMins: AGGREGATED_COL_MINS,
   });
 
-  const allIds = useMemo(() => rows.map((r) => r.id), [rows]);
+  const allIds = useMemo(() => displayRows.map((r) => r.id), [displayRows]);
   const total = allIds.length;
   const selectedOnPage = useMemo(() => allIds.filter((id) => selected.has(id)).length, [allIds, selected]);
   const allSelected = total > 0 && selectedOnPage === total;
@@ -644,25 +692,12 @@ function EntitiesAggregatedTable({ rows }: { rows: AggregatedEntityRow[] }) {
     });
   };
 
-  const sortComparators = useMemo(
-    (): Record<AggregatedSortColumn, (a: AggregatedEntityRow, b: AggregatedEntityRow) => number> => ({
-      risk: (a, b) => ENTITY_RISK_ORDER[a.risk] - ENTITY_RISK_ORDER[b.risk],
-      entity: (a, b) => compareStrings(a.entity, b.entity),
-      type: (a, b) => compareStrings(a.type, b.type),
-      lastSeen: (a, b) => compareStrings(a.lastSeen, b.lastSeen),
-      eventCount: (a, b) => a.eventCount - b.eventCount,
-      categories: (a, b) => compareStrings(a.categories, b.categories),
-      connector: (a, b) => compareStrings(a.connector, b.connector),
-    }),
-    [],
-  );
-  const { sortedRows, getSortProps } = useColumnSort(sortComparators);
-  const displayRows = sortedRows(rows);
+
 
   return (
-    <div ref={containerRef} className={cx("min-h-0 w-full min-w-0", isResizing && "select-none")}>
+    <div ref={containerRef} className={cx(DATA_GRID_TABLE_SCROLL_CLASS, isResizing && "select-none")}>
       <table
-        className="table-fixed border-collapse text-left text-sm"
+        className={DATA_GRID_TABLE_CLASS}
         style={{
           width: tableFillsContainer ? "100%" : baseTotal,
           minWidth: Math.max(minTableWidth, baseTotal),
@@ -674,8 +709,8 @@ function EntitiesAggregatedTable({ rows }: { rows: AggregatedEntityRow[] }) {
             <col key={i} style={{ width: w }} />
           ))}
         </colgroup>
-        <thead>
-          <tr className="h-10 border-b border-datavis-gridlines bg-surface-table-row-header">
+        <thead className={DATA_GRID_THEAD_CLASS}>
+          <tr className={DATA_GRID_HEADER_ROW_CLASS}>
             <th scope="col" style={colStyle(0)} className="relative h-10 border-r border-datavis-gridlines px-0 py-0 align-middle">
               <div className="flex items-center justify-center">
                 <Checkbox
@@ -788,12 +823,11 @@ function EntitiesAggregatedTable({ rows }: { rows: AggregatedEntityRow[] }) {
                 <TruncatedText className="text-sm text-text-secondary">{row.categories}</TruncatedText>
               </td>
               <td style={colStyle(7)} className="h-10 min-w-0 overflow-hidden px-2 py-0 align-middle">
-                <span className="flex w-full min-w-0 items-center gap-2">
-                  <span className={cx("size-2.5 shrink-0 rounded-sm", connectorSwatch(row.connector))} aria-hidden />
-                  <TruncatedText className="w-full text-sm text-text-secondary" wrapperClassName="min-w-0 flex-1">
-                    {row.connector}
-                  </TruncatedText>
-                </span>
+                <ConnectorTableCell
+                  name={row.connector}
+                  className="w-full"
+                  textClassName="w-full text-sm text-text-secondary"
+                />
               </td>
             </tr>
           ))}
@@ -811,7 +845,7 @@ function EntitiesDetailTabs({
   onChange: (tab: EntitiesDetailTab) => void;
 }) {
   return (
-    <nav className="flex shrink-0 gap-6 border-b border-border-container" aria-label="Entity detail views">
+    <nav className="relative z-10 flex shrink-0 gap-6" aria-label="Entity detail views">
       {ENTITIES_DETAIL_TABS.map((tab) => {
         const isActive = tab.id === active;
         return (
@@ -839,61 +873,57 @@ function EntitiesAggregatedPanel({ rows }: { rows: AggregatedEntityRow[] }) {
   const [searchQuery, setSearchQuery] = useState("");
   const [tableTool, setTableTool] = useState<FilterColumnPanelTool | null>(null);
 
-  const filteredRows = useMemo(
+    const filteredRows = useMemo(
     () => rows.filter((row) => aggregatedMatchesSearch(row, searchQuery)),
     [rows, searchQuery],
   );
-
-  const displayedRows = useMemo(
-    () => filteredRows.slice(0, AGGREGATED_PAGE_SIZE),
-    [filteredRows],
-  );
+  const tableGrid = useEntitiesAggregatedTableGrid(filteredRows);
 
   return (
-    <section className="mx-0 mb-0 flex min-h-0 min-w-0 flex-1 flex-col overflow-hidden rounded-[4px] border border-border-container bg-datavis-card-bg shadow-[0_1px_5px_rgba(0,0,0,0.2)]">
-      <div className="shrink-0 bg-datavis-card-bg pb-3 pl-4 pr-6 pt-3 sm:pl-5">
-        <h2 className="text-base-semibold text-text-primary">Entities</h2>
-        <div className="mt-2 flex flex-wrap items-center gap-3">
-          <p className="shrink-0 text-base-small text-text-secondary">
-            {displayedRows.length} of {rows.length} Results
-            {searchQuery.trim() ? ` · “${searchQuery.trim()}”` : ""}
-          </p>
-          <div className="w-[300px] shrink-0">
-            <Input
-              variant="search"
-              placeholder="Search"
-              value={searchQuery}
-              onChange={(event) => setSearchQuery(event.target.value)}
-              className="!bg-datavis-card-bg"
-              aria-label="Search aggregated entities"
-            />
+    <DataGridSection
+      header={
+        <>
+          <h2 className="text-base-semibold text-text-primary">Entities</h2>
+          <div className="mt-2 flex flex-wrap items-center gap-3">
+            <p className="shrink-0 text-base-small text-text-secondary">
+              {filteredRows.length} of {rows.length} Results
+              {searchQuery.trim() ? ` · “${searchQuery.trim()}”` : ""}
+            </p>
+            <div className="w-[300px] shrink-0">
+              <Input
+                variant="search"
+                placeholder="Search"
+                value={searchQuery}
+                onChange={(event) => setSearchQuery(event.target.value)}
+                className="!bg-datavis-card-bg"
+                aria-label="Search aggregated entities"
+              />
+            </div>
+            {searchQuery.trim() ? (
+              <Button
+                type="button"
+                variant="ghost"
+                className="h-8 shrink-0 gap-1.5 px-2 text-base-small text-text-tertiary hover:text-text-primary [&_svg]:!h-2 [&_svg]:!w-3"
+                onClick={() => setSearchQuery("")}
+              >
+                <Icon name="action-filter-list" size={12} aria-hidden />
+                Clear all filters
+              </Button>
+            ) : null}
+            <DataGridExportButton />
           </div>
-          {searchQuery.trim() ? (
-            <Button
-              type="button"
-              variant="ghost"
-              className="h-8 shrink-0 gap-1.5 px-2 text-base-small text-text-tertiary hover:text-text-primary [&_svg]:!h-2 [&_svg]:!w-3"
-              onClick={() => setSearchQuery("")}
-            >
-              <Icon name="action-filter-list" size={12} aria-hidden />
-              Clear all filters
-            </Button>
-          ) : null}
-          <DataGridExportButton />
-        </div>
-      </div>
-      <DatavisGridlineRule inset={false} />
-      <div className="flex min-h-0 flex-1 overflow-auto bg-datavis-card-bg">
+        </>
+      }
+      filterPanel={
         <FilterColumnPanel
           active={tableTool}
           onFilterClick={() => setTableTool(tableTool === "filter" ? null : "filter")}
           onColumnsClick={() => setTableTool(tableTool === "columns" ? null : "columns")}
         />
-        <div className="min-h-0 min-w-0 flex-1 pb-3">
-          <EntitiesAggregatedTable rows={displayedRows} />
-        </div>
-      </div>
-    </section>
+      }
+      table={<EntitiesAggregatedTable displayRows={tableGrid.displayRows} getSortProps={tableGrid.getSortProps} />}
+      footer={<DataGridPaginationFooter grid={tableGrid} />}
+    />
   );
 }
 
@@ -962,6 +992,7 @@ export function EntitiesOverviewContent() {
 
   return (
     <div className="flex shrink-0 flex-col gap-4 p-4 sm:p-5">
+      <div className={DATA_GRID_ABOVE_SECTION_CLASS}>
       <InsightCard title="New Entities Seen Per Day">
         <ChartZoomHint unit="Days" isChartZoomed={isChartZoomed} onReset={handleChartZoomReset} />
         <TimeSeriesBarChart
@@ -1005,6 +1036,7 @@ export function EntitiesOverviewContent() {
             xTicks={topEntitiesBarScale.xTicks}
           />
         </InsightCard>
+      </div>
       </div>
 
       <EntitiesDetailTabs active={activeDetailTab} onChange={setActiveDetailTab} />

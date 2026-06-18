@@ -201,7 +201,7 @@ export function ConnectorsPage() {
                 className="h-8 shrink-0 ring-offset-surface-page"
                 onClick={openAddConnector}
               >
-                <Icon name="action-add" size={12} className="size-3 shrink-0 text-current [&>svg]:!size-[12px]" aria-hidden />
+                <Icon name="action-add" size={6} className="size-1.5 shrink-0 text-current [&>svg]:!size-[6px]" aria-hidden />
                 Add Connector
               </Button>
               <Button type="button" variant="secondary" className="h-8 shrink-0 ring-offset-surface-page">
