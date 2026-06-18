@@ -1,4 +1,16 @@
 import { Fragment, useMemo, useState } from "react";
+import {
+  DATA_GRID_ABOVE_SECTION_CLASS,
+  DATA_GRID_EXPANDED_ROW_CLASS,
+  DATA_GRID_FILTER_ROW_CLASS,
+  DATA_GRID_HEADER_ROW_CLASS,
+  DATA_GRID_SECTION_CLASS,
+  DATA_GRID_TABLE_CLASS,
+  DATA_GRID_TABLE_SCROLL_CLASS,
+  DATA_GRID_THEAD_CLASS,
+  DATA_GRID_TOOLBAR_STICKY_CLASS,
+} from "../ui/dataGridTableStyles";
+import { useDataGridStickyToolbar } from "../ui/useDataGridStickyToolbar";
 import { Checkbox, Icon, type SeverityShapeIconName } from "../../design-system";
 import { Button } from "../ui/Button";
 import { ColumnHeaderMenu } from "../ui/ColumnHeaderMenu";
@@ -6,10 +18,12 @@ import { compareStrings, useColumnSort } from "../ui/useColumnSort";
 import { FilterColumnPanel, type FilterColumnPanelTool } from "../ui/FilterColumnPanel";
 import { Input } from "../ui/Input";
 import { DataGridExportButton } from "../ui/DataGridExportButton";
+import { DataGridPagination } from "../ui/DataGridPagination";
 import { DonutChartPanel } from "../ui/DonutChartPanel";
 import { SeverityTableIcon } from "../ui/SeverityTableIcon";
 import { TruncatedText } from "../ui/TruncatedText";
 import { useResizableColumns } from "../ui/useResizableColumns";
+import { useDataGridPagination } from "../ui/useDataGridPagination";
 import { InsightCard } from "../summary-insights/datavisCard";
 import { HorizontalBarPanel } from "../summary-insights/horizontalBarPanel";
 
@@ -431,7 +445,6 @@ function SeverityBreakdownCard({
         filterAriaLabel={(label) => `Filter run history by ${label} severity`}
         xMax={SEVERITY_BREAKDOWN_X_MAX}
         xTicks={SEVERITY_BREAKDOWN_X_TICKS}
-        axisLabel="Findings"
         dense
         denseRowGap={16}
       />
@@ -493,11 +506,15 @@ function RunHistoryTable({
   expandedIds,
   onToggleExpand,
   onToggleExpandAll,
+  tableTool,
+  onTableToolChange,
 }: {
   rows: RunHistoryRow[];
   expandedIds: Set<string>;
   onToggleExpand: (id: string) => void;
   onToggleExpandAll: () => void;
+  tableTool: FilterColumnPanelTool | null;
+  onTableToolChange: (tool: FilterColumnPanelTool | null) => void;
 }) {
   const [selected, setSelected] = useState<Set<string>>(() => new Set());
   const {
@@ -553,15 +570,34 @@ function RunHistoryTable({
     [],
   );
   const { sortedRows, getSortProps } = useColumnSort(sortComparators);
-  const displayRows = sortedRows(rows);
+  const sorted = sortedRows(rows);
+  const {
+    page,
+    setPage,
+    pageCount,
+    pagedItems: displayRows,
+    pageSize,
+    setPageSize,
+    pageSizeOptions,
+    showPagination,
+    showPageControls,
+    itemCount,
+  } = useDataGridPagination(sorted);
 
   return (
-    <div
-      ref={containerRef}
-      className={cx("min-h-0 min-w-0 flex-1 overflow-x-auto pb-3", isResizing && "select-none")}
-    >
+    <div className="flex min-w-0 flex-col bg-datavis-card-bg">
+      <div className={DATA_GRID_FILTER_ROW_CLASS}>
+        <FilterColumnPanel
+          active={tableTool}
+          onFilterClick={() => onTableToolChange(tableTool === "filter" ? null : "filter")}
+          onColumnsClick={() => onTableToolChange(tableTool === "columns" ? null : "columns")}
+        />
+        <div
+          ref={containerRef}
+          className={cx(DATA_GRID_TABLE_SCROLL_CLASS, isResizing && "select-none")}
+        >
       <table
-        className="table-fixed border-collapse text-left text-sm"
+        className={DATA_GRID_TABLE_CLASS}
         style={{
           width: tableFillsContainer ? "100%" : baseTotal,
           minWidth: Math.max(minTableWidth, baseTotal),
@@ -573,8 +609,8 @@ function RunHistoryTable({
             <col key={i} style={{ width: w }} />
           ))}
         </colgroup>
-        <thead>
-          <tr className="h-10 border-b border-datavis-gridlines bg-surface-table-row-header">
+        <thead className={DATA_GRID_THEAD_CLASS}>
+          <tr className={DATA_GRID_HEADER_ROW_CLASS}>
             <th scope="col" style={colStyle(0)} className="relative h-10 border-r border-datavis-gridlines px-0 py-0 align-middle">
               <div className="flex items-center justify-center">
                 <Checkbox
@@ -705,7 +741,7 @@ function RunHistoryTable({
                   </td>
                 </tr>
                 {expanded ? (
-                  <tr className="border-b border-datavis-gridlines bg-surface-table-row-header">
+                  <tr className={DATA_GRID_EXPANDED_ROW_CLASS}>
                     <td colSpan={RUN_HISTORY_COLUMN_COUNT} className="px-4 py-3 align-top">
                       <p className="text-sm leading-relaxed text-text-secondary">{row.details}</p>
                     </td>
@@ -716,6 +752,20 @@ function RunHistoryTable({
           })}
         </tbody>
       </table>
+        </div>
+      </div>
+      {showPagination ? (
+        <DataGridPagination
+          page={page}
+          pageCount={pageCount}
+          itemCount={itemCount}
+          pageSize={pageSize}
+          pageSizeOptions={pageSizeOptions}
+          showPageControls={showPageControls}
+          onPageChange={setPage}
+          onPageSizeChange={setPageSize}
+        />
+      ) : null}
     </div>
   );
 }
@@ -789,8 +839,11 @@ export function DetectionHistoryContent() {
     });
   };
 
+  const { toolbarRef, sectionStyle } = useDataGridStickyToolbar();
+
   return (
-    <>
+    <div className="flex flex-col gap-4">
+      <div className={DATA_GRID_ABOVE_SECTION_CLASS}>
       <div className="grid shrink-0 grid-cols-1 items-stretch gap-4 lg:grid-cols-3">
         <RunHistoryCard
           completedCount={RUNS_COMPLETED_COUNT}
@@ -802,9 +855,14 @@ export function DetectionHistoryContent() {
         <TopTriggeredDetectionsCard selectedLabel={detectionNameFilter} onSegmentClick={handleDetectionClick} />
         <SeverityBreakdownCard selectedSeverity={severityFilter} onSeverityClick={handleSeverityClick} />
       </div>
+      </div>
 
-      <section className="flex min-h-0 min-w-0 flex-1 flex-col overflow-hidden rounded-[4px] border border-border-container bg-datavis-card-bg shadow-datavis-card">
-        <div className="shrink-0 bg-datavis-card-bg pb-3 pl-4 pr-[20px] pt-3 sm:pl-5">
+      <section
+        className={DATA_GRID_SECTION_CLASS}
+        style={sectionStyle}
+      >
+        <div ref={toolbarRef} className={DATA_GRID_TOOLBAR_STICKY_CLASS}>
+          <div className="shrink-0 bg-datavis-card-bg pb-3 pl-4 pr-[20px] pt-3 sm:pl-5">
           <h2 className="text-base-semibold text-text-primary">Detection Run History</h2>
           <div className="mt-2 flex flex-wrap items-center gap-3">
             <p className="shrink-0 text-base-small text-text-secondary">
@@ -843,21 +901,17 @@ export function DetectionHistoryContent() {
             <DataGridExportButton />
           </div>
         </div>
-        <DatavisGridlineRule inset={false} />
-        <div className="flex min-h-0 flex-1 overflow-auto bg-datavis-card-bg">
-          <FilterColumnPanel
-            active={tableTool}
-            onFilterClick={() => setTableTool(tableTool === "filter" ? null : "filter")}
-            onColumnsClick={() => setTableTool(tableTool === "columns" ? null : "columns")}
-          />
-          <RunHistoryTable
-            rows={filteredRows}
-            expandedIds={expandedIds}
-            onToggleExpand={toggleExpand}
-            onToggleExpandAll={toggleExpandAll}
-          />
+          <DatavisGridlineRule inset={false} />
         </div>
+        <RunHistoryTable
+          rows={filteredRows}
+          expandedIds={expandedIds}
+          onToggleExpand={toggleExpand}
+          onToggleExpandAll={toggleExpandAll}
+          tableTool={tableTool}
+          onTableToolChange={setTableTool}
+        />
       </section>
-    </>
+    </div>
   );
 }

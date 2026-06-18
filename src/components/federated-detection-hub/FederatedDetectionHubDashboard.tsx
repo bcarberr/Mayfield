@@ -1,4 +1,16 @@
-import { Fragment, useEffect, useMemo, useState } from "react";
+import { Fragment, useCallback, useEffect, useMemo, useRef, useState } from "react";
+import {
+  DATA_GRID_ABOVE_SECTION_CLASS,
+  DATA_GRID_EXPANDED_ROW_CLASS,
+  DATA_GRID_FILTER_ROW_CLASS,
+  DATA_GRID_HEADER_ROW_CLASS,
+  DATA_GRID_SECTION_CLASS,
+  DATA_GRID_TABLE_CLASS,
+  DATA_GRID_TABLE_SCROLL_CLASS,
+  DATA_GRID_THEAD_CLASS,
+  DATA_GRID_TOOLBAR_STICKY_CLASS,
+} from "../ui/dataGridTableStyles";
+import { useDataGridStickyToolbar } from "../ui/useDataGridStickyToolbar";
 import { Checkbox, Icon, Switch, type SeverityShapeIconName } from "../../design-system";
 import { Button } from "../ui/Button";
 import { ColumnHeaderMenu } from "../ui/ColumnHeaderMenu";
@@ -11,17 +23,58 @@ import {
 import { FilterColumnPanel, type FilterColumnPanelTool } from "../ui/FilterColumnPanel";
 import { Input } from "../ui/Input";
 import { DataGridExportButton } from "../ui/DataGridExportButton";
+import { DataGridPagination } from "../ui/DataGridPagination";
 import { SeverityTableIcon } from "../ui/SeverityTableIcon";
-import { Modal } from "../ui/Modal";
-import { type ContentAreaSlideOverState } from "../ui/SlideOver";
+import {
+  PageSlideOver,
+  FORM_CONTENT_SLIDE_OVER_PANEL_CLASS,
+  type ContentAreaSlideOverState,
+} from "../ui/SlideOver";
 import { TruncatedText } from "../ui/TruncatedText";
+import { Snackbar } from "../ui/Snackbar";
 import { DonutChartPanel } from "../ui/DonutChartPanel";
 import { useResizableColumns } from "../ui/useResizableColumns";
+import { useDataGridPagination } from "../ui/useDataGridPagination";
 import { InsightCard } from "../summary-insights/datavisCard";
 import { HorizontalBarPanel } from "../summary-insights/horizontalBarPanel";
+import { CreateDetectionSlideOver, type NewDetectionPayload } from "./CreateDetectionSlideOver";
+import { DetectionExpandedDetails } from "./detectionRunConnectors";
+import { FindingsSearchCell } from "./FindingsSearchCell";
 import { DetectionHistoryContent } from "./DetectionHistoryContent";
-import { DetectionLibraryContent } from "./DetectionLibraryContent";
+import {
+  buildInitialEnabledByName,
+  detectionEnabledKey,
+  getDetectionEnabled,
+} from "./detectionEnabledState";
+import { DetectionLibraryContent, LIBRARY_DETECTION_ROWS, type LibraryDetectionRow } from "./DetectionLibraryContent";
 import { QueuedForReviewContent } from "./QueuedForReviewContent";
+import {
+  detectionRowToQueuedRow,
+  INITIAL_QUEUED_DETECTION_ROWS,
+  type QueuedDetectionRow,
+} from "./detectionQueue";
+import {
+  Dialog,
+  DialogContent,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+} from "@/components/shadcn/dialog";
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/shadcn/tabs";
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuLabel,
+  DropdownMenuSeparator,
+  DropdownMenuTrigger,
+} from "@/components/shadcn/dropdown-menu";
+import {
+  Tooltip,
+  TooltipContent,
+  TooltipProvider,
+  TooltipTrigger,
+} from "@/components/shadcn/tooltip";
 
 const cx = (...c: (string | false | undefined)[]) => c.filter(Boolean).join(" ");
 
@@ -59,16 +112,16 @@ const SYSTEM_HEALTH_FILTER_LABELS: Record<SystemHealthFilter, string> = {
   inactive: "Inactive",
 };
 
-function detectionIsEnabled(row: DetectionRow, enabledById: Record<string, boolean>): boolean {
-  return enabledById[row.id] ?? row.enabled;
+function detectionIsEnabled(row: DetectionRow, enabledByName: Record<string, boolean>): boolean {
+  return getDetectionEnabled(row.name, row.enabled, enabledByName);
 }
 
-function detectionRunsNormally(row: DetectionRow, enabledById: Record<string, boolean>): boolean {
-  return detectionIsEnabled(row, enabledById) && !detectionNeedsAttention(row);
+function detectionRunsNormally(row: DetectionRow, enabledByName: Record<string, boolean>): boolean {
+  return detectionIsEnabled(row, enabledByName) && !detectionNeedsAttention(row);
 }
 
-function detectionIsInactive(row: DetectionRow, enabledById: Record<string, boolean>): boolean {
-  return !detectionIsEnabled(row, enabledById);
+function detectionIsInactive(row: DetectionRow, enabledByName: Record<string, boolean>): boolean {
+  return !detectionIsEnabled(row, enabledByName);
 }
 
 function detectionMatchesSearch(row: DetectionRow, query: string, enabled: boolean): boolean {
@@ -102,7 +155,42 @@ type DetectionRow = {
   lastRun: string;
   recurrence: string;
   findings: number | "error" | "none";
+  /** Pre-configured detection from the Query library — read-only except copy. */
+  source?: "library";
+  connectorsActive?: number;
+  connectorsTotal?: number;
 };
+
+const LIBRARY_MANAGED_DETECTIONS: DetectionRow[] = [
+  {
+    id: "managed-lib-1",
+    source: "library",
+    name: "APT28 Operation Phantom Net Voxel",
+    description:
+      "Detects command-and-control beaconing and DNS tunneling patterns associated with APT28 infrastructure across perimeter and internal resolvers.",
+    enabled: true,
+    severity: "High",
+    lastRun: "Oct 31, 2024 2:15 PM",
+    recurrence: "Every 30 minutes",
+    findings: 42,
+    connectorsActive: 14,
+    connectorsTotal: 36,
+  },
+  {
+    id: "managed-lib-2",
+    source: "library",
+    name: "Suspicious Kerberos TGT Request",
+    description:
+      "Flags anomalous Kerberos ticket-granting ticket requests indicative of credential theft or golden ticket activity.",
+    enabled: true,
+    severity: "Critical",
+    lastRun: "Oct 31, 2024 1:45 PM",
+    recurrence: "Every 30 minutes",
+    findings: 18,
+    connectorsActive: 12,
+    connectorsTotal: 36,
+  },
+];
 
 const DETECTION_COLUMN_COUNT = 9;
 
@@ -133,6 +221,7 @@ const SEVERITY_BREAKDOWN_X_MAX = 700;
 const SEVERITY_BREAKDOWN_X_TICKS = [0, 175, 350, 525, 700] as const;
 
 const DETECTION_ROWS: DetectionRow[] = [
+  ...LIBRARY_MANAGED_DETECTIONS,
   {
     id: "1",
     name: "Suspicious PowerShell Execution",
@@ -311,30 +400,37 @@ const DETECTION_ROWS: DetectionRow[] = [
   },
 ];
 
-function HubTabs({ active, onChange }: { active: HubTab; onChange: (tab: HubTab) => void }) {
-  return (
-    <nav className="flex min-w-0 flex-1 gap-6" aria-label="Detection hub sections">
-      {HUB_TABS.map((tab) => {
-        const isActive = tab === active;
-        return (
-          <button
-            key={tab}
-            type="button"
-            className={cx(
-              "border-b-2 pb-3 text-sm font-semibold transition-colors",
-              isActive
-                ? "border-interactive-active text-text-primary"
-                : "border-transparent text-text-tertiary hover:text-text-secondary",
-            )}
-            aria-current={isActive ? "page" : undefined}
-            onClick={() => onChange(tab)}
-          >
-            {tab}
-          </button>
-        );
-      })}
-    </nav>
-  );
+
+function libraryDetectionToViewRow(
+  row: LibraryDetectionRow,
+  enabledByName: Record<string, boolean>,
+): DetectionRow {
+  return {
+    id: row.id,
+    source: "library",
+    name: row.name,
+    description: row.description,
+    enabled: getDetectionEnabled(row.name, row.enabled, enabledByName),
+    severity: row.severity,
+    lastRun: row.lastRun,
+    recurrence: row.recurrence,
+    findings: row.findings,
+    connectorsActive: row.connectorsActive,
+    connectorsTotal: row.connectorsTotal,
+  };
+}
+
+function libraryDetectionToManagedRow(row: LibraryDetectionRow): DetectionRow {
+  return {
+    id: row.id,
+    name: row.name,
+    description: row.description,
+    enabled: row.enabled,
+    severity: row.severity,
+    lastRun: "—",
+    recurrence: row.recurrence,
+    findings: "none",
+  };
 }
 
 /** Figma `7671:8909` — System Health widget. */
@@ -475,7 +571,6 @@ function SeverityBreakdownCard({
         filterAriaLabel={(label) => `Filter detections by ${label} severity`}
         xMax={SEVERITY_BREAKDOWN_X_MAX}
         xTicks={SEVERITY_BREAKDOWN_X_TICKS}
-        axisLabel="Findings"
         dense
         denseRowGap={16}
       />
@@ -483,174 +578,197 @@ function SeverityBreakdownCard({
   );
 }
 
-function defaultCopyDetectionName(name: string): string {
-  return `${name} copy`;
-}
-
-function nextDetectionId(rows: DetectionRow[]): string {
-  const numericIds = rows.map((row) => Number.parseInt(row.id, 10)).filter((id) => !Number.isNaN(id));
-  const maxId = numericIds.length > 0 ? Math.max(...numericIds) : 0;
-  return String(maxId + 1);
-}
-
-function DuplicateDetectionModal({
+function DeleteConfirmationModal({
   open,
-  name,
-  onNameChange,
   onClose,
   onConfirm,
 }: {
   open: boolean;
-  name: string;
-  onNameChange: (name: string) => void;
   onClose: () => void;
   onConfirm: () => void;
 }) {
-  const trimmedName = name.trim();
-
   return (
-    <Modal
-      open={open}
-      title="Duplicate Detection"
-      onClose={onClose}
-      footer={
-        <div className="flex justify-end gap-2">
+    <Dialog open={open} onOpenChange={(o) => { if (!o) onClose(); }}>
+      <DialogContent
+        showCloseButton={false}
+        className="gap-0 border border-border-rule bg-surface-modal p-0 text-text-primary ring-0 shadow-xl sm:max-w-sm"
+      >
+        <DialogHeader className="flex-row items-start justify-between gap-3 border-b border-border-rule px-4 py-3">
+          <DialogTitle className="text-base font-bold leading-normal tracking-wide text-text-primary">
+            Delete Detection
+          </DialogTitle>
+          <Button
+            type="button"
+            variant="ghost"
+            className="h-auto shrink-0 p-0 text-text-tertiary hover:text-text-primary"
+            aria-label="Close dialog"
+            onClick={onClose}
+          >
+            <Icon name="close" size={20} />
+          </Button>
+        </DialogHeader>
+        <div className="px-4 py-6 text-sm text-text-secondary">
+          Are you sure you want to delete this detection? This action cannot be undone.
+        </div>
+        <DialogFooter className="mx-0 mb-0 gap-2 rounded-b-xl border-t border-border-rule bg-transparent px-4 py-3 sm:flex-row sm:justify-end">
           <Button type="button" variant="secondary" onClick={onClose}>
             Cancel
           </Button>
-          <Button type="button" variant="primary" disabled={!trimmedName} onClick={onConfirm}>
-            Duplicate
+          <Button
+            type="button"
+            variant="primary"
+            className="!bg-feedback-negative hover:!opacity-90"
+            onClick={onConfirm}
+          >
+            Delete
           </Button>
-        </div>
-      }
-    >
-      <label className="block">
-        <span className="text-sm font-semibold text-text-primary">Detection name</span>
-        <Input
-          value={name}
-          onChange={(event) => onNameChange(event.target.value)}
-          className="mt-2"
-          autoFocus
-        />
-      </label>
-    </Modal>
+        </DialogFooter>
+      </DialogContent>
+    </Dialog>
+  );
+}
+
+function QueuedForReviewIndicator({ onClear }: { onClear: () => void }) {
+  return (
+    <DropdownMenu>
+      <DropdownMenuTrigger asChild>
+        <button
+          type="button"
+          className="shrink-0 rounded p-0.5 text-feedback-caution hover:bg-overlay-subtle focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-interactive-active"
+          aria-label="Queued for review"
+        >
+          <Icon name="action-time" size={14} aria-hidden />
+        </button>
+      </DropdownMenuTrigger>
+      <DropdownMenuContent align="start" className="w-52">
+        <DropdownMenuLabel>Queued for review</DropdownMenuLabel>
+        <DropdownMenuSeparator />
+        <DropdownMenuItem onClick={onClear}>Clear from queue</DropdownMenuItem>
+      </DropdownMenuContent>
+    </DropdownMenu>
+  );
+}
+
+function DisabledTableActionIcon({
+  icon,
+  label,
+  tooltip,
+}: {
+  icon: "action-edit" | "action-delete";
+  label: string;
+  tooltip: string;
+}) {
+  return (
+    <Tooltip>
+      <TooltipTrigger asChild>
+        <span
+          role="img"
+          aria-label={label}
+          className="inline-flex size-7 cursor-not-allowed items-center justify-center text-text-disabled opacity-[0.22] saturate-0 [&_svg]:!size-3 [&_svg]:!h-3 [&_svg]:!w-3"
+        >
+          <Icon name={icon} size={12} aria-hidden />
+        </span>
+      </TooltipTrigger>
+      <TooltipContent>{tooltip}</TooltipContent>
+    </Tooltip>
   );
 }
 
 function DetectionActions({
   name,
   onEdit,
+  onRunNow,
   onCopy,
   onDelete,
+  onQueueForReview,
+  isQueuedForReview,
+  isLibraryManaged = false,
 }: {
   name: string;
   onEdit: () => void;
+  onRunNow: () => void;
   onCopy: () => void;
   onDelete: () => void;
+  onQueueForReview: () => void;
+  isQueuedForReview: boolean;
+  isLibraryManaged?: boolean;
 }) {
   const actionBtn =
     "size-7 shrink-0 p-0 text-text-tertiary hover:text-text-primary [&_svg]:!size-3 [&_svg]:!h-3 [&_svg]:!w-3";
+  const actionBtnLg =
+    "size-7 shrink-0 p-0 text-text-tertiary hover:text-text-primary [&_svg]:!size-4 [&_svg]:!h-4 [&_svg]:!w-4";
   const moreBtn =
     "size-7 shrink-0 p-0 text-text-tertiary hover:text-text-primary [&_svg]:!size-4 [&_svg]:!h-4 [&_svg]:!w-4";
+  const libraryActionTooltip = "Pre-configured from Query library — copy to customize";
 
   return (
-    <div className="flex items-center justify-start gap-0.5">
-      <Button type="button" variant="ghost" className={actionBtn} aria-label={`Edit ${name}`} onClick={onEdit}>
-        <Icon name="action-edit" size={12} />
-      </Button>
-      <Button type="button" variant="ghost" className={actionBtn} aria-label={`Copy ${name}`} onClick={onCopy}>
-        <Icon name="action-content-copy" size={12} />
-      </Button>
-      <Button type="button" variant="ghost" className={actionBtn} aria-label={`Delete ${name}`} onClick={onDelete}>
-        <Icon name="action-delete" size={12} />
-      </Button>
-      <Button type="button" variant="ghost" className={moreBtn} aria-label={`More actions for ${name}`}>
-        <Icon name="navi-more-vert" size={16} />
-      </Button>
-    </div>
-  );
-}
+    <TooltipProvider>
+      <div className="flex items-center justify-start gap-0.5">
+        {isLibraryManaged ? (
+          <DisabledTableActionIcon
+            icon="action-edit"
+            label="Edit detection"
+            tooltip={libraryActionTooltip}
+          />
+        ) : (
+          <Tooltip>
+            <TooltipTrigger asChild>
+              <Button type="button" variant="ghost" className={actionBtn} aria-label="Edit detection" onClick={onEdit}>
+                <Icon name="action-edit" size={12} />
+              </Button>
+            </TooltipTrigger>
+            <TooltipContent>Edit detection</TooltipContent>
+          </Tooltip>
+        )}
 
-function FindingsCell({ findings }: { findings: DetectionRow["findings"] }) {
-  if (findings === "error") {
-    return (
-      <span className="inline-flex items-center gap-1.5 text-sm font-semibold text-feedback-negative">
-        <Icon name="error-outline" size={16} aria-hidden />
-        Error
-      </span>
-    );
-  }
-  if (findings === "none") {
-    return <span className="text-sm text-text-secondary">—</span>;
-  }
-  return (
-    <span className="inline-flex items-center gap-1.5 text-sm text-text-secondary">
-      <Icon name="search" size={14} className="text-text-tertiary" aria-hidden />
-      <span className="tabular-nums">{findings}</span>
-    </span>
-  );
-}
+        <Tooltip>
+          <TooltipTrigger asChild>
+            <Button type="button" variant="ghost" className={actionBtnLg} aria-label="Run now" onClick={onRunNow}>
+              <Icon name="navi-double-chevron" size={16} />
+            </Button>
+          </TooltipTrigger>
+          <TooltipContent>Run now</TooltipContent>
+        </Tooltip>
 
-function DetectionDetailPanel({
-  row,
-  enabled,
-  mode,
-  onClose,
-}: {
-  row: DetectionRow;
-  enabled: boolean;
-  mode: "view" | "edit";
-  onClose: () => void;
-}) {
-  return (
-    <div className="flex h-full min-h-0 flex-col text-text-primary">
-      <header className="flex shrink-0 items-start justify-between gap-3 border-b border-border-rule px-5 py-4">
-        <div className="min-w-0">
-          <p className="text-xs font-bold uppercase tracking-wide text-text-tertiary">
-            {mode === "edit" ? "Edit detection" : "Detection"}
-          </p>
-          <h2 className="mt-1 text-page-title text-text-primary">{row.name}</h2>
-        </div>
-        <Button type="button" variant="ghost" className="shrink-0 p-1 text-text-tertiary hover:text-text-primary" aria-label="Close detection details" onClick={onClose}>
-          <Icon name="close" size={20} />
-        </Button>
-      </header>
-      <div className="min-h-0 flex-1 overflow-y-auto px-5 py-4">
-        <div className="flex items-center gap-2">
-          <SeverityTableIcon name={SEV_ICONS[row.severity]} color={SEV_COLORS[row.severity]} />
-          <span className="text-sm font-semibold text-text-primary">{row.severity}</span>
-          <span className="text-sm text-text-tertiary">·</span>
-          <span className="text-sm text-text-secondary">{enabled ? "Enabled" : "Disabled"}</span>
-        </div>
-        <p className="mt-4 text-sm leading-relaxed text-text-secondary">{row.description}</p>
-        <dl className="mt-6 space-y-3 border-t border-border-rule pt-4 text-sm">
-          <div className="flex gap-3">
-            <dt className="w-28 shrink-0 text-text-tertiary">Last run</dt>
-            <dd className="text-text-secondary">{row.lastRun}</dd>
-          </div>
-          <div className="flex gap-3">
-            <dt className="w-28 shrink-0 text-text-tertiary">Recurrence</dt>
-            <dd className="text-text-secondary">{row.recurrence}</dd>
-          </div>
-          <div className="flex gap-3">
-            <dt className="w-28 shrink-0 text-text-tertiary">Findings</dt>
-            <dd>
-              <FindingsCell findings={row.findings} />
-            </dd>
-          </div>
-        </dl>
+        {isLibraryManaged ? (
+          <DisabledTableActionIcon
+            icon="action-delete"
+            label="Delete detection"
+            tooltip="Library detections cannot be deleted"
+          />
+        ) : (
+          <Tooltip>
+            <TooltipTrigger asChild>
+              <Button type="button" variant="ghost" className={actionBtn} aria-label="Delete detection" onClick={onDelete}>
+                <Icon name="action-delete" size={12} />
+              </Button>
+            </TooltipTrigger>
+            <TooltipContent>Delete detection</TooltipContent>
+          </Tooltip>
+        )}
+
+        <DropdownMenu>
+          <DropdownMenuTrigger asChild>
+            <Button type="button" variant="ghost" className={moreBtn} aria-label={`More actions for ${name}`}>
+              <Icon name="navi-more-vert" size={16} />
+            </Button>
+          </DropdownMenuTrigger>
+          <DropdownMenuContent align="end">
+            <DropdownMenuItem onClick={onCopy}>
+              Create copy
+            </DropdownMenuItem>
+            {!isQueuedForReview ? (
+              <DropdownMenuItem onClick={onQueueForReview}>
+                Queue for review
+              </DropdownMenuItem>
+            ) : null}
+          </DropdownMenuContent>
+        </DropdownMenu>
       </div>
-      <footer className="flex shrink-0 justify-end gap-2 border-t border-border-rule px-5 py-4">
-        <Button type="button" variant="secondary" onClick={onClose}>
-          Close
-        </Button>
-        <Button type="button" variant="primary">
-          Edit detection
-        </Button>
-      </footer>
-    </div>
+    </TooltipProvider>
   );
 }
+
 
 /** px widths: select, expand, detections, state, severity, last run, recurrence, findings, actions */
 const DETECTION_SEVERITY_ORDER: Record<DetectionSeverity, number> = {
@@ -694,11 +812,15 @@ function DetectionsTable({
   expandedIds,
   onToggleExpand,
   onToggleExpandAll,
-  onOpenDetection,
   onEditDetection,
+  onViewLibraryDetection,
   onCopyDetection,
   onDeleteDetection,
-  enabledById,
+  onRunNow,
+  onQueueForReview,
+  onClearFromReview,
+  queuedById,
+  enabledByName,
   onEnabledChange,
   detectionNameFilter,
   severityFilter,
@@ -709,6 +831,7 @@ function DetectionsTable({
   onShowOnlyActiveChange,
   totalCount,
   onClearFilters,
+  scrollToRowId,
 }: {
   rows: DetectionRow[];
   tableTool: FilterColumnPanelTool | null;
@@ -716,12 +839,16 @@ function DetectionsTable({
   expandedIds: Set<string>;
   onToggleExpand: (id: string) => void;
   onToggleExpandAll: () => void;
-  onOpenDetection: (id: string) => void;
   onEditDetection: (id: string) => void;
+  onViewLibraryDetection: (id: string) => void;
   onCopyDetection: (id: string) => void;
   onDeleteDetection: (id: string) => void;
-  enabledById: Record<string, boolean>;
-  onEnabledChange: (id: string, enabled: boolean) => void;
+  onRunNow: (name: string) => void;
+  onQueueForReview: (id: string) => void;
+  onClearFromReview: (id: string) => void;
+  queuedById: Record<string, boolean>;
+  enabledByName: Record<string, boolean>;
+  onEnabledChange: (name: string, enabled: boolean) => void;
   detectionNameFilter: string | null;
   severityFilter: BreakdownSeverity | null;
   systemHealthFilter: SystemHealthFilter | null;
@@ -731,6 +858,7 @@ function DetectionsTable({
   onShowOnlyActiveChange: (checked: boolean) => void;
   totalCount: number;
   onClearFilters: () => void;
+  scrollToRowId?: string | null;
 }) {
   const [selected, setSelected] = useState<Set<string>>(() => new Set());
   const {
@@ -775,27 +903,53 @@ function DetectionsTable({
     detectionNameFilter != null ||
     severityFilter != null ||
     systemHealthFilter != null ||
-    showOnlyActive ||
     searchQuery.trim().length > 0;
   const allExpanded = rows.length > 0 && rows.every((row) => expandedIds.has(row.id));
   const sortComparators = useMemo(
     (): Record<DetectionSortColumn, (a: DetectionRow, b: DetectionRow) => number> => ({
       name: (a, b) => compareStrings(a.name, b.name),
       state: (a, b) =>
-        compareBooleans(enabledById[a.id] ?? a.enabled, enabledById[b.id] ?? b.enabled),
+        compareBooleans(
+          getDetectionEnabled(a.name, a.enabled, enabledByName),
+          getDetectionEnabled(b.name, b.enabled, enabledByName),
+        ),
       severity: (a, b) => DETECTION_SEVERITY_ORDER[a.severity] - DETECTION_SEVERITY_ORDER[b.severity],
       lastRun: (a, b) => compareStrings(a.lastRun, b.lastRun),
       recurrence: (a, b) => compareStrings(a.recurrence, b.recurrence),
       findings: (a, b) => compareFindings(a.findings, b.findings),
     }),
-    [enabledById],
+    [enabledByName],
   );
-  const { sortedRows, getSortProps } = useColumnSort(sortComparators);
-  const displayRows = sortedRows(rows);
+  const { sortedRows, getSortProps, clearSort } = useColumnSort(sortComparators);
+  const sorted = sortedRows(rows);
+  const {
+    page,
+    setPage,
+    pageCount,
+    pagedItems: displayRows,
+    pageSize,
+    setPageSize,
+    pageSizeOptions,
+    showPagination,
+    showPageControls,
+    itemCount,
+  } = useDataGridPagination(sorted);
+
+  useEffect(() => {
+    if (!scrollToRowId) return;
+    clearSort();
+    setPage(1);
+  }, [scrollToRowId, clearSort, setPage]);
+
+  const { toolbarRef, sectionStyle } = useDataGridStickyToolbar();
 
   return (
-    <section className="flex min-h-0 min-w-0 flex-1 flex-col overflow-hidden rounded-[4px] border border-border-container bg-datavis-card-bg shadow-datavis-card">
-      <div className="shrink-0 bg-datavis-card-bg pb-3 pl-4 pr-[20px] pt-3 sm:pl-5">
+    <section
+      className={DATA_GRID_SECTION_CLASS}
+      style={sectionStyle}
+    >
+      <div ref={toolbarRef} className={DATA_GRID_TOOLBAR_STICKY_CLASS}>
+        <div className="shrink-0 bg-datavis-card-bg pb-3 pl-4 pr-[20px] pt-3 sm:pl-5">
         <h2 className="text-base-semibold text-text-primary">Detections</h2>
         <div className="mt-2 flex flex-wrap items-center gap-3">
           <p className="shrink-0 text-base-small text-text-secondary">
@@ -838,8 +992,9 @@ function DetectionsTable({
           <DataGridExportButton />
         </div>
       </div>
-      <DatavisGridlineRule inset={false} />
-      <div className="flex min-h-0 flex-1 overflow-auto bg-datavis-card-bg">
+        <DatavisGridlineRule inset={false} />
+      </div>
+      <div className={DATA_GRID_FILTER_ROW_CLASS}>
         <FilterColumnPanel
           active={tableTool}
           onFilterClick={() => onTableToolChange(tableTool === "filter" ? null : "filter")}
@@ -847,10 +1002,10 @@ function DetectionsTable({
         />
         <div
           ref={containerRef}
-          className={cx("min-h-0 min-w-0 flex-1 overflow-x-auto pb-3", isResizing && "select-none")}
+          className={cx(DATA_GRID_TABLE_SCROLL_CLASS, isResizing && "select-none")}
         >
           <table
-            className="table-fixed border-collapse text-left text-sm"
+            className={DATA_GRID_TABLE_CLASS}
             style={{
               width: tableFillsContainer ? "100%" : baseTotal,
               minWidth: Math.max(minTableWidth, baseTotal),
@@ -862,8 +1017,8 @@ function DetectionsTable({
                 <col key={i} style={{ width: w }} />
               ))}
             </colgroup>
-            <thead>
-              <tr className="h-10 border-b border-datavis-gridlines bg-surface-table-row-header">
+            <thead className={DATA_GRID_THEAD_CLASS}>
+              <tr className={DATA_GRID_HEADER_ROW_CLASS}>
                 <th scope="col" style={colStyle(0)} className="relative h-10 border-r border-datavis-gridlines px-0 py-0 align-middle">
                   <div className="flex items-center justify-center">
                     <Checkbox
@@ -946,16 +1101,13 @@ function DetectionsTable({
             <tbody>
               {displayRows.map((row) => {
                 const expanded = expandedIds.has(row.id);
-                const enabled = enabledById[row.id] ?? row.enabled;
+                const enabled = getDetectionEnabled(row.name, row.enabled, enabledByName);
+                const isLibraryManaged = row.source === "library";
+                const inactiveCellClass = !enabled ? "opacity-70" : "";
                 return (
                   <Fragment key={row.id}>
-                    <tr
-                      className={cx(
-                        "h-10 border-b border-datavis-gridlines hover:bg-overlay-subtle",
-                        !enabled && "opacity-70",
-                      )}
-                    >
-                      <td style={colStyle(0)} className="h-10 px-0 py-0 align-middle">
+                    <tr className="h-10 border-b border-datavis-gridlines hover:bg-overlay-subtle">
+                      <td style={colStyle(0)} className={cx("h-10 px-0 py-0 align-middle", inactiveCellClass)}>
                         <div className="flex items-center justify-center">
                           <Checkbox
                             checked={selected.has(row.id)}
@@ -964,7 +1116,7 @@ function DetectionsTable({
                           />
                         </div>
                       </td>
-                      <td style={colStyle(1)} className="h-10 px-0 py-0 align-middle">
+                      <td style={colStyle(1)} className={cx("h-10 px-0 py-0 align-middle", inactiveCellClass)}>
                         <div className="flex justify-center">
                           <button
                             type="button"
@@ -982,55 +1134,90 @@ function DetectionsTable({
                           </button>
                         </div>
                       </td>
-                      <td style={colStyle(2)} className={cx(tdClass, "min-w-0")}>
-                        <TruncatedText
-                          as="button"
-                          className="w-full text-left font-semibold text-interactive-active hover:underline focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-interactive-active"
-                          onClick={() => onOpenDetection(row.id)}
-                        >
-                          {row.name}
-                        </TruncatedText>
+                      <td style={colStyle(2)} className={cx(tdClass, "min-w-0", inactiveCellClass)}>
+                        <div className="flex min-w-0 items-center gap-1.5">
+                          {queuedById[row.id] ? (
+                            <QueuedForReviewIndicator onClear={() => onClearFromReview(row.id)} />
+                          ) : null}
+                          {isLibraryManaged ? (
+                            <>
+                              <Icon
+                                name="nav-detections"
+                                size={16}
+                                className="shrink-0 text-text-tertiary"
+                                aria-hidden
+                              />
+                              <TruncatedText
+                                as="button"
+                                className="min-w-0 flex-1 text-left font-semibold text-interactive-active hover:underline focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-interactive-active"
+                                onClick={() => onViewLibraryDetection(row.id)}
+                              >
+                                {row.name}
+                              </TruncatedText>
+                            </>
+                          ) : (
+                            <TruncatedText
+                              as="button"
+                              className="min-w-0 flex-1 text-left font-semibold text-interactive-active hover:underline focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-interactive-active"
+                              onClick={() => onEditDetection(row.id)}
+                            >
+                              {row.name}
+                            </TruncatedText>
+                          )}
+                        </div>
                       </td>
-                      <td style={colStyle(3)} className={tdClass}>
+                      <td style={colStyle(3)} className={cx(tdClass, inactiveCellClass)}>
                         <Switch
-                          checked={enabledById[row.id] ?? row.enabled}
-                          onCheckedChange={(checked) => onEnabledChange(row.id, checked)}
+                          checked={getDetectionEnabled(row.name, row.enabled, enabledByName)}
+                          onCheckedChange={(checked) => onEnabledChange(row.name, checked)}
                           aria-label={`Toggle ${row.name}`}
                         />
                       </td>
-                      <td style={colStyle(4)} className={tdClass}>
+                      <td style={colStyle(4)} className={cx(tdClass, inactiveCellClass)}>
                         <span className="inline-flex items-center gap-2">
                           <SeverityTableIcon name={SEV_ICONS[row.severity]} color={SEV_COLORS[row.severity]} />
                           <span>{row.severity}</span>
                         </span>
                       </td>
-                      <td style={colStyle(5)} className={cx(tdClass, "tabular-nums")}>
+                      <td style={colStyle(5)} className={cx(tdClass, "tabular-nums", inactiveCellClass)}>
                         {row.lastRun}
                       </td>
-                      <td style={colStyle(6)} className={tdClass}>
+                      <td style={colStyle(6)} className={cx(tdClass, inactiveCellClass)}>
                         {row.recurrence}
                       </td>
-                      <td style={colStyle(7)} className={tdClass}>
-                        <FindingsCell findings={row.findings} />
+                      <td style={colStyle(7)} className={cx(tdClass, inactiveCellClass)}>
+                        <FindingsSearchCell
+                          findings={row.findings}
+                          detectionId={row.id}
+                          detectionName={row.name}
+                          enabled={enabled}
+                        />
                       </td>
                       <td style={colStyle(8)} className={tdClass}>
                         <DetectionActions
                           name={row.name}
                           onEdit={() => onEditDetection(row.id)}
+                          onRunNow={() => onRunNow(row.name)}
                           onCopy={() => onCopyDetection(row.id)}
                           onDelete={() => onDeleteDetection(row.id)}
+                          onQueueForReview={() => onQueueForReview(row.id)}
+                          isQueuedForReview={Boolean(queuedById[row.id])}
+                          isLibraryManaged={isLibraryManaged}
                         />
                       </td>
                     </tr>
                     {expanded ? (
                       <tr
-                        className={cx(
-                          "border-b border-datavis-gridlines bg-surface-table-row-header",
-                          !enabled && "opacity-70",
-                        )}
+                        className={cx(DATA_GRID_EXPANDED_ROW_CLASS, !enabled && "opacity-70")}
                       >
                         <td colSpan={DETECTION_COLUMN_COUNT} className="px-4 py-3 align-top">
-                          <p className="text-sm leading-relaxed text-text-secondary">{row.description}</p>
+                          <DetectionExpandedDetails
+                            description={row.description}
+                            detectionId={row.id}
+                            lastRun={row.lastRun}
+                            connectorsActive={row.connectorsActive}
+                            connectorsTotal={row.connectorsTotal}
+                          />
                         </td>
                       </tr>
                     ) : null}
@@ -1041,96 +1228,107 @@ function DetectionsTable({
           </table>
         </div>
       </div>
+      {showPagination ? (
+        <DataGridPagination
+          page={page}
+          pageCount={pageCount}
+          itemCount={itemCount}
+          pageSize={pageSize}
+          pageSizeOptions={pageSizeOptions}
+          showPageControls={showPageControls}
+          onPageChange={setPage}
+          onPageSizeChange={setPageSize}
+        />
+      ) : null}
     </section>
   );
 }
 
-function ManageDetectionsContent({ onSlideOverChange }: { onSlideOverChange: (state: ContentAreaSlideOverState | null) => void }) {
+function ManageDetectionsContent({
+  newDetectionRow,
+  updatedDetectionRow,
+  onEditDetection,
+  onViewLibraryDetection,
+  onCopyDetection,
+  onRunNow,
+  queuedById,
+  onQueueForReview,
+  onClearFromReview,
+  enabledByName,
+  onEnabledChange,
+}: {
+  newDetectionRow?: DetectionRow | null;
+  updatedDetectionRow?: DetectionRow | null;
+  onEditDetection: (row: DetectionRow) => void;
+  onViewLibraryDetection: (row: DetectionRow) => void;
+  onCopyDetection: (row: DetectionRow) => void;
+  onRunNow: (name: string) => void;
+  queuedById: Record<string, boolean>;
+  onQueueForReview: (row: DetectionRow) => void;
+  onClearFromReview: (id: string) => void;
+  enabledByName: Record<string, boolean>;
+  onEnabledChange: (name: string, enabled: boolean) => void;
+}) {
   const [tableTool, setTableTool] = useState<FilterColumnPanelTool | null>("filter");
   const [searchQuery, setSearchQuery] = useState("");
   const [expandedIds, setExpandedIds] = useState<Set<string>>(() => new Set());
   const [detectionRows, setDetectionRows] = useState<DetectionRow[]>(() => [...DETECTION_ROWS]);
-  const [drawerDetectionId, setDrawerDetectionId] = useState<string | null>(null);
-  const [drawerMode, setDrawerMode] = useState<"view" | "edit">("view");
   const [detectionNameFilter, setDetectionNameFilter] = useState<string | null>(null);
   const [severityFilter, setSeverityFilter] = useState<BreakdownSeverity | null>(null);
-  const [enabledById, setEnabledById] = useState<Record<string, boolean>>(() =>
-    Object.fromEntries(DETECTION_ROWS.map((r) => [r.id, r.enabled])),
-  );
+
+  useEffect(() => {
+    if (!newDetectionRow) return;
+    setDetectionRows((rows) => {
+      if (rows.some((r) => r.id === newDetectionRow.id)) return rows;
+      return [newDetectionRow, ...rows];
+    });
+  }, [newDetectionRow]);
+
+  useEffect(() => {
+    if (!updatedDetectionRow) return;
+    setDetectionRows((rows) =>
+      rows.map((r) => (r.id === updatedDetectionRow.id ? updatedDetectionRow : r)),
+    );
+  }, [updatedDetectionRow]);
+
   const [showOnlyActive, setShowOnlyActive] = useState(false);
   const [systemHealthFilter, setSystemHealthFilter] = useState<SystemHealthFilter | null>(null);
-  const [copySourceId, setCopySourceId] = useState<string | null>(null);
-  const [copyName, setCopyName] = useState("");
+  const [deleteTargetId, setDeleteTargetId] = useState<string | null>(null);
 
-  const openDetectionPanel = (id: string, mode: "view" | "edit") => {
-    setDrawerDetectionId(id);
-    setDrawerMode(mode);
-  };
-
-  const handleDeleteDetection = (id: string) => {
-    setDetectionRows((rows) => rows.filter((row) => row.id !== id));
-    setDrawerDetectionId((current) => (current === id ? null : current));
+  const confirmDelete = () => {
+    if (!deleteTargetId) return;
+    setDetectionRows((rows) => rows.filter((row) => row.id !== deleteTargetId));
+    onClearFromReview(deleteTargetId);
     setExpandedIds((current) => {
       const next = new Set(current);
-      next.delete(id);
+      next.delete(deleteTargetId);
       return next;
     });
+    setDeleteTargetId(null);
   };
 
-  const handleOpenCopyDetection = (id: string) => {
-    const source = detectionRows.find((row) => row.id === id);
-    if (!source) return;
-    setCopySourceId(id);
-    setCopyName(defaultCopyDetectionName(source.name));
+  const handleCopyDetectionById = (id: string) => {
+    const row = detectionRows.find((r) => r.id === id);
+    if (row) onCopyDetection(row);
   };
 
-  const handleCloseCopyDetection = () => {
-    setCopySourceId(null);
-    setCopyName("");
-  };
-
-  const handleConfirmCopyDetection = () => {
-    const trimmedName = copyName.trim();
-    if (!copySourceId || !trimmedName) return;
-
-    const source = detectionRows.find((row) => row.id === copySourceId);
-    if (!source) {
-      handleCloseCopyDetection();
-      return;
-    }
-
-    const newId = nextDetectionId(detectionRows);
-    const duplicate: DetectionRow = {
-      ...source,
-      id: newId,
-      name: trimmedName,
-    };
-
-    setDetectionRows((rows) => {
-      const sourceIndex = rows.findIndex((row) => row.id === copySourceId);
-      if (sourceIndex === -1) return [...rows, duplicate];
-      const next = [...rows];
-      next.splice(sourceIndex + 1, 0, duplicate);
-      return next;
-    });
-    setEnabledById((current) => ({
-      ...current,
-      [newId]: source.enabled,
-    }));
-    handleCloseCopyDetection();
+  const handleQueueForReview = (id: string) => {
+    if (queuedById[id]) return;
+    const row = detectionRows.find((detection) => detection.id === id);
+    if (row) onQueueForReview(row);
   };
 
   const systemHealthCounts = useMemo(() => {
-    const inactive = detectionRows.filter((row) => detectionIsInactive(row, enabledById)).length;
+    const inactive = detectionRows.filter((row) => detectionIsInactive(row, enabledByName)).length;
     const needAttention = detectionRows.filter(detectionNeedsAttention).length;
-    const runningNormally = detectionRows.filter((row) => detectionRunsNormally(row, enabledById)).length;
+    const runningNormally = detectionRows.filter((row) => detectionRunsNormally(row, enabledByName)).length;
     return {
       inactive,
       needAttention,
       runningNormally,
       total: detectionRows.length,
     };
-  }, [detectionRows, enabledById]);
+  }, [detectionRows, enabledByName]);
 
   const filteredRows = useMemo(
     () =>
@@ -1138,40 +1336,15 @@ function ManageDetectionsContent({ onSlideOverChange }: { onSlideOverChange: (st
         if (detectionNameFilter && row.name !== detectionNameFilter) return false;
         if (severityFilter && !rowMatchesSeverityFilter(row.severity, severityFilter)) return false;
         if (systemHealthFilter === "need-attention" && !detectionNeedsAttention(row)) return false;
-        if (systemHealthFilter === "inactive" && !detectionIsInactive(row, enabledById)) return false;
-        if (systemHealthFilter === "running-normally" && !detectionRunsNormally(row, enabledById)) return false;
-        const enabled = enabledById[row.id] ?? row.enabled;
+        if (systemHealthFilter === "inactive" && !detectionIsInactive(row, enabledByName)) return false;
+        if (systemHealthFilter === "running-normally" && !detectionRunsNormally(row, enabledByName)) return false;
+        const enabled = getDetectionEnabled(row.name, row.enabled, enabledByName);
         if (showOnlyActive && !enabled) return false;
         if (!detectionMatchesSearch(row, searchQuery, enabled)) return false;
         return true;
       }),
-    [detectionRows, detectionNameFilter, severityFilter, systemHealthFilter, searchQuery, enabledById, showOnlyActive],
+    [detectionRows, detectionNameFilter, severityFilter, systemHealthFilter, searchQuery, enabledByName, showOnlyActive],
   );
-
-  const drawerRow = useMemo(
-    () => (drawerDetectionId ? detectionRows.find((r) => r.id === drawerDetectionId) : undefined),
-    [detectionRows, drawerDetectionId],
-  );
-
-  useEffect(() => {
-    onSlideOverChange(
-      drawerRow
-        ? {
-            ariaLabel: `Detection: ${drawerRow.name}`,
-            onClose: () => setDrawerDetectionId(null),
-            panel: (
-              <DetectionDetailPanel
-                row={drawerRow}
-                enabled={enabledById[drawerRow.id] ?? drawerRow.enabled}
-                mode={drawerMode}
-                onClose={() => setDrawerDetectionId(null)}
-              />
-            ),
-          }
-        : null,
-    );
-    return () => onSlideOverChange(null);
-  }, [drawerRow, drawerMode, enabledById, onSlideOverChange]);
 
   const toggleExpand = (id: string) => {
     setExpandedIds((current) => {
@@ -1215,7 +1388,8 @@ function ManageDetectionsContent({ onSlideOverChange }: { onSlideOverChange: (st
   };
 
   return (
-    <>
+    <div className="flex flex-col gap-4">
+      <div className={DATA_GRID_ABOVE_SECTION_CLASS}>
       <div className="grid shrink-0 grid-cols-1 items-stretch gap-4 lg:grid-cols-3">
         <SystemHealthCard
           runningNormallyCount={systemHealthCounts.runningNormally}
@@ -1228,6 +1402,7 @@ function ManageDetectionsContent({ onSlideOverChange }: { onSlideOverChange: (st
         <TopFindingsCard selectedLabel={detectionNameFilter} onSegmentClick={handleSegmentClick} />
         <SeverityBreakdownCard selectedSeverity={severityFilter} onSeverityClick={handleSeverityClick} />
       </div>
+      </div>
       <DetectionsTable
         rows={filteredRows}
         tableTool={tableTool}
@@ -1235,12 +1410,26 @@ function ManageDetectionsContent({ onSlideOverChange }: { onSlideOverChange: (st
         expandedIds={expandedIds}
         onToggleExpand={toggleExpand}
         onToggleExpandAll={toggleExpandAll}
-        onOpenDetection={(id) => openDetectionPanel(id, "view")}
-        onEditDetection={(id) => openDetectionPanel(id, "edit")}
-        onCopyDetection={handleOpenCopyDetection}
-        onDeleteDetection={handleDeleteDetection}
-        enabledById={enabledById}
-        onEnabledChange={(id, enabled) => setEnabledById((current) => ({ ...current, [id]: enabled }))}
+        onEditDetection={(id) => {
+          const row = detectionRows.find((r) => r.id === id);
+          if (row && row.source !== "library") onEditDetection(row);
+        }}
+        onViewLibraryDetection={(id) => {
+          const row = detectionRows.find((r) => r.id === id);
+          if (row?.source === "library") onViewLibraryDetection(row);
+        }}
+        onCopyDetection={handleCopyDetectionById}
+        onDeleteDetection={(id) => {
+          const row = detectionRows.find((r) => r.id === id);
+          if (row?.source === "library") return;
+          setDeleteTargetId(id);
+        }}
+        onRunNow={onRunNow}
+        onQueueForReview={handleQueueForReview}
+        onClearFromReview={onClearFromReview}
+        queuedById={queuedById}
+        enabledByName={enabledByName}
+        onEnabledChange={onEnabledChange}
         detectionNameFilter={detectionNameFilter}
         severityFilter={severityFilter}
         systemHealthFilter={systemHealthFilter}
@@ -1256,15 +1445,14 @@ function ManageDetectionsContent({ onSlideOverChange }: { onSlideOverChange: (st
           setShowOnlyActive(false);
           setSearchQuery("");
         }}
+        scrollToRowId={newDetectionRow?.id}
       />
-      <DuplicateDetectionModal
-        open={copySourceId != null}
-        name={copyName}
-        onNameChange={setCopyName}
-        onClose={handleCloseCopyDetection}
-        onConfirm={handleConfirmCopyDetection}
+      <DeleteConfirmationModal
+        open={deleteTargetId != null}
+        onClose={() => setDeleteTargetId(null)}
+        onConfirm={confirmDelete}
       />
-    </>
+    </div>
   );
 }
 
@@ -1274,41 +1462,335 @@ export function FederatedDetectionHubDashboard({
   onSlideOverChange: (state: ContentAreaSlideOverState | null) => void;
 }) {
   const [activeTab, setActiveTab] = useState<HubTab>("Manage Detections");
+  const [createDetectionOpen, setCreateDetectionOpen] = useState(false);
+  const createDetectionOpenRef = useRef(createDetectionOpen);
+  createDetectionOpenRef.current = createDetectionOpen;
+  const [newDetectionRow, setNewDetectionRow] = useState<DetectionRow | null>(null);
+  const [updatedDetectionRow, setUpdatedDetectionRow] = useState<DetectionRow | null>(null);
+  const [editDetectionRow, setEditDetectionRow] = useState<DetectionRow | null>(null);
+  const [slideOverMode, setSlideOverMode] = useState<"create" | "edit" | "copy" | "view">("create");
+  const [runningDetectionName, setRunningDetectionName] = useState<string | null>(null);
+  const [queuedRows, setQueuedRows] = useState<QueuedDetectionRow[]>(() => [...INITIAL_QUEUED_DETECTION_ROWS]);
+  const [queuedById, setQueuedById] = useState<Record<string, boolean>>({});
+  const [snackbarOpen, setSnackbarOpen] = useState(false);
+  const [snackbarMessage, setSnackbarMessage] = useState("");
+  const libraryCopySaveRef = useRef(false);
+  const [enabledByName, setEnabledByName] = useState<Record<string, boolean>>(() =>
+    buildInitialEnabledByName([
+      ...DETECTION_ROWS,
+      ...LIBRARY_DETECTION_ROWS,
+      ...INITIAL_QUEUED_DETECTION_ROWS,
+    ]),
+  );
+
+  const handleEnabledChange = useCallback((name: string, enabled: boolean) => {
+    setEnabledByName((prev) => ({
+      ...prev,
+      [detectionEnabledKey(name)]: enabled,
+    }));
+  }, []);
+
+  const handleChildSlideOverChange = useCallback(
+    (state: ContentAreaSlideOverState | null) => {
+      if (!createDetectionOpenRef.current) {
+        onSlideOverChange(state);
+      }
+    },
+    [onSlideOverChange],
+  );
+
+  const handleCloseCreateDetection = useCallback(() => {
+    setCreateDetectionOpen(false);
+    setEditDetectionRow(null);
+    setSlideOverMode("create");
+    libraryCopySaveRef.current = false;
+  }, []);
+
+  const handleEditDetection = useCallback((row: DetectionRow) => {
+    setSlideOverMode("edit");
+    setEditDetectionRow(row);
+    setCreateDetectionOpen(true);
+  }, []);
+
+  const handleViewLibraryDetection = useCallback((row: DetectionRow) => {
+    setSlideOverMode("view");
+    setEditDetectionRow(row);
+    setCreateDetectionOpen(true);
+  }, []);
+
+  const handleViewLibraryRow = useCallback(
+    (row: LibraryDetectionRow) => {
+      handleViewLibraryDetection(libraryDetectionToViewRow(row, enabledByName));
+    },
+    [handleViewLibraryDetection, enabledByName],
+  );
+
+  const handleCopyFromView = useCallback(() => {
+    if (!editDetectionRow) return;
+    if (editDetectionRow.source === "library" || editDetectionRow.id.startsWith("lib-")) {
+      libraryCopySaveRef.current = true;
+    }
+    setSlideOverMode("copy");
+  }, [editDetectionRow]);
+
+  const handleCopyDetection = useCallback((row: DetectionRow) => {
+    setSlideOverMode("copy");
+    setEditDetectionRow(row);
+    setCreateDetectionOpen(true);
+  }, []);
+
+  const handleCopyLibraryDetection = useCallback((row: LibraryDetectionRow) => {
+    libraryCopySaveRef.current = true;
+    handleCopyDetection({
+      ...libraryDetectionToManagedRow(row),
+      enabled: getDetectionEnabled(row.name, row.enabled, enabledByName),
+    });
+  }, [handleCopyDetection, enabledByName]);
+
+  const handleCloseSnackbar = useCallback(() => {
+    setSnackbarOpen(false);
+  }, []);
+
+  const handleRunNow = useCallback((name: string) => {
+    setRunningDetectionName(name);
+    setTimeout(() => setRunningDetectionName(null), 2500);
+  }, []);
+
+  const handleQueueDetection = useCallback((row: DetectionRow) => {
+    const enabled = getDetectionEnabled(row.name, row.enabled, enabledByName);
+    const rowWithEnabled = { ...row, enabled };
+    setQueuedById((prev) => ({ ...prev, [row.id]: true }));
+    setQueuedRows((prev) => {
+      const existing = prev.find((queued) => queued.id === row.id);
+      if (existing) {
+        return prev.map((queued) =>
+          queued.id === row.id
+            ? detectionRowToQueuedRow(rowWithEnabled, existing.queuedBy, existing.queuedDate)
+            : queued,
+        );
+      }
+      return [detectionRowToQueuedRow(rowWithEnabled), ...prev];
+    });
+  }, [enabledByName]);
+
+  const handleClearFromReview = useCallback((id: string) => {
+    setQueuedById((prev) => {
+      const next = { ...prev };
+      delete next[id];
+      return next;
+    });
+    setQueuedRows((prev) => prev.filter((row) => row.id !== id));
+  }, []);
+
+  useEffect(() => {
+    if (!updatedDetectionRow) return;
+    setQueuedRows((rows) =>
+      rows.map((row) =>
+        row.id === updatedDetectionRow.id
+          ? detectionRowToQueuedRow(updatedDetectionRow, row.queuedBy, row.queuedDate)
+          : row,
+      ),
+    );
+  }, [updatedDetectionRow]);
+
+  const handleDetectionSaved = useCallback((payload: NewDetectionPayload) => {
+    const savedName = payload.name.trim() || "Untitled Detection";
+    setEnabledByName((prev) => ({
+      ...prev,
+      [detectionEnabledKey(savedName)]: payload.enabled,
+    }));
+
+    if (payload.id) {
+      setUpdatedDetectionRow((prev) => {
+        const source = prev?.id === payload.id ? prev : editDetectionRow;
+        return {
+          ...(source ?? { lastRun: "—", findings: "none" as const }),
+          id: payload.id!,
+          name: payload.name,
+          description: payload.description,
+          enabled: payload.enabled,
+          severity: payload.severity,
+          recurrence: payload.recurrence,
+        };
+      });
+    } else {
+      setNewDetectionRow({
+        id: String(Date.now()),
+        name: savedName,
+        description: payload.description,
+        enabled: payload.enabled,
+        severity: payload.severity,
+        lastRun: "—",
+        recurrence: payload.recurrence,
+        findings: "none",
+      });
+      if (libraryCopySaveRef.current) {
+        setSnackbarMessage(`"${savedName}" has been added to Manage Detections.`);
+        setSnackbarOpen(true);
+        libraryCopySaveRef.current = false;
+      }
+    }
+    setCreateDetectionOpen(false);
+    setEditDetectionRow(null);
+    setSlideOverMode("create");
+  }, [editDetectionRow]);
 
   useEffect(() => {
     onSlideOverChange(null);
+    setCreateDetectionOpen(false);
   }, [activeTab, onSlideOverChange]);
 
   return (
-    <div className="flex min-h-0 flex-1 flex-col overflow-hidden pt-6">
-      <div className="flex shrink-0 items-end justify-between gap-4 px-6">
-        <HubTabs active={activeTab} onChange={setActiveTab} />
-        <Button type="button" variant="secondary" className="mb-3 h-8 shrink-0 ring-offset-surface-page">
+    <TooltipProvider>
+    <>
+      <PageSlideOver
+        open={createDetectionOpen}
+        onClose={handleCloseCreateDetection}
+        ariaLabel={slideOverMode === "view" ? "View Detection" : "Create New Detection"}
+        panelClassName={FORM_CONTENT_SLIDE_OVER_PANEL_CLASS}
+      >
+        <CreateDetectionSlideOver
+          key={
+            slideOverMode === "copy"
+              ? `copy-${editDetectionRow?.id ?? ""}`
+              : slideOverMode === "view"
+                ? `view-${editDetectionRow?.id ?? ""}`
+                : (editDetectionRow?.id ?? "new")
+          }
+          onClose={handleCloseCreateDetection}
+          onSave={handleDetectionSaved}
+          mode={slideOverMode === "copy" ? "copy" : slideOverMode === "view" ? "view" : undefined}
+          onCopy={handleCopyFromView}
+          editValues={editDetectionRow ? {
+            id: editDetectionRow.id,
+            name: editDetectionRow.name,
+            description: editDetectionRow.description,
+            severity: editDetectionRow.severity,
+            enabled: editDetectionRow.enabled,
+            recurrence: editDetectionRow.recurrence,
+            lastRun: editDetectionRow.lastRun,
+            connectorsActive: editDetectionRow.connectorsActive,
+            connectorsTotal: editDetectionRow.connectorsTotal,
+          } : undefined}
+        />
+      </PageSlideOver>
+
+      <Tabs
+        value={activeTab}
+        onValueChange={(v) => setActiveTab(v as HubTab)}
+        className="flex flex-col"
+      >
+        <div className="sticky top-0 z-20 flex shrink-0 items-end justify-between gap-4 bg-surface-page px-6 pt-4">
+        <TabsList
+          variant="line"
+          className="h-auto w-auto gap-6 rounded-none bg-transparent p-0"
+          aria-label="Detection hub sections"
+        >
+          {HUB_TABS.map((tab) => (
+            <TabsTrigger
+              key={tab}
+              value={tab}
+              className="h-auto flex-none rounded-none border-0 px-0 pb-3 text-sm font-semibold text-text-tertiary transition-colors hover:text-text-secondary [&::after]:hidden before:absolute before:inset-x-0 before:bottom-0 before:h-[2px] before:bg-transparent before:transition-colors data-active:!bg-transparent data-active:before:bg-interactive-active data-active:text-text-primary data-active:shadow-none"
+            >
+              {tab}
+            </TabsTrigger>
+          ))}
+        </TabsList>
+        <Button
+          type="button"
+          variant="secondary"
+          className="mb-3 h-8 shrink-0 ring-offset-surface-page"
+          onClick={() => {
+            setSlideOverMode("create");
+            setCreateDetectionOpen(true);
+          }}
+        >
           <Icon
             name="action-add"
-            size={12}
-            className="size-3 shrink-0 text-current [&>svg]:!size-[12px]"
+            size={6}
+            className="size-1.5 shrink-0 text-current [&>svg]:!size-[6px]"
             aria-hidden
           />
           Create New Detection
         </Button>
       </div>
 
-      <div className="flex min-h-0 flex-1 flex-col gap-4 overflow-y-auto px-6 py-4 sm:py-5">
-        {activeTab === "Manage Detections" ? (
-          <ManageDetectionsContent onSlideOverChange={onSlideOverChange} />
-        ) : activeTab === "Detection Library" ? (
-          <DetectionLibraryContent onSlideOverChange={onSlideOverChange} />
-        ) : activeTab === "Queued For Review" ? (
-          <QueuedForReviewContent onSlideOverChange={onSlideOverChange} />
-        ) : activeTab === "Detection History" ? (
-          <DetectionHistoryContent />
-        ) : (
-          <div className="flex flex-1 items-center justify-center rounded-[4px] border border-border-container bg-datavis-card-bg p-12 text-center shadow-datavis-card">
-            <p className="text-sm text-text-tertiary">{activeTab} — content coming soon.</p>
-          </div>
-        )}
+      <TabsContent
+        value="Manage Detections"
+        className="mt-0 px-6 pt-2 pb-4 sm:pt-3 sm:pb-5"
+      >
+        <ManageDetectionsContent
+          newDetectionRow={newDetectionRow}
+          updatedDetectionRow={updatedDetectionRow}
+          onEditDetection={handleEditDetection}
+          onViewLibraryDetection={handleViewLibraryDetection}
+          onCopyDetection={handleCopyDetection}
+          onRunNow={handleRunNow}
+          queuedById={queuedById}
+          onQueueForReview={handleQueueDetection}
+          onClearFromReview={handleClearFromReview}
+          enabledByName={enabledByName}
+          onEnabledChange={handleEnabledChange}
+        />
+      </TabsContent>
+      <TabsContent
+        value="Detection Library"
+        className="mt-0 px-6 pt-2 pb-4 sm:pt-3 sm:pb-5"
+      >
+        <DetectionLibraryContent
+          onCopyDetection={handleCopyLibraryDetection}
+          onViewDetection={handleViewLibraryRow}
+          enabledByName={enabledByName}
+          onEnabledChange={handleEnabledChange}
+        />
+      </TabsContent>
+      <TabsContent
+        value="Queued For Review"
+        className="mt-0 px-6 pt-2 pb-4 sm:pt-3 sm:pb-5"
+      >
+        <QueuedForReviewContent
+          onSlideOverChange={handleChildSlideOverChange}
+          onRunNow={handleRunNow}
+          queuedRows={queuedRows}
+          onClearFromReview={handleClearFromReview}
+          enabledByName={enabledByName}
+          onEnabledChange={handleEnabledChange}
+          onCopyDetection={(values) => handleCopyDetection({
+            id: `queued-${Date.now()}`,
+            lastRun: "—",
+            recurrence: "—",
+            findings: "none" as const,
+            ...values,
+          })}
+        />
+      </TabsContent>
+      <TabsContent
+        value="Detection History"
+        className="mt-0 px-6 pt-2 pb-4 sm:pt-3 sm:pb-5"
+      >
+        <DetectionHistoryContent />
+      </TabsContent>
+    </Tabs>
+
+    {runningDetectionName ? (
+      <div className="pointer-events-none fixed bottom-6 left-1/2 z-50 -translate-x-1/2 flex items-center gap-2.5 rounded-lg bg-surface-modal px-4 py-3 shadow-lg ring-1 ring-border-rule">
+        <svg
+          className="h-4 w-4 shrink-0 animate-spin text-interactive-active"
+          viewBox="0 0 24 24"
+          fill="none"
+          aria-hidden="true"
+        >
+          <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" />
+          <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z" />
+        </svg>
+        <span className="whitespace-nowrap text-sm font-semibold text-text-primary">
+          Running "{runningDetectionName}"…
+        </span>
       </div>
-    </div>
+    ) : null}
+
+    <Snackbar open={snackbarOpen} message={snackbarMessage} onClose={handleCloseSnackbar} />
+    </>
+    </TooltipProvider>
   );
 }

@@ -1,4 +1,15 @@
-import { Fragment, useEffect, useMemo, useState } from "react";
+import { Fragment, useMemo, useState } from "react";
+import {
+  DATA_GRID_EXPANDED_ROW_CLASS,
+  DATA_GRID_FILTER_ROW_CLASS,
+  DATA_GRID_HEADER_ROW_CLASS,
+  DATA_GRID_SECTION_CLASS,
+  DATA_GRID_TABLE_CLASS,
+  DATA_GRID_TABLE_SCROLL_CLASS,
+  DATA_GRID_THEAD_CLASS,
+  DATA_GRID_TOOLBAR_STICKY_CLASS,
+} from "../ui/dataGridTableStyles";
+import { useDataGridStickyToolbar } from "../ui/useDataGridStickyToolbar";
 import { Checkbox, Icon, Switch, type SeverityShapeIconName } from "../../design-system";
 import { Button } from "../ui/Button";
 import { ColumnHeaderMenu } from "../ui/ColumnHeaderMenu";
@@ -12,10 +23,14 @@ import {
 import { FilterColumnPanel, type FilterColumnPanelTool } from "../ui/FilterColumnPanel";
 import { Input } from "../ui/Input";
 import { DataGridExportButton } from "../ui/DataGridExportButton";
+import { DataGridPagination } from "../ui/DataGridPagination";
 import { SeverityTableIcon } from "../ui/SeverityTableIcon";
-import { type ContentAreaSlideOverState } from "../ui/SlideOver";
 import { TruncatedText } from "../ui/TruncatedText";
 import { useResizableColumns } from "../ui/useResizableColumns";
+import { useDataGridPagination } from "../ui/useDataGridPagination";
+import { DetectionExpandedDetails } from "./detectionRunConnectors";
+import { FindingsSearchCell } from "./FindingsSearchCell";
+import { getDetectionEnabled } from "./detectionEnabledState";
 
 const cx = (...c: (string | false | undefined)[]) => c.filter(Boolean).join(" ");
 
@@ -27,7 +42,7 @@ type DetectionSeverity = "Critical" | "High" | "Medium" | "Low";
 
 type LibraryCategory = "Network" | "Endpoint" | "Identity" | "Web" | "Cloud" | "Database" | "Email";
 
-type LibraryDetectionRow = {
+export type LibraryDetectionRow = {
   id: string;
   name: string;
   description: string;
@@ -55,7 +70,7 @@ const SEV_ICONS: Record<DetectionSeverity, SeverityShapeIconName> = {
   Low: "severity-low",
 };
 
-const LIBRARY_DETECTION_ROWS: LibraryDetectionRow[] = [
+export const LIBRARY_DETECTION_ROWS: LibraryDetectionRow[] = [
   {
     id: "lib-1",
     name: "APT28 Operation Phantom Net Voxel",
@@ -337,25 +352,6 @@ const LIBRARY_STAT_FILTER_LABELS: Record<LibraryStatFilter, string> = {
   high: "High Severity",
 };
 
-function LibraryFindingsCell({ findings }: { findings: LibraryDetectionRow["findings"] }) {
-  if (findings === "error") {
-    return (
-      <span className="inline-flex items-center gap-1.5 text-sm font-semibold text-feedback-negative">
-        <Icon name="error-outline" size={16} aria-hidden />
-        Error
-      </span>
-    );
-  }
-  if (findings === "none") {
-    return <span className="text-sm text-text-secondary">—</span>;
-  }
-  return (
-    <span className="inline-flex items-center gap-1.5 text-sm font-semibold text-interactive-active">
-      <Icon name="search" size={14} aria-hidden />
-      <span className="tabular-nums">{findings}</span>
-    </span>
-  );
-}
 
 function ConnectorsCell({ active, total }: { active: number; total: number }) {
   return (
@@ -365,87 +361,17 @@ function ConnectorsCell({ active, total }: { active: number; total: number }) {
   );
 }
 
-function LibraryCopyAction({ name }: { name: string }) {
+function LibraryCopyAction({ name, onClick }: { name: string; onClick: () => void }) {
   return (
     <Button
       type="button"
       variant="ghost"
       className="size-7 shrink-0 p-0 text-text-tertiary hover:text-text-primary [&_svg]:!size-3 [&_svg]:!h-3 [&_svg]:!w-3"
       aria-label={`Copy ${name}`}
+      onClick={onClick}
     >
       <Icon name="action-content-copy" size={12} />
     </Button>
-  );
-}
-
-function LibraryDetectionDetailPanel({
-  row,
-  enabled,
-  onClose,
-}: {
-  row: LibraryDetectionRow;
-  enabled: boolean;
-  onClose: () => void;
-}) {
-  return (
-    <div className="flex h-full min-h-0 flex-col text-text-primary">
-      <header className="flex shrink-0 items-start justify-between gap-3 border-b border-border-rule px-5 py-4">
-        <div className="min-w-0">
-          <p className="text-xs font-bold uppercase tracking-wide text-text-tertiary">Detection Library</p>
-          <h2 className="mt-1 text-page-title text-text-primary">{row.name}</h2>
-        </div>
-        <Button
-          type="button"
-          variant="ghost"
-          className="shrink-0 p-1 text-text-tertiary hover:text-text-primary"
-          aria-label="Close detection details"
-          onClick={onClose}
-        >
-          <Icon name="close" size={20} />
-        </Button>
-      </header>
-      <div className="min-h-0 flex-1 overflow-y-auto px-5 py-4">
-        <div className="flex flex-wrap items-center gap-2">
-          <SeverityTableIcon name={SEV_ICONS[row.severity]} color={SEV_COLORS[row.severity]} />
-          <span className="text-sm font-semibold text-text-primary">{row.severity}</span>
-          <span className="text-sm text-text-tertiary">·</span>
-          <span className="text-sm text-text-secondary">{row.category}</span>
-          <span className="text-sm text-text-tertiary">·</span>
-          <span className="text-sm text-text-secondary">{enabled ? "Enabled" : "Disabled"}</span>
-        </div>
-        <p className="mt-4 text-sm leading-relaxed text-text-secondary">{row.description}</p>
-        <dl className="mt-6 space-y-3 border-t border-border-rule pt-4 text-sm">
-          <div className="flex gap-3">
-            <dt className="w-28 shrink-0 text-text-tertiary">Last run</dt>
-            <dd className="text-text-secondary">{row.lastRun}</dd>
-          </div>
-          <div className="flex gap-3">
-            <dt className="w-28 shrink-0 text-text-tertiary">Recurrence</dt>
-            <dd className="text-text-secondary">{row.recurrence}</dd>
-          </div>
-          <div className="flex gap-3">
-            <dt className="w-28 shrink-0 text-text-tertiary">Findings</dt>
-            <dd>
-              <LibraryFindingsCell findings={row.findings} />
-            </dd>
-          </div>
-          <div className="flex gap-3">
-            <dt className="w-28 shrink-0 text-text-tertiary">Connectors</dt>
-            <dd className="text-text-secondary">
-              {row.connectorsActive} of {row.connectorsTotal}
-            </dd>
-          </div>
-        </dl>
-      </div>
-      <footer className="flex shrink-0 justify-end gap-2 border-t border-border-rule px-5 py-4">
-        <Button type="button" variant="secondary" onClick={onClose}>
-          Close
-        </Button>
-        <Button type="button" variant="primary">
-          Add to workspace
-        </Button>
-      </footer>
-    </div>
   );
 }
 
@@ -504,7 +430,8 @@ function LibraryDetectionsTable({
   onToggleExpand,
   onToggleExpandAll,
   onOpenDetection,
-  enabledById,
+  onCopyDetection,
+  enabledByName,
   onEnabledChange,
   searchQuery,
   onSearchQueryChange,
@@ -519,8 +446,9 @@ function LibraryDetectionsTable({
   onToggleExpand: (id: string) => void;
   onToggleExpandAll: () => void;
   onOpenDetection: (id: string) => void;
-  enabledById: Record<string, boolean>;
-  onEnabledChange: (id: string, enabled: boolean) => void;
+  onCopyDetection: (id: string) => void;
+  enabledByName: Record<string, boolean>;
+  onEnabledChange: (name: string, enabled: boolean) => void;
   searchQuery: string;
   onSearchQueryChange: (query: string) => void;
   totalCount: number;
@@ -572,7 +500,10 @@ function LibraryDetectionsTable({
     (): Record<LibrarySortColumn, (a: LibraryDetectionRow, b: LibraryDetectionRow) => number> => ({
       name: (a, b) => compareStrings(a.name, b.name),
       state: (a, b) =>
-        compareBooleans(enabledById[a.id] ?? a.enabled, enabledById[b.id] ?? b.enabled),
+        compareBooleans(
+          getDetectionEnabled(a.name, a.enabled, enabledByName),
+          getDetectionEnabled(b.name, b.enabled, enabledByName),
+        ),
       category: (a, b) => compareStrings(a.category, b.category),
       severity: (a, b) => LIBRARY_SEVERITY_ORDER[a.severity] - LIBRARY_SEVERITY_ORDER[b.severity],
       lastRun: (a, b) => compareStrings(a.lastRun, b.lastRun),
@@ -580,14 +511,32 @@ function LibraryDetectionsTable({
       findings: (a, b) => compareFindings(a.findings, b.findings),
       connectors: (a, b) => compareNumbers(a.connectorsActive, b.connectorsActive),
     }),
-    [enabledById],
+    [enabledByName],
   );
   const { sortedRows, getSortProps } = useColumnSort(sortComparators);
-  const displayRows = sortedRows(rows);
+  const sorted = sortedRows(rows);
+  const {
+    page,
+    setPage,
+    pageCount,
+    pagedItems: displayRows,
+    pageSize,
+    setPageSize,
+    pageSizeOptions,
+    showPagination,
+    showPageControls,
+    itemCount,
+  } = useDataGridPagination(sorted);
+
+  const { toolbarRef, sectionStyle } = useDataGridStickyToolbar();
 
   return (
-    <section className="flex min-h-0 min-w-0 flex-1 flex-col overflow-hidden rounded-[4px] border border-border-container bg-datavis-card-bg shadow-datavis-card">
-      <div className="shrink-0 bg-datavis-card-bg pb-3 pl-4 pr-[20px] pt-3 sm:pl-5">
+    <section
+      className={DATA_GRID_SECTION_CLASS}
+      style={sectionStyle}
+    >
+      <div ref={toolbarRef} className={DATA_GRID_TOOLBAR_STICKY_CLASS}>
+        <div className="shrink-0 bg-datavis-card-bg pb-3 pl-4 pr-[20px] pt-3 sm:pl-5">
         <h2 className="text-base-semibold text-text-primary">Detection Library</h2>
         <div className="mt-2 flex flex-wrap items-center gap-3">
           <p className="shrink-0 text-base-small text-text-secondary">
@@ -621,8 +570,9 @@ function LibraryDetectionsTable({
           <DataGridExportButton />
         </div>
       </div>
-      <DatavisGridlineRule inset={false} />
-      <div className="flex min-h-0 flex-1 overflow-auto bg-datavis-card-bg">
+        <DatavisGridlineRule inset={false} />
+      </div>
+      <div className={DATA_GRID_FILTER_ROW_CLASS}>
         <FilterColumnPanel
           active={tableTool}
           onFilterClick={() => onTableToolChange(tableTool === "filter" ? null : "filter")}
@@ -630,10 +580,10 @@ function LibraryDetectionsTable({
         />
         <div
           ref={containerRef}
-          className={cx("min-h-0 min-w-0 flex-1 overflow-x-auto pb-3", isResizing && "select-none")}
+          className={cx(DATA_GRID_TABLE_SCROLL_CLASS, isResizing && "select-none")}
         >
           <table
-            className="table-fixed border-collapse text-left text-sm"
+            className={DATA_GRID_TABLE_CLASS}
             style={{
               width: tableFillsContainer ? "100%" : baseTotal,
               minWidth: Math.max(minTableWidth, baseTotal),
@@ -645,8 +595,8 @@ function LibraryDetectionsTable({
                 <col key={i} style={{ width: w }} />
               ))}
             </colgroup>
-            <thead>
-              <tr className="h-10 border-b border-datavis-gridlines bg-surface-table-row-header">
+            <thead className={DATA_GRID_THEAD_CLASS}>
+              <tr className={DATA_GRID_HEADER_ROW_CLASS}>
                 <th scope="col" style={colStyle(0)} className="relative h-10 border-r border-datavis-gridlines px-0 py-0 align-middle">
                   <div className="flex items-center justify-center">
                     <Checkbox
@@ -742,16 +692,12 @@ function LibraryDetectionsTable({
             <tbody>
               {displayRows.map((row) => {
                 const expanded = expandedIds.has(row.id);
-                const enabled = enabledById[row.id] ?? row.enabled;
+                const enabled = getDetectionEnabled(row.name, row.enabled, enabledByName);
+                const inactiveCellClass = !enabled ? "opacity-70" : "";
                 return (
                   <Fragment key={row.id}>
-                    <tr
-                      className={cx(
-                        "h-10 border-b border-datavis-gridlines hover:bg-overlay-subtle",
-                        !enabled && "opacity-70",
-                      )}
-                    >
-                      <td style={colStyle(0)} className="h-10 px-0 py-0 align-middle">
+                    <tr className="h-10 border-b border-datavis-gridlines hover:bg-overlay-subtle">
+                      <td style={colStyle(0)} className={cx("h-10 px-0 py-0 align-middle", inactiveCellClass)}>
                         <div className="flex items-center justify-center">
                           <Checkbox
                             checked={selected.has(row.id)}
@@ -760,7 +706,7 @@ function LibraryDetectionsTable({
                           />
                         </div>
                       </td>
-                      <td style={colStyle(1)} className="h-10 px-0 py-0 align-middle">
+                      <td style={colStyle(1)} className={cx("h-10 px-0 py-0 align-middle", inactiveCellClass)}>
                         <div className="flex justify-center">
                           <button
                             type="button"
@@ -780,7 +726,7 @@ function LibraryDetectionsTable({
                           </button>
                         </div>
                       </td>
-                      <td style={colStyle(2)} className={cx(tdClass, "min-w-0")}>
+                      <td style={colStyle(2)} className={cx(tdClass, "min-w-0", inactiveCellClass)}>
                         <div className="flex min-w-0 items-center gap-2">
                           <Icon
                             name="nav-detections"
@@ -798,47 +744,55 @@ function LibraryDetectionsTable({
                           </TruncatedText>
                         </div>
                       </td>
-                      <td style={colStyle(3)} className={tdClass}>
+                      <td style={colStyle(3)} className={cx(tdClass, inactiveCellClass)}>
                         <Switch
-                          checked={enabledById[row.id] ?? row.enabled}
-                          onCheckedChange={(checked) => onEnabledChange(row.id, checked)}
+                          checked={getDetectionEnabled(row.name, row.enabled, enabledByName)}
+                          onCheckedChange={(checked) => onEnabledChange(row.name, checked)}
                           aria-label={`Toggle ${row.name}`}
                         />
                       </td>
-                      <td style={colStyle(4)} className={tdClass}>
+                      <td style={colStyle(4)} className={cx(tdClass, inactiveCellClass)}>
                         {row.category}
                       </td>
-                      <td style={colStyle(5)} className={tdClass}>
+                      <td style={colStyle(5)} className={cx(tdClass, inactiveCellClass)}>
                         <span className="inline-flex items-center gap-2">
                           <SeverityTableIcon name={SEV_ICONS[row.severity]} color={SEV_COLORS[row.severity]} />
                           <span>{row.severity}</span>
                         </span>
                       </td>
-                      <td style={colStyle(6)} className={cx(tdClass, "tabular-nums")}>
+                      <td style={colStyle(6)} className={cx(tdClass, "tabular-nums", inactiveCellClass)}>
                         {row.lastRun}
                       </td>
-                      <td style={colStyle(7)} className={tdClass}>
+                      <td style={colStyle(7)} className={cx(tdClass, inactiveCellClass)}>
                         {row.recurrence}
                       </td>
-                      <td style={colStyle(8)} className={tdClass}>
-                        <LibraryFindingsCell findings={row.findings} />
+                      <td style={colStyle(8)} className={cx(tdClass, inactiveCellClass)}>
+                        <FindingsSearchCell
+                          findings={row.findings}
+                          detectionId={row.id}
+                          detectionName={row.name}
+                          enabled={enabled}
+                        />
                       </td>
-                      <td style={colStyle(9)} className={tdClass}>
+                      <td style={colStyle(9)} className={cx(tdClass, inactiveCellClass)}>
                         <ConnectorsCell active={row.connectorsActive} total={row.connectorsTotal} />
                       </td>
                       <td style={colStyle(10)} className={tdClass}>
-                        <LibraryCopyAction name={row.name} />
+                        <LibraryCopyAction name={row.name} onClick={() => onCopyDetection(row.id)} />
                       </td>
                     </tr>
                     {expanded ? (
                       <tr
-                        className={cx(
-                          "border-b border-datavis-gridlines bg-surface-table-row-header",
-                          !enabled && "opacity-70",
-                        )}
+                        className={cx(DATA_GRID_EXPANDED_ROW_CLASS, !enabled && "opacity-70")}
                       >
                         <td colSpan={LIBRARY_COLUMN_COUNT} className="px-4 py-3 align-top">
-                          <p className="text-sm leading-relaxed text-text-secondary">{row.description}</p>
+                          <DetectionExpandedDetails
+                            description={row.description}
+                            detectionId={row.id}
+                            lastRun={row.lastRun}
+                            connectorsActive={row.connectorsActive}
+                            connectorsTotal={row.connectorsTotal}
+                          />
                         </td>
                       </tr>
                     ) : null}
@@ -849,18 +803,36 @@ function LibraryDetectionsTable({
           </table>
         </div>
       </div>
+      {showPagination ? (
+        <DataGridPagination
+          page={page}
+          pageCount={pageCount}
+          itemCount={itemCount}
+          pageSize={pageSize}
+          pageSizeOptions={pageSizeOptions}
+          showPageControls={showPageControls}
+          onPageChange={setPage}
+          onPageSizeChange={setPageSize}
+        />
+      ) : null}
     </section>
   );
 }
 
-export function DetectionLibraryContent({ onSlideOverChange }: { onSlideOverChange: (state: ContentAreaSlideOverState | null) => void }) {
+export function DetectionLibraryContent({
+  onCopyDetection,
+  onViewDetection,
+  enabledByName,
+  onEnabledChange,
+}: {
+  onCopyDetection: (row: LibraryDetectionRow) => void;
+  onViewDetection: (row: LibraryDetectionRow) => void;
+  enabledByName: Record<string, boolean>;
+  onEnabledChange: (name: string, enabled: boolean) => void;
+}) {
   const [tableTool, setTableTool] = useState<FilterColumnPanelTool | null>(null);
   const [searchQuery, setSearchQuery] = useState("");
   const [expandedIds, setExpandedIds] = useState<Set<string>>(() => new Set());
-  const [drawerDetectionId, setDrawerDetectionId] = useState<string | null>(null);
-  const [enabledById, setEnabledById] = useState<Record<string, boolean>>(() =>
-    Object.fromEntries(LIBRARY_DETECTION_ROWS.map((r) => [r.id, r.enabled])),
-  );
   const [statFilter, setStatFilter] = useState<LibraryStatFilter | null>(null);
 
   const handleStatFilterClick = (filter: LibraryStatFilter) => {
@@ -869,44 +841,34 @@ export function DetectionLibraryContent({ onSlideOverChange }: { onSlideOverChan
 
   const filteredRows = useMemo(() => {
     return LIBRARY_DETECTION_ROWS.filter((row) => {
-      const enabled = enabledById[row.id] ?? row.enabled;
+      const enabled = getDetectionEnabled(row.name, row.enabled, enabledByName);
       if (statFilter === "enabled" && !enabled) return false;
       if (statFilter === "critical" && row.severity !== "Critical") return false;
       if (statFilter === "high" && row.severity !== "High") return false;
       return libraryMatchesSearch(row, searchQuery, enabled);
     });
-  }, [searchQuery, enabledById, statFilter]);
+  }, [searchQuery, enabledByName, statFilter]);
 
   const summaryStats = useMemo(() => {
     const total = LIBRARY_DETECTION_ROWS.length;
-    const enabled = LIBRARY_DETECTION_ROWS.filter((row) => enabledById[row.id] ?? row.enabled).length;
+    const enabled = LIBRARY_DETECTION_ROWS.filter(
+      (row) => getDetectionEnabled(row.name, row.enabled, enabledByName),
+    ).length;
     const critical = LIBRARY_DETECTION_ROWS.filter((row) => row.severity === "Critical").length;
     const high = LIBRARY_DETECTION_ROWS.filter((row) => row.severity === "High").length;
     return { total, enabled, critical, high };
-  }, [enabledById]);
+  }, [enabledByName]);
 
-  const drawerRow = drawerDetectionId
-    ? LIBRARY_DETECTION_ROWS.find((row) => row.id === drawerDetectionId) ?? null
-    : null;
+  const handleCopyDetection = (id: string) => {
+    const row = LIBRARY_DETECTION_ROWS.find((entry) => entry.id === id);
+    if (!row) return;
+    onCopyDetection(row);
+  };
 
-  useEffect(() => {
-    onSlideOverChange(
-      drawerRow
-        ? {
-            ariaLabel: `Detection: ${drawerRow.name}`,
-            onClose: () => setDrawerDetectionId(null),
-            panel: (
-              <LibraryDetectionDetailPanel
-                row={drawerRow}
-                enabled={enabledById[drawerRow.id] ?? drawerRow.enabled}
-                onClose={() => setDrawerDetectionId(null)}
-              />
-            ),
-          }
-        : null,
-    );
-    return () => onSlideOverChange(null);
-  }, [drawerRow, enabledById, onSlideOverChange]);
+  const handleOpenDetection = (id: string) => {
+    const row = LIBRARY_DETECTION_ROWS.find((entry) => entry.id === id);
+    if (row) onViewDetection(row);
+  };
 
   const toggleExpand = (id: string) => {
     setExpandedIds((prev) => {
@@ -926,7 +888,7 @@ export function DetectionLibraryContent({ onSlideOverChange }: { onSlideOverChan
   };
 
   return (
-    <>
+    <div className="flex flex-col gap-4">
       <div className="grid shrink-0 grid-cols-1 gap-4 sm:grid-cols-2 xl:grid-cols-4">
         <LibraryStatCard
           label="Total Detections"
@@ -961,9 +923,10 @@ export function DetectionLibraryContent({ onSlideOverChange }: { onSlideOverChan
         expandedIds={expandedIds}
         onToggleExpand={toggleExpand}
         onToggleExpandAll={toggleExpandAll}
-        onOpenDetection={setDrawerDetectionId}
-        enabledById={enabledById}
-        onEnabledChange={(id, enabled) => setEnabledById((prev) => ({ ...prev, [id]: enabled }))}
+        onOpenDetection={handleOpenDetection}
+        onCopyDetection={handleCopyDetection}
+        enabledByName={enabledByName}
+        onEnabledChange={onEnabledChange}
         searchQuery={searchQuery}
         onSearchQueryChange={setSearchQuery}
         totalCount={LIBRARY_DETECTION_ROWS.length}
@@ -973,6 +936,6 @@ export function DetectionLibraryContent({ onSlideOverChange }: { onSlideOverChan
           setStatFilter(null);
         }}
       />
-    </>
+    </div>
   );
 }
