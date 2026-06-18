@@ -6,7 +6,7 @@ import { SearchQueryBuilder } from "../components/SearchQueryBuilder";
 import { SearchHeaderFilters } from "../components/SearchHeaderFilters";
 import { SearchTopHeader } from "../components/SearchTopHeader";
 import { V4NavThinner } from "../components/V4NavThinner";
-import { Button as UiButton } from "../components/ui/Button";
+
 import connectionAbstractUrl from "../assets/connection-abstract.svg";
 import { useTimeframe } from "../context/TimeframeContext";
 import { useCopilot } from "../context/CopilotContext";
@@ -26,9 +26,9 @@ import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/comp
 import { cn } from "@/lib/utils";
 import { NAV_RAIL_TARGETS } from "./navRailTargets";
 
-const toolbarBtnRing = "focus-visible:ring-offset-surface-container";
+const TOOLBAR_SECONDARY_BTN_CLASS = "shrink-0 ring-offset-surface-page";
 const TOOLBAR_PRIMARY_BUTTON_CLASS =
-  "bg-interactive-active text-text-on-primary hover:bg-interactive-active/90 focus-visible:ring-interactive-active";
+  "h-8 shrink-0 bg-interactive-active text-text-on-primary hover:bg-interactive-active/90 focus-visible:ring-interactive-active ring-offset-surface-page";
 
 const SEARCH_CRITERIA_MODE_OPTIONS: readonly {
   id: SearchCriteriaMode;
@@ -121,10 +121,10 @@ function SearchToolbarActions({
     <Collapsible
       open={criteriaOpen}
       onOpenChange={onCriteriaOpenChange}
-      className="relative z-50 flex shrink-0 flex-col bg-surface-container"
+      className="relative z-50 flex shrink-0 flex-col bg-surface-page"
     >
       <div
-        className="flex flex-wrap items-center justify-between gap-3 px-5 py-3"
+        className="flex flex-wrap items-center justify-between gap-3 px-6 py-3"
         role="toolbar"
         aria-label="Search actions"
       >
@@ -133,10 +133,7 @@ function SearchToolbarActions({
             <Button
               type="button"
               variant="ghost"
-              className={cn(
-                "h-auto gap-2 rounded px-1 py-1 font-semibold tracking-[0.4px] text-text-primary hover:bg-overlay-subtle",
-                toolbarBtnRing,
-              )}
+              className="h-auto gap-2 rounded px-1 py-1 font-semibold tracking-[0.4px] text-text-primary hover:bg-overlay-subtle ring-offset-surface-page"
               aria-controls="search-criteria-panel"
             >
               <Icon
@@ -157,26 +154,26 @@ function SearchToolbarActions({
         <div className="flex flex-wrap justify-end gap-3">
           {isFsql ? (
             <>
-              <UiButton
+              <Button
                 type="button"
-                variant="secondary"
-                className={toolbarBtnRing}
+                variant="secondary-outline"
+                className={TOOLBAR_SECONDARY_BTN_CLASS}
                 disabled={!hasFsqlQuery}
                 onClick={onClearSearch}
               >
                 <Icon name="action-cancel-clear" className="shrink-0 text-current" aria-hidden />
                 Clear Search
-              </UiButton>
-              <UiButton type="button" variant="secondary" className={toolbarBtnRing} disabled={!hasFsqlQuery}>
+              </Button>
+              <Button type="button" variant="secondary-outline" className={TOOLBAR_SECONDARY_BTN_CLASS} disabled={!hasFsqlQuery}>
                 Create New Detection
-              </UiButton>
-              <UiButton type="button" variant="secondary" className={toolbarBtnRing} disabled={!hasFsqlQuery}>
+              </Button>
+              <Button type="button" variant="secondary-outline" className={TOOLBAR_SECONDARY_BTN_CLASS} disabled={!hasFsqlQuery}>
                 <Icon name="action-saved-search" className="shrink-0 text-current" aria-hidden />
                 Save Search
-              </UiButton>
+              </Button>
               <Button
                 type="button"
-                className={cn(TOOLBAR_PRIMARY_BUTTON_CLASS, toolbarBtnRing)}
+                className={TOOLBAR_PRIMARY_BUTTON_CLASS}
                 disabled={!hasFsqlQuery}
                 onClick={onFsqlSearch}
               >
@@ -186,24 +183,24 @@ function SearchToolbarActions({
             </>
           ) : (
             <>
-              <UiButton
+              <Button
                 type="button"
-                variant="secondary"
-                className={toolbarBtnRing}
+                variant="secondary-outline"
+                className={TOOLBAR_SECONDARY_BTN_CLASS}
                 disabled={!queryBuilderValid}
                 onClick={onClearSearch}
               >
                 <Icon name="action-cancel-clear" className="shrink-0 text-current" aria-hidden />
                 Clear Search
-              </UiButton>
-              <UiButton type="button" variant="secondary" className={toolbarBtnRing} disabled={!queryBuilderValid}>
+              </Button>
+              <Button type="button" variant="secondary-outline" className={TOOLBAR_SECONDARY_BTN_CLASS} disabled={!queryBuilderValid}>
                 Create New Detection
-              </UiButton>
-              <UiButton type="button" variant="secondary" className={toolbarBtnRing} disabled={!queryBuilderValid}>
+              </Button>
+              <Button type="button" variant="secondary-outline" className={TOOLBAR_SECONDARY_BTN_CLASS} disabled={!queryBuilderValid}>
                 <Icon name="action-saved-search" className="shrink-0 text-current" aria-hidden />
                 Save Search
-              </UiButton>
-              <Button type="button" className={cn(TOOLBAR_PRIMARY_BUTTON_CLASS, toolbarBtnRing)} disabled={!canSearch}>
+              </Button>
+              <Button type="button" className={TOOLBAR_PRIMARY_BUTTON_CLASS} disabled={!canSearch}>
                 <Icon name="action-search" className="shrink-0 text-current" aria-hidden />
                 Search
               </Button>
@@ -216,7 +213,7 @@ function SearchToolbarActions({
         id="search-criteria-panel"
         role="region"
         aria-label="Search criteria options"
-        className="px-5 py-4 data-[state=closed]:py-0"
+        className="px-6 py-4 data-[state=closed]:py-0"
       >
         {isFsql ? (
           <FsqlSearchTextarea value={fsqlQuery} onChange={onFsqlQueryChange} onSearch={onFsqlSearch} />
@@ -228,7 +225,7 @@ function SearchToolbarActions({
           />
         )}
       </CollapsibleContent>
-      <div className="pl-5 pr-6">
+      <div className="px-6">
         <Separator className="bg-border-rule" />
       </div>
       {fsqlSearching ? <FsqlSearchLoadingPanel /> : null}
@@ -361,11 +358,12 @@ export function SearchLandingPage() {
 
   return (
     <TooltipProvider>
-    <div className="flex h-full min-h-0 bg-surface-container text-text-primary">
+    <div className="flex h-full min-h-0 bg-surface-page text-text-primary">
       <V4NavThinner variant="federated-search" activeSection="search" navTargets={NAV_RAIL_TARGETS} />
 
       <div className="relative flex min-h-0 min-w-0 flex-1 flex-col overflow-hidden">
         <SearchTopHeader
+          chromeSurface="page"
           headerAfterTitle={<SearchHeaderFilters />}
         />
         <div className="relative flex min-h-0 flex-1 flex-col overflow-hidden">
@@ -393,7 +391,7 @@ export function SearchLandingPage() {
                   detectionName={fsqlSearchDetectionName}
                 />
               ) : (
-                <div className="min-h-0 min-w-0 flex-1 bg-surface-container" aria-label="FSQL search workspace" />
+                <div className="min-h-0 min-w-0 flex-1 bg-surface-page" aria-label="FSQL search workspace" />
               )
             ) : (
               <div className="relative min-h-0 min-w-0 flex-1 overflow-hidden">

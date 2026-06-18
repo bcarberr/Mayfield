@@ -1,6 +1,6 @@
 import { useState, type DragEvent } from "react";
 import { Icon } from "../../design-system";
-import { Button } from "../ui/Button";
+import { Button } from "@/components/shadcn/button";
 import type { ConnectorCategory, ConnectorCategoryId } from "./connectorsData";
 import { ConnectorSelectionCountText } from "./ConnectorSelectionCountText";
 
