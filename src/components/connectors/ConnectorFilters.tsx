@@ -219,7 +219,7 @@ export function ConnectorFilters({
             aria-hidden
           />
           <span className="text-base-semibold">
-            <span className="text-interactive-active">Filters: </span>
+            <span className="text-interactive-active">Filters and Controls: </span>
             <span className="font-normal text-text-primary">
               Connectors{" "}
               {useLiveInstanceCounts ? (
