@@ -11,7 +11,7 @@ import {
   type AiAgentDefinition,
   type AiAgentId,
 } from "../ai-agents/aiAgentsData";
-import { Button } from "../ui/Button";
+import { Button } from "@/components/shadcn/button";
 
 const cx = (...c: (string | false | undefined)[]) => c.filter(Boolean).join(" ");
 
@@ -228,7 +228,8 @@ export function SearchAgentsPanel() {
           <Button
             type="button"
             variant="ghost"
-            className="absolute bottom-2 right-2 size-7 p-0 text-interactive-active hover:text-interactive-active"
+            size="icon-sm"
+            className="absolute bottom-2 right-2 p-0 text-interactive-active hover:text-interactive-active"
             aria-label="Send agent message"
             disabled={!prompt.trim() || isThinking}
             onClick={handleSend}

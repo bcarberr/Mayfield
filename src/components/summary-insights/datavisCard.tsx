@@ -1,6 +1,6 @@
 import type { ReactNode } from "react";
 import { Icon } from "../../design-system";
-import { Button } from "../ui/Button";
+import { Button } from "@/components/shadcn/button";
 import {
   Tooltip,
   TooltipContent,
@@ -36,7 +36,7 @@ export function InsightCard({
     <section
       className={cx(
         "flex min-w-0 flex-col overflow-hidden rounded-[4px] border border-border-container",
-        "bg-datavis-card-bg shadow-[0_1px_5px_rgba(0,0,0,0.2),0_2px_2px_rgba(0,0,0,0.14)]",
+        "bg-datavis-card-bg shadow-datavis-card",
         fillHeight ? "min-h-0 flex-1 lg:h-full" : stretch ? "h-full" : "shrink-0",
       )}
     >

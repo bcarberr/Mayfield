@@ -2,7 +2,7 @@ import { useEffect, useState } from "react";
 import { Icon } from "../design-system";
 import { DataPipelinesDashboard } from "../components/data-pipelines/DataPipelinesDashboard";
 import { SearchTopHeader } from "../components/SearchTopHeader";
-import { Button } from "../components/ui/Button";
+import { Button } from "@/components/shadcn/button";
 import { Input } from "../components/ui/Input";
 import { V4NavThinner } from "../components/V4NavThinner";
 import { NAV_RAIL_TARGETS } from "./navRailTargets";
@@ -43,7 +43,7 @@ export function DataPipelinesPage() {
           }
           titleTrailing={
             <div className="flex items-center gap-4" role="toolbar" aria-label="Pipeline actions">
-              <Button type="button" variant="secondary" className="h-8 shrink-0 ring-offset-surface-page">
+              <Button type="button" variant="secondary-outline" className="h-8 shrink-0 ring-offset-surface-page">
                 <Icon
                   name="action-add"
                   size={12}
@@ -52,7 +52,7 @@ export function DataPipelinesPage() {
                 />
                 Add Data Pipeline
               </Button>
-              <Button type="button" variant="secondary" className="h-8 shrink-0 ring-offset-surface-page">
+              <Button type="button" variant="secondary-outline" className="h-8 shrink-0 ring-offset-surface-page">
                 <Icon
                   name="action-file-download"
                   size={12}

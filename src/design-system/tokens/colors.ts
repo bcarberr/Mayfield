@@ -90,7 +90,7 @@ export const lightPalette = {
     primaryHover: "#118a9e",
     primaryPressed: "#146c7b",
     secondaryHover: "#e6fbff",
-    secondaryPressed: "#b8eeff",
+    secondaryPressed: "#13afca",
     selected: "#f3fdff",
     destructive: "#da0711",
     destructiveHover: "#8e0217",

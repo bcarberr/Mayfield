@@ -2,7 +2,7 @@ import { useMemo, useState } from "react";
 import { DATA_GRID_ABOVE_SECTION_CLASS, DATA_GRID_HEADER_ROW_CLASS, DATA_GRID_RESULTS_SEARCH_PLACEHOLDER, DATA_GRID_TABLE_CLASS, DATA_GRID_TABLE_SCROLL_CLASS, DATA_GRID_THEAD_CLASS } from "../ui/dataGridTableStyles";
 import { Checkbox, Icon, type SeverityShapeIconName } from "../../design-system";
 import type { TimeframeRange } from "../../context/TimeframeContext";
-import { Button } from "../ui/Button";
+import { Button } from "@/components/shadcn/button";
 import { ColumnHeaderMenu } from "../ui/ColumnHeaderMenu";
 import { DonutChartPanel } from "../ui/DonutChartPanel";
 import { FilterColumnPanel, type FilterColumnPanelTool } from "../ui/FilterColumnPanel";
@@ -160,7 +160,7 @@ const DISCOVERY_ROWS: DiscoveryRow[] = [
   {
     id: "1",
     severity: "Critical",
-    title: "Internet-facing host running EOL OS detected…",
+    title: "Internet-facing host running EOL OS detected",
     time: "14:22:08",
     activity: "Update",
     eventClass: "Device Inventory Info",
@@ -173,7 +173,7 @@ const DISCOVERY_ROWS: DiscoveryRow[] = [
   {
     id: "2",
     severity: "High",
-    title: "Vulnerable OpenSSL version found on production API host…",
+    title: "Vulnerable OpenSSL version found on production API host",
     time: "13:05:41",
     activity: "Update",
     eventClass: "Software Inventory Info",
@@ -186,7 +186,7 @@ const DISCOVERY_ROWS: DiscoveryRow[] = [
   {
     id: "3",
     severity: "High",
-    title: "Unmanaged S3 bucket exposed with public read ACL…",
+    title: "Unmanaged S3 bucket exposed with public read ACL",
     time: "11:40:12",
     activity: "Create",
     eventClass: "Cloud Resources Inventory Info",
@@ -199,7 +199,7 @@ const DISCOVERY_ROWS: DiscoveryRow[] = [
   {
     id: "4",
     severity: "Medium",
-    title: "Stale service account discovered without MFA enrollment…",
+    title: "Stale service account discovered without MFA enrollment",
     time: "09:12:00",
     activity: "Update",
     eventClass: "User Inventory Info",
@@ -212,7 +212,7 @@ const DISCOVERY_ROWS: DiscoveryRow[] = [
   {
     id: "5",
     severity: "Medium",
-    title: "Workstation missing endpoint protection agent…",
+    title: "Workstation missing endpoint protection agent",
     time: "22:18:55",
     activity: "Create",
     eventClass: "Device Inventory Info",
@@ -225,7 +225,7 @@ const DISCOVERY_ROWS: DiscoveryRow[] = [
   {
     id: "6",
     severity: "Low",
-    title: "New macOS laptop enrolled outside standard build image…",
+    title: "New macOS laptop enrolled outside standard build image",
     time: "18:00:03",
     activity: "Create",
     eventClass: "Device Inventory Info",
@@ -238,7 +238,7 @@ const DISCOVERY_ROWS: DiscoveryRow[] = [
   {
     id: "7",
     severity: "Informational",
-    title: "Cloud VM tagged with owner and environment metadata…",
+    title: "Cloud VM tagged with owner and environment metadata",
     time: "16:44:19",
     activity: "Update",
     eventClass: "Cloud Resources Inventory Info",
@@ -251,7 +251,7 @@ const DISCOVERY_ROWS: DiscoveryRow[] = [
   {
     id: "8",
     severity: "Informational",
-    title: "Installed package inventory refreshed for jump host…",
+    title: "Installed package inventory refreshed for jump host",
     time: "12:01:47",
     activity: "Update",
     eventClass: "Software Inventory Info",
@@ -264,7 +264,7 @@ const DISCOVERY_ROWS: DiscoveryRow[] = [
   {
     id: "9",
     severity: "High",
-    title: "Unknown device observed on corporate VLAN segment…",
+    title: "Unknown device observed on corporate VLAN segment",
     time: "09:33:22",
     activity: "Create",
     eventClass: "Device Inventory Info",
@@ -277,7 +277,7 @@ const DISCOVERY_ROWS: DiscoveryRow[] = [
   {
     id: "10",
     severity: "Medium",
-    title: "Contractor account discovered in privileged AD group…",
+    title: "Contractor account discovered in privileged AD group",
     time: "21:15:08",
     activity: "Update",
     eventClass: "User Inventory Info",
@@ -420,7 +420,7 @@ function DiscoveryEventsTable({ displayRows, getSortProps }: { displayRows: Disc
         </colgroup>
         <thead className={DATA_GRID_THEAD_CLASS}>
           <tr className={DATA_GRID_HEADER_ROW_CLASS}>
-            <th scope="col" style={colStyle(0)} className="relative h-10 border-r border-datavis-gridlines px-0 py-0 align-middle">
+            <th scope="col" style={colStyle(0)} className="relative border-r border-datavis-gridlines px-0 py-0 align-middle">
               <div className="flex items-center justify-center">
                 <Checkbox
                   checked={allSelected}
@@ -434,7 +434,7 @@ function DiscoveryEventsTable({ displayRows, getSortProps }: { displayRows: Disc
             <th
               scope="col"
               style={colStyle(1)}
-              className="relative h-10 border-r border-datavis-gridlines px-2 py-0 align-middle text-xs font-bold uppercase tracking-wide text-text-primary"
+              className="relative border-r border-datavis-gridlines px-2 py-0 align-middle text-xs font-bold uppercase tracking-wide text-text-primary"
             >
               <ColumnHeaderMenu label="Severity" menuLabel="Severity column options" {...getSortProps("severity")} />
               {resizeHandle(1)}
@@ -442,7 +442,7 @@ function DiscoveryEventsTable({ displayRows, getSortProps }: { displayRows: Disc
             <th
               scope="col"
               style={colStyle(2)}
-              className="relative h-10 border-r border-datavis-gridlines px-2 py-0 align-middle text-xs font-bold uppercase tracking-wide text-text-primary"
+              className="relative border-r border-datavis-gridlines px-2 py-0 align-middle text-xs font-bold uppercase tracking-wide text-text-primary"
             >
               <ColumnHeaderMenu label="Title" menuLabel="Title column options" {...getSortProps("title")} />
               {resizeHandle(2)}
@@ -450,7 +450,7 @@ function DiscoveryEventsTable({ displayRows, getSortProps }: { displayRows: Disc
             <th
               scope="col"
               style={colStyle(3)}
-              className="relative h-10 border-r border-datavis-gridlines px-2 py-0 align-middle text-xs font-bold uppercase tracking-wide text-text-primary"
+              className="relative border-r border-datavis-gridlines px-2 py-0 align-middle text-xs font-bold uppercase tracking-wide text-text-primary"
             >
               <ColumnHeaderMenu label="Time" menuLabel="Time column options" {...getSortProps("time")} />
               {resizeHandle(3)}
@@ -458,7 +458,7 @@ function DiscoveryEventsTable({ displayRows, getSortProps }: { displayRows: Disc
             <th
               scope="col"
               style={colStyle(4)}
-              className="relative h-10 border-r border-datavis-gridlines px-2 py-0 align-middle text-xs font-bold uppercase tracking-wide text-text-primary"
+              className="relative border-r border-datavis-gridlines px-2 py-0 align-middle text-xs font-bold uppercase tracking-wide text-text-primary"
             >
               <ColumnHeaderMenu label="Activity" menuLabel="Activity column options" {...getSortProps("activity")} />
               {resizeHandle(4)}
@@ -466,7 +466,7 @@ function DiscoveryEventsTable({ displayRows, getSortProps }: { displayRows: Disc
             <th
               scope="col"
               style={colStyle(5)}
-              className="relative h-10 border-r border-datavis-gridlines px-2 py-0 align-middle text-xs font-bold uppercase tracking-wide text-text-primary"
+              className="relative border-r border-datavis-gridlines px-2 py-0 align-middle text-xs font-bold uppercase tracking-wide text-text-primary"
             >
               <ColumnHeaderMenu label="Class" menuLabel="Class column options" {...getSortProps("eventClass")} />
               {resizeHandle(5)}
@@ -474,7 +474,7 @@ function DiscoveryEventsTable({ displayRows, getSortProps }: { displayRows: Disc
             <th
               scope="col"
               style={colStyle(6)}
-              className="relative h-10 border-r border-datavis-gridlines px-2 py-0 align-middle text-xs font-bold uppercase tracking-wide text-text-primary"
+              className="relative border-r border-datavis-gridlines px-2 py-0 align-middle text-xs font-bold uppercase tracking-wide text-text-primary"
             >
               <ColumnHeaderMenu label="Asset" menuLabel="Asset column options" {...getSortProps("asset")} />
               {resizeHandle(6)}
@@ -482,7 +482,7 @@ function DiscoveryEventsTable({ displayRows, getSortProps }: { displayRows: Disc
             <th
               scope="col"
               style={colStyle(7)}
-              className="relative h-10 border-r border-datavis-gridlines px-2 py-0 align-middle text-xs font-bold uppercase tracking-wide text-text-primary"
+              className="relative border-r border-datavis-gridlines px-2 py-0 align-middle text-xs font-bold uppercase tracking-wide text-text-primary"
             >
               <ColumnHeaderMenu label="Owner" menuLabel="Owner column options" {...getSortProps("owner")} />
               {resizeHandle(7)}
@@ -490,7 +490,7 @@ function DiscoveryEventsTable({ displayRows, getSortProps }: { displayRows: Disc
             <th
               scope="col"
               style={colStyle(8)}
-              className="relative h-10 px-2 py-0 align-middle text-xs font-bold uppercase tracking-wide text-text-primary"
+              className="relative px-2 py-0 align-middle text-xs font-bold uppercase tracking-wide text-text-primary"
             >
               <ColumnHeaderMenu label="Connectors" menuLabel="Connectors column options" {...getSortProps("connector")} />
               {resizeHandle(8)}
@@ -499,8 +499,8 @@ function DiscoveryEventsTable({ displayRows, getSortProps }: { displayRows: Disc
         </thead>
         <tbody>
           {displayRows.map((row) => (
-            <tr key={row.id} className="h-10 border-b border-datavis-gridlines hover:bg-overlay-subtle">
-              <td style={colStyle(0)} className="h-10 px-0 py-0 align-middle">
+            <tr key={row.id} className="border-b border-datavis-gridlines hover:bg-overlay-subtle">
+              <td style={colStyle(0)} className="px-0 py-0 align-middle">
                 <div className="flex items-center justify-center">
                   <Checkbox
                     checked={selected.has(row.id)}
@@ -509,13 +509,13 @@ function DiscoveryEventsTable({ displayRows, getSortProps }: { displayRows: Disc
                   />
                 </div>
               </td>
-              <td style={colStyle(1)} className="h-10 px-2 py-0 align-middle">
+              <td style={colStyle(1)} className="px-2 py-0 align-middle">
                 <span className="inline-flex items-center gap-2">
                   <SeverityTableIcon name={SEV_ICONS[row.severity]} color={SEV_BAR[row.severity]} />
                   <span className="text-sm text-text-secondary">{row.severity}</span>
                 </span>
               </td>
-              <td style={colStyle(2)} className="h-10 min-w-0 px-2 py-0 align-middle">
+              <td style={colStyle(2)} className="min-w-0 px-2 py-0 align-middle">
                 <TruncatedText
                   as="button"
                   className="w-full text-left text-sm font-semibold text-interactive-active hover:underline focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-interactive-active"
@@ -523,13 +523,13 @@ function DiscoveryEventsTable({ displayRows, getSortProps }: { displayRows: Disc
                   {row.title}
                 </TruncatedText>
               </td>
-              <td style={colStyle(3)} className="h-10 min-w-0 px-2 py-0 align-middle tabular-nums">
+              <td style={colStyle(3)} className="min-w-0 px-2 py-0 align-middle tabular-nums">
                 <TruncatedText className="text-sm text-text-secondary">{row.time}</TruncatedText>
               </td>
-              <td style={colStyle(4)} className="h-10 min-w-0 px-2 py-0 align-middle">
+              <td style={colStyle(4)} className="min-w-0 px-2 py-0 align-middle">
                 <TruncatedText className="text-sm text-text-secondary">{row.activity}</TruncatedText>
               </td>
-              <td style={colStyle(5)} className="h-10 min-w-0 overflow-hidden px-2 py-0 align-middle">
+              <td style={colStyle(5)} className="min-w-0 overflow-hidden px-2 py-0 align-middle">
                 <span className="flex w-full min-w-0 items-center gap-2">
                   <Icon
                     name="ocsf-discovery"
@@ -542,13 +542,13 @@ function DiscoveryEventsTable({ displayRows, getSortProps }: { displayRows: Disc
                   </TruncatedText>
                 </span>
               </td>
-              <td style={colStyle(6)} className="h-10 min-w-0 px-2 py-0 align-middle">
+              <td style={colStyle(6)} className="min-w-0 px-2 py-0 align-middle">
                 <TruncatedText className="text-sm text-text-secondary">{row.asset}</TruncatedText>
               </td>
-              <td style={colStyle(7)} className="h-10 min-w-0 px-2 py-0 align-middle">
+              <td style={colStyle(7)} className="min-w-0 px-2 py-0 align-middle">
                 <TruncatedText className="text-sm text-text-secondary">{row.owner}</TruncatedText>
               </td>
-              <td style={colStyle(8)} className="h-10 min-w-0 px-2 py-0 align-middle">
+              <td style={colStyle(8)} className="min-w-0 px-2 py-0 align-middle">
                 <ConnectorTableCell name={row.connector} />
               </td>
             </tr>

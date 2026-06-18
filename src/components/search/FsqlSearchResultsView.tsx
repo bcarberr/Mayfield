@@ -32,6 +32,9 @@ import {
   type FsqlSearchResultRow,
 } from "./fsqlSearchResultsData";
 import { timeframeFromBucketSelection } from "../summary-insights/timeframeChartUtils";
+import { FsqlSearchProgressStats } from "./FsqlSearchProgressStats";
+import { useFsqlSearchProgress } from "./useFsqlSearchProgress";
+import { useConnectorSelectionCounts } from "../connectors/connectorEnabledState";
 import { Button } from "@/components/shadcn/button";
 import { Checkbox } from "@/components/shadcn/checkbox";
 import { Input } from "@/components/shadcn/input";
@@ -205,7 +208,7 @@ function FsqlSearchResultsTable({
                   <TruncatedText className="text-sm font-semibold text-interactive-active">{row.title}</TruncatedText>
                 </td>
                 <td style={colStyle(3)} className="h-10 min-w-0 px-2 py-0 align-middle tabular-nums">
-                  <TruncatedText className="text-sm text-interactive-active">{row.time}</TruncatedText>
+                  <TruncatedText className="text-sm text-text-secondary">{row.time}</TruncatedText>
                 </td>
                 <td style={colStyle(4)} className="h-10 min-w-0 px-2 py-0 align-middle">
                   <TruncatedText className="text-sm text-text-secondary">{row.activity}</TruncatedText>
@@ -239,11 +242,9 @@ function FsqlSearchResultsTable({
 }
 
 export function FsqlSearchResultsView({
-  isSearching,
   searchInitialTimeframe,
   detectionName,
 }: {
-  isSearching?: boolean;
   searchInitialTimeframe: TimeframeRange | null;
   detectionName?: string | null;
 }) {
@@ -257,12 +258,28 @@ export function FsqlSearchResultsView({
     setResultsChartZoomed,
     resultsPage,
     setResultsPage,
+    fsqlSearching,
+    searchSessionKey,
+    completedSearchSessionKey,
+    markSearchSessionComplete,
   } = useSearch();
+  const connectorCounts = useConnectorSelectionCounts();
   const [timeframeRefreshing, setTimeframeRefreshing] = useState(false);
   const isFirstTimeframeRender = useRef(true);
 
   const resultRows = useMemo(() => buildFsqlSearchResults(timeframe), [timeframe]);
   const timeline = useMemo(() => buildFsqlResultsTimeline(timeframe), [timeframe]);
+  const progressSearchKey =
+    searchSessionKey && completedSearchSessionKey === searchSessionKey ? null : searchSessionKey;
+  const searchProgress = useFsqlSearchProgress({
+    searchKey: progressSearchKey,
+    finalTotalResults: resultRows.length,
+    selectedConnectorCount: connectorCounts.selectedCount,
+  });
+  const streamingRows = useMemo(() => {
+    if (!searchProgress.isProgressActive) return resultRows;
+    return resultRows.slice(0, searchProgress.displayedTotalResults);
+  }, [resultRows, searchProgress.displayedTotalResults, searchProgress.isProgressActive]);
 
   const handleTimelineBrush = useCallback(
     ({ startIndex, endIndex }: { startIndex: number; endIndex: number }) => {
@@ -288,6 +305,18 @@ export function FsqlSearchResultsView({
   }, [searchInitialTimeframe?.from.getTime(), searchInitialTimeframe?.to.getTime(), setResultsChartZoomed]);
 
   useEffect(() => {
+    if (!searchSessionKey) return;
+    if (completedSearchSessionKey === searchSessionKey) return;
+    if (!searchProgress.returningResultsComplete) return;
+    markSearchSessionComplete(searchSessionKey);
+  }, [
+    searchSessionKey,
+    completedSearchSessionKey,
+    searchProgress.returningResultsComplete,
+    markSearchSessionComplete,
+  ]);
+
+  useEffect(() => {
     if (isFirstTimeframeRender.current) {
       isFirstTimeframeRender.current = false;
       return;
@@ -298,12 +327,12 @@ export function FsqlSearchResultsView({
   }, [timeframe.from.getTime(), timeframe.to.getTime()]);
 
   const filteredRows = useMemo(
-    () => resultRows.filter((row) => fsqlResultMatchesSearch(row, resultsFilterQuery)),
-    [resultRows, resultsFilterQuery],
+    () => streamingRows.filter((row) => fsqlResultMatchesSearch(row, resultsFilterQuery)),
+    [streamingRows, resultsFilterQuery],
   );
 
-  const showTableLoading = Boolean(isSearching || timeframeRefreshing);
-  const showChartLoading = Boolean(isSearching);
+  const showTableLoading = timeframeRefreshing;
+  const showChartLoading = Boolean(fsqlSearching || searchProgress.isProgressActive);
   const resultsTitle = detectionName ? `Total Results: ${detectionName}` : "Total Results";
   const tableGrid = useFsqlSearchTableGrid(filteredRows, {
     page: resultsPage,
@@ -314,6 +343,8 @@ export function FsqlSearchResultsView({
     <div className={cx(DATA_GRID_PAGE_SCROLL_OUTER_CLASS, "bg-surface-page")}>
       <div className={cx(DATA_GRID_PAGE_SCROLL_INNER_CLASS, "px-6 pb-4 sm:pb-5")}>
       <div className="flex shrink-0 flex-col gap-4 pt-4">
+        <FsqlSearchProgressStats progress={searchProgress} />
+
         <div className={DATA_GRID_ABOVE_SECTION_CLASS}>
           <InsightCard title={resultsTitle}>
           <div className="flex shrink-0 flex-col">
@@ -357,7 +388,9 @@ export function FsqlSearchResultsView({
             <>
               <div className="flex flex-wrap items-center gap-3">
                 <p className="shrink-0 text-base-small text-text-secondary">
-                  {filteredRows.length} Results
+                  {searchProgress.isProgressActive
+                    ? `${searchProgress.displayedTotalResults.toLocaleString()} of ${resultRows.length.toLocaleString()} Results`
+                    : `${filteredRows.length} Results`}
                   {resultsFilterQuery.trim() ? ` · “${resultsFilterQuery.trim()}”` : ""}
                 </p>
                 <div className="relative w-[300px] shrink-0">
@@ -399,11 +432,19 @@ export function FsqlSearchResultsView({
           table={
             showTableLoading ? (
               <div className="flex h-40 items-center justify-center text-sm text-text-tertiary">Loading results…</div>
+            ) : filteredRows.length === 0 && searchProgress.isProgressActive ? (
+              <div className="flex h-40 items-center justify-center text-sm text-text-tertiary">
+                Waiting for connector results…
+              </div>
             ) : (
               <FsqlSearchResultsTable displayRows={tableGrid.displayRows} getSortProps={tableGrid.getSortProps} />
             )
           }
-          footer={showTableLoading ? null : <DataGridPaginationFooter grid={tableGrid} />}
+          footer={
+            showTableLoading || (filteredRows.length === 0 && searchProgress.isProgressActive) ? null : (
+              <DataGridPaginationFooter grid={tableGrid} />
+            )
+          }
         />
       </div>
       </div>

@@ -1,7 +1,7 @@
 import { useState, useCallback, useMemo, useId } from "react";
 import { Icon, Switch } from "../../design-system";
-import { SlideOverHeaderBackButton } from "../ui/SlideOver";
-import { Button } from "../ui/Button";
+import { SlideOverHeaderBackButton, SLIDE_OVER_FLOATING_FOOTER_PANEL_CLASS, SLIDE_OVER_FLOATING_FOOTER_WRAPPER_CLASS, SLIDE_OVER_FOOTER_BUTTON_CLASS, SLIDE_OVER_FOOTER_GHOST_BUTTON_CLASS } from "../ui/SlideOver";
+import { Button } from "@/components/shadcn/button";
 import { Checkbox } from "@/components/shadcn/checkbox";
 import {
   Collapsible,
@@ -389,7 +389,7 @@ function DetectionLogicTabContent({
           <div>
             <Button
               type="button"
-              variant="secondary"
+              variant="secondary-outline"
               disabled={!detectionQuery.trim() || testState === "running"}
               onClick={handleTestQuery}
             >
@@ -597,7 +597,7 @@ function NotificationChannelsSection({
                     <Button
                       type="button"
                       variant="ghost"
-                      size="small"
+                      size="sm"
                       className="text-interactive-active hover:text-interactive-active/80"
                     >
                       {expanded ? "collapse" : "expand to configure"}
@@ -845,7 +845,7 @@ function DetectionSettingsTabContent({
 
 function Spinner() {
   return (
-    <svg className="animate-spin" viewBox="0 0 24 24" fill="none" aria-hidden>
+    <svg className="size-3 shrink-0 animate-spin" viewBox="0 0 24 24" fill="none" aria-hidden>
       <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" />
       <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z" />
     </svg>
@@ -1283,19 +1283,19 @@ export function CreateDetectionSlideOver({
         </div>
       </Tabs>
 
-      <div className="pointer-events-none absolute bottom-0 right-0 z-20 flex justify-end p-4">
-        <div className="pointer-events-auto flex items-center gap-2 rounded-tl-lg rounded-bl-lg bg-surface-container/80 px-3 py-2.5 shadow-lg ring-1 ring-border-container backdrop-blur-sm">
+      <div className={SLIDE_OVER_FLOATING_FOOTER_WRAPPER_CLASS}>
+        <div className={SLIDE_OVER_FLOATING_FOOTER_PANEL_CLASS}>
           {isViewMode ? (
             <>
               <Button
                 type="button"
                 variant="ghost"
-                className="text-text-secondary hover:text-text-primary"
+                className={SLIDE_OVER_FOOTER_GHOST_BUTTON_CLASS}
                 onClick={onClose}
               >
                 Close
               </Button>
-              <Button type="button" variant="primary" onClick={onCopy}>
+              <Button type="button" variant="default" className={SLIDE_OVER_FOOTER_BUTTON_CLASS} onClick={onCopy}>
                 Create copy
               </Button>
             </>
@@ -1304,20 +1304,27 @@ export function CreateDetectionSlideOver({
               <Button
                 type="button"
                 variant="ghost"
-                className="text-text-secondary hover:text-text-primary"
+                className={SLIDE_OVER_FOOTER_GHOST_BUTTON_CLASS}
                 onClick={onClose}
               >
                 Cancel
               </Button>
               {!isLogicTab && canGoNext && (
-                <Button type="button" variant="secondary" disabled={!canSaveSettingsTab} onClick={handleNext}>
+                <Button
+                  type="button"
+                  variant="secondary-outline"
+                  className={SLIDE_OVER_FOOTER_BUTTON_CLASS}
+                  disabled={!canSaveSettingsTab}
+                  onClick={handleNext}
+                >
                   Next: Detection Logic
                 </Button>
               )}
               {showSaveButton && (
                 <Button
                   type="button"
-                  variant="primary"
+                  variant="default"
+                  className={SLIDE_OVER_FOOTER_BUTTON_CLASS}
                   disabled={!canSaveAction || isSaving}
                   onClick={handleSaveDetection}
                 >

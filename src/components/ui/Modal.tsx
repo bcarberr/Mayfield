@@ -1,6 +1,6 @@
 import { type ReactNode, useEffect, useId } from "react";
 import { Icon } from "../../design-system";
-import { Button } from "./Button";
+import { Button } from "@/components/shadcn/button";
 
 export type ModalProps = {
   open: boolean;
@@ -42,7 +42,7 @@ export function Modal({ open, title, children, footer, onClose }: ModalProps) {
           <h2 id={titleId} className="text-base font-bold tracking-wide text-text-primary">
             {title}
           </h2>
-          <Button type="button" variant="ghost" aria-label="Close dialog" onClick={onClose}>
+          <Button type="button" variant="ghost" size="icon" aria-label="Close dialog" onClick={onClose}>
             <Icon name="close" size={20} />
           </Button>
         </div>

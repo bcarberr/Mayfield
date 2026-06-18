@@ -37,12 +37,12 @@ export function DataTable<Row>({
         {caption ? <caption className="sr-only">{caption}</caption> : null}
         {!hideHeader ? (
           <thead>
-            <tr className="border-b border-border-rule bg-surface-container/60">
+            <tr className="h-[40px] max-h-[40px] border-b border-border-rule bg-surface-table-row-header">
               {columns.map((c) => (
                 <th
                   key={c.id}
                   scope="col"
-                  className={`px-3 py-2 text-xs font-bold uppercase tracking-wide text-text-tertiary ${c.className ?? ""}`.trim()}
+                  className={`h-[40px] max-h-[40px] px-3 py-0 align-middle text-xs font-bold uppercase tracking-wide text-text-tertiary ${c.className ?? ""}`.trim()}
                 >
                   {c.header}
                 </th>
@@ -52,11 +52,11 @@ export function DataTable<Row>({
         ) : null}
         <tbody>
           {rows.map((row) => (
-            <tr key={rowKey(row)} className="hover:bg-surface-container/40">
+            <tr key={rowKey(row)} className="h-[40px] max-h-[40px] hover:bg-surface-container/40">
               {columns.map((c) => (
                 <td
                   key={c.id}
-                  className={`align-middle text-text-primary ${c.className ?? "px-3 py-2"}`.trim()}
+                  className={`h-[40px] max-h-[40px] py-0 align-middle text-text-primary ${c.className ?? "px-3"}`.trim()}
                 >
                   {c.cell(row)}
                 </td>

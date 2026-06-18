@@ -1,7 +1,7 @@
 import { type KeyboardEvent, useEffect, useRef, useState } from "react";
 import { Icon } from "../../design-system";
 import aiAgentsNavSvg from "../../assets/nav-v4/ai-agents.svg?raw";
-import { Button } from "../ui/Button";
+import { Button } from "@/components/shadcn/button";
 import { AgentAvatar } from "./AgentAvatar";
 import {
   AGENT_GUARDRAIL_DISCLAIMER,
@@ -159,7 +159,8 @@ function AgentsSidebar({
         <Button
           type="button"
           variant="ghost"
-          className="size-7 p-0 text-text-tertiary hover:text-text-primary"
+          size="icon-sm"
+          className="p-0 text-text-tertiary hover:text-text-primary"
           aria-label="Collapse agents panel"
           onClick={() => onOpenChange(false)}
         >
@@ -342,7 +343,8 @@ export function AiAgentsWorkspace() {
             <Button
               type="button"
               variant="ghost"
-              className="absolute bottom-2 right-2 size-8 p-0 text-interactive-active hover:text-interactive-primary-hover"
+              size="icon"
+              className="absolute bottom-2 right-2 p-0 text-interactive-active hover:text-interactive-primary-hover"
               aria-label="Send message"
               disabled={!prompt.trim() || isThinking}
               onClick={handleSend}

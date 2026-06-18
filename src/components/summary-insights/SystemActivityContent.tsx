@@ -1,7 +1,7 @@
 import { useMemo, useState } from "react";
 import { DATA_GRID_ABOVE_SECTION_CLASS, DATA_GRID_HEADER_ROW_CLASS, DATA_GRID_RESULTS_SEARCH_PLACEHOLDER, DATA_GRID_TABLE_CLASS, DATA_GRID_TABLE_SCROLL_CLASS, DATA_GRID_THEAD_CLASS } from "../ui/dataGridTableStyles";
 import { Checkbox, Icon, type SeverityShapeIconName } from "../../design-system";
-import { Button } from "../ui/Button";
+import { Button } from "@/components/shadcn/button";
 import { ColumnHeaderMenu } from "../ui/ColumnHeaderMenu";
 import { FilterColumnPanel, type FilterColumnPanelTool } from "../ui/FilterColumnPanel";
 import { Input } from "../ui/Input";
@@ -134,7 +134,7 @@ const SYSTEM_ACTIVITY_ROWS: SystemActivityRow[] = [
   {
     id: "1",
     severity: "Critical",
-    title: "Encoded PowerShell launched from spawned cmd.exe…",
+    title: "Encoded PowerShell launched from spawned cmd.exe",
     time: "04:12:08",
     activity: "Launch",
     eventClass: "Process Activity",
@@ -146,7 +146,7 @@ const SYSTEM_ACTIVITY_ROWS: SystemActivityRow[] = [
   {
     id: "2",
     severity: "High",
-    title: "Suspicious scheduled job created under SYSTEM context…",
+    title: "Suspicious scheduled job created under SYSTEM context",
     time: "03:58:41",
     activity: "Create",
     eventClass: "Scheduled Job Activity",
@@ -158,7 +158,7 @@ const SYSTEM_ACTIVITY_ROWS: SystemActivityRow[] = [
   {
     id: "3",
     severity: "High",
-    title: "Unsigned module loaded from user-writable directory…",
+    title: "Unsigned module loaded from user-writable directory",
     time: "03:40:12",
     activity: "Load",
     eventClass: "Module Activity",
@@ -170,7 +170,7 @@ const SYSTEM_ACTIVITY_ROWS: SystemActivityRow[] = [
   {
     id: "4",
     severity: "Medium",
-    title: "Kernel driver service registered with matching persist…",
+    title: "Kernel driver service registered with matching persistence key",
     time: "02:12:00",
     activity: "Update",
     eventClass: "Kernel Activity",
@@ -182,7 +182,7 @@ const SYSTEM_ACTIVITY_ROWS: SystemActivityRow[] = [
   {
     id: "5",
     severity: "Low",
-    title: "Temporary script executed from AppData with outbound…",
+    title: "Temporary script executed from AppData with outbound connection",
     time: "22:18:55",
     activity: "Launch",
     eventClass: "Script Activity",
@@ -194,7 +194,7 @@ const SYSTEM_ACTIVITY_ROWS: SystemActivityRow[] = [
   {
     id: "6",
     severity: "Informational",
-    title: "Process creation auditing enabled on endpoint policy…",
+    title: "Process creation auditing enabled on endpoint policy",
     time: "18:00:03",
     activity: "Update",
     eventClass: "Process Activity",
@@ -206,7 +206,7 @@ const SYSTEM_ACTIVITY_ROWS: SystemActivityRow[] = [
   {
     id: "7",
     severity: "Critical",
-    title: "LSASS memory access attempt from unexpected process…",
+    title: "LSASS memory access attempt from unexpected process",
     time: "16:44:19",
     activity: "Inject",
     eventClass: "Process Activity",
@@ -218,7 +218,7 @@ const SYSTEM_ACTIVITY_ROWS: SystemActivityRow[] = [
   {
     id: "8",
     severity: "High",
-    title: "Executable renamed to resemble system binary in System32…",
+    title: "Executable renamed to resemble system binary in System32",
     time: "12:01:47",
     activity: "Rename",
     eventClass: "File System Activity",
@@ -230,7 +230,7 @@ const SYSTEM_ACTIVITY_ROWS: SystemActivityRow[] = [
   {
     id: "9",
     severity: "Medium",
-    title: "New service installed with auto-start and network bind…",
+    title: "New service installed with auto-start and network binding",
     time: "09:33:22",
     activity: "Create",
     eventClass: "Process Activity",
@@ -242,7 +242,7 @@ const SYSTEM_ACTIVITY_ROWS: SystemActivityRow[] = [
   {
     id: "10",
     severity: "Low",
-    title: "Script block logging captured obfuscated batch content…",
+    title: "Script block logging captured obfuscated batch content",
     time: "21:15:08",
     activity: "Launch",
     eventClass: "Script Activity",
@@ -360,7 +360,7 @@ function SystemActivityTable({ displayRows, getSortProps }: { displayRows: Syste
         </colgroup>
         <thead className={DATA_GRID_THEAD_CLASS}>
           <tr className={DATA_GRID_HEADER_ROW_CLASS}>
-            <th scope="col" style={colStyle(0)} className="relative h-10 border-r border-datavis-gridlines px-0 py-0 align-middle">
+            <th scope="col" style={colStyle(0)} className="relative border-r border-datavis-gridlines px-0 py-0 align-middle">
               <div className="flex items-center justify-center">
                 <Checkbox
                   checked={allSelected}
@@ -374,7 +374,7 @@ function SystemActivityTable({ displayRows, getSortProps }: { displayRows: Syste
             <th
               scope="col"
               style={colStyle(1)}
-              className="relative h-10 border-r border-datavis-gridlines px-2 py-0 align-middle text-xs font-bold uppercase tracking-wide text-text-primary"
+              className="relative border-r border-datavis-gridlines px-2 py-0 align-middle text-xs font-bold uppercase tracking-wide text-text-primary"
             >
               <ColumnHeaderMenu
                 label="Severity"
@@ -386,7 +386,7 @@ function SystemActivityTable({ displayRows, getSortProps }: { displayRows: Syste
             <th
               scope="col"
               style={colStyle(2)}
-              className="relative h-10 border-r border-datavis-gridlines px-2 py-0 align-middle text-xs font-bold uppercase tracking-wide text-text-primary"
+              className="relative border-r border-datavis-gridlines px-2 py-0 align-middle text-xs font-bold uppercase tracking-wide text-text-primary"
             >
               <ColumnHeaderMenu label="Title" menuLabel="Title column options" {...getSortProps("title")} />
               {resizeHandle(2)}
@@ -394,7 +394,7 @@ function SystemActivityTable({ displayRows, getSortProps }: { displayRows: Syste
             <th
               scope="col"
               style={colStyle(3)}
-              className="relative h-10 border-r border-datavis-gridlines px-2 py-0 align-middle text-xs font-bold uppercase tracking-wide text-text-primary"
+              className="relative border-r border-datavis-gridlines px-2 py-0 align-middle text-xs font-bold uppercase tracking-wide text-text-primary"
             >
               <ColumnHeaderMenu label="Time" menuLabel="Time column options" {...getSortProps("time")} />
               {resizeHandle(3)}
@@ -402,7 +402,7 @@ function SystemActivityTable({ displayRows, getSortProps }: { displayRows: Syste
             <th
               scope="col"
               style={colStyle(4)}
-              className="relative h-10 border-r border-datavis-gridlines px-2 py-0 align-middle text-xs font-bold uppercase tracking-wide text-text-primary"
+              className="relative border-r border-datavis-gridlines px-2 py-0 align-middle text-xs font-bold uppercase tracking-wide text-text-primary"
             >
               <ColumnHeaderMenu label="Activity" menuLabel="Activity column options" {...getSortProps("activity")} />
               {resizeHandle(4)}
@@ -410,7 +410,7 @@ function SystemActivityTable({ displayRows, getSortProps }: { displayRows: Syste
             <th
               scope="col"
               style={colStyle(5)}
-              className="relative h-10 border-r border-datavis-gridlines px-2 py-0 align-middle text-xs font-bold uppercase tracking-wide text-text-primary"
+              className="relative border-r border-datavis-gridlines px-2 py-0 align-middle text-xs font-bold uppercase tracking-wide text-text-primary"
             >
               <ColumnHeaderMenu label="Class" menuLabel="Class column options" {...getSortProps("eventClass")} />
               {resizeHandle(5)}
@@ -418,7 +418,7 @@ function SystemActivityTable({ displayRows, getSortProps }: { displayRows: Syste
             <th
               scope="col"
               style={colStyle(6)}
-              className="relative h-10 border-r border-datavis-gridlines px-2 py-0 align-middle text-xs font-bold uppercase tracking-wide text-text-primary"
+              className="relative border-r border-datavis-gridlines px-2 py-0 align-middle text-xs font-bold uppercase tracking-wide text-text-primary"
             >
               <ColumnHeaderMenu label="Host" menuLabel="Host column options" {...getSortProps("host")} />
               {resizeHandle(6)}
@@ -426,7 +426,7 @@ function SystemActivityTable({ displayRows, getSortProps }: { displayRows: Syste
             <th
               scope="col"
               style={colStyle(7)}
-              className="relative h-10 border-r border-datavis-gridlines px-2 py-0 align-middle text-xs font-bold uppercase tracking-wide text-text-primary"
+              className="relative border-r border-datavis-gridlines px-2 py-0 align-middle text-xs font-bold uppercase tracking-wide text-text-primary"
             >
               <ColumnHeaderMenu label="Process" menuLabel="Process column options" {...getSortProps("process")} />
               {resizeHandle(7)}
@@ -434,7 +434,7 @@ function SystemActivityTable({ displayRows, getSortProps }: { displayRows: Syste
             <th
               scope="col"
               style={colStyle(8)}
-              className="relative h-10 px-2 py-0 align-middle text-xs font-bold uppercase tracking-wide text-text-primary"
+              className="relative px-2 py-0 align-middle text-xs font-bold uppercase tracking-wide text-text-primary"
             >
               <ColumnHeaderMenu label="Connectors" menuLabel="Connectors column options" {...getSortProps("connector")} />
               {resizeHandle(8)}
@@ -443,8 +443,8 @@ function SystemActivityTable({ displayRows, getSortProps }: { displayRows: Syste
         </thead>
         <tbody>
           {displayRows.map((row) => (
-            <tr key={row.id} className="h-10 border-b border-datavis-gridlines hover:bg-overlay-subtle">
-              <td style={colStyle(0)} className="h-10 px-0 py-0 align-middle">
+            <tr key={row.id} className="border-b border-datavis-gridlines hover:bg-overlay-subtle">
+              <td style={colStyle(0)} className="px-0 py-0 align-middle">
                 <div className="flex items-center justify-center">
                   <Checkbox
                     checked={selected.has(row.id)}
@@ -453,13 +453,13 @@ function SystemActivityTable({ displayRows, getSortProps }: { displayRows: Syste
                   />
                 </div>
               </td>
-              <td style={colStyle(1)} className="h-10 px-2 py-0 align-middle">
+              <td style={colStyle(1)} className="px-2 py-0 align-middle">
                 <span className="inline-flex items-center gap-2">
                   <SeverityTableIcon name={SEV_ICONS[row.severity]} color={SEV_BAR[row.severity]} />
                   <span className="text-sm text-text-secondary">{row.severity}</span>
                 </span>
               </td>
-              <td style={colStyle(2)} className="h-10 min-w-0 px-2 py-0 align-middle">
+              <td style={colStyle(2)} className="min-w-0 px-2 py-0 align-middle">
                 <TruncatedText
                   as="button"
                   className="w-full text-left text-sm font-semibold text-interactive-active hover:underline focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-interactive-active"
@@ -467,13 +467,13 @@ function SystemActivityTable({ displayRows, getSortProps }: { displayRows: Syste
                   {row.title}
                 </TruncatedText>
               </td>
-              <td style={colStyle(3)} className="h-10 min-w-0 px-2 py-0 align-middle tabular-nums">
+              <td style={colStyle(3)} className="min-w-0 px-2 py-0 align-middle tabular-nums">
                 <TruncatedText className="text-sm text-text-secondary">{row.time}</TruncatedText>
               </td>
-              <td style={colStyle(4)} className="h-10 min-w-0 px-2 py-0 align-middle">
+              <td style={colStyle(4)} className="min-w-0 px-2 py-0 align-middle">
                 <TruncatedText className="text-sm text-text-secondary">{row.activity}</TruncatedText>
               </td>
-              <td style={colStyle(5)} className="h-10 min-w-0 overflow-hidden px-2 py-0 align-middle">
+              <td style={colStyle(5)} className="min-w-0 overflow-hidden px-2 py-0 align-middle">
                 <span className="flex w-full min-w-0 items-center gap-2">
                   <Icon
                     name="ocsf-system-activity"
@@ -486,13 +486,13 @@ function SystemActivityTable({ displayRows, getSortProps }: { displayRows: Syste
                   </TruncatedText>
                 </span>
               </td>
-              <td style={colStyle(6)} className="h-10 min-w-0 px-2 py-0 align-middle">
+              <td style={colStyle(6)} className="min-w-0 px-2 py-0 align-middle">
                 <TruncatedText className="text-sm text-text-secondary">{row.host}</TruncatedText>
               </td>
-              <td style={colStyle(7)} className="h-10 min-w-0 px-2 py-0 align-middle">
+              <td style={colStyle(7)} className="min-w-0 px-2 py-0 align-middle">
                 <TruncatedText className="text-sm text-text-secondary">{row.process}</TruncatedText>
               </td>
-              <td style={colStyle(8)} className="h-10 min-w-0 px-2 py-0 align-middle">
+              <td style={colStyle(8)} className="min-w-0 px-2 py-0 align-middle">
                 <ConnectorTableCell name={row.connector} />
               </td>
             </tr>

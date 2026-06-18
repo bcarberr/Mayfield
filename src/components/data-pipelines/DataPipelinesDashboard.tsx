@@ -1,6 +1,7 @@
 import { Fragment, useMemo, useState } from "react";
 import {
   DATA_GRID_ABOVE_SECTION_CLASS,
+  DATA_GRID_EXPANDED_CELL_WIDE_CLASS,
   DATA_GRID_EXPANDED_ROW_CLASS,
   DATA_GRID_FILTER_ROW_CLASS,
   DATA_GRID_HEADER_ROW_CLASS,
@@ -12,7 +13,7 @@ import {
 } from "../ui/dataGridTableStyles";
 import { useDataGridStickyToolbar } from "../ui/useDataGridStickyToolbar";
 import { Checkbox, Icon, Switch } from "../../design-system";
-import { Button } from "../ui/Button";
+import { Button } from "@/components/shadcn/button";
 import { ColumnHeaderMenu } from "../ui/ColumnHeaderMenu";
 import { compareBooleans, compareNumbers, compareStrings, useColumnSort } from "../ui/useColumnSort";
 import { FilterColumnPanel, type FilterColumnPanelTool } from "../ui/FilterColumnPanel";
@@ -213,8 +214,8 @@ function PipelinesTable({
   });
 
   const thClass =
-    "relative h-10 border-r border-datavis-gridlines px-2 py-0 align-middle text-xs font-bold uppercase tracking-wide text-text-primary";
-  const tdClass = "h-10 px-2 py-0 align-middle text-sm text-text-secondary";
+    "relative border-r border-datavis-gridlines px-2 py-0 align-middle text-xs font-bold uppercase tracking-wide text-text-primary";
+  const tdClass = "px-2 py-0 align-middle text-sm text-text-secondary";
 
   const allExpanded = rows.length > 0 && rows.every((row) => expandedIds.has(row.id));
 
@@ -351,8 +352,8 @@ function PipelinesTable({
                 const expanded = expandedIds.has(row.id);
                 return (
                   <Fragment key={row.id}>
-                    <tr className="h-10 border-b border-datavis-gridlines hover:bg-overlay-subtle">
-                      <td style={colStyle(0)} className="h-10 px-0 py-0 align-middle">
+                    <tr className="border-b border-datavis-gridlines hover:bg-overlay-subtle">
+                      <td style={colStyle(0)} className="px-0 py-0 align-middle">
                         <div className="flex justify-center">
                           <button
                             type="button"
@@ -399,7 +400,8 @@ function PipelinesTable({
                           <Button
                             type="button"
                             variant="ghost"
-                            className="size-8 p-0 text-text-tertiary hover:text-text-primary"
+                            size="icon"
+                            className="p-0 text-text-tertiary hover:text-text-primary"
                             aria-label={`Actions for ${row.name}`}
                           >
                             <Icon name="navi-more-vert" size={16} />
@@ -409,7 +411,7 @@ function PipelinesTable({
                     </tr>
                     {expanded ? (
                       <tr className={DATA_GRID_EXPANDED_ROW_CLASS}>
-                        <td colSpan={PIPELINE_COLUMN_COUNT} className="px-6 py-4 align-top">
+                        <td colSpan={PIPELINE_COLUMN_COUNT} className={DATA_GRID_EXPANDED_CELL_WIDE_CLASS}>
                           <PipelineExpandedRow
                             row={row}
                             eventLogEnabled={eventLogEnabledByPipeline[row.id] ?? {}}

@@ -8,7 +8,7 @@ import {
   isExecutableFsqlQuery,
   resolveCopilotPrompt,
 } from "../lib/fsqlCopilotResponder";
-import { Button } from "./ui/Button";
+import { Button } from "@/components/shadcn/button";
 import { SearchAgentsPanel } from "./search/SearchAgentsPanel";
 import aiAgentsNavSvg from "../assets/nav-v4/ai-agents.svg?raw";
 import copilotSparklesUrl from "../assets/icons/copilot-sparkles.svg?url";
@@ -90,8 +90,8 @@ function CopilotResponseBlock({
           {canSendToSearch ? (
             <Button
               type="button"
-              variant="secondary"
-              size="small"
+              variant="secondary-outline"
+              size="sm"
               className="w-full"
               onClick={() => onSendToFsqlSearch(block.text.trim())}
             >
@@ -135,16 +135,17 @@ function CopilotMessageActions({
 
   return (
     <div className="mt-3 flex items-center justify-end gap-1">
-      <Button type="button" variant="ghost" className="size-7 p-0 text-text-tertiary hover:text-text-primary" aria-label="Helpful response">
+      <Button type="button" variant="ghost" size="icon-sm" className="p-0 text-text-tertiary hover:text-text-primary" aria-label="Helpful response">
         <ThumbUpIcon className="size-4" />
       </Button>
-      <Button type="button" variant="ghost" className="size-7 p-0 text-text-tertiary hover:text-text-primary" aria-label="Unhelpful response">
+      <Button type="button" variant="ghost" size="icon-sm" className="p-0 text-text-tertiary hover:text-text-primary" aria-label="Unhelpful response">
         <ThumbDownIcon className="size-4" />
       </Button>
       <Button
         type="button"
         variant="ghost"
-        className="size-7 p-0 text-text-tertiary hover:text-text-primary"
+        size="icon-sm"
+        className="p-0 text-text-tertiary hover:text-text-primary"
         aria-label="Copy copilot message"
         onClick={onCopy}
       >
@@ -377,7 +378,8 @@ function CopilotChatView({
           <Button
             type="button"
             variant="ghost"
-            className="absolute bottom-2 right-2 size-7 p-0 text-interactive-active hover:text-interactive-active"
+            size="icon-sm"
+            className="absolute bottom-2 right-2 p-0 text-interactive-active hover:text-interactive-active"
             aria-label="Send copilot message"
             disabled={!prompt.trim() || isThinking}
             onClick={handleSend}

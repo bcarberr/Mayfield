@@ -92,7 +92,7 @@
   --light-interactive-primary-hover: #118a9e;
   --light-interactive-primary-pressed: #146c7b;
   --light-interactive-secondary-hover: #e6fbff;
-  --light-interactive-secondary-pressed: #b8eeff;
+  --light-interactive-secondary-pressed: #13afca;
   --light-interactive-selected: #f3fdff;
   --light-interactive-destructive: #da0711;
   --light-interactive-destructive-hover: #8e0217;
@@ -171,6 +171,7 @@
   --color-datavis-data-pop-teal-20: var(--dark-datavis-data-pop-teal-20);
   --color-datavis-card-bg: var(--dark-datavis-card-bg);
   --color-datavis-gridlines: var(--dark-datavis-gridlines);
+  --color-datagrid-row-bg: var(--dark-datavis-card-bg);
 
   --color-overlay-subtle: rgba(255, 255, 255, 0.06);
   --color-overlay-scrim: rgba(0, 0, 0, 0.6);
@@ -228,7 +229,8 @@
   --color-datavis-data-rouge-40: var(--light-datavis-data-rouge-40);
   --color-datavis-data-pop-teal-20: var(--light-datavis-data-pop-teal-20);
   --color-datavis-card-bg: var(--light-datavis-card-bg);
-  --color-datavis-gridlines: var(--light-datavis-gridlines);
+  --color-datavis-gridlines: var(--light-surface-container-borders);
+  --color-datagrid-row-bg: var(--light-surface-container-bg);
 
   --color-overlay-subtle: rgba(0, 0, 0, 0.06);
   --color-overlay-scrim: rgba(18, 18, 18, 0.55);

@@ -49,6 +49,7 @@ export const typography = {
     lineHeight: "16px",
     letterSpacing: "0.4px",
   },
+  /** Figma “Tbl/Head”: Lato 12 bold — use Tailwind `text-tbl-head`. */
   tableHead: {
     size: "12px",
     weight: fontWeight.bold,

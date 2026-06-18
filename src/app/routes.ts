@@ -29,6 +29,12 @@ export function connectorsPanelLocationState(background: {
   return { background, connectorsVariant: "panel" };
 }
 
+/** `location.state` when opening Federated Detection Hub actions from other pages. */
+export type FederatedDetectionHubLocationState = {
+  openCreateDetection?: boolean;
+  focusManageDetections?: boolean;
+};
+
 /** Query param that opens the connector setup slide-over on `ROUTES.connectors`. */
 export const CONNECTOR_SETUP_SEARCH_PARAM = "setup";
 

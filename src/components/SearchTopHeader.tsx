@@ -6,9 +6,10 @@ import { Button } from "@/components/shadcn/button";
 import { Separator } from "@/components/shadcn/separator";
 import { cn } from "@/lib/utils";
 
-/** Top-header action glyphs: ~10% larger and brighter than the default 18px / disabled tone. */
+/** Top-header help and notification glyphs — same color as table action icons. */
+const HEADER_UTILITY_ICON_BTN_CLASS =
+  "text-text-tertiary hover:bg-overlay-subtle hover:text-text-primary [&_svg]:text-current";
 const HEADER_ACTION_ICON_SIZE = 20;
-const HEADER_ACTION_ICON_CLASS = "brightness-110 [&_svg]:!size-5";
 const HEADER_COPILOT_ICON_CLASS = "h-[1.925rem] w-[1.925rem] brightness-110";
 
 export type SearchTopHeaderProps = {
@@ -50,25 +51,19 @@ export function SearchTopHeader({
           type="button"
           variant="ghost"
           size="icon"
-          className={cn(
-            "text-text-disabled hover:bg-overlay-subtle hover:text-text-disabled [&_svg]:text-current",
-            ringOffset,
-          )}
+          className={cn(HEADER_UTILITY_ICON_BTN_CLASS, ringOffset)}
           aria-label="Help"
         >
-          <Icon name="nav-quick-help" size={HEADER_ACTION_ICON_SIZE} className={HEADER_ACTION_ICON_CLASS} />
+          <Icon name="nav-quick-help" size={HEADER_ACTION_ICON_SIZE} />
         </Button>
         <Button
           type="button"
           variant="ghost"
           size="icon"
-          className={cn(
-            "text-text-disabled hover:bg-overlay-subtle hover:text-text-disabled [&_svg]:text-current",
-            ringOffset,
-          )}
+          className={cn(HEADER_UTILITY_ICON_BTN_CLASS, ringOffset)}
           aria-label="Notifications"
         >
-          <Icon name="nav-notifications" size={HEADER_ACTION_ICON_SIZE} className={HEADER_ACTION_ICON_CLASS} />
+          <Icon name="nav-notifications" size={HEADER_ACTION_ICON_SIZE} />
         </Button>
       </div>
       <Separator orientation="vertical" className="h-6 bg-border-container" />
@@ -77,7 +72,7 @@ export function SearchTopHeader({
         variant="outline"
         size="icon-lg"
         className={cn(
-          "size-9 shrink-0 rounded-full border-border-container bg-nav-highlight text-xs font-bold tracking-[0.4px] text-text-primary [html[data-theme=light]_&]:text-text-on-primary hover:bg-interactive-secondary-pressed/80",
+          "size-9 shrink-0 rounded-full border-border-container !bg-datavis-data-pop-teal-20 text-xs font-bold tracking-[0.4px] !text-text-on-primary hover:brightness-95 hover:!bg-datavis-data-pop-teal-20 hover:!text-text-on-primary",
           ringOffset,
         )}
         aria-label="Account menu"

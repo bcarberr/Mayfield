@@ -1,5 +1,7 @@
-import { useEffect, useRef } from "react";
+import { useCallback, useEffect, useRef, useState, type ReactNode } from "react";
+import { Link } from "react-router-dom";
 import { Icon } from "../design-system";
+import { ROUTES } from "./routes";
 import { FsqlSearchTextarea } from "../components/FsqlSearchTextarea";
 import { FsqlSearchResultsView } from "../components/search/FsqlSearchResultsView";
 import { SearchQueryBuilder } from "../components/SearchQueryBuilder";
@@ -25,8 +27,16 @@ import { Separator } from "@/components/shadcn/separator";
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/shadcn/tooltip";
 import { cn } from "@/lib/utils";
 import { NAV_RAIL_TARGETS } from "./navRailTargets";
+import {
+  CreateDetectionSlideOver,
+  type NewDetectionPayload,
+} from "../components/federated-detection-hub/CreateDetectionSlideOver";
+import { PageSlideOver, FORM_CONTENT_SLIDE_OVER_PANEL_CLASS } from "../components/ui/SlideOver";
+import { Snackbar } from "../components/ui/Snackbar";
+import { useDetectionHub } from "../context/DetectionHubContext";
 
 const TOOLBAR_SECONDARY_BTN_CLASS = "shrink-0 ring-offset-surface-page";
+const TOOLBAR_ICON_CLASS = "size-3 shrink-0 text-current [&>svg]:!size-[12px]";
 const TOOLBAR_PRIMARY_BUTTON_CLASS =
   "h-8 shrink-0 bg-interactive-active text-text-on-primary hover:bg-interactive-active/90 focus-visible:ring-interactive-active ring-offset-surface-page";
 
@@ -97,6 +107,7 @@ function SearchToolbarActions({
   onClearSearch,
   onFsqlSearch,
   onConvertToFsql,
+  onCreateDetection,
   fsqlSearching,
 }: {
   criteriaMode: SearchCriteriaMode;
@@ -111,6 +122,7 @@ function SearchToolbarActions({
   onClearSearch: () => void;
   onFsqlSearch: () => void;
   onConvertToFsql: (query: string) => void;
+  onCreateDetection: () => void;
   fsqlSearching: boolean;
 }) {
   const isFsql = criteriaMode === "fsql";
@@ -161,14 +173,21 @@ function SearchToolbarActions({
                 disabled={!hasFsqlQuery}
                 onClick={onClearSearch}
               >
-                <Icon name="action-cancel-clear" className="shrink-0 text-current" aria-hidden />
+                <Icon name="action-cancel-clear" size={12} className={TOOLBAR_ICON_CLASS} aria-hidden />
                 Clear Search
               </Button>
-              <Button type="button" variant="secondary-outline" className={TOOLBAR_SECONDARY_BTN_CLASS} disabled={!hasFsqlQuery}>
+              <Button
+                type="button"
+                variant="secondary-outline"
+                className={TOOLBAR_SECONDARY_BTN_CLASS}
+                disabled={!hasFsqlQuery}
+                onClick={onCreateDetection}
+              >
+                <Icon name="action-add" size={12} className={TOOLBAR_ICON_CLASS} aria-hidden />
                 Create New Detection
               </Button>
               <Button type="button" variant="secondary-outline" className={TOOLBAR_SECONDARY_BTN_CLASS} disabled={!hasFsqlQuery}>
-                <Icon name="action-saved-search" className="shrink-0 text-current" aria-hidden />
+                <Icon name="action-saved-search" size={12} className={TOOLBAR_ICON_CLASS} aria-hidden />
                 Save Search
               </Button>
               <Button
@@ -177,7 +196,7 @@ function SearchToolbarActions({
                 disabled={!hasFsqlQuery}
                 onClick={onFsqlSearch}
               >
-                <Icon name="action-search" className="shrink-0 text-current" aria-hidden />
+                <Icon name="action-search" size={12} className={TOOLBAR_ICON_CLASS} aria-hidden />
                 Search
               </Button>
             </>
@@ -190,18 +209,25 @@ function SearchToolbarActions({
                 disabled={!queryBuilderValid}
                 onClick={onClearSearch}
               >
-                <Icon name="action-cancel-clear" className="shrink-0 text-current" aria-hidden />
+                <Icon name="action-cancel-clear" size={12} className={TOOLBAR_ICON_CLASS} aria-hidden />
                 Clear Search
               </Button>
-              <Button type="button" variant="secondary-outline" className={TOOLBAR_SECONDARY_BTN_CLASS} disabled={!queryBuilderValid}>
+              <Button
+                type="button"
+                variant="secondary-outline"
+                className={TOOLBAR_SECONDARY_BTN_CLASS}
+                disabled={!queryBuilderValid}
+                onClick={onCreateDetection}
+              >
+                <Icon name="action-add" size={12} className={TOOLBAR_ICON_CLASS} aria-hidden />
                 Create New Detection
               </Button>
               <Button type="button" variant="secondary-outline" className={TOOLBAR_SECONDARY_BTN_CLASS} disabled={!queryBuilderValid}>
-                <Icon name="action-saved-search" className="shrink-0 text-current" aria-hidden />
+                <Icon name="action-saved-search" size={12} className={TOOLBAR_ICON_CLASS} aria-hidden />
                 Save Search
               </Button>
               <Button type="button" className={TOOLBAR_PRIMARY_BUTTON_CLASS} disabled={!canSearch}>
-                <Icon name="action-search" className="shrink-0 text-current" aria-hidden />
+                <Icon name="action-search" size={12} className={TOOLBAR_ICON_CLASS} aria-hidden />
                 Search
               </Button>
             </>
@@ -237,6 +263,10 @@ function SearchToolbarActions({
  * Federated search entry screen — query builder, FSQL, and Copilot assistant.
  */
 export function SearchLandingPage() {
+  const { registerCreatedDetection } = useDetectionHub();
+  const [createDetectionOpen, setCreateDetectionOpen] = useState(false);
+  const [snackbarOpen, setSnackbarOpen] = useState(false);
+  const [snackbarMessage, setSnackbarMessage] = useState<ReactNode>("");
   const { range: timeframe, setRange: setTimeframeRange } = useTimeframe();
   const { pendingFsqlSearch, setPendingFsqlSearch } = useCopilot();
   const {
@@ -254,12 +284,23 @@ export function SearchLandingPage() {
     searchInitialTimeframe,
     fsqlSearchDetectionName,
     setFsqlSearchDetectionName,
+    searchSessionKey,
+    completedSearchSessionKey,
+    markSearchSessionComplete,
     beginFsqlSearch,
     clearSearch,
   } = useSearch();
   const skipTimeframeToFsqlSyncRef = useRef(false);
   const fsqlQueryRef = useRef(fsqlQuery);
   fsqlQueryRef.current = fsqlQuery;
+
+  useEffect(() => {
+    return () => {
+      if (!searchSessionKey) return;
+      if (completedSearchSessionKey === searchSessionKey) return;
+      markSearchSessionComplete(searchSessionKey);
+    };
+  }, [searchSessionKey, completedSearchSessionKey, markSearchSessionComplete]);
 
   useEffect(() => {
     if (!pendingFsqlSearch) return;
@@ -356,6 +397,41 @@ export function SearchLandingPage() {
     setCriteriaOpen(true);
   };
 
+  const handleCreateDetection = () => {
+    setCreateDetectionOpen(true);
+  };
+
+  const handleCloseCreateDetection = useCallback(() => {
+    setCreateDetectionOpen(false);
+  }, []);
+
+  const handleCloseSnackbar = useCallback(() => {
+    setSnackbarOpen(false);
+  }, []);
+
+  const handleDetectionSavedFromSearch = useCallback(
+    (payload: NewDetectionPayload) => {
+      const createdRow = registerCreatedDetection(payload);
+      setCreateDetectionOpen(false);
+      setSnackbarMessage(
+        <>
+          &ldquo;{createdRow.name}&rdquo; has been created and can now be managed in{" "}
+          <Link
+            to={ROUTES.federatedDetectionHub}
+            state={{ focusManageDetections: true }}
+            className="text-interactive-active underline underline-offset-2 hover:text-interactive-active/90"
+            onClick={handleCloseSnackbar}
+          >
+            Managed Detections
+          </Link>
+          .
+        </>,
+      );
+      setSnackbarOpen(true);
+    },
+    [handleCloseSnackbar, registerCreatedDetection],
+  );
+
   return (
     <TooltipProvider>
     <div className="flex h-full min-h-0 bg-surface-page text-text-primary">
@@ -380,80 +456,91 @@ export function SearchLandingPage() {
             onClearSearch={handleClearSearch}
             onFsqlSearch={executeFsqlSearch}
             onConvertToFsql={handleConvertToFsql}
+            onCreateDetection={handleCreateDetection}
             fsqlSearching={fsqlSearching}
           />
 
           <div className="relative flex min-h-0 flex-1 overflow-hidden">
-            {criteriaMode === "fsql" ? (
-              fsqlSearchExecuted && !fsqlSearching ? (
-                <FsqlSearchResultsView
-                  searchInitialTimeframe={searchInitialTimeframe}
-                  detectionName={fsqlSearchDetectionName}
+            {!(criteriaMode === "fsql" && fsqlSearchExecuted) && (
+              <div
+                className="pointer-events-none absolute inset-0 z-0 select-none overflow-hidden [html[data-theme=light]_&]:opacity-50"
+                aria-hidden
+              >
+                <img
+                  src={connectionAbstractUrl}
+                  alt=""
+                  className="h-full w-full object-cover object-bottom"
+                  draggable={false}
                 />
-              ) : (
-                <div className="min-h-0 min-w-0 flex-1 bg-surface-page" aria-label="FSQL search workspace" />
-              )
-            ) : (
-              <div className="relative min-h-0 min-w-0 flex-1 overflow-hidden">
-                <div
-                  className="pointer-events-none absolute inset-0 z-0 select-none overflow-hidden [html[data-theme=light]_&]:opacity-50"
-                  aria-hidden
-                >
-                  <img
-                    src={connectionAbstractUrl}
-                    alt=""
-                    className="h-full w-full object-cover object-bottom"
-                    draggable={false}
-                  />
-                </div>
-
-                <main
-                  className="relative z-[1] flex min-h-0 flex-1 flex-col items-center overflow-y-auto px-6 py-12 sm:py-16 md:py-20"
-                  aria-label="Query builder search workspace"
-                >
-                  <div className="mt-[60px] flex w-full max-w-[720px] flex-col items-stretch">
-                    <h1 className="text-center text-3xl font-bold leading-9 tracking-[0.5px] text-text-primary sm:text-4xl sm:leading-tight">
-                      Welcome Bonnie Carberry!
-                    </h1>
-                    <p className="mx-auto mt-4 max-w-[560px] text-center text-base leading-6 text-text-secondary">
-                      Query every connected source from a single field. Combine field paths, identifiers, and
-                      plain-language terms in one search.
-                    </p>
-
-                    <section className="mt-14 pt-10 text-text-tertiary" aria-labelledby="search-tips-heading">
-                      <h2 id="search-tips-heading" className="text-base-semibold text-text-primary">
-                        Search tips
-                      </h2>
-                      <ul className="mt-4 space-y-3 text-base-small">
-                        <li className="flex gap-3">
-                          <span className="mt-0.5 shrink-0 font-semibold">•</span>
-                          <span>
-                            Narrow by connector or dataset name — matching behaves like the mapping workspace quick
-                            filters.
-                          </span>
-                        </li>
-                        <li className="flex gap-3">
-                          <span className="mt-0.5 shrink-0 font-semibold">•</span>
-                          <span>
-                            Use field paths (for example{" "}
-                            <span className="font-mono text-text-tertiary">event.action</span>) to jump to schema-aligned
-                            results.
-                          </span>
-                        </li>
-                        <li className="flex gap-3">
-                          <span className="mt-0.5 shrink-0 font-semibold">•</span>
-                          <span>Combine plain-language phrases with identifiers from your normalized model.</span>
-                        </li>
-                      </ul>
-                    </section>
-                  </div>
-                </main>
               </div>
+            )}
+
+            {criteriaMode === "fsql" && fsqlSearchExecuted ? (
+              <FsqlSearchResultsView
+                searchInitialTimeframe={searchInitialTimeframe}
+                detectionName={fsqlSearchDetectionName}
+              />
+            ) : (
+              <main
+                className="relative z-[1] flex min-h-0 flex-1 flex-col items-center overflow-y-auto px-6 py-12 sm:py-16 md:py-20"
+                aria-label="Search workspace"
+              >
+                <div className="mt-[60px] flex w-full max-w-[720px] flex-col items-stretch">
+                  <h1 className="text-center text-3xl font-bold leading-9 tracking-[0.5px] text-text-primary sm:text-4xl sm:leading-tight">
+                    Welcome Bonnie Carberry!
+                  </h1>
+                  <p className="mx-auto mt-4 max-w-[560px] text-center text-base leading-6 text-text-secondary">
+                    Query every connected source from a single field. Combine field paths, identifiers, and
+                    plain-language terms in one search.
+                  </p>
+
+                  <section className="mt-14 pt-10 text-text-tertiary" aria-labelledby="search-tips-heading">
+                    <h2 id="search-tips-heading" className="text-base-semibold text-text-primary">
+                      Search tips
+                    </h2>
+                    <ul className="mt-4 space-y-3 text-base-small">
+                      <li className="flex gap-3">
+                        <span className="mt-0.5 shrink-0 font-semibold">•</span>
+                        <span>
+                          Narrow by connector or dataset name — matching behaves like the mapping workspace quick
+                          filters.
+                        </span>
+                      </li>
+                      <li className="flex gap-3">
+                        <span className="mt-0.5 shrink-0 font-semibold">•</span>
+                        <span>
+                          Use field paths (for example{" "}
+                          <span className="font-mono text-text-tertiary">event.action</span>) to jump to schema-aligned
+                          results.
+                        </span>
+                      </li>
+                      <li className="flex gap-3">
+                        <span className="mt-0.5 shrink-0 font-semibold">•</span>
+                        <span>Combine plain-language phrases with identifiers from your normalized model.</span>
+                      </li>
+                    </ul>
+                  </section>
+                </div>
+              </main>
             )}
           </div>
         </div>
       </div>
 
+      <PageSlideOver
+        open={createDetectionOpen}
+        onClose={handleCloseCreateDetection}
+        ariaLabel="Create New Detection"
+        panelClassName={FORM_CONTENT_SLIDE_OVER_PANEL_CLASS}
+      >
+        <CreateDetectionSlideOver
+          key="search-create-detection"
+          onClose={handleCloseCreateDetection}
+          onSave={handleDetectionSavedFromSearch}
+        />
+      </PageSlideOver>
+
+      <Snackbar open={snackbarOpen} message={snackbarMessage} onClose={handleCloseSnackbar} />
     </div>
     </TooltipProvider>
   );

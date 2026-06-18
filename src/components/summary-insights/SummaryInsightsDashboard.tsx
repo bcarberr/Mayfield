@@ -14,7 +14,7 @@ import { Checkbox, Icon } from "../../design-system";
 import { DonutChartPanel } from "../ui/DonutChartPanel";
 import { FilterColumnPanel, type FilterColumnPanelTool } from "../ui/FilterColumnPanel";
 import { SeverityTableIcon } from "../ui/SeverityTableIcon";
-import { Button } from "../ui/Button";
+import { Button } from "@/components/shadcn/button";
 import { ColumnHeaderMenu } from "../ui/ColumnHeaderMenu";
 import { compareStrings } from "../ui/useColumnSort";
 import { useSortedDataGridPagination } from "../ui/useSortedDataGridPagination";
@@ -299,7 +299,8 @@ function RowActionsMenu({ rowId }: { rowId: string }) {
         <Button
           type="button"
           variant="ghost"
-          className="size-7 shrink-0 p-0 text-text-tertiary hover:text-text-primary [&_svg]:!size-4"
+          size="icon-sm"
+          className="shrink-0 p-0 text-text-tertiary hover:text-text-primary [&_svg]:!size-4"
           aria-label={`Actions for finding ${rowId}`}
         >
           <Icon name="navi-more-vert" size={16} />
@@ -387,10 +388,10 @@ function FindingDetailDialog({
           </dl>
         </div>
         <DialogFooter className="mx-0 mb-0 shrink-0 gap-2 rounded-none border-t border-border-rule bg-transparent px-5 py-4 sm:flex-row sm:justify-end">
-          <Button type="button" variant="secondary" onClick={onClose}>
+          <Button type="button" variant="secondary-outline" onClick={onClose}>
             Close
           </Button>
-          <Button type="button" variant="primary">
+          <Button type="button" variant="default">
             View event
           </Button>
         </DialogFooter>
@@ -478,7 +479,7 @@ function FindingEventsTable({
       </colgroup>
       <thead className={DATA_GRID_THEAD_CLASS}>
         <tr className={DATA_GRID_HEADER_ROW_CLASS}>
-          <th scope="col" style={colStyle(0)} className="relative h-10 border-r border-datavis-gridlines px-0 py-0 align-middle">
+          <th scope="col" style={colStyle(0)} className="relative border-r border-datavis-gridlines px-0 py-0 align-middle">
             <div className="flex items-center justify-center">
               <Checkbox
                 checked={allSelected}
@@ -492,7 +493,7 @@ function FindingEventsTable({
           <th
             scope="col"
             style={colStyle(1)}
-            className="relative h-10 border-r border-datavis-gridlines px-2 py-0 align-middle text-xs font-bold uppercase tracking-wide text-text-primary"
+            className="relative border-r border-datavis-gridlines px-2 py-0 align-middle text-xs font-bold uppercase tracking-wide text-text-primary"
           >
             <ColumnHeaderMenu
               label="Severity"
@@ -504,7 +505,7 @@ function FindingEventsTable({
           <th
             scope="col"
             style={colStyle(2)}
-            className="relative h-10 border-r border-datavis-gridlines px-2 py-0 align-middle text-xs font-bold uppercase tracking-wide text-text-primary"
+            className="relative border-r border-datavis-gridlines px-2 py-0 align-middle text-xs font-bold uppercase tracking-wide text-text-primary"
           >
             <ColumnHeaderMenu label="Title" menuLabel="Title column options" {...getSortProps("title")} />
             {resizeHandle(2)}
@@ -512,7 +513,7 @@ function FindingEventsTable({
           <th
             scope="col"
             style={colStyle(3)}
-            className="relative h-10 border-r border-datavis-gridlines px-2 py-0 align-middle text-xs font-bold uppercase tracking-wide text-text-primary"
+            className="relative border-r border-datavis-gridlines px-2 py-0 align-middle text-xs font-bold uppercase tracking-wide text-text-primary"
           >
             <ColumnHeaderMenu label="Time" menuLabel="Time column options" {...getSortProps("time")} />
             {resizeHandle(3)}
@@ -520,7 +521,7 @@ function FindingEventsTable({
           <th
             scope="col"
             style={colStyle(4)}
-            className="relative h-10 border-r border-datavis-gridlines px-2 py-0 align-middle text-xs font-bold uppercase tracking-wide text-text-primary"
+            className="relative border-r border-datavis-gridlines px-2 py-0 align-middle text-xs font-bold uppercase tracking-wide text-text-primary"
           >
             <ColumnHeaderMenu label="Activity" menuLabel="Activity column options" {...getSortProps("activity")} />
             {resizeHandle(4)}
@@ -528,7 +529,7 @@ function FindingEventsTable({
           <th
             scope="col"
             style={colStyle(5)}
-            className="relative h-10 border-r border-datavis-gridlines px-2 py-0 align-middle text-xs font-bold uppercase tracking-wide text-text-primary"
+            className="relative border-r border-datavis-gridlines px-2 py-0 align-middle text-xs font-bold uppercase tracking-wide text-text-primary"
           >
             <ColumnHeaderMenu label="Status" menuLabel="Status column options" {...getSortProps("status")} />
             {resizeHandle(5)}
@@ -536,7 +537,7 @@ function FindingEventsTable({
           <th
             scope="col"
             style={colStyle(6)}
-            className="relative h-10 border-r border-datavis-gridlines px-2 py-0 align-middle text-xs font-bold uppercase tracking-wide text-text-primary"
+            className="relative border-r border-datavis-gridlines px-2 py-0 align-middle text-xs font-bold uppercase tracking-wide text-text-primary"
           >
             <ColumnHeaderMenu
               label="Event type"
@@ -548,7 +549,7 @@ function FindingEventsTable({
           <th
             scope="col"
             style={colStyle(7)}
-            className="relative h-10 border-r border-datavis-gridlines px-2 py-0 align-middle text-xs font-bold uppercase tracking-wide text-text-primary"
+            className="relative border-r border-datavis-gridlines px-2 py-0 align-middle text-xs font-bold uppercase tracking-wide text-text-primary"
           >
             <span className="block translate-y-px truncate">Actions</span>
             {resizeHandle(7)}
@@ -556,7 +557,7 @@ function FindingEventsTable({
           <th
             scope="col"
             style={colStyle(8)}
-            className="relative h-10 px-2 py-0 align-middle text-xs font-bold uppercase tracking-wide text-text-primary"
+            className="relative px-2 py-0 align-middle text-xs font-bold uppercase tracking-wide text-text-primary"
           >
             <ColumnHeaderMenu label="Connectors" menuLabel="Connectors column options" {...getSortProps("connector")} />
             {resizeHandle(8)}
@@ -567,8 +568,8 @@ function FindingEventsTable({
         {displayRows.map((row) => {
           const et = EVENT_TYPE_ICON[row.eventType];
           return (
-            <tr key={row.id} className="h-10 border-b border-datavis-gridlines hover:bg-overlay-subtle">
-              <td style={colStyle(0)} className="h-10 px-0 py-0 align-middle">
+            <tr key={row.id} className="border-b border-datavis-gridlines hover:bg-overlay-subtle">
+              <td style={colStyle(0)} className="px-0 py-0 align-middle">
                 <div className="flex items-center justify-center">
                   <Checkbox
                     checked={selected.has(row.id)}
@@ -577,13 +578,13 @@ function FindingEventsTable({
                   />
                 </div>
               </td>
-              <td style={colStyle(1)} className="h-10 px-2 py-0 align-middle">
+              <td style={colStyle(1)} className="px-2 py-0 align-middle">
                 <span className="inline-flex items-center gap-2">
                   <SeverityTableIcon name={SEVERITY_ICON[row.severity]} color={SEV_BAR[row.severity]} />
                   <span className="text-sm text-text-secondary">{row.severity}</span>
                 </span>
               </td>
-              <td style={colStyle(2)} className="h-10 min-w-0 px-2 py-0 align-middle">
+              <td style={colStyle(2)} className="min-w-0 px-2 py-0 align-middle">
                 <TruncatedText
                   as="button"
                   className="w-full text-left text-sm font-semibold text-interactive-active hover:underline focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-interactive-active"
@@ -592,16 +593,16 @@ function FindingEventsTable({
                   {row.title}
                 </TruncatedText>
               </td>
-              <td style={colStyle(3)} className="h-10 min-w-0 px-2 py-0 align-middle tabular-nums">
+              <td style={colStyle(3)} className="min-w-0 px-2 py-0 align-middle tabular-nums">
                 <TruncatedText className="text-sm text-text-secondary">{row.time}</TruncatedText>
               </td>
-              <td style={colStyle(4)} className="h-10 min-w-0 px-2 py-0 align-middle">
+              <td style={colStyle(4)} className="min-w-0 px-2 py-0 align-middle">
                 <TruncatedText className="text-sm text-text-secondary">{row.activity}</TruncatedText>
               </td>
-              <td style={colStyle(5)} className="h-10 min-w-0 px-2 py-0 align-middle">
+              <td style={colStyle(5)} className="min-w-0 px-2 py-0 align-middle">
                 <TruncatedText className="text-sm text-text-secondary">{row.status}</TruncatedText>
               </td>
-              <td style={colStyle(6)} className="h-10 min-w-0 px-2 py-0 align-middle">
+              <td style={colStyle(6)} className="min-w-0 px-2 py-0 align-middle">
                 <span className="inline-flex min-w-0 items-center gap-2">
                   <Icon
                     name={et.name}
@@ -614,10 +615,10 @@ function FindingEventsTable({
                   </TruncatedText>
                 </span>
               </td>
-              <td style={colStyle(7)} className="h-10 px-2 py-0 align-middle">
+              <td style={colStyle(7)} className="px-2 py-0 align-middle">
                 <RowActionsMenu rowId={row.id} />
               </td>
-              <td style={colStyle(8)} className="h-10 min-w-0 px-2 py-0 align-middle">
+              <td style={colStyle(8)} className="min-w-0 px-2 py-0 align-middle">
                 <ConnectorTableCell name={row.connector} />
               </td>
             </tr>
@@ -661,7 +662,7 @@ export function SummaryInsightsDashboard() {
         id: "1",
         severity: "Critical",
         category: "Detections",
-        title: "This and that happened over cat r…",
+        title: "Repeated POST requests to catalog service exceeded baseline volume",
         description:
           "Repeated POST requests to an internal catalog service exceeded baseline volume during peak traffic, indicating potential data exfiltration or misconfigured automation.",
         time: "2024-07-31 14:22:08",
@@ -675,7 +676,7 @@ export function SummaryInsightsDashboard() {
         id: "2",
         severity: "High",
         category: "Incidents",
-        title: "Multiple failed logins from unusual region and follow-on…",
+        title: "Multiple failed logins from unusual region and follow-on activity",
         description:
           "Fifteen failed authentication attempts originated from an atypical geography, followed by a successful login from the same source within ten minutes.",
         time: "2024-07-31 13:05:41",
@@ -689,7 +690,7 @@ export function SummaryInsightsDashboard() {
         id: "3",
         severity: "High",
         category: "Vulnerabilities",
-        title: "Policy violation: privileged container launch detected in…",
+        title: "Policy violation: privileged container launch detected in production",
         description:
           "A workload in the production namespace launched with privileged security context, violating the cluster hardening policy for non-system namespaces.",
         time: "2024-07-31 11:40:12",
@@ -703,7 +704,7 @@ export function SummaryInsightsDashboard() {
         id: "4",
         severity: "Medium",
         category: "Compliance",
-        title: "Scheduled scan completed with warnings on production cl…",
+        title: "Scheduled scan completed with warnings on production cluster",
         description:
           "The nightly vulnerability scan finished with warnings on three production cluster nodes where agent versions were out of compliance.",
         time: "2024-07-31 09:12:00",
@@ -717,7 +718,7 @@ export function SummaryInsightsDashboard() {
         id: "5",
         severity: "Low",
         category: "Vulnerabilities",
-        title: "Certificate renewal reminder for edge gateway cluster…",
+        title: "Certificate renewal reminder for edge gateway cluster",
         description:
           "TLS certificates on the edge gateway cluster expire within fourteen days; automated renewal has not yet been confirmed for two ingress hosts.",
         time: "2024-07-30 22:18:55",
@@ -731,7 +732,7 @@ export function SummaryInsightsDashboard() {
         id: "6",
         severity: "Informational",
         category: "Security",
-        title: "Connector health check succeeded across all regions…",
+        title: "Connector health check succeeded across all regions",
         description:
           "All configured connectors reported healthy heartbeat and ingestion latency within SLA across US, EU, and APAC regions.",
         time: "2024-07-30 18:00:03",
@@ -745,7 +746,7 @@ export function SummaryInsightsDashboard() {
         id: "7",
         severity: "Critical",
         category: "Detections",
-        title: "Anomalous outbound DNS tunneling pattern observed…",
+        title: "Anomalous outbound DNS tunneling pattern observed",
         description:
           "High-entropy DNS queries to a newly registered domain suggest possible DNS tunneling from a compromised host in the analytics subnet.",
         time: "2024-07-30 16:44:19",
@@ -759,7 +760,7 @@ export function SummaryInsightsDashboard() {
         id: "8",
         severity: "High",
         category: "Incidents",
-        title: "Service principal credential rotation outside change win…",
+        title: "Service principal credential rotation outside change window",
         description:
           "A service principal credential was rotated outside the approved change window without a linked change ticket in the ITSM system.",
         time: "2024-07-30 12:01:47",
@@ -773,7 +774,7 @@ export function SummaryInsightsDashboard() {
         id: "9",
         severity: "Medium",
         category: "Detections",
-        title: "Unusual API call volume from service account in staging…",
+        title: "Unusual API call volume from service account in staging",
         description:
           "A staging service account issued four times its normal API call volume over one hour, primarily against storage list endpoints.",
         time: "2024-07-30 09:33:22",
@@ -787,7 +788,7 @@ export function SummaryInsightsDashboard() {
         id: "10",
         severity: "Low",
         category: "Data Security",
-        title: "Deprecated TLS version negotiated on internal load balanc…",
+        title: "Deprecated TLS version negotiated on internal load balancer",
         description:
           "An internal load balancer accepted TLS 1.0 during a health probe from a legacy monitoring agent that has not yet been upgraded.",
         time: "2024-07-29 21:15:08",
@@ -801,7 +802,7 @@ export function SummaryInsightsDashboard() {
         id: "11",
         severity: "Critical",
         category: "Vulnerabilities",
-        title: "Ransomware-like file encryption activity detected on fil…",
+        title: "Ransomware-like file encryption activity detected on file server",
         description:
           "Rapid mass file renames and entropy spikes on a file server share match ransomware behavior patterns and require immediate containment.",
         time: "2024-07-29 17:48:51",
@@ -815,7 +816,7 @@ export function SummaryInsightsDashboard() {
         id: "12",
         severity: "Informational",
         category: "Compliance",
-        title: "Weekly compliance report generated for SOC 2 controls…",
+        title: "Weekly compliance report generated for SOC 2 controls",
         description:
           "The automated SOC 2 compliance report was generated successfully with no new control failures since the previous weekly run.",
         time: "2024-07-29 14:00:00",
@@ -829,7 +830,7 @@ export function SummaryInsightsDashboard() {
         id: "13",
         severity: "High",
         category: "Incidents",
-        title: "Impossible travel login attempt from two continents…",
+        title: "Impossible travel login attempt from two continents",
         description:
           "The same user account authenticated from North America and Europe within a thirty-minute window, exceeding plausible travel velocity.",
         time: "2024-07-29 08:27:36",
@@ -843,7 +844,7 @@ export function SummaryInsightsDashboard() {
         id: "14",
         severity: "Medium",
         category: "Data Security",
-        title: "S3 bucket policy changed to allow public read access…",
+        title: "S3 bucket policy changed to allow public read access",
         description:
           "An object storage bucket policy was modified to grant public read access to all objects, diverging from the organization baseline.",
         time: "2024-07-28 23:59:14",
@@ -1027,13 +1028,14 @@ export function SummaryInsightsDashboard() {
           </TabsList>
           <Button
             type="button"
-            variant="secondary"
+            variant="secondary-outline"
             className="mb-3 h-8 shrink-0 ring-offset-surface-page"
             onClick={() => {
               setPendingFsqlSearch({ query: "" });
               void navigate(ROUTES.search);
             }}
           >
+            <Icon name="action-search" size={12} className="size-3 shrink-0 text-current [&>svg]:!size-[12px]" aria-hidden />
             Start a New Search
           </Button>
         </div>

@@ -1,9 +1,17 @@
-import { Fragment, useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { Fragment, useCallback, useEffect, useMemo, useRef, useState, type Dispatch, type SetStateAction } from "react";
+import { useLocation, useNavigate } from "react-router-dom";
+import type { FederatedDetectionHubLocationState } from "../../app/routes";
 import {
   DATA_GRID_ABOVE_SECTION_CLASS,
+  DATA_GRID_BODY_CELL_CENTER_CLASS,
+  DATA_GRID_BODY_CELL_CLASS,
+  DATA_GRID_BODY_ROW_CLASS,
+  DATA_GRID_EXPANDED_CELL_CLASS,
   DATA_GRID_EXPANDED_ROW_CLASS,
   DATA_GRID_FILTER_ROW_CLASS,
   DATA_GRID_HEADER_ROW_CLASS,
+  DATA_GRID_ROW_EXPAND_BTN_CLASS,
+  DATA_GRID_ROW_EXPAND_ICON_SIZE,
   DATA_GRID_SECTION_CLASS,
   DATA_GRID_TABLE_CLASS,
   DATA_GRID_TABLE_SCROLL_CLASS,
@@ -12,7 +20,7 @@ import {
 } from "../ui/dataGridTableStyles";
 import { useDataGridStickyToolbar } from "../ui/useDataGridStickyToolbar";
 import { Checkbox, Icon, Switch, type SeverityShapeIconName } from "../../design-system";
-import { Button } from "../ui/Button";
+import { Button } from "@/components/shadcn/button";
 import { ColumnHeaderMenu } from "../ui/ColumnHeaderMenu";
 import {
   compareBooleans,
@@ -37,16 +45,14 @@ import { useResizableColumns } from "../ui/useResizableColumns";
 import { useDataGridPagination } from "../ui/useDataGridPagination";
 import { InsightCard } from "../summary-insights/datavisCard";
 import { HorizontalBarPanel } from "../summary-insights/horizontalBarPanel";
-import { CreateDetectionSlideOver, type NewDetectionPayload } from "./CreateDetectionSlideOver";
+import type { DetectionRow } from "./detectionHubTypes";
+import { useDetectionHub } from "../../context/DetectionHubContext";
 import { DetectionExpandedDetails } from "./detectionRunConnectors";
 import { FindingsSearchCell } from "./FindingsSearchCell";
 import { DetectionHistoryContent } from "./DetectionHistoryContent";
-import {
-  buildInitialEnabledByName,
-  detectionEnabledKey,
-  getDetectionEnabled,
-} from "./detectionEnabledState";
-import { DetectionLibraryContent, LIBRARY_DETECTION_ROWS, type LibraryDetectionRow } from "./DetectionLibraryContent";
+import { detectionEnabledKey, getDetectionEnabled } from "./detectionEnabledState";
+import { CreateDetectionSlideOver, type NewDetectionPayload } from "./CreateDetectionSlideOver";
+import { DetectionLibraryContent, type LibraryDetectionRow } from "./DetectionLibraryContent";
 import { QueuedForReviewContent } from "./QueuedForReviewContent";
 import {
   detectionRowToQueuedRow,
@@ -146,52 +152,6 @@ function detectionMatchesSearch(row: DetectionRow, query: string, enabled: boole
   return haystack.includes(q);
 }
 
-type DetectionRow = {
-  id: string;
-  name: string;
-  description: string;
-  enabled: boolean;
-  severity: DetectionSeverity;
-  lastRun: string;
-  recurrence: string;
-  findings: number | "error" | "none";
-  /** Pre-configured detection from the Query library — read-only except copy. */
-  source?: "library";
-  connectorsActive?: number;
-  connectorsTotal?: number;
-};
-
-const LIBRARY_MANAGED_DETECTIONS: DetectionRow[] = [
-  {
-    id: "managed-lib-1",
-    source: "library",
-    name: "APT28 Operation Phantom Net Voxel",
-    description:
-      "Detects command-and-control beaconing and DNS tunneling patterns associated with APT28 infrastructure across perimeter and internal resolvers.",
-    enabled: true,
-    severity: "High",
-    lastRun: "Oct 31, 2024 2:15 PM",
-    recurrence: "Every 30 minutes",
-    findings: 42,
-    connectorsActive: 14,
-    connectorsTotal: 36,
-  },
-  {
-    id: "managed-lib-2",
-    source: "library",
-    name: "Suspicious Kerberos TGT Request",
-    description:
-      "Flags anomalous Kerberos ticket-granting ticket requests indicative of credential theft or golden ticket activity.",
-    enabled: true,
-    severity: "Critical",
-    lastRun: "Oct 31, 2024 1:45 PM",
-    recurrence: "Every 30 minutes",
-    findings: 18,
-    connectorsActive: 12,
-    connectorsTotal: 36,
-  },
-];
-
 const DETECTION_COLUMN_COUNT = 9;
 
 const SEV_COLORS: Record<DetectionSeverity, string> = {
@@ -220,185 +180,6 @@ const SEVERITY_BREAKDOWN_ROWS = [
 const SEVERITY_BREAKDOWN_X_MAX = 700;
 const SEVERITY_BREAKDOWN_X_TICKS = [0, 175, 350, 525, 700] as const;
 
-const DETECTION_ROWS: DetectionRow[] = [
-  ...LIBRARY_MANAGED_DETECTIONS,
-  {
-    id: "1",
-    name: "Suspicious PowerShell Execution",
-    description:
-      "Flags encoded or obfuscated PowerShell commands executed outside approved automation accounts, often used for fileless malware staging and credential access.",
-    enabled: true,
-    severity: "High",
-    lastRun: "1 min ago",
-    recurrence: "Every Tue 12:00 AM",
-    findings: 861,
-  },
-  {
-    id: "2",
-    name: "Lateral Movement via SMB",
-    description:
-      "Correlates unusual SMB session setup and remote service creation patterns that indicate an actor pivoting between hosts after initial compromise.",
-    enabled: true,
-    severity: "Critical",
-    lastRun: "22 mins ago",
-    recurrence: "Every Tue 12:00 AM",
-    findings: "error",
-  },
-  {
-    id: "3",
-    name: "Credential Dumping Activity",
-    description:
-      "Detects access to LSASS or credential store artifacts consistent with Mimikatz-style tooling and pass-the-hash preparation.",
-    enabled: true,
-    severity: "High",
-    lastRun: "58 mins ago",
-    recurrence: "Every Tue 12:00 AM",
-    findings: 209,
-  },
-  {
-    id: "4",
-    name: "Unusual Outbound DNS Queries",
-    description:
-      "Surfaces high-entropy subdomain lookups and rare resolver destinations that may indicate DNS tunneling or C2 beaconing.",
-    enabled: false,
-    severity: "High",
-    lastRun: "1 hour 15 mins ago",
-    recurrence: "Every Tue 12:00 AM",
-    findings: 87,
-  },
-  {
-    id: "5",
-    name: "Privilege Escalation Attempts",
-    description:
-      "Monitors token manipulation, sudo misuse, and local admin group changes on endpoints where escalation is not part of the change window.",
-    enabled: true,
-    severity: "Medium",
-    lastRun: "—",
-    recurrence: "—",
-    findings: "none",
-  },
-  {
-    id: "6",
-    name: "Suspicious PowerShell Execution",
-    description:
-      "Flags encoded or obfuscated PowerShell commands executed outside approved automation accounts, often used for fileless malware staging and credential access.",
-    enabled: true,
-    severity: "Medium",
-    lastRun: "6 hours ago",
-    recurrence: "Every Tue 12:00 AM",
-    findings: 24,
-  },
-  {
-    id: "7",
-    name: "Lateral Movement via SMB",
-    description:
-      "Correlates unusual SMB session setup and remote service creation patterns that indicate an actor pivoting between hosts after initial compromise.",
-    enabled: true,
-    severity: "Critical",
-    lastRun: "7 hours ago",
-    recurrence: "Every Tue 12:00 AM",
-    findings: 319,
-  },
-  {
-    id: "8",
-    name: "Credential Dumping Activity",
-    description:
-      "Detects access to LSASS or credential store artifacts consistent with Mimikatz-style tooling and pass-the-hash preparation.",
-    enabled: false,
-    severity: "Low",
-    lastRun: "8 hours ago",
-    recurrence: "Every Tue 12:00 AM",
-    findings: 11,
-  },
-  {
-    id: "9",
-    name: "Unusual Outbound DNS Queries",
-    description:
-      "Surfaces high-entropy subdomain lookups and rare resolver destinations that may indicate DNS tunneling or C2 beaconing.",
-    enabled: true,
-    severity: "Medium",
-    lastRun: "10 hours ago",
-    recurrence: "Every Tue 12:00 AM",
-    findings: 56,
-  },
-  {
-    id: "10",
-    name: "Privilege Escalation Attempts",
-    description:
-      "Monitors token manipulation, sudo misuse, and local admin group changes on endpoints where escalation is not part of the change window.",
-    enabled: true,
-    severity: "High",
-    lastRun: "18 hours ago",
-    recurrence: "Every Tue 12:00 AM",
-    findings: 33,
-  },
-  {
-    id: "11",
-    name: "Ransomware Precursor File Activity",
-    description:
-      "Identifies mass file rename and encryption extension changes consistent with ransomware staging before payload deployment.",
-    enabled: true,
-    severity: "Critical",
-    lastRun: "20 hours ago",
-    recurrence: "Every Tue 12:00 AM",
-    findings: 42,
-  },
-  {
-    id: "12",
-    name: "Impossible Travel Login",
-    description:
-      "Flags authentications from geographically distant locations within an implausible time window for the same user account.",
-    enabled: true,
-    severity: "High",
-    lastRun: "1 day ago",
-    recurrence: "Every Tue 12:00 AM",
-    findings: "error",
-  },
-  {
-    id: "13",
-    name: "Cloud Storage Public Exposure",
-    description:
-      "Detects bucket or container ACL changes that grant anonymous or public read access to sensitive data stores.",
-    enabled: false,
-    severity: "Medium",
-    lastRun: "1 day ago",
-    recurrence: "Every Tue 12:00 AM",
-    findings: "none",
-  },
-  {
-    id: "14",
-    name: "Kerberoasting Anomaly",
-    description:
-      "Surfaces service ticket requests targeting accounts with weak SPN configurations outside normal service desk activity.",
-    enabled: true,
-    severity: "High",
-    lastRun: "2 days ago",
-    recurrence: "Every Tue 12:00 AM",
-    findings: 72,
-  },
-  {
-    id: "15",
-    name: "Disabled AV Tampering",
-    description:
-      "Alerts when endpoint protection services are stopped, uninstalled, or excluded paths are added without approved change tickets.",
-    enabled: true,
-    severity: "High",
-    lastRun: "2 days ago",
-    recurrence: "Every Tue 12:00 AM",
-    findings: 18,
-  },
-  {
-    id: "16",
-    name: "Anomalous SaaS OAuth Grant",
-    description:
-      "Monitors new third-party OAuth applications granted broad mail or directory scopes to high-privilege user accounts.",
-    enabled: true,
-    severity: "Low",
-    lastRun: "3 days ago",
-    recurrence: "Every Tue 12:00 AM",
-    findings: 9,
-  },
-];
 
 
 function libraryDetectionToViewRow(
@@ -611,12 +392,12 @@ function DeleteConfirmationModal({
           Are you sure you want to delete this detection? This action cannot be undone.
         </div>
         <DialogFooter className="mx-0 mb-0 gap-2 rounded-b-xl border-t border-border-rule bg-transparent px-4 py-3 sm:flex-row sm:justify-end">
-          <Button type="button" variant="secondary" onClick={onClose}>
+          <Button type="button" variant="secondary-outline" onClick={onClose}>
             Cancel
           </Button>
           <Button
             type="button"
-            variant="primary"
+            variant="default"
             className="!bg-feedback-negative hover:!opacity-90"
             onClick={onConfirm}
           >
@@ -694,11 +475,11 @@ function DetectionActions({
   isLibraryManaged?: boolean;
 }) {
   const actionBtn =
-    "size-7 shrink-0 p-0 text-text-tertiary hover:text-text-primary [&_svg]:!size-3 [&_svg]:!h-3 [&_svg]:!w-3";
+    "shrink-0 p-0 text-text-tertiary hover:text-text-primary [&_svg]:!size-3 [&_svg]:!h-3 [&_svg]:!w-3";
   const actionBtnLg =
-    "size-7 shrink-0 p-0 text-text-tertiary hover:text-text-primary [&_svg]:!size-4 [&_svg]:!h-4 [&_svg]:!w-4";
+    "shrink-0 p-0 text-text-tertiary hover:text-text-primary [&_svg]:!size-4 [&_svg]:!h-4 [&_svg]:!w-4";
   const moreBtn =
-    "size-7 shrink-0 p-0 text-text-tertiary hover:text-text-primary [&_svg]:!size-4 [&_svg]:!h-4 [&_svg]:!w-4";
+    "shrink-0 p-0 text-text-tertiary hover:text-text-primary [&_svg]:!size-4 [&_svg]:!h-4 [&_svg]:!w-4";
   const libraryActionTooltip = "Pre-configured from Query library — copy to customize";
 
   return (
@@ -713,7 +494,7 @@ function DetectionActions({
         ) : (
           <Tooltip>
             <TooltipTrigger asChild>
-              <Button type="button" variant="ghost" className={actionBtn} aria-label="Edit detection" onClick={onEdit}>
+              <Button type="button" variant="ghost" size="icon-sm" className={actionBtn} aria-label="Edit detection" onClick={onEdit}>
                 <Icon name="action-edit" size={12} />
               </Button>
             </TooltipTrigger>
@@ -723,7 +504,7 @@ function DetectionActions({
 
         <Tooltip>
           <TooltipTrigger asChild>
-            <Button type="button" variant="ghost" className={actionBtnLg} aria-label="Run now" onClick={onRunNow}>
+            <Button type="button" variant="ghost" size="icon-sm" className={actionBtnLg} aria-label="Run now" onClick={onRunNow}>
               <Icon name="navi-double-chevron" size={16} />
             </Button>
           </TooltipTrigger>
@@ -739,7 +520,7 @@ function DetectionActions({
         ) : (
           <Tooltip>
             <TooltipTrigger asChild>
-              <Button type="button" variant="ghost" className={actionBtn} aria-label="Delete detection" onClick={onDelete}>
+              <Button type="button" variant="ghost" size="icon-sm" className={actionBtn} aria-label="Delete detection" onClick={onDelete}>
                 <Icon name="action-delete" size={12} />
               </Button>
             </TooltipTrigger>
@@ -749,7 +530,7 @@ function DetectionActions({
 
         <DropdownMenu>
           <DropdownMenuTrigger asChild>
-            <Button type="button" variant="ghost" className={moreBtn} aria-label={`More actions for ${name}`}>
+            <Button type="button" variant="ghost" size="icon-sm" className={moreBtn} aria-label={`More actions for ${name}`}>
               <Icon name="navi-more-vert" size={16} />
             </Button>
           </DropdownMenuTrigger>
@@ -897,8 +678,8 @@ function DetectionsTable({
   };
 
   const thClass =
-    "relative h-10 border-r border-datavis-gridlines px-2 py-0 align-middle text-xs font-bold uppercase tracking-wide text-text-primary";
-  const tdClass = "h-10 px-2 py-0 align-middle text-sm text-text-secondary";
+    "relative border-r border-datavis-gridlines px-2 py-0 align-middle text-xs font-bold uppercase tracking-wide text-text-primary";
+  const tdClass = cx(DATA_GRID_BODY_CELL_CLASS, "text-sm text-text-secondary");
   const hasActiveFilters =
     detectionNameFilter != null ||
     severityFilter != null ||
@@ -1020,7 +801,7 @@ function DetectionsTable({
             </colgroup>
             <thead className={DATA_GRID_THEAD_CLASS}>
               <tr className={DATA_GRID_HEADER_ROW_CLASS}>
-                <th scope="col" style={colStyle(0)} className="relative h-10 border-r border-datavis-gridlines px-0 py-0 align-middle">
+                <th scope="col" style={colStyle(0)} className="relative border-r border-datavis-gridlines px-0 py-0 align-middle">
                   <div className="flex items-center justify-center">
                     <Checkbox
                       checked={allSelected}
@@ -1093,7 +874,7 @@ function DetectionsTable({
                   />
                   {resizeHandle(7)}
                 </th>
-                <th scope="col" style={colStyle(8)} className="relative h-10 px-2 py-0 align-middle text-xs font-bold uppercase tracking-wide text-text-primary">
+                <th scope="col" style={colStyle(8)} className="relative px-2 py-0 align-middle text-xs font-bold uppercase tracking-wide text-text-primary">
                   <span className="block translate-y-px truncate">Actions</span>
                   {resizeHandle(8)}
                 </th>
@@ -1107,9 +888,9 @@ function DetectionsTable({
                 const inactiveCellClass = !enabled ? "opacity-70" : "";
                 return (
                   <Fragment key={row.id}>
-                    <tr className="h-10 border-b border-datavis-gridlines hover:bg-overlay-subtle">
-                      <td style={colStyle(0)} className={cx("h-10 px-0 py-0 align-middle", inactiveCellClass)}>
-                        <div className="flex items-center justify-center">
+                    <tr className={DATA_GRID_BODY_ROW_CLASS}>
+                      <td style={colStyle(0)} className={cx("px-0 py-0 align-middle", inactiveCellClass)}>
+                        <div className={DATA_GRID_BODY_CELL_CENTER_CLASS}>
                           <Checkbox
                             checked={selected.has(row.id)}
                             onCheckedChange={(checked) => toggleRow(row.id, checked)}
@@ -1117,18 +898,18 @@ function DetectionsTable({
                           />
                         </div>
                       </td>
-                      <td style={colStyle(1)} className={cx("h-10 px-0 py-0 align-middle", inactiveCellClass)}>
-                        <div className="flex justify-center">
+                      <td style={colStyle(1)} className={cx("px-0 py-0 align-middle", inactiveCellClass)}>
+                        <div className={DATA_GRID_BODY_CELL_CENTER_CLASS}>
                           <button
                             type="button"
-                            className="p-1 text-text-tertiary hover:text-text-primary"
+                            className={DATA_GRID_ROW_EXPAND_BTN_CLASS}
                             aria-expanded={expanded}
                             aria-label={expanded ? `Collapse description for ${row.name}` : `Expand description for ${row.name}`}
                             onClick={() => onToggleExpand(row.id)}
                           >
                             <Icon
                               name="navi-arrow-drop-down"
-                              size={32}
+                              size={DATA_GRID_ROW_EXPAND_ICON_SIZE}
                               className={cx("block transition-transform", expanded ? "rotate-0" : "-rotate-90")}
                               aria-hidden
                             />
@@ -1136,7 +917,7 @@ function DetectionsTable({
                         </div>
                       </td>
                       <td style={colStyle(2)} className={cx(tdClass, "min-w-0", inactiveCellClass)}>
-                        <div className="flex min-w-0 items-center gap-1.5">
+                        <div className="flex min-w-0 items-center gap-1.5 overflow-hidden">
                           {queuedById[row.id] ? (
                             <QueuedForReviewIndicator onClear={() => onClearFromReview(row.id)} />
                           ) : null}
@@ -1186,15 +967,15 @@ function DetectionsTable({
                       <td style={colStyle(6)} className={cx(tdClass, inactiveCellClass)}>
                         {row.recurrence}
                       </td>
-                      <td style={colStyle(7)} className={cx(tdClass, inactiveCellClass)}>
+                      <td style={colStyle(7)} className={tdClass}>
                         <FindingsSearchCell
                           findings={row.findings}
                           detectionId={row.id}
                           detectionName={row.name}
-                          enabled={enabled}
                         />
                       </td>
                       <td style={colStyle(8)} className={tdClass}>
+                        <div className="flex items-center justify-start gap-0.5 overflow-hidden">
                         <DetectionActions
                           name={row.name}
                           onEdit={() => onEditDetection(row.id)}
@@ -1205,13 +986,14 @@ function DetectionsTable({
                           isQueuedForReview={Boolean(queuedById[row.id])}
                           isLibraryManaged={isLibraryManaged}
                         />
+                        </div>
                       </td>
                     </tr>
                     {expanded ? (
                       <tr
                         className={cx(DATA_GRID_EXPANDED_ROW_CLASS, !enabled && "opacity-70")}
                       >
-                        <td colSpan={DETECTION_COLUMN_COUNT} className="px-4 py-3 align-top">
+                        <td colSpan={DETECTION_COLUMN_COUNT} className={DATA_GRID_EXPANDED_CELL_CLASS}>
                           <DetectionExpandedDetails
                             description={row.description}
                             detectionId={row.id}
@@ -1246,8 +1028,9 @@ function DetectionsTable({
 }
 
 function ManageDetectionsContent({
+  detectionRows,
+  setDetectionRows,
   newDetectionRow,
-  updatedDetectionRow,
   onEditDetection,
   onViewLibraryDetection,
   onCopyDetection,
@@ -1258,8 +1041,9 @@ function ManageDetectionsContent({
   enabledByName,
   onEnabledChange,
 }: {
+  detectionRows: DetectionRow[];
+  setDetectionRows: Dispatch<SetStateAction<DetectionRow[]>>;
   newDetectionRow?: DetectionRow | null;
-  updatedDetectionRow?: DetectionRow | null;
   onEditDetection: (row: DetectionRow) => void;
   onViewLibraryDetection: (row: DetectionRow) => void;
   onCopyDetection: (row: DetectionRow) => void;
@@ -1273,28 +1057,20 @@ function ManageDetectionsContent({
   const [tableTool, setTableTool] = useState<FilterColumnPanelTool | null>("filter");
   const [searchQuery, setSearchQuery] = useState("");
   const [expandedIds, setExpandedIds] = useState<Set<string>>(() => new Set());
-  const [detectionRows, setDetectionRows] = useState<DetectionRow[]>(() => [...DETECTION_ROWS]);
   const [detectionNameFilter, setDetectionNameFilter] = useState<string | null>(null);
   const [severityFilter, setSeverityFilter] = useState<BreakdownSeverity | null>(null);
-
-  useEffect(() => {
-    if (!newDetectionRow) return;
-    setDetectionRows((rows) => {
-      if (rows.some((r) => r.id === newDetectionRow.id)) return rows;
-      return [newDetectionRow, ...rows];
-    });
-  }, [newDetectionRow]);
-
-  useEffect(() => {
-    if (!updatedDetectionRow) return;
-    setDetectionRows((rows) =>
-      rows.map((r) => (r.id === updatedDetectionRow.id ? updatedDetectionRow : r)),
-    );
-  }, [updatedDetectionRow]);
-
   const [showOnlyActive, setShowOnlyActive] = useState(false);
   const [systemHealthFilter, setSystemHealthFilter] = useState<SystemHealthFilter | null>(null);
   const [deleteTargetId, setDeleteTargetId] = useState<string | null>(null);
+
+  useEffect(() => {
+    if (!newDetectionRow) return;
+    setDetectionNameFilter(null);
+    setSeverityFilter(null);
+    setSystemHealthFilter(null);
+    setShowOnlyActive(false);
+    setSearchQuery("");
+  }, [newDetectionRow]);
 
   const confirmDelete = () => {
     if (!deleteTargetId) return;
@@ -1466,8 +1242,6 @@ export function FederatedDetectionHubDashboard({
   const [createDetectionOpen, setCreateDetectionOpen] = useState(false);
   const createDetectionOpenRef = useRef(createDetectionOpen);
   createDetectionOpenRef.current = createDetectionOpen;
-  const [newDetectionRow, setNewDetectionRow] = useState<DetectionRow | null>(null);
-  const [updatedDetectionRow, setUpdatedDetectionRow] = useState<DetectionRow | null>(null);
   const [editDetectionRow, setEditDetectionRow] = useState<DetectionRow | null>(null);
   const [slideOverMode, setSlideOverMode] = useState<"create" | "edit" | "copy" | "view">("create");
   const [runningDetectionName, setRunningDetectionName] = useState<string | null>(null);
@@ -1476,13 +1250,18 @@ export function FederatedDetectionHubDashboard({
   const [snackbarOpen, setSnackbarOpen] = useState(false);
   const [snackbarMessage, setSnackbarMessage] = useState("");
   const libraryCopySaveRef = useRef(false);
-  const [enabledByName, setEnabledByName] = useState<Record<string, boolean>>(() =>
-    buildInitialEnabledByName([
-      ...DETECTION_ROWS,
-      ...LIBRARY_DETECTION_ROWS,
-      ...INITIAL_QUEUED_DETECTION_ROWS,
-    ]),
-  );
+  const location = useLocation();
+  const navigate = useNavigate();
+  const {
+    detectionRows,
+    setDetectionRows,
+    newDetectionRow,
+    updatedDetectionRow,
+    setUpdatedDetectionRow,
+    enabledByName,
+    setEnabledByName,
+    registerCreatedDetection,
+  } = useDetectionHub();
 
   const handleEnabledChange = useCallback((name: string, enabled: boolean) => {
     setEnabledByName((prev) => ({
@@ -1602,29 +1381,24 @@ export function FederatedDetectionHubDashboard({
     }));
 
     if (payload.id) {
-      setUpdatedDetectionRow((prev) => {
-        const source = prev?.id === payload.id ? prev : editDetectionRow;
-        return {
-          ...(source ?? { lastRun: "—", findings: "none" as const }),
-          id: payload.id!,
-          name: payload.name,
-          description: payload.description,
-          enabled: payload.enabled,
-          severity: payload.severity,
-          recurrence: payload.recurrence,
-        };
-      });
-    } else {
-      setNewDetectionRow({
-        id: String(Date.now()),
-        name: savedName,
+      const existingRow =
+        editDetectionRow?.id === payload.id
+          ? editDetectionRow
+          : detectionRows.find((row) => row.id === payload.id);
+      const updatedRow: DetectionRow = {
+        ...(existingRow ?? { lastRun: "—", findings: "none" as const, enabled: payload.enabled }),
+        id: payload.id,
+        name: payload.name,
         description: payload.description,
         enabled: payload.enabled,
         severity: payload.severity,
-        lastRun: "—",
         recurrence: payload.recurrence,
-        findings: "none",
-      });
+      };
+      setDetectionRows((rows) => rows.map((row) => (row.id === payload.id ? updatedRow : row)));
+      setUpdatedDetectionRow(updatedRow);
+    } else {
+      registerCreatedDetection(payload);
+      setActiveTab("Manage Detections");
       if (libraryCopySaveRef.current) {
         setSnackbarMessage(`"${savedName}" has been added to Manage Detections.`);
         setSnackbarOpen(true);
@@ -1634,9 +1408,27 @@ export function FederatedDetectionHubDashboard({
     setCreateDetectionOpen(false);
     setEditDetectionRow(null);
     setSlideOverMode("create");
-  }, [editDetectionRow]);
+  }, [detectionRows, editDetectionRow, registerCreatedDetection, setDetectionRows, setEnabledByName, setUpdatedDetectionRow]);
 
   useEffect(() => {
+    const state = location.state as FederatedDetectionHubLocationState | null;
+    if (state?.focusManageDetections) {
+      setActiveTab("Manage Detections");
+      navigate(location.pathname, { replace: true, state: null });
+      return;
+    }
+    if (!state?.openCreateDetection) return;
+    setSlideOverMode("create");
+    setEditDetectionRow(null);
+    setCreateDetectionOpen(true);
+    navigate(location.pathname, { replace: true, state: null });
+  }, [location.pathname, location.state, navigate]);
+
+  const previousActiveTabRef = useRef<HubTab>(activeTab);
+
+  useEffect(() => {
+    if (previousActiveTabRef.current === activeTab) return;
+    previousActiveTabRef.current = activeTab;
     onSlideOverChange(null);
     setCreateDetectionOpen(false);
   }, [activeTab, onSlideOverChange]);
@@ -1699,7 +1491,7 @@ export function FederatedDetectionHubDashboard({
         </TabsList>
         <Button
           type="button"
-          variant="secondary"
+          variant="secondary-outline"
           className="mb-3 h-8 shrink-0 ring-offset-surface-page"
           onClick={() => {
             setSlideOverMode("create");
@@ -1708,8 +1500,8 @@ export function FederatedDetectionHubDashboard({
         >
           <Icon
             name="action-add"
-            size={6}
-            className="size-1.5 shrink-0 text-current [&>svg]:!size-[6px]"
+            size={12}
+            className="size-3 shrink-0 text-current [&>svg]:!size-[12px]"
             aria-hidden
           />
           Create New Detection
@@ -1721,8 +1513,9 @@ export function FederatedDetectionHubDashboard({
         className="mt-0 px-6 pt-2 pb-4 sm:pt-3 sm:pb-5"
       >
         <ManageDetectionsContent
+          detectionRows={detectionRows}
+          setDetectionRows={setDetectionRows}
           newDetectionRow={newDetectionRow}
-          updatedDetectionRow={updatedDetectionRow}
           onEditDetection={handleEditDetection}
           onViewLibraryDetection={handleViewLibraryDetection}
           onCopyDetection={handleCopyDetection}

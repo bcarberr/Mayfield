@@ -18,6 +18,10 @@ function cloneTimeframeRange(range: TimeframeRange): TimeframeRange {
   return { from: new Date(range.from), to: new Date(range.to) };
 }
 
+function buildSearchSessionKey(query: string, timeframe: TimeframeRange): string {
+  return `${query.trim()}|${timeframe.from.getTime()}|${timeframe.to.getTime()}`;
+}
+
 type SearchContextValue = {
   criteriaMode: SearchCriteriaMode;
   setCriteriaMode: (mode: SearchCriteriaMode) => void;
@@ -31,10 +35,13 @@ type SearchContextValue = {
   setQueryBuilderValid: (valid: boolean) => void;
   fsqlSearchExecuted: boolean;
   fsqlSearching: boolean;
+  searchSessionKey: string | null;
+  completedSearchSessionKey: string | null;
   searchInitialTimeframe: TimeframeRange | null;
   fsqlSearchDetectionName: string | null;
   setFsqlSearchDetectionName: (name: string | null) => void;
   beginFsqlSearch: (query: string, searchTimeframe: TimeframeRange) => void;
+  markSearchSessionComplete: (sessionKey: string) => void;
   clearSearch: (mode: SearchCriteriaMode) => void;
   resultsFilterQuery: string;
   setResultsFilterQuery: (query: string) => void;
@@ -56,6 +63,8 @@ export function SearchProvider({ children }: { children: ReactNode }) {
   const [queryBuilderValid, setQueryBuilderValid] = useState(false);
   const [fsqlSearchExecuted, setFsqlSearchExecuted] = useState(false);
   const [fsqlSearching, setFsqlSearching] = useState(false);
+  const [searchSessionKey, setSearchSessionKey] = useState<string | null>(null);
+  const [completedSearchSessionKey, setCompletedSearchSessionKey] = useState<string | null>(null);
   const [searchInitialTimeframe, setSearchInitialTimeframe] = useState<TimeframeRange | null>(null);
   const [fsqlSearchDetectionName, setFsqlSearchDetectionName] = useState<string | null>(null);
   const [resultsFilterQuery, setResultsFilterQuery] = useState("");
@@ -76,6 +85,8 @@ export function SearchProvider({ children }: { children: ReactNode }) {
       if (!query.trim()) return;
       resetResultsViewState();
       setSearchInitialTimeframe(cloneTimeframeRange(searchTimeframe));
+      setSearchSessionKey(buildSearchSessionKey(query, searchTimeframe));
+      setCompletedSearchSessionKey(null);
       setCriteriaOpen(true);
       setFsqlSearchExecuted(true);
       setFsqlSearching(true);
@@ -89,6 +100,15 @@ export function SearchProvider({ children }: { children: ReactNode }) {
     [resetResultsViewState],
   );
 
+  const markSearchSessionComplete = useCallback((sessionKey: string) => {
+    setCompletedSearchSessionKey(sessionKey);
+    setFsqlSearching(false);
+    if (searchTimerRef.current) {
+      clearTimeout(searchTimerRef.current);
+      searchTimerRef.current = null;
+    }
+  }, []);
+
   const clearSearch = useCallback(
     (mode: SearchCriteriaMode) => {
       if (mode === "fsql") {
@@ -96,6 +116,8 @@ export function SearchProvider({ children }: { children: ReactNode }) {
         setFsqlSearchExecuted(false);
         setFsqlSearching(false);
         setSearchInitialTimeframe(null);
+        setSearchSessionKey(null);
+        setCompletedSearchSessionKey(null);
         setFsqlSearchDetectionName(null);
         resetResultsViewState();
         if (searchTimerRef.current) {
@@ -134,10 +156,13 @@ export function SearchProvider({ children }: { children: ReactNode }) {
     setQueryBuilderValid,
     fsqlSearchExecuted,
     fsqlSearching,
+    searchSessionKey,
+    completedSearchSessionKey,
     searchInitialTimeframe,
     fsqlSearchDetectionName,
     setFsqlSearchDetectionName,
     beginFsqlSearch,
+    markSearchSessionComplete,
     clearSearch,
     resultsFilterQuery,
     setResultsFilterQuery,

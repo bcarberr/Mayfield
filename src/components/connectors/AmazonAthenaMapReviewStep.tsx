@@ -130,7 +130,7 @@ const INITIAL_ROWS: MappingRow[] = [
   { source: "http_status", sample: "200", mapped: false },
   { source: "protocol", sample: "HTTPS", mapped: false },
   { source: "request_path", sample: "/api/v1/health", mapped: false },
-  { source: "user_agent", sample: "Mozilla/5.0…", mapped: false },
+  { source: "user_agent", sample: "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36", mapped: false },
 ];
 
 const MAPPING_FIELD_COLGROUP = (

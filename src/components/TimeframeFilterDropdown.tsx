@@ -13,7 +13,6 @@ import {
   DropdownMenuContent,
   DropdownMenuTrigger,
 } from "@/components/shadcn/dropdown-menu";
-import { Button as DsButton } from "./ui/Button";
 import { Input } from "./ui/Input";
 import { cn } from "@/lib/utils";
 
@@ -75,8 +74,8 @@ export function TimeframeFilterDropdown() {
         >
           <Icon
             name="action-time"
-            size={16}
-            className="size-4 shrink-0 text-current [&_svg]:!size-4"
+            size={18.4}
+            className="size-[18.4px] shrink-0 text-current [&_svg]:!size-[18.4px]"
             aria-hidden
           />
           <span className="inline-flex shrink-0 items-center gap-1 text-sm font-semibold">Timeframe</span>
@@ -114,12 +113,12 @@ export function TimeframeFilterDropdown() {
           </label>
         </div>
         <div className="mt-4 flex justify-end gap-2">
-          <DsButton type="button" variant="secondary" className="h-8 ring-offset-surface-modal" onClick={() => setOpen(false)}>
+          <Button type="button" variant="secondary-outline" className="h-8 ring-offset-surface-modal" onClick={() => setOpen(false)}>
             Cancel
-          </DsButton>
-          <DsButton type="button" variant="primary" className="h-8" disabled={!canApply} onClick={applyRange}>
+          </Button>
+          <Button type="button" variant="default" className="h-8" disabled={!canApply} onClick={applyRange}>
             Apply
-          </DsButton>
+          </Button>
         </div>
       </DropdownMenuContent>
     </DropdownMenu>

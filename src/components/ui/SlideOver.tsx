@@ -1,7 +1,7 @@
 import { type ReactNode, useEffect } from "react";
 import { createPortal } from "react-dom";
 import { Icon } from "../../design-system";
-import { Button } from "./Button";
+import { Button } from "@/components/shadcn/button";
 
 export type SlideOverProps = {
   open: boolean;
@@ -72,6 +72,24 @@ export const THREE_QUARTER_VIEWPORT_SLIDE_OVER_PANEL_CLASS = "w-[75vw] max-w-non
 
 /** max-w-2xl form column (42rem) + 24px horizontal padding on each side (48px total). */
 export const FORM_CONTENT_SLIDE_OVER_PANEL_CLASS = "w-[calc(42rem+48px)] max-w-none shrink-0";
+
+/** Floating footer wrapper — sticky action cluster at bottom-right of slide-over panels. */
+export const SLIDE_OVER_FLOATING_FOOTER_WRAPPER_CLASS =
+  "pointer-events-none absolute bottom-0 right-0 z-20 flex justify-end p-4";
+
+/** Floating footer panel — matches Add Connector / Create Detection footer chrome. */
+export const SLIDE_OVER_FLOATING_FOOTER_PANEL_CLASS =
+  "pointer-events-auto flex items-center gap-2 rounded-tl-lg rounded-bl-lg bg-surface-container/80 px-3 py-2.5 shadow-lg ring-1 ring-border-container backdrop-blur-sm";
+
+/** Figma default action control — 32px total height for slide-over footer buttons. */
+export const SLIDE_OVER_FOOTER_BUTTON_CLASS =
+  "box-border h-8 min-h-8 max-h-8 shrink-0 py-0 leading-[14px]";
+
+/** Cancel-style ghost control in floating footers — 32px height, compact horizontal padding. */
+export const SLIDE_OVER_FOOTER_GHOST_BUTTON_CLASS = cx(
+  SLIDE_OVER_FOOTER_BUTTON_CLASS,
+  "gap-1 px-1 text-text-secondary hover:text-text-primary",
+);
 
 /**
  * Full-viewport modal drawer — scrim covers nav + page header; panel slides in from the right at full height.

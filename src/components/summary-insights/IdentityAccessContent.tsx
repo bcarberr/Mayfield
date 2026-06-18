@@ -1,7 +1,7 @@
 import { useMemo, useState } from "react";
 import { DATA_GRID_ABOVE_SECTION_CLASS, DATA_GRID_HEADER_ROW_CLASS, DATA_GRID_RESULTS_SEARCH_PLACEHOLDER, DATA_GRID_TABLE_CLASS, DATA_GRID_TABLE_SCROLL_CLASS, DATA_GRID_THEAD_CLASS } from "../ui/dataGridTableStyles";
 import { Checkbox, Icon, type SeverityShapeIconName } from "../../design-system";
-import { Button } from "../ui/Button";
+import { Button } from "@/components/shadcn/button";
 import { ColumnHeaderMenu } from "../ui/ColumnHeaderMenu";
 import { FilterColumnPanel, type FilterColumnPanelTool } from "../ui/FilterColumnPanel";
 import { Input } from "../ui/Input";
@@ -132,7 +132,7 @@ const IDENTITY_ACCESS_ROWS: IdentityAccessRow[] = [
   {
     id: "1",
     severity: "Critical",
-    title: "Impossible travel: login from two countries within 5 min…",
+    title: "Impossible travel: login from two countries within 5 minutes",
     time: "14:22:08",
     activity: "Logon",
     eventClass: "Authentication",
@@ -144,7 +144,7 @@ const IDENTITY_ACCESS_ROWS: IdentityAccessRow[] = [
   {
     id: "2",
     severity: "High",
-    title: "Repeated failed logons for privileged service account…",
+    title: "Repeated failed logons for privileged service account",
     time: "13:05:41",
     activity: "Logon",
     eventClass: "Authentication",
@@ -156,7 +156,7 @@ const IDENTITY_ACCESS_ROWS: IdentityAccessRow[] = [
   {
     id: "3",
     severity: "High",
-    title: "Admin account password reset outside change window…",
+    title: "Admin account password reset outside change window",
     time: "11:40:12",
     activity: "Update",
     eventClass: "Account Change",
@@ -169,7 +169,7 @@ const IDENTITY_ACCESS_ROWS: IdentityAccessRow[] = [
   {
     id: "4",
     severity: "Medium",
-    title: "New user added to Domain Admins group…",
+    title: "New user added to Domain Admins group",
     time: "09:12:00",
     activity: "Add",
     eventClass: "Group Management",
@@ -181,7 +181,7 @@ const IDENTITY_ACCESS_ROWS: IdentityAccessRow[] = [
   {
     id: "5",
     severity: "Low",
-    title: "Session privilege elevation for standard user context…",
+    title: "Session privilege elevation for standard user context",
     time: "22:18:55",
     activity: "Assign Privileges",
     eventClass: "Authorize Session",
@@ -193,7 +193,7 @@ const IDENTITY_ACCESS_ROWS: IdentityAccessRow[] = [
   {
     id: "6",
     severity: "Informational",
-    title: "MFA enrollment completed for contractor account…",
+    title: "MFA enrollment completed for contractor account",
     time: "18:00:03",
     activity: "Update",
     eventClass: "Entity Management",
@@ -205,7 +205,7 @@ const IDENTITY_ACCESS_ROWS: IdentityAccessRow[] = [
   {
     id: "7",
     severity: "Critical",
-    title: "Disabled account re-enabled without approval ticket…",
+    title: "Disabled account re-enabled without approval ticket",
     time: "16:44:19",
     activity: "Enable",
     eventClass: "Account Change",
@@ -218,7 +218,7 @@ const IDENTITY_ACCESS_ROWS: IdentityAccessRow[] = [
   {
     id: "8",
     severity: "High",
-    title: "OAuth consent grant to unverified third-party app…",
+    title: "OAuth consent grant to unverified third-party app",
     time: "12:01:47",
     activity: "Authorize",
     eventClass: "User Access Management",
@@ -339,7 +339,7 @@ function IdentityAccessTable({ displayRows, getSortProps }: { displayRows: Ident
         </colgroup>
         <thead className={DATA_GRID_THEAD_CLASS}>
           <tr className={DATA_GRID_HEADER_ROW_CLASS}>
-            <th scope="col" style={colStyle(0)} className="relative h-10 border-r border-datavis-gridlines px-0 py-0 align-middle">
+            <th scope="col" style={colStyle(0)} className="relative border-r border-datavis-gridlines px-0 py-0 align-middle">
               <div className="flex items-center justify-center">
                 <Checkbox
                   checked={allSelected}
@@ -353,7 +353,7 @@ function IdentityAccessTable({ displayRows, getSortProps }: { displayRows: Ident
             <th
               scope="col"
               style={colStyle(1)}
-              className="relative h-10 border-r border-datavis-gridlines px-2 py-0 align-middle text-xs font-bold uppercase tracking-wide text-text-primary"
+              className="relative border-r border-datavis-gridlines px-2 py-0 align-middle text-xs font-bold uppercase tracking-wide text-text-primary"
             >
               <ColumnHeaderMenu
                 label="Severity"
@@ -365,7 +365,7 @@ function IdentityAccessTable({ displayRows, getSortProps }: { displayRows: Ident
             <th
               scope="col"
               style={colStyle(2)}
-              className="relative h-10 border-r border-datavis-gridlines px-2 py-0 align-middle text-xs font-bold uppercase tracking-wide text-text-primary"
+              className="relative border-r border-datavis-gridlines px-2 py-0 align-middle text-xs font-bold uppercase tracking-wide text-text-primary"
             >
               <ColumnHeaderMenu label="Title" menuLabel="Title column options" {...getSortProps("title")} />
               {resizeHandle(2)}
@@ -373,7 +373,7 @@ function IdentityAccessTable({ displayRows, getSortProps }: { displayRows: Ident
             <th
               scope="col"
               style={colStyle(3)}
-              className="relative h-10 border-r border-datavis-gridlines px-2 py-0 align-middle text-xs font-bold uppercase tracking-wide text-text-primary"
+              className="relative border-r border-datavis-gridlines px-2 py-0 align-middle text-xs font-bold uppercase tracking-wide text-text-primary"
             >
               <ColumnHeaderMenu label="Time" menuLabel="Time column options" {...getSortProps("time")} />
               {resizeHandle(3)}
@@ -381,7 +381,7 @@ function IdentityAccessTable({ displayRows, getSortProps }: { displayRows: Ident
             <th
               scope="col"
               style={colStyle(4)}
-              className="relative h-10 border-r border-datavis-gridlines px-2 py-0 align-middle text-xs font-bold uppercase tracking-wide text-text-primary"
+              className="relative border-r border-datavis-gridlines px-2 py-0 align-middle text-xs font-bold uppercase tracking-wide text-text-primary"
             >
               <ColumnHeaderMenu label="Activity" menuLabel="Activity column options" {...getSortProps("activity")} />
               {resizeHandle(4)}
@@ -389,7 +389,7 @@ function IdentityAccessTable({ displayRows, getSortProps }: { displayRows: Ident
             <th
               scope="col"
               style={colStyle(5)}
-              className="relative h-10 border-r border-datavis-gridlines px-2 py-0 align-middle text-xs font-bold uppercase tracking-wide text-text-primary"
+              className="relative border-r border-datavis-gridlines px-2 py-0 align-middle text-xs font-bold uppercase tracking-wide text-text-primary"
             >
               <ColumnHeaderMenu label="Class" menuLabel="Class column options" {...getSortProps("eventClass")} />
               {resizeHandle(5)}
@@ -397,7 +397,7 @@ function IdentityAccessTable({ displayRows, getSortProps }: { displayRows: Ident
             <th
               scope="col"
               style={colStyle(6)}
-              className="relative h-10 border-r border-datavis-gridlines px-2 py-0 align-middle text-xs font-bold uppercase tracking-wide text-text-primary"
+              className="relative border-r border-datavis-gridlines px-2 py-0 align-middle text-xs font-bold uppercase tracking-wide text-text-primary"
             >
               <ColumnHeaderMenu label="User" menuLabel="User column options" {...getSortProps("user")} />
               {resizeHandle(6)}
@@ -405,7 +405,7 @@ function IdentityAccessTable({ displayRows, getSortProps }: { displayRows: Ident
             <th
               scope="col"
               style={colStyle(7)}
-              className="relative h-10 border-r border-datavis-gridlines px-2 py-0 align-middle text-xs font-bold uppercase tracking-wide text-text-primary"
+              className="relative border-r border-datavis-gridlines px-2 py-0 align-middle text-xs font-bold uppercase tracking-wide text-text-primary"
             >
               <ColumnHeaderMenu label="Source IP" menuLabel="Source IP column options" {...getSortProps("sourceIp")} />
               {resizeHandle(7)}
@@ -413,7 +413,7 @@ function IdentityAccessTable({ displayRows, getSortProps }: { displayRows: Ident
             <th
               scope="col"
               style={colStyle(8)}
-              className="relative h-10 px-2 py-0 align-middle text-xs font-bold uppercase tracking-wide text-text-primary"
+              className="relative px-2 py-0 align-middle text-xs font-bold uppercase tracking-wide text-text-primary"
             >
               <ColumnHeaderMenu label="Connectors" menuLabel="Connectors column options" {...getSortProps("connector")} />
               {resizeHandle(8)}
@@ -422,8 +422,8 @@ function IdentityAccessTable({ displayRows, getSortProps }: { displayRows: Ident
         </thead>
         <tbody>
           {displayRows.map((row) => (
-            <tr key={row.id} className="h-10 border-b border-datavis-gridlines hover:bg-overlay-subtle">
-              <td style={colStyle(0)} className="h-10 px-0 py-0 align-middle">
+            <tr key={row.id} className="border-b border-datavis-gridlines hover:bg-overlay-subtle">
+              <td style={colStyle(0)} className="px-0 py-0 align-middle">
                 <div className="flex items-center justify-center">
                   <Checkbox
                     checked={selected.has(row.id)}
@@ -432,13 +432,13 @@ function IdentityAccessTable({ displayRows, getSortProps }: { displayRows: Ident
                   />
                 </div>
               </td>
-              <td style={colStyle(1)} className="h-10 px-2 py-0 align-middle">
+              <td style={colStyle(1)} className="px-2 py-0 align-middle">
                 <span className="inline-flex items-center gap-2">
                   <SeverityTableIcon name={SEV_ICONS[row.severity]} color={SEV_BAR[row.severity]} />
                   <span className="text-sm text-text-secondary">{row.severity}</span>
                 </span>
               </td>
-              <td style={colStyle(2)} className="h-10 min-w-0 px-2 py-0 align-middle">
+              <td style={colStyle(2)} className="min-w-0 px-2 py-0 align-middle">
                 <TruncatedText
                   as="button"
                   className="w-full text-left text-sm font-semibold text-interactive-active hover:underline focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-interactive-active"
@@ -446,13 +446,13 @@ function IdentityAccessTable({ displayRows, getSortProps }: { displayRows: Ident
                   {row.title}
                 </TruncatedText>
               </td>
-              <td style={colStyle(3)} className="h-10 min-w-0 px-2 py-0 align-middle tabular-nums">
+              <td style={colStyle(3)} className="min-w-0 px-2 py-0 align-middle tabular-nums">
                 <TruncatedText className="text-sm text-text-secondary">{row.time}</TruncatedText>
               </td>
-              <td style={colStyle(4)} className="h-10 min-w-0 px-2 py-0 align-middle">
+              <td style={colStyle(4)} className="min-w-0 px-2 py-0 align-middle">
                 <TruncatedText className="text-sm text-text-secondary">{row.activity}</TruncatedText>
               </td>
-              <td style={colStyle(5)} className="h-10 min-w-0 overflow-hidden px-2 py-0 align-middle">
+              <td style={colStyle(5)} className="min-w-0 overflow-hidden px-2 py-0 align-middle">
                 <span className="flex w-full min-w-0 items-center gap-2">
                   <Icon
                     name="ocsf-identity-access"
@@ -465,13 +465,13 @@ function IdentityAccessTable({ displayRows, getSortProps }: { displayRows: Ident
                   </TruncatedText>
                 </span>
               </td>
-              <td style={colStyle(6)} className="h-10 min-w-0 px-2 py-0 align-middle">
+              <td style={colStyle(6)} className="min-w-0 px-2 py-0 align-middle">
                 <TruncatedText className="text-sm text-text-secondary">{row.user}</TruncatedText>
               </td>
-              <td style={colStyle(7)} className="h-10 min-w-0 px-2 py-0 align-middle tabular-nums">
+              <td style={colStyle(7)} className="min-w-0 px-2 py-0 align-middle tabular-nums">
                 <TruncatedText className="text-sm text-text-secondary">{row.sourceIp}</TruncatedText>
               </td>
-              <td style={colStyle(8)} className="h-10 min-w-0 overflow-hidden px-2 py-0 align-middle">
+              <td style={colStyle(8)} className="min-w-0 overflow-hidden px-2 py-0 align-middle">
                 <ConnectorTableCell
                   name={row.connector}
                   className="w-full"

@@ -20,17 +20,24 @@ const HEADER_FILTER_TRIGGER_CLASS =
   "h-auto max-w-full gap-1.5 rounded px-0 py-0.5 font-semibold text-interactive-active hover:bg-transparent hover:text-[var(--color-primary-hover)] active:text-[var(--color-primary-pressed)] lg:inline-flex lg:w-auto";
 
 const HEADER_FILTER_ICON_CLASS = "size-4 shrink-0 text-current [&_svg]:!size-4";
+const HEADER_FILTER_ICON_LG_CLASS = "size-[18.4px] shrink-0 text-current [&_svg]:!size-[18.4px]";
 
 type HeaderFilterTriggerProps = {
   icon: IconName;
   label: string;
   value?: ReactNode;
+  largeIcon?: boolean;
 };
 
-function HeaderFilterTrigger({ icon, label, value }: HeaderFilterTriggerProps) {
+function HeaderFilterTrigger({ icon, label, value, largeIcon = false }: HeaderFilterTriggerProps) {
   return (
     <>
-      <Icon name={icon} size={16} className={HEADER_FILTER_ICON_CLASS} aria-hidden />
+      <Icon
+        name={icon}
+        size={largeIcon ? 18.4 : 16}
+        className={largeIcon ? HEADER_FILTER_ICON_LG_CLASS : HEADER_FILTER_ICON_CLASS}
+        aria-hidden
+      />
       <span className="inline-flex shrink-0 items-center gap-1 text-sm font-semibold">{label}</span>
       {value ? (
         <Badge
@@ -49,6 +56,7 @@ type SearchHeaderFilterDropdownProps = {
   label: string;
   menuLabel: string;
   value?: ReactNode;
+  largeIcon?: boolean;
   /** When set, opens the panel instead of toggling a placeholder menu. */
   onActivate?: () => void;
 };
@@ -58,6 +66,7 @@ function SearchHeaderFilterDropdown({
   label,
   menuLabel,
   value,
+  largeIcon,
   onActivate,
 }: SearchHeaderFilterDropdownProps) {
   if (onActivate) {
@@ -69,7 +78,7 @@ function SearchHeaderFilterDropdown({
         aria-label={`${menuLabel} filter`}
         onClick={onActivate}
       >
-        <HeaderFilterTrigger icon={icon} label={label} value={value} />
+        <HeaderFilterTrigger icon={icon} label={label} value={value} largeIcon={largeIcon} />
       </Button>
     );
   }
@@ -83,7 +92,7 @@ function SearchHeaderFilterDropdown({
           className={cn(HEADER_FILTER_TRIGGER_CLASS, "w-full justify-start text-left lg:w-auto")}
           aria-label={`${menuLabel} filter`}
         >
-          <HeaderFilterTrigger icon={icon} label={label} value={value} />
+          <HeaderFilterTrigger icon={icon} label={label} value={value} largeIcon={largeIcon} />
         </Button>
       </DropdownMenuTrigger>
       <DropdownMenuContent
@@ -134,6 +143,7 @@ export function SearchHeaderFilters() {
         label="Connectors"
         menuLabel="Connectors"
         value={<ConnectorSelectionCountText />}
+        largeIcon
         onActivate={openConnectorsPanel}
       />
       <TimeframeFilterDropdown />
