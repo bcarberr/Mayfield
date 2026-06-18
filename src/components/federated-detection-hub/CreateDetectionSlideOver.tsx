@@ -1,19 +1,54 @@
-import { useEffect, useRef, useState, type HTMLAttributes, type KeyboardEvent, type ReactNode } from "react";
-import { Checkbox, Icon, Switch, type SeverityShapeIconName } from "../../design-system";
-import { Button } from "../ui/Button";
-import { SeverityTableIcon } from "../ui/SeverityTableIcon";
+import { useState, useCallback, useMemo, useId } from "react";
+import { Icon, Switch } from "../../design-system";
 import { SlideOverHeaderBackButton } from "../ui/SlideOver";
-import { Snackbar } from "../ui/Snackbar";
+import { Button } from "../ui/Button";
+import { Checkbox } from "@/components/shadcn/checkbox";
+import {
+  Collapsible,
+  CollapsibleContent,
+  CollapsibleTrigger,
+} from "@/components/shadcn/collapsible";
+import { Field, FieldLabel } from "@/components/shadcn/field";
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/shadcn/tabs";
+import {
+  AlertThresholdField,
+  CustomMessageTemplateField,
+  EnableOnSaveField,
+  FormInputField,
+  FormSelectField,
+  FormTextareaField,
+  CollapsibleSettingsSection,
+  RecurrencePreviewBanner,
+  SeveritySelectField,
+  TagsField,
+} from "./createDetectionFormFields";
+import {
+  DetectionConnectorsRunPanel,
+  getLastRunConnectorsForDetection,
+  pickRandomConnectors,
+  type DetectionConnector,
+} from "./detectionRunConnectors";
 
 const cx = (...c: (string | false | undefined)[]) => c.filter(Boolean).join(" ");
 
 const CREATE_DETECTION_TABS = ["Detection Settings", "Detection Logic"] as const;
 
+const DETECTION_FORM_SECTION_IDS = {
+  basicInformation: "basic-information",
+  detectionSchedule: "detection-schedule",
+  alertConfiguration: "alert-configuration",
+  detectionLogic: "detection-logic",
+} as const;
+
+const ALL_DETECTION_FORM_SECTION_IDS = Object.values(DETECTION_FORM_SECTION_IDS);
+
+function createExpandedSectionsState(expanded: boolean) {
+  return Object.fromEntries(ALL_DETECTION_FORM_SECTION_IDS.map((id) => [id, expanded]));
+}
+
 type CreateDetectionTab = (typeof CREATE_DETECTION_TABS)[number];
 
 type DetectionSeverity = "Critical" | "High" | "Medium" | "Low";
-
-type ScheduledState = "draft" | "active" | "paused";
 
 type OcsfCategory = "" | "process-activity" | "network-activity" | "identity-access" | "discovery";
 
@@ -116,20 +151,6 @@ const DAY_OF_MONTH_OPTIONS = Array.from({ length: 28 }, (_, index) => {
 
 const QUERY_LANGUAGE_OPTIONS: readonly { id: QueryLanguage; label: string }[] = [{ id: "FSQL", label: "FSQL" }];
 
-const SEV_COLORS: Record<DetectionSeverity, string> = {
-  Critical: "#ff604a",
-  High: "#f28830",
-  Medium: "#fac354",
-  Low: "#57969e",
-};
-
-const SEV_ICONS: Record<DetectionSeverity, SeverityShapeIconName> = {
-  Critical: "severity-critical",
-  High: "severity-high",
-  Medium: "severity-medium",
-  Low: "severity-low",
-};
-
 const SEVERITY_OPTIONS: readonly { id: DetectionSeverity; label: string }[] = [
   { id: "Critical", label: "Critical" },
   { id: "High", label: "High" },
@@ -154,396 +175,6 @@ const SCHEDULE_MINUTE_PERIOD_OPTIONS = SCHEDULE_MINUTE_OPTIONS.flatMap((minute) 
     label: `${minute.label} ${period.label}`,
   })),
 );
-
-const SCHEDULED_STATE_OPTIONS: readonly { id: ScheduledState; label: string }[] = [
-  { id: "active", label: "ACTIVE" },
-  { id: "paused", label: "PAUSED" },
-  { id: "draft", label: "DRAFT" },
-];
-
-const SCHEDULED_STATE_BADGE_CLASS: Record<ScheduledState, string> = {
-  active: "bg-feedback-bg-positive",
-  paused: "bg-feedback-bg-caution",
-  draft: "bg-feedback-bg-neutral",
-};
-
-function ScheduledStateBadge({ state }: { state: ScheduledState }) {
-  const label = SCHEDULED_STATE_OPTIONS.find((option) => option.id === state)?.label ?? state.toUpperCase();
-  return (
-    <span
-      className={cx(
-        "inline-flex shrink-0 rounded px-2 py-0.5 text-xs font-bold uppercase leading-4 tracking-[0.4px] text-white",
-        "[html[data-theme=light]_&]:text-text-on-primary",
-        SCHEDULED_STATE_BADGE_CLASS[state],
-      )}
-    >
-      {label}
-    </span>
-  );
-}
-
-function SettingsSectionHeading({ children }: { children: ReactNode }) {
-  return (
-    <h3 className="text-xs font-bold uppercase tracking-[0.6px] text-text-primary">{children}</h3>
-  );
-}
-
-function DraftBadge() {
-  return <ScheduledStateBadge state="draft" />;
-}
-
-function DropdownChevron({ open }: { open: boolean }) {
-  return (
-    <Icon
-      name={open ? "navi-expand-less" : "navi-expand-more"}
-      size={16}
-      className="shrink-0 text-text-secondary"
-      aria-hidden
-    />
-  );
-}
-
-function useDismissibleDropdown() {
-  const containerRef = useRef<HTMLDivElement>(null);
-  const [open, setOpen] = useState(false);
-
-  useEffect(() => {
-    function onPointerDown(event: PointerEvent) {
-      if (!containerRef.current?.contains(event.target as Node)) setOpen(false);
-    }
-    document.addEventListener("pointerdown", onPointerDown);
-    return () => document.removeEventListener("pointerdown", onPointerDown);
-  }, []);
-
-  useEffect(() => {
-    if (!open) return;
-    function onKey(event: globalThis.KeyboardEvent) {
-      if (event.key === "Escape") setOpen(false);
-    }
-    document.addEventListener("keydown", onKey);
-    return () => document.removeEventListener("keydown", onKey);
-  }, [open]);
-
-  return { containerRef, open, setOpen };
-}
-
-/** Figma Single-line Dropdown-Field on modal (`142:22585` default 40px, `142:22649` hover, `142:22601` focused). */
-const OUTLINED_FIELD_VALUE_CLASS = "text-sm font-normal leading-[18px] text-text-primary";
-
-function outlinedFieldShellClass(active: boolean) {
-  return cx(
-    "group relative flex h-10 w-full min-w-0 items-center gap-2 rounded-[4px] bg-surface-modal px-3 text-left transition-[border-color] focus-visible:outline-none",
-    active
-      ? "border-2 border-interactive-active hover:border-interactive-active"
-      : "border border-border-rule hover:border-text-secondary",
-  );
-}
-
-function OutlinedFieldLabel({ label, active }: { label: string; active?: boolean }) {
-  return (
-    <span
-      className={cx(
-        "pointer-events-none absolute left-3 top-0 z-[1] -translate-y-1/2 bg-surface-modal px-1 text-xs font-semibold leading-4 tracking-[0.4px]",
-        active ? "text-interactive-active" : "text-text-tertiary group-focus-within:text-interactive-active",
-      )}
-    >
-      {label}
-    </span>
-  );
-}
-
-function OutlinedFieldShell({
-  label,
-  active = false,
-  children,
-}: {
-  label: string;
-  active?: boolean;
-  children: ReactNode;
-}) {
-  return (
-    <>
-      <OutlinedFieldLabel label={label} active={active} />
-      {children}
-    </>
-  );
-}
-
-function OutlinedTextInput({
-  label,
-  value,
-  onChange,
-  placeholder,
-  inputMode,
-}: {
-  label: string;
-  value: string;
-  onChange: (value: string) => void;
-  placeholder?: string;
-  inputMode?: HTMLAttributes<HTMLInputElement>["inputMode"];
-}) {
-  return (
-    <label
-      className={cx(
-        outlinedFieldShellClass(false),
-        "focus-within:border-2 focus-within:border-interactive-active focus-within:hover:border-interactive-active",
-      )}
-    >
-      <OutlinedFieldShell label={label}>
-        <input
-          type="text"
-          inputMode={inputMode}
-          value={value}
-          onChange={(event) => onChange(event.target.value)}
-          placeholder={placeholder}
-          className={cx(
-            "min-w-0 flex-1 truncate bg-transparent px-1 outline-none placeholder:italic placeholder:text-text-tertiary",
-            OUTLINED_FIELD_VALUE_CLASS,
-          )}
-        />
-      </OutlinedFieldShell>
-    </label>
-  );
-}
-
-const DROPDOWN_MENU_CLASS =
-  "absolute left-0 top-[calc(100%+4px)] z-50 min-w-full overflow-hidden rounded-[4px] border border-border-rule bg-surface-modal py-1 shadow-[0px_5px_5px_-3px_rgba(0,0,0,0.2),0px_8px_10px_1px_rgba(0,0,0,0.14),0px_3px_14px_2px_rgba(0,0,0,0.12)]";
-
-function OutlinedDropdownTrigger({
-  label,
-  open,
-  onClick,
-  ariaLabel,
-  children,
-}: {
-  label: string;
-  open: boolean;
-  onClick: () => void;
-  ariaLabel: string;
-  children: ReactNode;
-}) {
-  return (
-    <button
-      type="button"
-      aria-label={ariaLabel}
-      aria-expanded={open}
-      aria-haspopup="listbox"
-      onClick={onClick}
-      className={outlinedFieldShellClass(open)}
-    >
-      <OutlinedFieldShell label={label} active={open}>
-        {children}
-      </OutlinedFieldShell>
-    </button>
-  );
-}
-
-function TextOptionSelect<T extends string>({
-  value,
-  onChange,
-  options,
-  ariaLabel,
-  label,
-  placeholder,
-}: {
-  value: T | "";
-  onChange: (next: T) => void;
-  options: readonly { id: T; label: string }[];
-  ariaLabel: string;
-  label: string;
-  placeholder?: string;
-}) {
-  const { containerRef, open, setOpen } = useDismissibleDropdown();
-  const selectedOption = options.find((option) => option.id === value);
-  const displayValue = selectedOption?.label ?? (placeholder && !value ? placeholder : value);
-
-  const selectOption = (next: T) => {
-    onChange(next);
-    setOpen(false);
-  };
-
-  return (
-    <div ref={containerRef} className="relative min-w-0">
-      <OutlinedDropdownTrigger
-        label={label}
-        open={open}
-        ariaLabel={ariaLabel}
-        onClick={() => setOpen((current) => !current)}
-      >
-        <span
-          className={cx(
-            "min-w-0 flex-1 truncate px-1",
-            OUTLINED_FIELD_VALUE_CLASS,
-            !selectedOption && placeholder ? "italic text-text-tertiary" : undefined,
-          )}
-        >
-          {displayValue}
-        </span>
-        <DropdownChevron open={open} />
-      </OutlinedDropdownTrigger>
-
-      {open ? (
-        <ul role="listbox" aria-label={ariaLabel} className={DROPDOWN_MENU_CLASS}>
-          {options.map((option) => {
-            const isSelected = option.id === value;
-            return (
-              <li key={option.id} role="presentation">
-                <button
-                  type="button"
-                  role="option"
-                  aria-selected={isSelected}
-                  className={cx(
-                    "flex h-8 w-full min-w-0 items-center gap-2 px-3 text-left text-sm font-normal leading-8 transition-colors focus-visible:bg-interactive-secondary-hover focus-visible:outline-none",
-                    isSelected
-                      ? "bg-interactive-secondary-hover text-interactive-active"
-                      : "text-text-secondary hover:bg-interactive-secondary-hover hover:text-text-primary",
-                  )}
-                  onClick={() => selectOption(option.id)}
-                >
-                  <span className="truncate">{option.label}</span>
-                </button>
-              </li>
-            );
-          })}
-        </ul>
-      ) : null}
-    </div>
-  );
-}
-
-function OcsfCategorySelect({
-  value,
-  onChange,
-}: {
-  value: OcsfCategory;
-  onChange: (next: OcsfCategory) => void;
-}) {
-  return (
-    <TextOptionSelect
-      label="OCSF Category"
-      value={value}
-      onChange={onChange}
-      options={OCSF_CATEGORY_OPTIONS}
-      ariaLabel="OCSF category"
-      placeholder="Select category"
-    />
-  );
-}
-
-function MinutePeriodSelect({
-  minute,
-  period,
-  onChange,
-}: {
-  minute: string;
-  period: TimePeriod;
-  onChange: (minute: string, period: TimePeriod) => void;
-}) {
-  const compositeValue = `${minute}-${period}`;
-  const options = SCHEDULE_MINUTE_PERIOD_OPTIONS.map((option) => ({
-    id: option.id,
-    label: option.label,
-  }));
-
-  return (
-    <TextOptionSelect
-      label="Minute"
-      value={compositeValue}
-      onChange={(next) => {
-        const match = SCHEDULE_MINUTE_PERIOD_OPTIONS.find((option) => option.id === next);
-        if (match) onChange(match.minute, match.period);
-      }}
-      options={options}
-      ariaLabel="Schedule minute and period"
-    />
-  );
-}
-
-function EnableOnSaveField({
-  checked,
-  onCheckedChange,
-}: {
-  checked: boolean;
-  onCheckedChange: (checked: boolean) => void;
-}) {
-  return (
-    <div className={outlinedFieldShellClass(false)}>
-      <OutlinedFieldShell label="Enable on Save">
-        <Switch checked={checked} onCheckedChange={onCheckedChange} />
-        <span className="text-sm text-text-secondary">
-          {checked ? "On — enable when saved" : "Off — save as draft"}
-        </span>
-      </OutlinedFieldShell>
-    </div>
-  );
-}
-
-function TagsField({ tags, onTagsChange }: { tags: string[]; onTagsChange: (tags: string[]) => void }) {
-  const inputRef = useRef<HTMLInputElement>(null);
-  const [inputValue, setInputValue] = useState("");
-
-  const handleRemove = (tag: string) => {
-    onTagsChange(tags.filter((current) => current !== tag));
-  };
-
-  const addTag = (raw: string) => {
-    const trimmed = raw.trim();
-    if (!trimmed || tags.includes(trimmed)) return;
-    onTagsChange([...tags, trimmed]);
-    setInputValue("");
-  };
-
-  const handleInputKeyDown = (event: KeyboardEvent<HTMLInputElement>) => {
-    if (event.key !== "Enter") return;
-    event.preventDefault();
-    addTag(inputValue);
-  };
-
-  return (
-    <label
-      className={cx(
-        outlinedFieldShellClass(false),
-        "h-auto min-h-10 cursor-text flex-wrap items-center gap-2 py-2",
-        "focus-within:border-2 focus-within:border-interactive-active focus-within:hover:border-interactive-active",
-      )}
-      onClick={() => inputRef.current?.focus()}
-    >
-      <OutlinedFieldLabel label="Tags" />
-      {tags.map((tag) => (
-        <span
-          key={tag}
-          className="inline-flex h-6 max-w-full items-center gap-1 rounded-full bg-surface-container px-2.5 text-xs font-semibold text-text-primary ring-1 ring-border-container"
-        >
-          <span className="truncate">{tag}</span>
-          <button
-            type="button"
-            className="-mr-0.5 flex shrink-0 items-center justify-center rounded-full p-0.5 text-text-secondary transition-colors hover:bg-overlay-subtle hover:text-text-primary focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-interactive-active"
-            aria-label={`Remove ${tag}`}
-            onClick={(event) => {
-              event.stopPropagation();
-              handleRemove(tag);
-            }}
-          >
-            <Icon name="close" size={14} aria-hidden />
-          </button>
-        </span>
-      ))}
-      <input
-        ref={inputRef}
-        type="text"
-        value={inputValue}
-        onChange={(event) => setInputValue(event.target.value)}
-        onKeyDown={handleInputKeyDown}
-        placeholder={tags.length === 0 ? "Type tag and press Enter" : "+ Add tag"}
-        aria-label="Add tag"
-        className={cx(
-          "min-w-[8ch] flex-1 bg-transparent px-1 outline-none placeholder:italic placeholder:text-text-tertiary",
-          OUTLINED_FIELD_VALUE_CLASS,
-        )}
-      />
-    </label>
-  );
-}
 
 function formatScheduleRecurrencePreview({
   frequency,
@@ -573,162 +204,6 @@ function formatScheduleRecurrencePreview({
   }
 }
 
-function RecurrencePreviewBanner({ preview }: { preview: string }) {
-  return (
-    <div className="flex items-center gap-2 rounded-[4px] bg-interactive-selected px-3 py-2.5">
-      <Icon name="action-date-range" size={16} className="shrink-0 text-interactive-active" aria-hidden />
-      <p className="text-sm">
-        <span className="font-semibold text-interactive-active">Recurrence preview: </span>
-        <span className="text-text-primary">{preview}</span>
-      </p>
-    </div>
-  );
-}
-
-function QueryLanguageSelect({
-  value,
-  onChange,
-}: {
-  value: QueryLanguage;
-  onChange: (next: QueryLanguage) => void;
-}) {
-  const { containerRef, open, setOpen } = useDismissibleDropdown();
-
-  const selectOption = (next: QueryLanguage) => {
-    onChange(next);
-    setOpen(false);
-  };
-
-  return (
-    <div ref={containerRef} className="relative min-w-0">
-      <OutlinedDropdownTrigger
-        label="Query Language"
-        open={open}
-        ariaLabel="Query language"
-        onClick={() => setOpen((current) => !current)}
-      >
-        <span className={cx("min-w-0 flex-1 truncate px-1", OUTLINED_FIELD_VALUE_CLASS)}>{value}</span>
-        <DropdownChevron open={open} />
-      </OutlinedDropdownTrigger>
-
-      {open ? (
-        <ul role="listbox" aria-label="Query language" className={DROPDOWN_MENU_CLASS}>
-          {QUERY_LANGUAGE_OPTIONS.map((option) => {
-            const isSelected = option.id === value;
-            return (
-              <li key={option.id} role="presentation">
-                <button
-                  type="button"
-                  role="option"
-                  aria-selected={isSelected}
-                  className={cx(
-                    "flex h-8 w-full min-w-0 items-center gap-2 px-3 text-left text-sm font-normal leading-8 transition-colors focus-visible:bg-interactive-secondary-hover focus-visible:outline-none",
-                    isSelected
-                      ? "bg-interactive-secondary-hover text-interactive-active"
-                      : "text-text-secondary hover:bg-interactive-secondary-hover hover:text-text-primary",
-                  )}
-                  onClick={() => selectOption(option.id)}
-                >
-                  <span className="truncate">{option.label}</span>
-                </button>
-              </li>
-            );
-          })}
-        </ul>
-      ) : null}
-    </div>
-  );
-}
-
-function SeveritySelect({
-  value,
-  onChange,
-}: {
-  value: DetectionSeverity;
-  onChange: (next: DetectionSeverity) => void;
-}) {
-  const { containerRef, open, setOpen } = useDismissibleDropdown();
-
-  const selectOption = (next: DetectionSeverity) => {
-    onChange(next);
-    setOpen(false);
-  };
-
-  return (
-    <div ref={containerRef} className="relative min-w-0">
-      <OutlinedDropdownTrigger
-        label="Severity"
-        open={open}
-        ariaLabel="Severity"
-        onClick={() => setOpen((current) => !current)}
-      >
-        <SeverityTableIcon name={SEV_ICONS[value]} color={SEV_COLORS[value]} />
-        <span className={cx("min-w-0 flex-1 truncate px-1", OUTLINED_FIELD_VALUE_CLASS)}>{value}</span>
-        <DropdownChevron open={open} />
-      </OutlinedDropdownTrigger>
-
-      {open ? (
-        <ul role="listbox" aria-label="Severity" className={DROPDOWN_MENU_CLASS}>
-          {SEVERITY_OPTIONS.map((option) => {
-            const isSelected = option.id === value;
-            return (
-              <li key={option.id} role="presentation">
-                <button
-                  type="button"
-                  role="option"
-                  aria-selected={isSelected}
-                  className={cx(
-                    "flex h-8 w-full min-w-0 items-center gap-2 px-3 text-left text-sm font-normal leading-8 transition-colors focus-visible:bg-interactive-secondary-hover focus-visible:outline-none",
-                    isSelected
-                      ? "bg-interactive-secondary-hover text-interactive-active"
-                      : "text-text-secondary hover:bg-interactive-secondary-hover hover:text-text-primary",
-                  )}
-                  onClick={() => selectOption(option.id)}
-                >
-                  <SeverityTableIcon name={SEV_ICONS[option.id]} color={SEV_COLORS[option.id]} />
-                  <span className="truncate">{option.label}</span>
-                </button>
-              </li>
-            );
-          })}
-        </ul>
-      ) : null}
-    </div>
-  );
-}
-
-function CreateDetectionTabs({
-  active,
-  onChange,
-}: {
-  active: CreateDetectionTab;
-  onChange: (tab: CreateDetectionTab) => void;
-}) {
-  return (
-    <nav className="flex shrink-0 gap-6 border-b border-border-rule px-5 pt-5" aria-label="Create detection sections">
-      {CREATE_DETECTION_TABS.map((tab) => {
-        const isActive = tab === active;
-        return (
-          <button
-            key={tab}
-            type="button"
-            className={cx(
-              "border-b-2 pb-3 text-sm font-semibold transition-colors",
-              isActive
-                ? "border-interactive-active text-text-primary"
-                : "border-transparent text-text-tertiary hover:text-text-secondary",
-            )}
-            aria-current={isActive ? "page" : undefined}
-            onClick={() => onChange(tab)}
-          >
-            {tab}
-          </button>
-        );
-      })}
-    </nav>
-  );
-}
-
 function BasicDetectionInformationSection({
   name,
   onNameChange,
@@ -744,6 +219,9 @@ function BasicDetectionInformationSection({
   onMitreTechniqueChange,
   tags,
   onTagsChange,
+  readOnly = false,
+  sectionOpen,
+  onSectionOpenChange,
 }: {
   name: string;
   onNameChange: (value: string) => void;
@@ -759,75 +237,179 @@ function BasicDetectionInformationSection({
   onMitreTechniqueChange: (value: string) => void;
   tags: string[];
   onTagsChange: (tags: string[]) => void;
+  readOnly?: boolean;
+  sectionOpen: boolean;
+  onSectionOpenChange: (open: boolean) => void;
 }) {
   return (
-    <section className="space-y-5">
-      <SettingsSectionHeading>Basic Detection Information</SettingsSectionHeading>
-
-      <OutlinedTextInput
+    <CollapsibleSettingsSection
+      title="Basic Detection Information"
+      open={sectionOpen}
+      onOpenChange={onSectionOpenChange}
+    >
+      <FormInputField
         label="Name of Detection"
         value={name}
         onChange={onNameChange}
         placeholder="Enter detection name"
+        readOnly={readOnly}
       />
 
-      <OutlinedTextInput
+      <FormTextareaField
         label="Description"
         value={description}
         onChange={onDescriptionChange}
         placeholder="Describe what this detection identifies and why it matters"
+        rows={3}
+        readOnly={readOnly}
       />
 
-      <div className="grid grid-cols-2 gap-4">
-        <SeveritySelect value={severity} onChange={onSeverityChange} />
-        <EnableOnSaveField checked={enableOnSave} onCheckedChange={onEnableOnSaveChange} />
-      </div>
+      <SeveritySelectField
+        label="Severity"
+        value={severity}
+        onChange={onSeverityChange}
+        options={SEVERITY_OPTIONS}
+        readOnly={readOnly}
+      />
+
+      <EnableOnSaveField checked={enableOnSave} onCheckedChange={onEnableOnSaveChange} readOnly={readOnly} />
 
       <div className="grid grid-cols-2 gap-4">
-        <OcsfCategorySelect value={ocsfCategory} onChange={onOcsfCategoryChange} />
-        <OutlinedTextInput
+        <FormSelectField
+          label="OCSF Category"
+          value={ocsfCategory}
+          onChange={onOcsfCategoryChange}
+          options={OCSF_CATEGORY_OPTIONS}
+          placeholder="Select category"
+          readOnly={readOnly}
+        />
+        <FormInputField
           label="MITRE ATT&CK Technique"
           value={mitreTechnique}
           onChange={onMitreTechniqueChange}
           placeholder="e.g. T1078, T1059"
+          readOnly={readOnly}
         />
       </div>
 
-      <TagsField tags={tags} onTagsChange={onTagsChange} />
-    </section>
+      <TagsField tags={tags} onTagsChange={onTagsChange} readOnly={readOnly} />
+    </CollapsibleSettingsSection>
   );
 }
+
+type TestState = "idle" | "running" | "success";
 
 function DetectionLogicTabContent({
   queryLanguage,
   onQueryLanguageChange,
   detectionQuery,
   onDetectionQueryChange,
-  onTestQuery,
+  readOnly = false,
+  detectionId,
+  lastRun,
+  connectorsActive,
+  connectorsTotal,
+  sectionOpen,
+  onSectionOpenChange,
 }: {
   queryLanguage: QueryLanguage;
   onQueryLanguageChange: (value: QueryLanguage) => void;
   detectionQuery: string;
   onDetectionQueryChange: (value: string) => void;
-  onTestQuery: () => void;
+  readOnly?: boolean;
+  detectionId?: string;
+  lastRun?: string;
+  connectorsActive?: number;
+  connectorsTotal?: number;
+  sectionOpen: boolean;
+  onSectionOpenChange: (open: boolean) => void;
 }) {
+  const [testState, setTestState] = useState<TestState>("idle");
+  const [testedConnectors, setTestedConnectors] = useState<DetectionConnector[]>([]);
+
+  const handleQueryChange = (value: string) => {
+    onDetectionQueryChange(value);
+    if (testState !== "idle") setTestState("idle");
+  };
+
+  const handleTestQuery = () => {
+    if (!detectionQuery.trim() || testState === "running") return;
+    setTestState("running");
+    const picked = pickRandomConnectors();
+    setTimeout(() => {
+      setTestedConnectors(picked);
+      setTestState("success");
+    }, 2000);
+  };
+
+  const lastRunConnectorOptions =
+    readOnly && connectorsActive != null && connectorsTotal != null
+      ? { connectorsActive, connectorsTotal }
+      : undefined;
+
+  const lastRunConnectors =
+    readOnly && detectionId
+      ? getLastRunConnectorsForDetection(detectionId, lastRun, lastRunConnectorOptions)
+      : [];
+
   return (
-    <div className="mx-auto w-full max-w-2xl space-y-5 py-6 pb-24">
-      <h2 className="text-base font-semibold text-text-primary">Detection Logic</h2>
-
-      <QueryLanguageSelect value={queryLanguage} onChange={onQueryLanguageChange} />
-
-      <OutlinedTextInput
-        label="Enter your detection query"
-        value={detectionQuery}
-        onChange={onDetectionQueryChange}
+    <div className="mx-auto w-full max-w-2xl pt-4 pb-24">
+      <CollapsibleSettingsSection
+        title="Detection Logic"
+        open={sectionOpen}
+        onOpenChange={onSectionOpenChange}
+      >
+      <FormSelectField
+        label="Query Language"
+        value={queryLanguage}
+        onChange={onQueryLanguageChange}
+        options={QUERY_LANGUAGE_OPTIONS}
+        readOnly={readOnly}
       />
 
-      <div>
-        <Button type="button" variant="secondary" onClick={onTestQuery}>
-          Test Query
-        </Button>
-      </div>
+      <FormTextareaField
+        label="Enter your detection query"
+        value={detectionQuery}
+        onChange={handleQueryChange}
+        rows={4}
+        readOnly={readOnly}
+      />
+
+      {readOnly ? (
+        lastRunConnectors.length > 0 ? (
+          <DetectionConnectorsRunPanel
+            connectors={lastRunConnectors}
+            variant="last-run"
+            connectorsActive={connectorsActive}
+            connectorsTotal={connectorsTotal}
+          />
+        ) : null
+      ) : (
+        <div className="space-y-4">
+          <div>
+            <Button
+              type="button"
+              variant="secondary"
+              disabled={!detectionQuery.trim() || testState === "running"}
+              onClick={handleTestQuery}
+            >
+              {testState === "running" && <Spinner />}
+              Test Query
+            </Button>
+          </div>
+
+          {testState !== "idle" && (
+            <div className="rounded border border-border bg-muted/20 p-4">
+              {testState === "running" ? (
+                <p className="text-sm text-text-tertiary">Running query across connectors…</p>
+              ) : (
+                <DetectionConnectorsRunPanel connectors={testedConnectors} variant="test-success" />
+              )}
+            </div>
+          )}
+        </div>
+      )}
+      </CollapsibleSettingsSection>
     </div>
   );
 }
@@ -845,6 +427,10 @@ function DetectionScheduleSection({
   onMinuteChange,
   period,
   onPeriodChange,
+  readOnly = false,
+  recurrenceOverride,
+  sectionOpen,
+  onSectionOpenChange,
 }: {
   frequency: ScheduleFrequency;
   onFrequencyChange: (value: ScheduleFrequency) => void;
@@ -858,6 +444,10 @@ function DetectionScheduleSection({
   onMinuteChange: (value: string) => void;
   period: TimePeriod;
   onPeriodChange: (value: TimePeriod) => void;
+  readOnly?: boolean;
+  recurrenceOverride?: string;
+  sectionOpen: boolean;
+  onSectionOpenChange: (open: boolean) => void;
 }) {
   const recurrencePreview = formatScheduleRecurrencePreview({
     frequency,
@@ -868,25 +458,39 @@ function DetectionScheduleSection({
     period,
   });
 
-  return (
-    <section className="space-y-5">
-      <SettingsSectionHeading>Detection Schedule</SettingsSectionHeading>
+  if (readOnly && recurrenceOverride) {
+    return (
+      <CollapsibleSettingsSection
+        title="Detection Schedule"
+        open={sectionOpen}
+        onOpenChange={onSectionOpenChange}
+      >
+        <RecurrencePreviewBanner preview={recurrenceOverride} />
+      </CollapsibleSettingsSection>
+    );
+  }
 
-      <TextOptionSelect
+  return (
+    <CollapsibleSettingsSection
+      title="Detection Schedule"
+      open={sectionOpen}
+      onOpenChange={onSectionOpenChange}
+    >
+      <FormSelectField
         label="Frequency"
         value={frequency}
         onChange={onFrequencyChange}
         options={SCHEDULE_FREQUENCY_OPTIONS}
-        ariaLabel="Schedule frequency"
+        readOnly={readOnly}
       />
 
       {frequency === "Monthly" ? (
-        <TextOptionSelect
+        <FormSelectField
           label="Day of Month"
           value={dayOfMonth}
           onChange={onDayOfMonthChange}
           options={DAY_OF_MONTH_OPTIONS}
-          ariaLabel="Day of month"
+          readOnly={readOnly}
         />
       ) : null}
 
@@ -897,118 +501,43 @@ function DetectionScheduleSection({
         )}
       >
         {frequency === "Weekly" ? (
-          <TextOptionSelect
+          <FormSelectField
             label="Day of Week"
             value={dayOfWeek}
             onChange={onDayOfWeekChange}
             options={DAY_OF_WEEK_OPTIONS}
-            ariaLabel="Day of week"
+            readOnly={readOnly}
           />
         ) : null}
 
-        <TextOptionSelect
+        <FormSelectField
           label="Hour"
           value={hour}
           onChange={onHourChange}
           options={SCHEDULE_HOUR_OPTIONS}
-          ariaLabel="Schedule hour"
+          readOnly={readOnly}
         />
 
-        <MinutePeriodSelect
-          minute={minute}
-          period={period}
-          onChange={(nextMinute, nextPeriod) => {
-            onMinuteChange(nextMinute);
-            onPeriodChange(nextPeriod);
+        <FormSelectField
+          label="Minute"
+          value={`${minute}-${period}`}
+          onChange={(next) => {
+            const match = SCHEDULE_MINUTE_PERIOD_OPTIONS.find((option) => option.id === next);
+            if (match) {
+              onMinuteChange(match.minute);
+              onPeriodChange(match.period);
+            }
           }}
+          options={SCHEDULE_MINUTE_PERIOD_OPTIONS.map((option) => ({
+            id: option.id,
+            label: option.label,
+          }))}
+          readOnly={readOnly}
         />
       </div>
 
       <RecurrencePreviewBanner preview={recurrencePreview} />
-    </section>
-  );
-}
-
-function AlertConfigurationBox({ children }: { children: ReactNode }) {
-  return (
-    <div className="rounded-[4px] border border-border-rule bg-surface-modal p-4">{children}</div>
-  );
-}
-
-function AlertThresholdField({
-  value,
-  onChange,
-}: {
-  value: string;
-  onChange: (value: string) => void;
-}) {
-  const handleChange = (raw: string) => {
-    if (raw === "") {
-      onChange("");
-      return;
-    }
-    const parsed = Number.parseInt(raw, 10);
-    if (!Number.isNaN(parsed)) onChange(String(Math.max(1, parsed)));
-  };
-
-  return (
-    <AlertConfigurationBox>
-      <div className="space-y-3">
-        <p className="text-xs font-semibold leading-4 tracking-[0.4px] text-text-tertiary">
-          Alert when findings exceed
-        </p>
-        <div className="flex flex-wrap items-center gap-2">
-          <label
-            className={cx(
-              outlinedFieldShellClass(false),
-              "w-[72px] shrink-0 focus-within:border-2 focus-within:border-interactive-active focus-within:hover:border-interactive-active",
-            )}
-          >
-            <input
-              type="number"
-              min={1}
-              step={1}
-              value={value}
-              onChange={(event) => handleChange(event.target.value)}
-              className={cx(
-                "min-w-0 flex-1 bg-transparent px-1 text-center outline-none",
-                OUTLINED_FIELD_VALUE_CLASS,
-              )}
-              aria-label="Alert threshold"
-            />
-          </label>
-          <span className="text-sm leading-[18px] text-text-secondary">finding(s) per run</span>
-        </div>
-      </div>
-    </AlertConfigurationBox>
-  );
-}
-
-function ChannelExpandLink({
-  expanded,
-  onToggle,
-  channelLabel,
-}: {
-  expanded: boolean;
-  onToggle: () => void;
-  channelLabel: string;
-}) {
-  return (
-    <button
-      type="button"
-      className="inline-flex shrink-0 items-center gap-1 text-xs font-semibold text-interactive-active transition-colors hover:text-interactive-active/80"
-      aria-expanded={expanded}
-      aria-label={expanded ? `Collapse ${channelLabel} configuration` : `Expand ${channelLabel} configuration`}
-      onClick={onToggle}
-    >
-      {expanded ? "collapse" : "expand to configure"}
-      <Icon
-        name={expanded ? "navi-expand-less" : "navi-chevron-right"}
-        size={16}
-        className="text-interactive-active"
-        aria-hidden
-      />
-    </button>
+    </CollapsibleSettingsSection>
   );
 }
 
@@ -1019,6 +548,7 @@ function NotificationChannelsSection({
   onEmailRecipientsChange,
   expandedChannels,
   onExpandedChannelsChange,
+  readOnly = false,
 }: {
   channels: NotificationChannels;
   onChannelsChange: (channels: NotificationChannels) => void;
@@ -1026,13 +556,10 @@ function NotificationChannelsSection({
   onEmailRecipientsChange: (value: string) => void;
   expandedChannels: ExpandedChannels;
   onExpandedChannelsChange: (channels: ExpandedChannels) => void;
+  readOnly?: boolean;
 }) {
   const toggleChannel = (channel: NotificationChannel, checked: boolean) => {
     onChannelsChange({ ...channels, [channel]: checked });
-  };
-
-  const toggleExpanded = (channel: NotificationChannel) => {
-    onExpandedChannelsChange({ ...expandedChannels, [channel]: !expandedChannels[channel] });
   };
 
   return (
@@ -1041,98 +568,74 @@ function NotificationChannelsSection({
       <div className="space-y-4">
         {NOTIFICATION_CHANNEL_OPTIONS.map((option) => {
           const expanded = expandedChannels[option.id];
-          const stub =
-            option.id !== "email" ? CHANNEL_CONFIG_STUBS[option.id] : null;
+          const stub = option.id !== "email" ? CHANNEL_CONFIG_STUBS[option.id] : null;
+          const checkboxId = `notification-channel-${option.id}`;
 
           return (
-            <div key={option.id} className="space-y-3">
+            <Collapsible
+              key={option.id}
+              open={expanded}
+              onOpenChange={(open) => {
+                if (readOnly) return;
+                onExpandedChannelsChange({ ...expandedChannels, [option.id]: open });
+              }}
+            >
               <div className="flex items-center justify-between gap-3">
-                <Checkbox
-                  checked={channels[option.id]}
-                  onCheckedChange={(checked) => toggleChannel(option.id, checked)}
-                  label={option.label}
-                  labelClassName="text-sm font-semibold leading-[18px] text-text-primary"
-                />
-                <ChannelExpandLink
-                  expanded={expanded}
-                  onToggle={() => toggleExpanded(option.id)}
-                  channelLabel={option.label}
-                />
+                <Field orientation="horizontal" className="items-center gap-2">
+                  <Checkbox
+                    id={checkboxId}
+                    checked={channels[option.id]}
+                    disabled={readOnly}
+                    onCheckedChange={(checked) => toggleChannel(option.id, checked === true)}
+                  />
+                  <FieldLabel htmlFor={checkboxId} className="text-sm font-semibold">
+                    {option.label}
+                  </FieldLabel>
+                </Field>
+                {!readOnly ? (
+                  <CollapsibleTrigger asChild>
+                    <Button
+                      type="button"
+                      variant="ghost"
+                      size="small"
+                      className="text-interactive-active hover:text-interactive-active/80"
+                    >
+                      {expanded ? "collapse" : "expand to configure"}
+                      <Icon
+                        name={expanded ? "navi-expand-less" : "navi-chevron-right"}
+                        size={16}
+                        className="text-interactive-active"
+                        aria-hidden
+                      />
+                    </Button>
+                  </CollapsibleTrigger>
+                ) : null}
               </div>
 
-              {expanded ? (
-                <div className="pl-6">
-                  {option.id === "email" ? (
-                    <OutlinedTextInput
-                      label="Recipients"
-                      value={emailRecipients}
-                      onChange={onEmailRecipientsChange}
-                      placeholder="soc-team@company.com"
-                    />
-                  ) : stub ? (
-                    <OutlinedTextInput
-                      label={stub.label}
-                      value=""
-                      onChange={() => undefined}
-                      placeholder={stub.placeholder}
-                    />
-                  ) : null}
-                </div>
-              ) : null}
-            </div>
+              <CollapsibleContent className="space-y-3 pl-6 pt-3">
+                {option.id === "email" ? (
+                  <FormInputField
+                    label="Recipients"
+                    value={emailRecipients}
+                    onChange={onEmailRecipientsChange}
+                    placeholder="soc-team@company.com"
+                    readOnly={readOnly}
+                  />
+                ) : stub ? (
+                  <FormInputField
+                    label={stub.label}
+                    value=""
+                    onChange={() => undefined}
+                    placeholder={stub.placeholder}
+                    readOnly={readOnly}
+                  />
+                ) : null}
+              </CollapsibleContent>
+            </Collapsible>
           );
         })}
       </div>
     </div>
-  );
-}
-
-function MessageTemplateVariablePill({
-  variable,
-  onInsert,
-}: {
-  variable: string;
-  onInsert: (variable: string) => void;
-}) {
-  return (
-    <button
-      type="button"
-      className="inline-flex rounded bg-interactive-selected px-1.5 py-0.5 text-xs font-semibold leading-4 text-interactive-active transition-colors hover:bg-interactive-secondary-hover"
-      onClick={() => onInsert(variable)}
-    >
-      {variable}
-    </button>
-  );
-}
-
-function CustomMessageTemplateField({
-  value,
-  onChange,
-}: {
-  value: string;
-  onChange: (value: string) => void;
-}) {
-  const insertVariable = (variable: string) => {
-    onChange(`${value}${variable}`);
-  };
-
-  return (
-    <AlertConfigurationBox>
-      <div className="space-y-3">
-        <OutlinedTextInput
-          label="Custom Message Template"
-          value={value}
-          onChange={onChange}
-          placeholder={DEFAULT_ALERT_MESSAGE_TEMPLATE}
-        />
-        <div className="flex flex-wrap items-center gap-2">
-          <span className="text-xs font-semibold leading-4 text-text-tertiary">Available variables:</span>
-          {ALERT_MESSAGE_VARIABLES.map((variable) => (
-            <MessageTemplateVariablePill key={variable} variable={variable} onInsert={insertVariable} />
-          ))}
-        </div>
-      </div>
-    </AlertConfigurationBox>
   );
 }
 
@@ -1147,6 +650,9 @@ function AlertConfigurationSection({
   onExpandedChannelsChange,
   alertMessageTemplate,
   onAlertMessageTemplateChange,
+  readOnly = false,
+  sectionOpen,
+  onSectionOpenChange,
 }: {
   alertThreshold: string;
   onAlertThresholdChange: (value: string) => void;
@@ -1158,12 +664,17 @@ function AlertConfigurationSection({
   onExpandedChannelsChange: (channels: ExpandedChannels) => void;
   alertMessageTemplate: string;
   onAlertMessageTemplateChange: (value: string) => void;
+  readOnly?: boolean;
+  sectionOpen: boolean;
+  onSectionOpenChange: (open: boolean) => void;
 }) {
   return (
-    <section className="space-y-5">
-      <SettingsSectionHeading>Alert Configuration</SettingsSectionHeading>
-
-      <AlertThresholdField value={alertThreshold} onChange={onAlertThresholdChange} />
+    <CollapsibleSettingsSection
+      title="Alert Configuration"
+      open={sectionOpen}
+      onOpenChange={onSectionOpenChange}
+    >
+      <AlertThresholdField value={alertThreshold} onChange={onAlertThresholdChange} readOnly={readOnly} />
 
       <NotificationChannelsSection
         channels={notificationChannels}
@@ -1172,10 +683,17 @@ function AlertConfigurationSection({
         onEmailRecipientsChange={onEmailRecipientsChange}
         expandedChannels={expandedChannels}
         onExpandedChannelsChange={onExpandedChannelsChange}
+        readOnly={readOnly}
       />
 
-      <CustomMessageTemplateField value={alertMessageTemplate} onChange={onAlertMessageTemplateChange} />
-    </section>
+      <CustomMessageTemplateField
+        value={alertMessageTemplate}
+        onChange={onAlertMessageTemplateChange}
+        variables={ALERT_MESSAGE_VARIABLES}
+        defaultTemplate={DEFAULT_ALERT_MESSAGE_TEMPLATE}
+        readOnly={readOnly}
+      />
+    </CollapsibleSettingsSection>
   );
 }
 
@@ -1216,6 +734,10 @@ function DetectionSettingsTabContent({
   onExpandedChannelsChange,
   alertMessageTemplate,
   onAlertMessageTemplateChange,
+  readOnly = false,
+  recurrenceOverride,
+  expandedSections,
+  onSectionOpenChange,
 }: {
   name: string;
   onNameChange: (value: string) => void;
@@ -1253,9 +775,18 @@ function DetectionSettingsTabContent({
   onExpandedChannelsChange: (channels: ExpandedChannels) => void;
   alertMessageTemplate: string;
   onAlertMessageTemplateChange: (value: string) => void;
+  readOnly?: boolean;
+  recurrenceOverride?: string;
+  expandedSections: Record<string, boolean>;
+  onSectionOpenChange: (sectionId: string, open: boolean) => void;
 }) {
   return (
-    <div className="mx-auto flex w-full max-w-2xl flex-col gap-8 py-6 pb-24">
+    <div className="mx-auto flex w-full max-w-2xl flex-col gap-8 pt-4 pb-24">
+      {readOnly ? (
+        <div className="rounded-lg border border-border bg-muted/20 px-3 py-2.5 text-sm text-text-secondary">
+          Pre-configured from the Query library. This detection is read-only — create a copy to customize.
+        </div>
+      ) : null}
       <BasicDetectionInformationSection
         name={name}
         onNameChange={onNameChange}
@@ -1271,6 +802,9 @@ function DetectionSettingsTabContent({
         onMitreTechniqueChange={onMitreTechniqueChange}
         tags={tags}
         onTagsChange={onTagsChange}
+        readOnly={readOnly}
+        sectionOpen={expandedSections[DETECTION_FORM_SECTION_IDS.basicInformation] ?? true}
+        onSectionOpenChange={(open) => onSectionOpenChange(DETECTION_FORM_SECTION_IDS.basicInformation, open)}
       />
       <DetectionScheduleSection
         frequency={frequency}
@@ -1285,6 +819,10 @@ function DetectionSettingsTabContent({
         onMinuteChange={onMinuteChange}
         period={period}
         onPeriodChange={onPeriodChange}
+        readOnly={readOnly}
+        recurrenceOverride={recurrenceOverride}
+        sectionOpen={expandedSections[DETECTION_FORM_SECTION_IDS.detectionSchedule] ?? true}
+        onSectionOpenChange={(open) => onSectionOpenChange(DETECTION_FORM_SECTION_IDS.detectionSchedule, open)}
       />
       <AlertConfigurationSection
         alertThreshold={alertThreshold}
@@ -1297,12 +835,52 @@ function DetectionSettingsTabContent({
         onExpandedChannelsChange={onExpandedChannelsChange}
         alertMessageTemplate={alertMessageTemplate}
         onAlertMessageTemplateChange={onAlertMessageTemplateChange}
+        readOnly={readOnly}
+        sectionOpen={expandedSections[DETECTION_FORM_SECTION_IDS.alertConfiguration] ?? true}
+        onSectionOpenChange={(open) => onSectionOpenChange(DETECTION_FORM_SECTION_IDS.alertConfiguration, open)}
       />
     </div>
   );
 }
 
-type SavedSnapshot = {
+function Spinner() {
+  return (
+    <svg className="animate-spin" viewBox="0 0 24 24" fill="none" aria-hidden>
+      <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" />
+      <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z" />
+    </svg>
+  );
+}
+
+export type NewDetectionPayload = {
+  /** Present when editing an existing detection; absent for new creations. */
+  id?: string;
+  name: string;
+  description: string;
+  severity: DetectionSeverity;
+  enabled: boolean;
+  recurrence: string;
+};
+
+export type DetectionEditValues = {
+  id: string;
+  name: string;
+  description: string;
+  severity: DetectionSeverity;
+  enabled: boolean;
+  recurrence?: string;
+  lastRun?: string;
+  connectorsActive?: number;
+  connectorsTotal?: number;
+};
+
+function defaultCopyDetectionName(name: string): string {
+  const trimmed = name.trim();
+  if (!trimmed) return "Untitled Detection copy";
+  return `${trimmed} copy`;
+}
+
+type DetectionFormSnapshot = {
   name: string;
   description: string;
   severity: DetectionSeverity;
@@ -1321,41 +899,169 @@ type SavedSnapshot = {
   alertThreshold: string;
   notificationChannels: NotificationChannels;
   emailRecipients: string;
-  expandedChannels: ExpandedChannels;
   alertMessageTemplate: string;
 };
 
-export function CreateDetectionSlideOver({ onClose }: { onClose: () => void }) {
-  const [activeTab, setActiveTab] = useState<CreateDetectionTab>("Detection Settings");
-  const [name, setName] = useState("");
-  const [description, setDescription] = useState("");
-  const [severity, setSeverity] = useState<DetectionSeverity>("Critical");
-  const [enableOnSave, setEnableOnSave] = useState(false);
-  const [ocsfCategory, setOcsfCategory] = useState<OcsfCategory>("");
-  const [mitreTechnique, setMitreTechnique] = useState("");
-  const [tags, setTags] = useState<string[]>([...DEFAULT_DETECTION_TAGS]);
-  const [queryLanguage, setQueryLanguage] = useState<QueryLanguage>("FSQL");
-  const [detectionQuery, setDetectionQuery] = useState(DEFAULT_DETECTION_QUERY);
-  const [scheduleFrequency, setScheduleFrequency] = useState<ScheduleFrequency>("Weekly");
-  const [scheduleDayOfWeek, setScheduleDayOfWeek] = useState<DayOfWeek>("Tue");
-  const [scheduleDayOfMonth, setScheduleDayOfMonth] = useState("1");
-  const [scheduleHour, setScheduleHour] = useState("12");
-  const [scheduleMinute, setScheduleMinute] = useState("00");
-  const [schedulePeriod, setSchedulePeriod] = useState<TimePeriod>("AM");
-  const [alertThreshold, setAlertThreshold] = useState("1");
-  const [notificationChannels, setNotificationChannels] = useState<NotificationChannels>(
-    DEFAULT_NOTIFICATION_CHANNELS,
+const LIBRARY_VIEW_PRESETS: Partial<Record<string, Partial<DetectionFormSnapshot>>> = {
+  "managed-lib-1": {
+    ocsfCategory: "network-activity",
+    mitreTechnique: "T1071.004",
+    tags: ["apt28", "dns-tunneling", "c2"],
+    detectionQuery:
+      "SELECT dns_query, src_ip, dest_ip, timestamp FROM network_events WHERE dns_entropy > 4.5 AND query_length > 50",
+    alertThreshold: "5",
+  },
+  "lib-1": {
+    ocsfCategory: "network-activity",
+    mitreTechnique: "T1071.004",
+    tags: ["apt28", "dns-tunneling", "c2"],
+    detectionQuery:
+      "SELECT dns_query, src_ip, dest_ip, timestamp FROM network_events WHERE dns_entropy > 4.5 AND query_length > 50",
+    alertThreshold: "5",
+  },
+  "managed-lib-2": {
+    ocsfCategory: "identity-access",
+    mitreTechnique: "T1558.001",
+    tags: ["kerberos", "golden-ticket", "credential-access"],
+    detectionQuery:
+      "SELECT user, service, encryption_type, timestamp FROM auth_events WHERE event_type = 'kerberos_tgt' AND encryption_type = 0x17",
+    alertThreshold: "1",
+  },
+  "lib-2": {
+    ocsfCategory: "identity-access",
+    mitreTechnique: "T1558.001",
+    tags: ["kerberos", "golden-ticket", "credential-access"],
+    detectionQuery:
+      "SELECT user, service, encryption_type, timestamp FROM auth_events WHERE event_type = 'kerberos_tgt' AND encryption_type = 0x17",
+    alertThreshold: "1",
+  },
+};
+
+function buildInitialFormSnapshot(
+  editValues?: DetectionEditValues,
+  mode?: "copy" | "view",
+): DetectionFormSnapshot {
+  const base: DetectionFormSnapshot = {
+    name:
+      mode === "copy" && editValues?.name
+        ? defaultCopyDetectionName(editValues.name)
+        : editValues?.name ?? "",
+    description: editValues?.description ?? "",
+    severity: editValues?.severity ?? "Critical",
+    enableOnSave: editValues?.enabled ?? false,
+    ocsfCategory: "",
+    mitreTechnique: "",
+    tags: [...DEFAULT_DETECTION_TAGS],
+    queryLanguage: "FSQL",
+    detectionQuery: DEFAULT_DETECTION_QUERY,
+    scheduleFrequency: "Weekly",
+    scheduleDayOfWeek: "Tue",
+    scheduleDayOfMonth: "1",
+    scheduleHour: "12",
+    scheduleMinute: "00",
+    schedulePeriod: "AM",
+    alertThreshold: "1",
+    notificationChannels: { ...DEFAULT_NOTIFICATION_CHANNELS },
+    emailRecipients: DEFAULT_EMAIL_RECIPIENTS,
+    alertMessageTemplate: DEFAULT_ALERT_MESSAGE_TEMPLATE,
+  };
+
+  if (mode === "view" && editValues?.id) {
+    const preset = LIBRARY_VIEW_PRESETS[editValues.id];
+    if (preset) return { ...base, ...preset };
+  }
+
+  return base;
+}
+
+function formSnapshotsEqual(a: DetectionFormSnapshot, b: DetectionFormSnapshot): boolean {
+  return (
+    a.name === b.name &&
+    a.description === b.description &&
+    a.severity === b.severity &&
+    a.enableOnSave === b.enableOnSave &&
+    a.ocsfCategory === b.ocsfCategory &&
+    a.mitreTechnique === b.mitreTechnique &&
+    a.tags.length === b.tags.length &&
+    a.tags.every((tag, index) => tag === b.tags[index]) &&
+    a.queryLanguage === b.queryLanguage &&
+    a.detectionQuery === b.detectionQuery &&
+    a.scheduleFrequency === b.scheduleFrequency &&
+    a.scheduleDayOfWeek === b.scheduleDayOfWeek &&
+    a.scheduleDayOfMonth === b.scheduleDayOfMonth &&
+    a.scheduleHour === b.scheduleHour &&
+    a.scheduleMinute === b.scheduleMinute &&
+    a.schedulePeriod === b.schedulePeriod &&
+    a.alertThreshold === b.alertThreshold &&
+    a.emailRecipients === b.emailRecipients &&
+    a.alertMessageTemplate === b.alertMessageTemplate &&
+    a.notificationChannels.email === b.notificationChannels.email &&
+    a.notificationChannels.slack === b.notificationChannels.slack &&
+    a.notificationChannels.microsoftTeams === b.notificationChannels.microsoftTeams &&
+    a.notificationChannels.pagerDuty === b.notificationChannels.pagerDuty
   );
-  const [emailRecipients, setEmailRecipients] = useState(DEFAULT_EMAIL_RECIPIENTS);
+}
+
+export function CreateDetectionSlideOver({
+  onClose,
+  onSave,
+  editValues,
+  mode,
+  onCopy,
+}: {
+  onClose: () => void;
+  onSave?: (payload: NewDetectionPayload) => void;
+  editValues?: DetectionEditValues;
+  mode?: "copy" | "view";
+  onCopy?: () => void;
+}) {
+  const isViewMode = mode === "view";
+  const readOnly = isViewMode;
+  const isEditing = editValues != null && !isViewMode;
+  const isEditMode = isEditing && mode !== "copy";
+  const [initialFormState] = useState(() => buildInitialFormSnapshot(editValues, mode));
+  const [activeTab, setActiveTab] = useState<CreateDetectionTab>("Detection Settings");
+  const expandAllSwitchId = useId();
+  const [expandAll, setExpandAll] = useState(true);
+  const [expandedSections, setExpandedSections] = useState<Record<string, boolean>>(() =>
+    createExpandedSectionsState(true),
+  );
+
+  const handleExpandAllChange = useCallback((checked: boolean) => {
+    setExpandAll(checked);
+    setExpandedSections(createExpandedSectionsState(checked));
+  }, []);
+
+  const handleSectionOpenChange = useCallback((sectionId: string, open: boolean) => {
+    setExpandedSections((prev) => {
+      const next = { ...prev, [sectionId]: open };
+      setExpandAll(ALL_DETECTION_FORM_SECTION_IDS.every((id) => next[id]));
+      return next;
+    });
+  }, []);
+
+  const [name, setName] = useState(initialFormState.name);
+  const [description, setDescription] = useState(initialFormState.description);
+  const [severity, setSeverity] = useState<DetectionSeverity>(initialFormState.severity);
+  const [enableOnSave, setEnableOnSave] = useState(initialFormState.enableOnSave);
+  const [ocsfCategory, setOcsfCategory] = useState<OcsfCategory>(initialFormState.ocsfCategory);
+  const [mitreTechnique, setMitreTechnique] = useState(initialFormState.mitreTechnique);
+  const [tags, setTags] = useState<string[]>(initialFormState.tags);
+  const [queryLanguage, setQueryLanguage] = useState<QueryLanguage>(initialFormState.queryLanguage);
+  const [detectionQuery, setDetectionQuery] = useState(initialFormState.detectionQuery);
+  const [scheduleFrequency, setScheduleFrequency] = useState<ScheduleFrequency>(initialFormState.scheduleFrequency);
+  const [scheduleDayOfWeek, setScheduleDayOfWeek] = useState<DayOfWeek>(initialFormState.scheduleDayOfWeek);
+  const [scheduleDayOfMonth, setScheduleDayOfMonth] = useState(initialFormState.scheduleDayOfMonth);
+  const [scheduleHour, setScheduleHour] = useState(initialFormState.scheduleHour);
+  const [scheduleMinute, setScheduleMinute] = useState(initialFormState.scheduleMinute);
+  const [schedulePeriod, setSchedulePeriod] = useState<TimePeriod>(initialFormState.schedulePeriod);
+  const [alertThreshold, setAlertThreshold] = useState(initialFormState.alertThreshold);
+  const [notificationChannels, setNotificationChannels] = useState<NotificationChannels>(
+    initialFormState.notificationChannels,
+  );
+  const [emailRecipients, setEmailRecipients] = useState(initialFormState.emailRecipients);
   const [expandedChannels, setExpandedChannels] = useState<ExpandedChannels>(DEFAULT_EXPANDED_CHANNELS);
-  const [alertMessageTemplate, setAlertMessageTemplate] = useState(DEFAULT_ALERT_MESSAGE_TEMPLATE);
-  const [hasSaved, setHasSaved] = useState(false);
-  const [savedSnapshot, setSavedSnapshot] = useState<SavedSnapshot | null>(null);
-  const [snackbarOpen, setSnackbarOpen] = useState(false);
-
-  const tagsMatchSnapshot = (current: string[], saved: string[]) =>
-    current.length === saved.length && current.every((tag, index) => tag === saved[index]);
-
+  const [alertMessageTemplate, setAlertMessageTemplate] = useState(initialFormState.alertMessageTemplate);
   const canSaveSettingsTab =
     (name.trim().length > 0 || description.trim().length > 0) &&
     scheduleHour.trim().length > 0 &&
@@ -1366,41 +1072,13 @@ export function CreateDetectionSlideOver({ onClose }: { onClose: () => void }) {
 
   const canSave =
     activeTab === "Detection Logic" ? detectionQuery.trim().length > 0 : canSaveSettingsTab;
-  const isDirtyAfterSave =
-    hasSaved &&
-    savedSnapshot !== null &&
-    (name !== savedSnapshot.name ||
-      description !== savedSnapshot.description ||
-      severity !== savedSnapshot.severity ||
-      enableOnSave !== savedSnapshot.enableOnSave ||
-      ocsfCategory !== savedSnapshot.ocsfCategory ||
-      mitreTechnique !== savedSnapshot.mitreTechnique ||
-      !tagsMatchSnapshot(tags, savedSnapshot.tags) ||
-      queryLanguage !== savedSnapshot.queryLanguage ||
-      detectionQuery !== savedSnapshot.detectionQuery ||
-      scheduleFrequency !== savedSnapshot.scheduleFrequency ||
-      scheduleDayOfWeek !== savedSnapshot.scheduleDayOfWeek ||
-      scheduleDayOfMonth !== savedSnapshot.scheduleDayOfMonth ||
-      scheduleHour !== savedSnapshot.scheduleHour ||
-      scheduleMinute !== savedSnapshot.scheduleMinute ||
-      schedulePeriod !== savedSnapshot.schedulePeriod ||
-      alertThreshold !== savedSnapshot.alertThreshold ||
-      emailRecipients !== savedSnapshot.emailRecipients ||
-      alertMessageTemplate !== savedSnapshot.alertMessageTemplate ||
-      NOTIFICATION_CHANNEL_OPTIONS.some(
-        (option) => notificationChannels[option.id] !== savedSnapshot.notificationChannels[option.id],
-      ) ||
-      NOTIFICATION_CHANNEL_OPTIONS.some(
-        (option) => expandedChannels[option.id] !== savedSnapshot.expandedChannels[option.id],
-      ));
-  const saveDisabled = !canSave || (hasSaved && !isDirtyAfterSave);
+  const isLogicTab = activeTab === "Detection Logic";
   const activeTabIndex = CREATE_DETECTION_TABS.indexOf(activeTab);
   const canGoNext = activeTabIndex < CREATE_DETECTION_TABS.length - 1;
+  const [isSaving, setIsSaving] = useState(false);
 
-  const handleSave = () => {
-    if (saveDisabled) return;
-    setHasSaved(true);
-    setSavedSnapshot({
+  const currentFormState = useMemo(
+    (): DetectionFormSnapshot => ({
       name,
       description,
       severity,
@@ -1419,18 +1097,64 @@ export function CreateDetectionSlideOver({ onClose }: { onClose: () => void }) {
       alertThreshold,
       notificationChannels,
       emailRecipients,
-      expandedChannels,
       alertMessageTemplate,
-    });
-    setSnackbarOpen(true);
-  };
+    }),
+    [
+      name,
+      description,
+      severity,
+      enableOnSave,
+      ocsfCategory,
+      mitreTechnique,
+      tags,
+      queryLanguage,
+      detectionQuery,
+      scheduleFrequency,
+      scheduleDayOfWeek,
+      scheduleDayOfMonth,
+      scheduleHour,
+      scheduleMinute,
+      schedulePeriod,
+      alertThreshold,
+      notificationChannels,
+      emailRecipients,
+      alertMessageTemplate,
+    ],
+  );
 
-  const handleTestQuery = () => {
-    if (!detectionQuery.trim()) return;
+  const isDirty = !isEditMode || !formSnapshotsEqual(currentFormState, initialFormState);
+  const showSaveButton = isEditMode ? isDirty : isLogicTab;
+  const canSaveAction = isEditMode
+    ? isDirty && (isLogicTab ? detectionQuery.trim().length > 0 : canSaveSettingsTab)
+    : canSave;
+
+  const buildPayload = useCallback((enabled: boolean): NewDetectionPayload => ({
+    ...(isEditing && mode !== "copy" ? { id: editValues!.id } : {}),
+    name: name.trim() || "Untitled Detection",
+    description,
+    severity,
+    enabled,
+    recurrence: formatScheduleRecurrencePreview({
+      frequency: scheduleFrequency,
+      dayOfWeek: scheduleDayOfWeek,
+      dayOfMonth: scheduleDayOfMonth,
+      hour: scheduleHour,
+      minute: scheduleMinute,
+      period: schedulePeriod,
+    }),
+  }), [isEditing, mode, editValues, name, description, severity, scheduleFrequency, scheduleDayOfWeek, scheduleDayOfMonth, scheduleHour, scheduleMinute, schedulePeriod]);
+
+  const handleSaveDetection = () => {
+    if (!canSaveAction || isSaving) return;
+    setIsSaving(true);
+    setTimeout(() => {
+      onSave?.(buildPayload(enableOnSave));
+      setIsSaving(false);
+    }, 1000);
   };
 
   const handleNext = () => {
-    if (!canGoNext || !hasSaved) return;
+    if (!canGoNext || !canSaveSettingsTab) return;
     setActiveTab(CREATE_DETECTION_TABS[activeTabIndex + 1]);
   };
 
@@ -1439,8 +1163,15 @@ export function CreateDetectionSlideOver({ onClose }: { onClose: () => void }) {
       <header className="flex shrink-0 items-start justify-between gap-3 border-b border-border-rule px-5 py-4">
         <div className="flex min-w-0 flex-wrap items-center gap-3">
           <SlideOverHeaderBackButton onClose={onClose} className="ring-offset-surface-modal" />
-          <h2 className="text-page-title text-text-primary">Create New Detection</h2>
-          <DraftBadge />
+          <h2 className="text-page-title text-text-primary">
+            {isViewMode
+              ? "View Detection"
+              : mode === "copy"
+                ? "Copy Detection"
+                : isEditing
+                  ? "Edit Detection"
+                  : "Create New Detection"}
+          </h2>
         </div>
         <Button
           type="button"
@@ -1453,79 +1184,152 @@ export function CreateDetectionSlideOver({ onClose }: { onClose: () => void }) {
         </Button>
       </header>
 
-      <CreateDetectionTabs active={activeTab} onChange={setActiveTab} />
+      <Tabs
+        value={activeTab}
+        onValueChange={(value) => setActiveTab(value as CreateDetectionTab)}
+        className="flex min-h-0 flex-1 flex-col"
+      >
+        <div className="flex shrink-0 items-end justify-between gap-4 px-6 pt-4 pb-0">
+          <TabsList
+            variant="line"
+            className="h-auto w-auto shrink-0 justify-start gap-6 rounded-none bg-transparent p-0 group-data-horizontal/tabs:h-auto"
+            aria-label="Create detection sections"
+          >
+            {CREATE_DETECTION_TABS.map((tab) => (
+              <TabsTrigger
+                key={tab}
+                value={tab}
+                className="h-auto flex-none rounded-none border-0 px-0 pb-3 text-sm font-semibold text-text-tertiary transition-colors hover:text-text-secondary [&::after]:hidden before:absolute before:inset-x-0 before:bottom-0 before:h-[2px] before:bg-transparent before:transition-colors data-active:!bg-transparent data-active:before:bg-interactive-active data-active:text-text-primary data-active:shadow-none"
+              >
+                {tab}
+              </TabsTrigger>
+            ))}
+          </TabsList>
+          <Field orientation="horizontal" className="mb-3 w-auto shrink-0 items-center gap-2">
+            <Switch
+              id={expandAllSwitchId}
+              checked={expandAll}
+              onCheckedChange={handleExpandAllChange}
+              aria-label="Expand all sections"
+            />
+            <FieldLabel htmlFor={expandAllSwitchId} className="mb-0 text-sm font-medium whitespace-nowrap">
+              Expand all
+            </FieldLabel>
+          </Field>
+        </div>
 
-      <div className="min-h-0 flex-1 overflow-y-auto px-6">
-        {activeTab === "Detection Settings" ? (
-          <DetectionSettingsTabContent
-            name={name}
-            onNameChange={setName}
-            description={description}
-            onDescriptionChange={setDescription}
-            severity={severity}
-            onSeverityChange={setSeverity}
-            enableOnSave={enableOnSave}
-            onEnableOnSaveChange={setEnableOnSave}
-            ocsfCategory={ocsfCategory}
-            onOcsfCategoryChange={setOcsfCategory}
-            mitreTechnique={mitreTechnique}
-            onMitreTechniqueChange={setMitreTechnique}
-            tags={tags}
-            onTagsChange={setTags}
-            frequency={scheduleFrequency}
-            onFrequencyChange={setScheduleFrequency}
-            dayOfWeek={scheduleDayOfWeek}
-            onDayOfWeekChange={setScheduleDayOfWeek}
-            dayOfMonth={scheduleDayOfMonth}
-            onDayOfMonthChange={setScheduleDayOfMonth}
-            hour={scheduleHour}
-            onHourChange={setScheduleHour}
-            minute={scheduleMinute}
-            onMinuteChange={setScheduleMinute}
-            period={schedulePeriod}
-            onPeriodChange={setSchedulePeriod}
-            alertThreshold={alertThreshold}
-            onAlertThresholdChange={setAlertThreshold}
-            notificationChannels={notificationChannels}
-            onNotificationChannelsChange={setNotificationChannels}
-            emailRecipients={emailRecipients}
-            onEmailRecipientsChange={setEmailRecipients}
-            expandedChannels={expandedChannels}
-            onExpandedChannelsChange={setExpandedChannels}
-            alertMessageTemplate={alertMessageTemplate}
-            onAlertMessageTemplateChange={setAlertMessageTemplate}
-          />
-        ) : (
-          <DetectionLogicTabContent
-            queryLanguage={queryLanguage}
-            onQueryLanguageChange={setQueryLanguage}
-            detectionQuery={detectionQuery}
-            onDetectionQueryChange={setDetectionQuery}
-            onTestQuery={handleTestQuery}
-          />
-        )}
-      </div>
+        <div className="min-h-0 flex-1 overflow-y-auto px-6">
+          <TabsContent value="Detection Settings" className="mt-0">
+            <DetectionSettingsTabContent
+              name={name}
+              onNameChange={setName}
+              description={description}
+              onDescriptionChange={setDescription}
+              severity={severity}
+              onSeverityChange={setSeverity}
+              enableOnSave={enableOnSave}
+              onEnableOnSaveChange={setEnableOnSave}
+              ocsfCategory={ocsfCategory}
+              onOcsfCategoryChange={setOcsfCategory}
+              mitreTechnique={mitreTechnique}
+              onMitreTechniqueChange={setMitreTechnique}
+              tags={tags}
+              onTagsChange={setTags}
+              frequency={scheduleFrequency}
+              onFrequencyChange={setScheduleFrequency}
+              dayOfWeek={scheduleDayOfWeek}
+              onDayOfWeekChange={setScheduleDayOfWeek}
+              dayOfMonth={scheduleDayOfMonth}
+              onDayOfMonthChange={setScheduleDayOfMonth}
+              hour={scheduleHour}
+              onHourChange={setScheduleHour}
+              minute={scheduleMinute}
+              onMinuteChange={setScheduleMinute}
+              period={schedulePeriod}
+              onPeriodChange={setSchedulePeriod}
+              alertThreshold={alertThreshold}
+              onAlertThresholdChange={setAlertThreshold}
+              notificationChannels={notificationChannels}
+              onNotificationChannelsChange={setNotificationChannels}
+              emailRecipients={emailRecipients}
+              onEmailRecipientsChange={setEmailRecipients}
+              expandedChannels={expandedChannels}
+              onExpandedChannelsChange={setExpandedChannels}
+              alertMessageTemplate={alertMessageTemplate}
+              onAlertMessageTemplateChange={setAlertMessageTemplate}
+              readOnly={readOnly}
+              recurrenceOverride={isViewMode ? editValues?.recurrence : undefined}
+              expandedSections={expandedSections}
+              onSectionOpenChange={handleSectionOpenChange}
+            />
+          </TabsContent>
+          <TabsContent value="Detection Logic" className="mt-0">
+            <DetectionLogicTabContent
+              queryLanguage={queryLanguage}
+              onQueryLanguageChange={setQueryLanguage}
+              detectionQuery={detectionQuery}
+              onDetectionQueryChange={setDetectionQuery}
+              readOnly={readOnly}
+              detectionId={isViewMode ? editValues?.id : undefined}
+              lastRun={isViewMode ? editValues?.lastRun : undefined}
+              connectorsActive={isViewMode ? editValues?.connectorsActive : undefined}
+              connectorsTotal={isViewMode ? editValues?.connectorsTotal : undefined}
+              sectionOpen={expandedSections[DETECTION_FORM_SECTION_IDS.detectionLogic] ?? true}
+              onSectionOpenChange={(open) =>
+                handleSectionOpenChange(DETECTION_FORM_SECTION_IDS.detectionLogic, open)
+              }
+            />
+          </TabsContent>
+        </div>
+      </Tabs>
 
       <div className="pointer-events-none absolute bottom-0 right-0 z-20 flex justify-end p-4">
         <div className="pointer-events-auto flex items-center gap-2 rounded-tl-lg rounded-bl-lg bg-surface-container/80 px-3 py-2.5 shadow-lg ring-1 ring-border-container backdrop-blur-sm">
-          <Button
-            type="button"
-            variant="tertiary"
-            className="text-text-secondary hover:text-text-primary"
-            onClick={onClose}
-          >
-            Cancel
-          </Button>
-          <Button type="button" variant="secondary" disabled={!canGoNext || !hasSaved} onClick={handleNext}>
-            {activeTab === "Detection Settings" ? "Next: Detection Logic" : "Next"}
-          </Button>
-          <Button type="button" variant="primary" disabled={saveDisabled} onClick={handleSave}>
-            Save as Draft
-          </Button>
+          {isViewMode ? (
+            <>
+              <Button
+                type="button"
+                variant="ghost"
+                className="text-text-secondary hover:text-text-primary"
+                onClick={onClose}
+              >
+                Close
+              </Button>
+              <Button type="button" variant="primary" onClick={onCopy}>
+                Create copy
+              </Button>
+            </>
+          ) : (
+            <>
+              <Button
+                type="button"
+                variant="ghost"
+                className="text-text-secondary hover:text-text-primary"
+                onClick={onClose}
+              >
+                Cancel
+              </Button>
+              {!isLogicTab && canGoNext && (
+                <Button type="button" variant="secondary" disabled={!canSaveSettingsTab} onClick={handleNext}>
+                  Next: Detection Logic
+                </Button>
+              )}
+              {showSaveButton && (
+                <Button
+                  type="button"
+                  variant="primary"
+                  disabled={!canSaveAction || isSaving}
+                  onClick={handleSaveDetection}
+                >
+                  {isSaving ? <Spinner /> : null}
+                  Save
+                </Button>
+              )}
+            </>
+          )}
         </div>
       </div>
 
-      <Snackbar open={snackbarOpen} message="Draft saved" onClose={() => setSnackbarOpen(false)} />
     </div>
   );
 }

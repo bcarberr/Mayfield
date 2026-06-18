@@ -1,5 +1,6 @@
 import { useMemo, useState } from "react";
-import { Icon, type SeverityShapeIconName } from "../../design-system";
+import { DATA_GRID_ABOVE_SECTION_CLASS, DATA_GRID_HEADER_ROW_CLASS, DATA_GRID_TABLE_CLASS, DATA_GRID_TABLE_SCROLL_CLASS, DATA_GRID_THEAD_CLASS } from "../ui/dataGridTableStyles";
+import { Checkbox, Icon, type SeverityShapeIconName } from "../../design-system";
 import type { TimeframeRange } from "../../context/TimeframeContext";
 import { Button } from "../ui/Button";
 import { ColumnHeaderMenu } from "../ui/ColumnHeaderMenu";
@@ -8,10 +9,14 @@ import { FilterColumnPanel, type FilterColumnPanelTool } from "../ui/FilterColum
 import { Input } from "../ui/Input";
 import { DataGridExportButton } from "../ui/DataGridExportButton";
 import { SeverityTableIcon } from "../ui/SeverityTableIcon";
-import { compareStrings, useColumnSort } from "../ui/useColumnSort";
+import { compareStrings } from "../ui/useColumnSort";
+import { useSortedDataGridPagination } from "../ui/useSortedDataGridPagination";
+import { DataGridSection } from "../ui/DataGridSection";
+import { DataGridPaginationFooter } from "../ui/DataGridTableLayout";
 import { useResizableColumns } from "../ui/useResizableColumns";
 import { TruncatedText } from "../ui/TruncatedText";
-import { Checkbox } from "../uiCheckbox";
+import { demoTableConnector } from "../connectors/demoTableConnectors";
+import { ConnectorTableCell } from "../ui/ConnectorTableCell";
 import {
   buildDailyEventRows,
   ChartZoomHint,
@@ -22,7 +27,7 @@ import {
   useFederatedAnalyticsTimeframeZoom,
 } from "./federatedAnalyticsZoom";
 import { CHART_CATEGORY_FILL, HorizontalBarPanel } from "./horizontalBarPanel";
-import { cx, DatavisGridlineRule, InsightCard } from "./datavisCard";
+import { cx, InsightCard } from "./datavisCard";
 import { TimeSeriesBarChart } from "./timeSeriesBarChart";
 import { buildDailyBuckets, type HourBucket } from "./timeframeChartUtils";
 
@@ -78,12 +83,6 @@ type DiscoveryRow = {
   patchStatus: PatchStatus;
   connector: string;
 };
-
-function connectorSwatch(connector: string) {
-  if (connector.startsWith("BCs")) return "bg-feedback-info";
-  if (connector.includes("Athena")) return "bg-interactive-active";
-  return "bg-feedback-negative";
-}
 
 const WEEKDAY_SHORT = ["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"] as const;
 
@@ -169,7 +168,7 @@ const DISCOVERY_ROWS: DiscoveryRow[] = [
     owner: "unassigned",
     platform: "Linux",
     patchStatus: "Missing critical",
-    connector: "BCs1",
+    connector: demoTableConnector(0),
   },
   {
     id: "2",
@@ -182,7 +181,7 @@ const DISCOVERY_ROWS: DiscoveryRow[] = [
     owner: "platform-team",
     platform: "Linux",
     patchStatus: "Missing non-crit",
-    connector: "BC-CS-Athena",
+    connector: demoTableConnector(1),
   },
   {
     id: "3",
@@ -195,7 +194,7 @@ const DISCOVERY_ROWS: DiscoveryRow[] = [
     owner: "j.alvarez",
     platform: "Cloud / SaaS",
     patchStatus: "Unknown",
-    connector: "BC-CS",
+    connector: demoTableConnector(2),
   },
   {
     id: "4",
@@ -208,7 +207,7 @@ const DISCOVERY_ROWS: DiscoveryRow[] = [
     owner: "it-ops",
     platform: "Cloud / SaaS",
     patchStatus: "Up to date",
-    connector: "BCs1",
+    connector: demoTableConnector(3),
   },
   {
     id: "5",
@@ -221,7 +220,7 @@ const DISCOVERY_ROWS: DiscoveryRow[] = [
     owner: "unassigned",
     platform: "Windows",
     patchStatus: "Missing non-crit",
-    connector: "BC-CS-Athena",
+    connector: demoTableConnector(4),
   },
   {
     id: "6",
@@ -234,7 +233,7 @@ const DISCOVERY_ROWS: DiscoveryRow[] = [
     owner: "design-team",
     platform: "macOS",
     patchStatus: "Up to date",
-    connector: "BC-CS",
+    connector: demoTableConnector(5),
   },
   {
     id: "7",
@@ -247,7 +246,7 @@ const DISCOVERY_ROWS: DiscoveryRow[] = [
     owner: "platform-team",
     platform: "Cloud / SaaS",
     patchStatus: "Up to date",
-    connector: "BCs1",
+    connector: demoTableConnector(6),
   },
   {
     id: "8",
@@ -260,7 +259,7 @@ const DISCOVERY_ROWS: DiscoveryRow[] = [
     owner: "it-ops",
     platform: "Windows",
     patchStatus: "Up to date",
-    connector: "BC-CS-Athena",
+    connector: demoTableConnector(7),
   },
   {
     id: "9",
@@ -273,7 +272,7 @@ const DISCOVERY_ROWS: DiscoveryRow[] = [
     owner: "unassigned",
     platform: "Unknown",
     patchStatus: "Unknown",
-    connector: "BC-CS-Athena",
+    connector: demoTableConnector(8),
   },
   {
     id: "10",
@@ -286,7 +285,7 @@ const DISCOVERY_ROWS: DiscoveryRow[] = [
     owner: "security-team",
     platform: "Windows",
     patchStatus: "Missing critical",
-    connector: "BC-CS",
+    connector: demoTableConnector(9),
   },
 ];
 
@@ -349,7 +348,24 @@ const SELECT_COL_WIDTH = 40;
 const COL_DEFAULTS: readonly number[] = [SELECT_COL_WIDTH, 108, 280, 96, 88, 168, 120, 112, 120];
 const COL_MINS: readonly number[] = [SELECT_COL_WIDTH, 72, 120, 72, 56, 120, 80, 80, 80];
 
-function DiscoveryEventsTable({ rows }: { rows: DiscoveryRow[] }) {
+export function useDiscoveryEventsTableGrid(rows: readonly Parameters<typeof DiscoveryEventsTable>[0]["displayRows"][number][]) {
+  const sortComparators = useMemo(
+    (): Record<DiscoverySortColumn, (a: DiscoveryRow, b: DiscoveryRow) => number> => ({
+      severity: (a, b) => SEVERITY_ORDER[a.severity] - SEVERITY_ORDER[b.severity],
+      title: (a, b) => compareStrings(a.title, b.title),
+      time: (a, b) => compareStrings(a.time, b.time),
+      activity: (a, b) => compareStrings(a.activity, b.activity),
+      eventClass: (a, b) => compareStrings(a.eventClass, b.eventClass),
+      asset: (a, b) => compareStrings(a.asset, b.asset),
+      owner: (a, b) => compareStrings(a.owner, b.owner),
+      connector: (a, b) => compareStrings(a.connector, b.connector),
+    }),
+    [],
+  );
+  return useSortedDataGridPagination(rows, sortComparators);
+}
+
+function DiscoveryEventsTable({ displayRows, getSortProps }: { displayRows: DiscoveryRow[]; getSortProps: ReturnType<typeof useDiscoveryEventsTableGrid>["getSortProps"] }) {
   const [selected, setSelected] = useState<Set<string>>(() => new Set());
   const {
     containerRef,
@@ -366,7 +382,7 @@ function DiscoveryEventsTable({ rows }: { rows: DiscoveryRow[] }) {
     colMins: COL_MINS,
   });
 
-  const allIds = useMemo(() => rows.map((r) => r.id), [rows]);
+  const allIds = useMemo(() => displayRows.map((r) => r.id), [displayRows]);
   const total = allIds.length;
   const selectedOnPage = useMemo(() => allIds.filter((id) => selected.has(id)).length, [allIds, selected]);
   const allSelected = total > 0 && selectedOnPage === total;
@@ -385,26 +401,12 @@ function DiscoveryEventsTable({ rows }: { rows: DiscoveryRow[] }) {
     });
   };
 
-  const sortComparators = useMemo(
-    (): Record<DiscoverySortColumn, (a: DiscoveryRow, b: DiscoveryRow) => number> => ({
-      severity: (a, b) => SEVERITY_ORDER[a.severity] - SEVERITY_ORDER[b.severity],
-      title: (a, b) => compareStrings(a.title, b.title),
-      time: (a, b) => compareStrings(a.time, b.time),
-      activity: (a, b) => compareStrings(a.activity, b.activity),
-      eventClass: (a, b) => compareStrings(a.eventClass, b.eventClass),
-      asset: (a, b) => compareStrings(a.asset, b.asset),
-      owner: (a, b) => compareStrings(a.owner, b.owner),
-      connector: (a, b) => compareStrings(a.connector, b.connector),
-    }),
-    [],
-  );
-  const { sortedRows, getSortProps } = useColumnSort(sortComparators);
-  const displayRows = sortedRows(rows);
+
 
   return (
-    <div ref={containerRef} className={cx("min-h-0 w-full min-w-0", isResizing && "select-none")}>
+    <div ref={containerRef} className={cx(DATA_GRID_TABLE_SCROLL_CLASS, isResizing && "select-none")}>
       <table
-        className="table-fixed border-collapse text-left text-sm"
+        className={DATA_GRID_TABLE_CLASS}
         style={{
           width: tableFillsContainer ? "100%" : baseTotal,
           minWidth: Math.max(minTableWidth, baseTotal),
@@ -416,8 +418,8 @@ function DiscoveryEventsTable({ rows }: { rows: DiscoveryRow[] }) {
             <col key={i} style={{ width: w }} />
           ))}
         </colgroup>
-        <thead>
-          <tr className="h-10 border-b border-datavis-gridlines bg-surface-table-row-header">
+        <thead className={DATA_GRID_THEAD_CLASS}>
+          <tr className={DATA_GRID_HEADER_ROW_CLASS}>
             <th scope="col" style={colStyle(0)} className="relative h-10 border-r border-datavis-gridlines px-0 py-0 align-middle">
               <div className="flex items-center justify-center">
                 <Checkbox
@@ -547,15 +549,7 @@ function DiscoveryEventsTable({ rows }: { rows: DiscoveryRow[] }) {
                 <TruncatedText className="text-sm text-text-secondary">{row.owner}</TruncatedText>
               </td>
               <td style={colStyle(8)} className="h-10 min-w-0 px-2 py-0 align-middle">
-                <span className="inline-flex min-w-0 items-center gap-2">
-                  <span
-                    className={cx("size-2.5 shrink-0 rounded-sm", connectorSwatch(row.connector))}
-                    aria-hidden
-                  />
-                  <TruncatedText className="text-sm text-text-secondary" wrapperClassName="min-w-0 flex-1">
-                    {row.connector}
-                  </TruncatedText>
-                </span>
+                <ConnectorTableCell name={row.connector} />
               </td>
             </tr>
           ))}
@@ -633,7 +627,7 @@ export function DiscoveryContent() {
     [patchSegments],
   );
 
-  const filteredRows = useMemo(
+    const filteredRows = useMemo(
     () =>
       timeframeScopedRows.filter((row) => {
         if (platformFilter && row.platform !== platformFilter) return false;
@@ -644,6 +638,7 @@ export function DiscoveryContent() {
       }),
     [timeframeScopedRows, platformFilter, severityFilter, patchFilter, searchQuery],
   );
+  const tableGrid = useDiscoveryEventsTableGrid(filteredRows);
 
   const hasActiveFilters =
     platformFilter != null ||
@@ -670,6 +665,7 @@ export function DiscoveryContent() {
 
   return (
     <div className="flex shrink-0 flex-col gap-4 p-4 sm:p-5">
+      <div className={DATA_GRID_ABOVE_SECTION_CLASS}>
       <InsightCard title="New Assets Discovered Over Time">
         <ChartZoomHint unit="Days" isChartZoomed={isChartZoomed} onReset={handleChartZoomReset} />
         <TimeSeriesBarChart
@@ -723,59 +719,60 @@ export function DiscoveryContent() {
           />
         </InsightCard>
       </div>
+      </div>
 
-      <section className="mx-0 mb-0 flex min-h-0 min-w-0 flex-1 flex-col overflow-hidden rounded-[4px] border border-border-container bg-datavis-card-bg shadow-[0_1px_5px_rgba(0,0,0,0.2)]">
-        <div className="shrink-0 bg-datavis-card-bg pb-3 pl-4 pr-6 pt-3 sm:pl-5">
-          <h2 className="text-base-semibold text-text-primary">Discovery Events</h2>
-          <div className="mt-2 flex flex-wrap items-center gap-3">
-            <p className="shrink-0 text-base-small text-text-secondary">
-              {filteredRows.length} of {timeframeScopedRows.length} Results
-              {platformFilter ? ` · ${platformFilter}` : ""}
-              {severityFilter ? ` · ${severityFilter}` : ""}
-              {patchFilter ? ` · ${patchFilter}` : ""}
-              {searchQuery.trim() ? ` · “${searchQuery.trim()}”` : ""}
-            </p>
-            <div className="w-[300px] shrink-0">
-              <Input
-                variant="search"
-                placeholder="Search"
-                value={searchQuery}
-                onChange={(event) => setSearchQuery(event.target.value)}
-                className="!bg-datavis-card-bg"
-                aria-label="Search discovery events"
-              />
+      <DataGridSection
+        header={
+          <>
+            <h2 className="text-base-semibold text-text-primary">Discovery Events</h2>
+            <div className="mt-2 flex flex-wrap items-center gap-3">
+              <p className="shrink-0 text-base-small text-text-secondary">
+                {filteredRows.length} of {timeframeScopedRows.length} Results
+                {platformFilter ? ` · ${platformFilter}` : ""}
+                {severityFilter ? ` · ${severityFilter}` : ""}
+                {patchFilter ? ` · ${patchFilter}` : ""}
+                {searchQuery.trim() ? ` · “${searchQuery.trim()}”` : ""}
+              </p>
+              <div className="w-[300px] shrink-0">
+                <Input
+                  variant="search"
+                  placeholder="Search"
+                  value={searchQuery}
+                  onChange={(event) => setSearchQuery(event.target.value)}
+                  className="!bg-datavis-card-bg"
+                  aria-label="Search discovery events"
+                />
+              </div>
+              {hasActiveFilters ? (
+                <Button
+                  type="button"
+                  variant="ghost"
+                  className="h-8 shrink-0 gap-1.5 px-2 text-base-small text-text-tertiary hover:text-text-primary [&_svg]:!h-2 [&_svg]:!w-3"
+                  onClick={() => {
+                    setPlatformFilter(null);
+                    setSeverityFilter(null);
+                    setPatchFilter(null);
+                    setSearchQuery("");
+                  }}
+                >
+                  <Icon name="action-filter-list" size={12} aria-hidden />
+                  Clear all filters
+                </Button>
+              ) : null}
+              <DataGridExportButton />
             </div>
-            {hasActiveFilters ? (
-              <Button
-                type="button"
-                variant="ghost"
-                className="h-8 shrink-0 gap-1.5 px-2 text-base-small text-text-tertiary hover:text-text-primary [&_svg]:!h-2 [&_svg]:!w-3"
-                onClick={() => {
-                  setPlatformFilter(null);
-                  setSeverityFilter(null);
-                  setPatchFilter(null);
-                  setSearchQuery("");
-                }}
-              >
-                <Icon name="action-filter-list" size={12} aria-hidden />
-                Clear all filters
-              </Button>
-            ) : null}
-            <DataGridExportButton />
-          </div>
-        </div>
-        <DatavisGridlineRule inset={false} />
-        <div className="flex min-h-0 flex-1 overflow-auto bg-datavis-card-bg">
+          </>
+        }
+        filterPanel={
           <FilterColumnPanel
             active={tableTool}
             onFilterClick={() => setTableTool(tableTool === "filter" ? null : "filter")}
             onColumnsClick={() => setTableTool(tableTool === "columns" ? null : "columns")}
           />
-          <div className="min-h-0 min-w-0 flex-1 pb-3">
-            <DiscoveryEventsTable rows={filteredRows} />
-          </div>
-        </div>
-      </section>
+        }
+        table={<DiscoveryEventsTable displayRows={tableGrid.displayRows} getSortProps={tableGrid.getSortProps} />}
+        footer={<DataGridPaginationFooter grid={tableGrid} />}
+      />
     </div>
   );
 }

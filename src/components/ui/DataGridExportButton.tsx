@@ -12,7 +12,7 @@ export function DataGridExportButton({
   className?: string;
 }) {
   return (
-    <Button type="button" variant="secondary" className={cx("ml-auto shrink-0 gap-1.5 px-3", className)}>
+    <Button type="button" variant="secondary" className={cx("ml-auto shrink-0 gap-1.5", className)}>
       <Icon name="action-file-download" size={18} aria-hidden />
       {label}
     </Button>

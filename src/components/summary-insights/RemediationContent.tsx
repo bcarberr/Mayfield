@@ -1,5 +1,6 @@
 import { useMemo, useState } from "react";
-import { Icon, type SeverityShapeIconName } from "../../design-system";
+import { DATA_GRID_ABOVE_SECTION_CLASS, DATA_GRID_HEADER_ROW_CLASS, DATA_GRID_TABLE_CLASS, DATA_GRID_TABLE_SCROLL_CLASS, DATA_GRID_THEAD_CLASS } from "../ui/dataGridTableStyles";
+import { Checkbox, Icon, type SeverityShapeIconName } from "../../design-system";
 import { Button } from "../ui/Button";
 import { ColumnHeaderMenu } from "../ui/ColumnHeaderMenu";
 import { DonutChartPanel } from "../ui/DonutChartPanel";
@@ -7,11 +8,15 @@ import { FilterColumnPanel, type FilterColumnPanelTool } from "../ui/FilterColum
 import { Input } from "../ui/Input";
 import { DataGridExportButton } from "../ui/DataGridExportButton";
 import { SeverityTableIcon } from "../ui/SeverityTableIcon";
-import { compareStrings, useColumnSort } from "../ui/useColumnSort";
+import { compareStrings } from "../ui/useColumnSort";
+import { useSortedDataGridPagination } from "../ui/useSortedDataGridPagination";
+import { DataGridSection } from "../ui/DataGridSection";
+import { DataGridPaginationFooter } from "../ui/DataGridTableLayout";
 import { useResizableColumns } from "../ui/useResizableColumns";
 import { TruncatedText } from "../ui/TruncatedText";
-import { Checkbox } from "../uiCheckbox";
-import { cx, DatavisGridlineRule, InsightCard } from "./datavisCard";
+import { demoTableConnector } from "../connectors/demoTableConnectors";
+import { ConnectorTableCell } from "../ui/ConnectorTableCell";
+import { cx, InsightCard } from "./datavisCard";
 import {
   buildHourlyEventRows,
   ChartZoomHint,
@@ -28,6 +33,7 @@ import {
   buildHourlyBuckets,
   findSpikeBucketIndex,
   formatBucketTimeLabel,
+  shouldIncludeDateInBucketLabels,
   hourlySeverityValues,
 } from "./timeframeChartUtils";
 
@@ -115,7 +121,7 @@ const REMEDIATION_ROW_TEMPLATES: RemediationRow[] = [
     activityClass: "Network Remediation",
     entity: "fin-ws-014",
     status: "Failed",
-    connector: "CrowdStrike",
+    connector: demoTableConnector(0),
   },
   {
     id: "2",
@@ -127,7 +133,7 @@ const REMEDIATION_ROW_TEMPLATES: RemediationRow[] = [
     activityClass: "File Remediation",
     entity: "C:\\Users\\Public\\update.exe",
     status: "Succeeded",
-    connector: "Defender",
+    connector: demoTableConnector(1),
   },
   {
     id: "3",
@@ -139,7 +145,7 @@ const REMEDIATION_ROW_TEMPLATES: RemediationRow[] = [
     activityClass: "Process Remediation",
     entity: "powershell.exe (PID 8842)",
     status: "Succeeded",
-    connector: "CrowdStrike",
+    connector: demoTableConnector(2),
   },
   {
     id: "4",
@@ -151,7 +157,7 @@ const REMEDIATION_ROW_TEMPLATES: RemediationRow[] = [
     activityClass: "Network Remediation",
     entity: "203.0.113.44:443",
     status: "Pending",
-    connector: "Panorama",
+    connector: demoTableConnector(3),
   },
   {
     id: "5",
@@ -163,7 +169,7 @@ const REMEDIATION_ROW_TEMPLATES: RemediationRow[] = [
     activityClass: "Remediation Activity",
     entity: "INC-2024-8841",
     status: "Succeeded",
-    connector: "Intune",
+    connector: demoTableConnector(4),
   },
   {
     id: "6",
@@ -175,7 +181,7 @@ const REMEDIATION_ROW_TEMPLATES: RemediationRow[] = [
     activityClass: "File Remediation",
     entity: "\\\\file-stg\\quarantine\\drop.zip",
     status: "Succeeded",
-    connector: "Defender",
+    connector: demoTableConnector(5),
   },
   {
     id: "7",
@@ -187,7 +193,7 @@ const REMEDIATION_ROW_TEMPLATES: RemediationRow[] = [
     activityClass: "Network Remediation",
     entity: "ops-jump-03",
     status: "Failed",
-    connector: "Panorama",
+    connector: demoTableConnector(6),
   },
   {
     id: "8",
@@ -199,7 +205,7 @@ const REMEDIATION_ROW_TEMPLATES: RemediationRow[] = [
     activityClass: "Process Remediation",
     entity: "svc-host.exe",
     status: "Pending",
-    connector: "CrowdStrike",
+    connector: demoTableConnector(7),
   },
   {
     id: "9",
@@ -211,7 +217,7 @@ const REMEDIATION_ROW_TEMPLATES: RemediationRow[] = [
     activityClass: "File Remediation",
     entity: "sha256:9f2c…a11b",
     status: "Succeeded",
-    connector: "Panorama",
+    connector: demoTableConnector(8),
   },
   {
     id: "10",
@@ -223,16 +229,9 @@ const REMEDIATION_ROW_TEMPLATES: RemediationRow[] = [
     activityClass: "Remediation Activity",
     entity: "hr-laptop-22",
     status: "Succeeded",
-    connector: "Intune",
+    connector: demoTableConnector(9),
   },
 ];
-
-function connectorSwatch(connector: string) {
-  if (connector === "CrowdStrike") return "bg-feedback-negative";
-  if (connector === "Defender") return "bg-interactive-active";
-  if (connector === "Panorama") return "bg-datavis-data-peanut-orange";
-  return "bg-datavis-data-pop-teal-20";
-}
 
 function statusClassName(status: RemediationStatus): string {
   if (status === "Succeeded") return "text-feedback-positive";
@@ -291,7 +290,24 @@ const SELECT_COL_WIDTH = 40;
 const COL_DEFAULTS: readonly number[] = [SELECT_COL_WIDTH, 108, 280, 96, 96, 168, 140, 96, 120];
 const COL_MINS: readonly number[] = [SELECT_COL_WIDTH, 72, 120, 72, 56, 96, 80, 72, 80];
 
-function RemediationEventsTable({ rows }: { rows: RemediationRow[] }) {
+export function useRemediationEventsTableGrid(rows: readonly Parameters<typeof RemediationEventsTable>[0]["displayRows"][number][]) {
+  const sortComparators = useMemo(
+    (): Record<RemediationSortColumn, (a: RemediationRow, b: RemediationRow) => number> => ({
+      severity: (a, b) => SEVERITY_ORDER[a.severity] - SEVERITY_ORDER[b.severity],
+      title: (a, b) => compareStrings(a.title, b.title),
+      time: (a, b) => compareStrings(a.time, b.time),
+      activity: (a, b) => compareStrings(a.activity, b.activity),
+      eventClass: (a, b) => compareStrings(a.eventClass, b.eventClass),
+      entity: (a, b) => compareStrings(a.entity, b.entity),
+      status: (a, b) => compareStrings(a.status, b.status),
+      connector: (a, b) => compareStrings(a.connector, b.connector),
+    }),
+    [],
+  );
+  return useSortedDataGridPagination(rows, sortComparators);
+}
+
+function RemediationEventsTable({ displayRows, getSortProps }: { displayRows: RemediationRow[]; getSortProps: ReturnType<typeof useRemediationEventsTableGrid>["getSortProps"] }) {
   const [selected, setSelected] = useState<Set<string>>(() => new Set());
   const {
     containerRef,
@@ -308,7 +324,7 @@ function RemediationEventsTable({ rows }: { rows: RemediationRow[] }) {
     colMins: COL_MINS,
   });
 
-  const allIds = useMemo(() => rows.map((r) => r.id), [rows]);
+  const allIds = useMemo(() => displayRows.map((r) => r.id), [displayRows]);
   const total = allIds.length;
   const selectedOnPage = useMemo(() => allIds.filter((id) => selected.has(id)).length, [allIds, selected]);
   const allSelected = total > 0 && selectedOnPage === total;
@@ -327,26 +343,12 @@ function RemediationEventsTable({ rows }: { rows: RemediationRow[] }) {
     });
   };
 
-  const sortComparators = useMemo(
-    (): Record<RemediationSortColumn, (a: RemediationRow, b: RemediationRow) => number> => ({
-      severity: (a, b) => SEVERITY_ORDER[a.severity] - SEVERITY_ORDER[b.severity],
-      title: (a, b) => compareStrings(a.title, b.title),
-      time: (a, b) => compareStrings(a.time, b.time),
-      activity: (a, b) => compareStrings(a.activity, b.activity),
-      eventClass: (a, b) => compareStrings(a.eventClass, b.eventClass),
-      entity: (a, b) => compareStrings(a.entity, b.entity),
-      status: (a, b) => compareStrings(a.status, b.status),
-      connector: (a, b) => compareStrings(a.connector, b.connector),
-    }),
-    [],
-  );
-  const { sortedRows, getSortProps } = useColumnSort(sortComparators);
-  const displayRows = sortedRows(rows);
+
 
   return (
-    <div ref={containerRef} className={cx("min-h-0 w-full min-w-0", isResizing && "select-none")}>
+    <div ref={containerRef} className={cx(DATA_GRID_TABLE_SCROLL_CLASS, isResizing && "select-none")}>
       <table
-        className="table-fixed border-collapse text-left text-sm"
+        className={DATA_GRID_TABLE_CLASS}
         style={{
           width: tableFillsContainer ? "100%" : baseTotal,
           minWidth: Math.max(minTableWidth, baseTotal),
@@ -358,8 +360,8 @@ function RemediationEventsTable({ rows }: { rows: RemediationRow[] }) {
             <col key={i} style={{ width: w }} />
           ))}
         </colgroup>
-        <thead>
-          <tr className="h-10 border-b border-datavis-gridlines bg-surface-table-row-header">
+        <thead className={DATA_GRID_THEAD_CLASS}>
+          <tr className={DATA_GRID_HEADER_ROW_CLASS}>
             <th scope="col" style={colStyle(0)} className="relative h-10 border-r border-datavis-gridlines px-0 py-0 align-middle">
               <div className="flex items-center justify-center">
                 <Checkbox
@@ -491,15 +493,7 @@ function RemediationEventsTable({ rows }: { rows: RemediationRow[] }) {
                 </TruncatedText>
               </td>
               <td style={colStyle(8)} className="h-10 min-w-0 px-2 py-0 align-middle">
-                <span className="inline-flex min-w-0 items-center gap-2">
-                  <span
-                    className={cx("size-2.5 shrink-0 rounded-sm", connectorSwatch(row.connector))}
-                    aria-hidden
-                  />
-                  <TruncatedText className="text-sm text-text-secondary" wrapperClassName="min-w-0 flex-1">
-                    {row.connector}
-                  </TruncatedText>
-                </span>
+                <ConnectorTableCell name={row.connector} />
               </td>
             </tr>
           ))}
@@ -569,7 +563,7 @@ export function RemediationContent() {
     [timeframeScopedRows],
   );
 
-  const filteredRows = useMemo(
+    const filteredRows = useMemo(
     () =>
       timeframeScopedRows.filter((row) => {
         if (activityClassFilter && row.activityClass !== activityClassFilter) return false;
@@ -580,6 +574,7 @@ export function RemediationContent() {
       }),
     [timeframeScopedRows, activityClassFilter, severityFilter, statusFilter, searchQuery],
   );
+  const tableGrid = useRemediationEventsTableGrid(filteredRows);
 
   const hasActiveFilters =
     activityClassFilter != null ||
@@ -610,7 +605,7 @@ export function RemediationContent() {
   const eventsPerHourChart = useMemo(() => {
     const buckets = buildHourlyBuckets(timeframe);
     const spikeIndex = findSpikeBucketIndex(buckets, timeframe.to, REMEDIATION_SPIKE_HOUR);
-    const includeDate = timeframe.to.getTime() - timeframe.from.getTime() > 36 * 3_600_000;
+    const includeDate = shouldIncludeDateInBucketLabels(timeframe);
     const xLabels = buckets.map((bucket) => formatBucketTimeLabel(bucket.start, includeDate));
     const { indices: xTickIndices, labels: xTickLabels } = buildHourlyAxisTicks(buckets, timeframe);
 
@@ -648,6 +643,7 @@ export function RemediationContent() {
 
   return (
     <div className="flex shrink-0 flex-col gap-4 p-4 sm:p-5">
+      <div className={DATA_GRID_ABOVE_SECTION_CLASS}>
       <InsightCard title="Remediation Events Per Hour By Severity">
         <ChartZoomHint unit="Hours" isChartZoomed={isChartZoomed} onReset={handleChartZoomReset} />
         <TimeSeriesAreaChart
@@ -655,6 +651,7 @@ export function RemediationContent() {
           xLabels={eventsPerHourChart.xLabels}
           xTickIndices={eventsPerHourChart.xTickIndices}
           xTickLabels={eventsPerHourChart.xTickLabels}
+          bucketStarts={eventsPerHourChart.buckets.map((bucket) => bucket.start)}
           spikeHighlight={eventsPerHourChart.spikeHighlight}
           ariaLabel="Remediation events per hour by severity"
           selectedSeriesId={severityFilter && isRemediationSeverity(severityFilter) ? severityFilter : null}
@@ -695,59 +692,60 @@ export function RemediationContent() {
           />
         </InsightCard>
       </div>
+      </div>
 
-      <section className="mx-0 mb-0 flex min-h-0 min-w-0 flex-1 flex-col overflow-hidden rounded-[4px] border border-border-container bg-datavis-card-bg shadow-[0_1px_5px_rgba(0,0,0,0.2)]">
-        <div className="shrink-0 bg-datavis-card-bg pb-3 pl-4 pr-6 pt-3 sm:pl-5">
-          <h2 className="text-base-semibold text-text-primary">Remediation Activity Events</h2>
-          <div className="mt-2 flex flex-wrap items-center gap-3">
-            <p className="shrink-0 text-base-small text-text-secondary">
-              {filteredRows.length} of {timeframeScopedRows.length} Results
-              {activityClassFilter ? ` · ${activityClassFilter}` : ""}
-              {severityFilter ? ` · ${severityFilter}` : ""}
-              {statusFilter ? ` · ${statusFilter}` : ""}
-              {searchQuery.trim() ? ` · “${searchQuery.trim()}”` : ""}
-            </p>
-            <div className="w-[300px] shrink-0">
-              <Input
-                variant="search"
-                placeholder="Search"
-                value={searchQuery}
-                onChange={(event) => setSearchQuery(event.target.value)}
-                className="!bg-datavis-card-bg"
-                aria-label="Search remediation activity events"
-              />
+      <DataGridSection
+        header={
+          <>
+            <h2 className="text-base-semibold text-text-primary">Remediation Activity Events</h2>
+            <div className="mt-2 flex flex-wrap items-center gap-3">
+              <p className="shrink-0 text-base-small text-text-secondary">
+                {filteredRows.length} of {timeframeScopedRows.length} Results
+                {activityClassFilter ? ` · ${activityClassFilter}` : ""}
+                {severityFilter ? ` · ${severityFilter}` : ""}
+                {statusFilter ? ` · ${statusFilter}` : ""}
+                {searchQuery.trim() ? ` · “${searchQuery.trim()}”` : ""}
+              </p>
+              <div className="w-[300px] shrink-0">
+                <Input
+                  variant="search"
+                  placeholder="Search"
+                  value={searchQuery}
+                  onChange={(event) => setSearchQuery(event.target.value)}
+                  className="!bg-datavis-card-bg"
+                  aria-label="Search remediation activity events"
+                />
+              </div>
+              {hasActiveFilters ? (
+                <Button
+                  type="button"
+                  variant="ghost"
+                  className="h-8 shrink-0 gap-1.5 px-2 text-base-small text-text-tertiary hover:text-text-primary [&_svg]:!h-2 [&_svg]:!w-3"
+                  onClick={() => {
+                    setActivityClassFilter(null);
+                    setSeverityFilter(null);
+                    setStatusFilter(null);
+                    setSearchQuery("");
+                  }}
+                >
+                  <Icon name="action-filter-list" size={12} aria-hidden />
+                  Clear all filters
+                </Button>
+              ) : null}
+              <DataGridExportButton />
             </div>
-            {hasActiveFilters ? (
-              <Button
-                type="button"
-                variant="ghost"
-                className="h-8 shrink-0 gap-1.5 px-2 text-base-small text-text-tertiary hover:text-text-primary [&_svg]:!h-2 [&_svg]:!w-3"
-                onClick={() => {
-                  setActivityClassFilter(null);
-                  setSeverityFilter(null);
-                  setStatusFilter(null);
-                  setSearchQuery("");
-                }}
-              >
-                <Icon name="action-filter-list" size={12} aria-hidden />
-                Clear all filters
-              </Button>
-            ) : null}
-            <DataGridExportButton />
-          </div>
-        </div>
-        <DatavisGridlineRule inset={false} />
-        <div className="flex min-h-0 flex-1 overflow-auto bg-datavis-card-bg">
+          </>
+        }
+        filterPanel={
           <FilterColumnPanel
             active={tableTool}
             onFilterClick={() => setTableTool(tableTool === "filter" ? null : "filter")}
             onColumnsClick={() => setTableTool(tableTool === "columns" ? null : "columns")}
           />
-          <div className="min-h-0 min-w-0 flex-1 pb-3">
-            <RemediationEventsTable rows={filteredRows} />
-          </div>
-        </div>
-      </section>
+        }
+        table={<RemediationEventsTable displayRows={tableGrid.displayRows} getSortProps={tableGrid.getSortProps} />}
+        footer={<DataGridPaginationFooter grid={tableGrid} />}
+      />
     </div>
   );
 }

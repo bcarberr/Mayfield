@@ -2,6 +2,7 @@ import { lazy, Suspense, useCallback } from "react";
 import { matchPath, Route, Routes, useLocation, useNavigate } from "react-router-dom";
 import { TimeframeProvider } from "../context/TimeframeContext";
 import { CopilotProvider, useCopilot } from "../context/CopilotContext";
+import { SearchProvider } from "../context/SearchContext";
 import { SearchCopilotSidePanel } from "../components/SearchCopilotPanel";
 import { DEFAULT_ROUTE, ROUTES, type ConnectorsLocationState } from "./routes";
 import { SHOW_AI_AGENTS_PAGE } from "./navRailConfig";
@@ -37,7 +38,7 @@ function RouteFallback() {
 }
 
 function AppShell() {
-  const { open, setOpen, setPendingFsqlQuery } = useCopilot();
+  const { open, setOpen, setPendingFsqlSearch } = useCopilot();
   const location = useLocation();
   const navigate = useNavigate();
   const navState = location.state as ConnectorsLocationState | null;
@@ -63,10 +64,10 @@ function AppShell() {
 
   const handleSendToFsqlSearch = useCallback(
     (query: string) => {
-      setPendingFsqlQuery(query);
+      setPendingFsqlSearch({ query });
       navigate(ROUTES.search);
     },
-    [setPendingFsqlQuery, navigate],
+    [setPendingFsqlSearch, navigate],
   );
   return (
     <div className="flex h-full min-h-screen">
@@ -106,7 +107,9 @@ export function App() {
   return (
     <TimeframeProvider>
       <CopilotProvider>
-        <AppShell />
+        <SearchProvider>
+          <AppShell />
+        </SearchProvider>
       </CopilotProvider>
     </TimeframeProvider>
   );

@@ -1,4 +1,16 @@
 import { Fragment, useMemo, useState } from "react";
+import {
+  DATA_GRID_ABOVE_SECTION_CLASS,
+  DATA_GRID_EXPANDED_ROW_CLASS,
+  DATA_GRID_FILTER_ROW_CLASS,
+  DATA_GRID_HEADER_ROW_CLASS,
+  DATA_GRID_SECTION_CLASS,
+  DATA_GRID_TABLE_CLASS,
+  DATA_GRID_TABLE_SCROLL_CLASS,
+  DATA_GRID_THEAD_CLASS,
+  DATA_GRID_TOOLBAR_STICKY_CLASS,
+} from "../ui/dataGridTableStyles";
+import { useDataGridStickyToolbar } from "../ui/useDataGridStickyToolbar";
 import { Checkbox, Icon, Switch } from "../../design-system";
 import { Button } from "../ui/Button";
 import { ColumnHeaderMenu } from "../ui/ColumnHeaderMenu";
@@ -221,9 +233,15 @@ function PipelinesTable({
   const { sortedRows, getSortProps } = useColumnSort(sortComparators);
   const displayRows = sortedRows(rows);
 
+  const { toolbarRef, sectionStyle } = useDataGridStickyToolbar();
+
   return (
-    <section className="flex min-h-0 min-w-0 flex-1 flex-col overflow-hidden rounded-[4px] border border-border-container bg-datavis-card-bg shadow-datavis-card">
-      <div className="shrink-0 bg-datavis-card-bg pb-3 pl-4 pr-[20px] pt-3 sm:pl-5">
+    <section
+      className={cx(DATA_GRID_SECTION_CLASS, "min-h-0 min-w-0 flex-1")}
+      style={sectionStyle}
+    >
+      <div ref={toolbarRef} className={DATA_GRID_TOOLBAR_STICKY_CLASS}>
+        <div className="shrink-0 bg-datavis-card-bg pb-3 pl-4 pr-[20px] pt-3 sm:pl-5">
         <div className="flex flex-wrap items-center gap-3">
           <p className="shrink-0 text-base-small text-text-secondary">
             {rows.length} of {DATA_PIPELINE_ROWS.length} Results
@@ -243,8 +261,9 @@ function PipelinesTable({
           <DataGridExportButton />
         </div>
       </div>
-      <DatavisGridlineRule inset={false} />
-      <div className="flex min-h-0 flex-1 overflow-auto bg-datavis-card-bg">
+        <DatavisGridlineRule inset={false} />
+      </div>
+      <div className={DATA_GRID_FILTER_ROW_CLASS}>
         <FilterColumnPanel
           active={tableTool}
           onFilterClick={() => onTableToolChange(tableTool === "filter" ? null : "filter")}
@@ -252,10 +271,10 @@ function PipelinesTable({
         />
         <div
           ref={containerRef}
-          className={cx("min-h-0 min-w-0 flex-1 overflow-x-auto pb-3", isResizing && "select-none")}
+          className={cx(DATA_GRID_TABLE_SCROLL_CLASS, isResizing && "select-none")}
         >
           <table
-            className="table-fixed border-collapse text-left text-sm"
+            className={DATA_GRID_TABLE_CLASS}
             style={{
               width: tableFillsContainer ? "100%" : baseTotal,
               minWidth: Math.max(minTableWidth, baseTotal),
@@ -267,8 +286,8 @@ function PipelinesTable({
                 <col key={i} style={{ width: w }} />
               ))}
             </colgroup>
-            <thead>
-              <tr className="h-10 border-b border-datavis-gridlines bg-surface-table-row-header">
+            <thead className={DATA_GRID_THEAD_CLASS}>
+              <tr className={DATA_GRID_HEADER_ROW_CLASS}>
                 <th scope="col" style={colStyle(0)} className={cx(thClass, "px-0")}>
                   <div className="flex justify-center">
                     <button
@@ -389,7 +408,7 @@ function PipelinesTable({
                       </td>
                     </tr>
                     {expanded ? (
-                      <tr className="border-b border-datavis-gridlines bg-surface-table-row-header">
+                      <tr className={DATA_GRID_EXPANDED_ROW_CLASS}>
                         <td colSpan={PIPELINE_COLUMN_COUNT} className="px-6 py-4 align-top">
                           <PipelineExpandedRow
                             row={row}
@@ -502,6 +521,7 @@ export function DataPipelinesDashboard({ searchQuery, onSearchQueryChange }: Dat
 
   return (
     <div className="flex min-h-0 flex-1 flex-col gap-6">
+      <div className={DATA_GRID_ABOVE_SECTION_CLASS}>
       <div className="grid shrink-0 grid-cols-1 gap-4 sm:grid-cols-2 xl:grid-cols-4">
         <PipelineStatCard
           label="Total Pipelines"
@@ -527,6 +547,7 @@ export function DataPipelinesDashboard({ searchQuery, onSearchQueryChange }: Dat
           selected={statFilter === "highest-records"}
           onClick={() => handleStatFilterClick("highest-records")}
         />
+      </div>
       </div>
 
       <PipelinesTable

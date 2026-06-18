@@ -66,7 +66,7 @@ export function DataPipelinesPage() {
           }
         />
 
-        <main className="flex min-h-0 flex-1 flex-col overflow-y-auto px-5 py-6">
+        <main className="flex min-h-0 flex-1 flex-col overflow-x-auto overflow-y-auto px-5 py-6">
           <DataPipelinesDashboard searchQuery={searchQuery} onSearchQueryChange={setSearchQuery} />
         </main>
       </div>
