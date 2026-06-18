@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useId, useMemo, useState, type ReactNode } from "react";
 import { Checkbox, Icon } from "../../design-system";
-import { Button } from "../ui/Button";
+import { Button } from "@/components/shadcn/button";
 import { DataTable, type DataTableColumn } from "../ui/DataTable";
 import { Input } from "../ui/Input";
 import { Switch } from "../ui/Switch";
@@ -305,7 +305,6 @@ function MapSchemaOverviewCard({ onMapRecommendedField }: { onMapRecommendedFiel
               variant="search"
               readOnly
               tabIndex={-1}
-              startAdornment={<Icon name="search" />}
               placeholder="Search"
               className="w-full border-border-rule px-1.5"
             />
@@ -460,7 +459,7 @@ function MappingToolbarV2() {
         </div>
         <div className="flex shrink-0 flex-wrap items-center gap-x-6 gap-y-2">
           <Switch checked={allowAutosave} onCheckedChange={setAllowAutosave} label="Allow Autosave" />
-          <Button variant="tertiary" className="gap-1 text-sm font-semibold text-text-secondary hover:text-text-primary">
+          <Button variant="ghost" className="gap-1 text-sm font-semibold text-text-secondary hover:bg-overlay-subtle hover:text-text-primary">
             <Icon name="close" />
             Clear All Mappings
           </Button>
@@ -513,7 +512,6 @@ function FieldMappingBar({
               variant="search"
               readOnly
               tabIndex={-1}
-              startAdornment={<Icon name="search" />}
               placeholder="Search source fields"
               className="w-[200px] shrink-0"
             />
@@ -629,7 +627,7 @@ export function AmazonAthenaMapReviewStep({
           <div className="flex w-full justify-end">
             <Button
               variant="ghost"
-              className="text-text-tertiary hover:text-text-primary"
+              className="text-text-tertiary hover:bg-overlay-subtle hover:text-text-primary"
               aria-label="Clear row"
               onClick={() => clearRowMapping(r.source)}
             >
