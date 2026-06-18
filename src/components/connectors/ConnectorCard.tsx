@@ -1,7 +1,7 @@
 import { useEffect, useRef, useState } from "react";
 import { createPortal } from "react-dom";
 import { Icon, Switch } from "../../design-system";
-import { Button } from "../ui/Button";
+import { Button } from "@/components/shadcn/button";
 import type { ConnectorInstance } from "./connectorsData";
 
 const cx = (...c: (string | false | undefined)[]) => c.filter(Boolean).join(" ");
