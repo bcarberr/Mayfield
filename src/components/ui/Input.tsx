@@ -26,12 +26,7 @@ export const Input = forwardRef<HTMLInputElement, InputProps>(function Input(
     variant === "search"
       ? "h-full min-h-0 min-w-0 flex-1 bg-transparent py-0 pr-1 text-sm font-semibold outline-none file:border-0 file:bg-transparent"
       : "min-h-6 min-w-0 flex-1 bg-transparent py-1 pr-1 text-sm font-semibold outline-none file:border-0 file:bg-transparent";
-  const effectiveAdornment =
-    startAdornment !== undefined
-      ? startAdornment
-      : variant === "search"
-        ? <Icon name="search" size={16} aria-hidden />
-        : null;
+  const effectiveAdornment = startAdornment ?? null;
   const showClear = Boolean(onClear && rest.value);
   return (
     <div className={`${base} ${shellClass} ${className}`.trim()}>
