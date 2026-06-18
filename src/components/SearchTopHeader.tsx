@@ -107,7 +107,7 @@ export function SearchTopHeader({
 
   return (
     <header className={cn("shrink-0", bg, className)}>
-      <div className="flex flex-col gap-4 px-5 py-2 lg:min-h-12 lg:flex-row lg:items-center lg:justify-between lg:gap-4">
+      <div className="flex flex-col gap-4 px-6 py-2 lg:min-h-12 lg:flex-row lg:items-center lg:justify-between lg:gap-4">
         <div className="flex w-full min-w-0 flex-col gap-4 lg:flex-1 lg:flex-row lg:items-center lg:gap-8">
           <div className="flex w-full min-w-0 items-center justify-between gap-3 lg:w-auto lg:shrink-0">
             <h1 className="min-w-0 truncate text-page-title text-text-primary">{title}</h1>
@@ -121,7 +121,7 @@ export function SearchTopHeader({
 
         <div className="hidden shrink-0 items-center gap-2 sm:gap-3 lg:flex">{headerActions}</div>
       </div>
-      <Separator className="mx-5 bg-border-rule" />
+      <Separator className="mx-6 bg-border-rule" />
     </header>
   );
 }
