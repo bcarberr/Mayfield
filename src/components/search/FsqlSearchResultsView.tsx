@@ -18,6 +18,7 @@ import { ColumnHeaderMenu } from "../ui/ColumnHeaderMenu";
 import { compareStrings } from "../ui/useColumnSort";
 import { useSortedDataGridPagination } from "../ui/useSortedDataGridPagination";
 import { DataGridSection } from "../ui/DataGridSection";
+import { DATA_GRID_RESULTS_SEARCH_PLACEHOLDER } from "../ui/dataGridTableStyles";
 import { DataGridPaginationFooter } from "../ui/DataGridTableLayout";
 import { TruncatedText } from "../ui/TruncatedText";
 import { ConnectorTableCell } from "../ui/ConnectorTableCell";
@@ -310,9 +311,9 @@ export function FsqlSearchResultsView({
   });
 
   return (
-    <div className={cx(DATA_GRID_PAGE_SCROLL_OUTER_CLASS, "bg-surface-container")}>
-      <div className={cx(DATA_GRID_PAGE_SCROLL_INNER_CLASS, "px-6 pt-2 pb-4 sm:pt-3 sm:pb-5")}>
-      <div className="flex shrink-0 flex-col gap-4">
+    <div className={cx(DATA_GRID_PAGE_SCROLL_OUTER_CLASS, "bg-surface-page")}>
+      <div className={cx(DATA_GRID_PAGE_SCROLL_INNER_CLASS, "px-6 pb-4 sm:pb-5")}>
+      <div className="flex shrink-0 flex-col gap-4 pt-4">
         <div className={DATA_GRID_ABOVE_SECTION_CLASS}>
           <InsightCard title={resultsTitle}>
           <div className="flex shrink-0 flex-col">
@@ -359,18 +360,30 @@ export function FsqlSearchResultsView({
                   {filteredRows.length} Results
                   {resultsFilterQuery.trim() ? ` · “${resultsFilterQuery.trim()}”` : ""}
                 </p>
-                <div className="w-[300px] shrink-0">
+                <div className="relative w-[300px] shrink-0">
                   <Input
-                    type="search"
-                    placeholder="Search results…"
+                    type="text"
+                    placeholder={DATA_GRID_RESULTS_SEARCH_PLACEHOLDER}
                     value={resultsFilterQuery}
                     onChange={(event) => setResultsFilterQuery(event.target.value)}
                     className={cn(
                       "h-8 border-border-rule bg-datavis-card-bg text-sm font-semibold shadow-none",
                       "placeholder:font-semibold placeholder:italic placeholder:text-text-tertiary dark:bg-datavis-card-bg",
+                      resultsFilterQuery && "pr-7",
                     )}
                     aria-label="Filter search results"
                   />
+                  {resultsFilterQuery ? (
+                    <button
+                      type="button"
+                      tabIndex={-1}
+                      aria-label="Clear"
+                      onClick={() => setResultsFilterQuery("")}
+                      className="absolute inset-y-0 right-2 flex items-center text-text-tertiary hover:text-text-primary"
+                    >
+                      <Icon name="action-cancel-clear" size={14} aria-hidden />
+                    </button>
+                  ) : null}
                 </div>
                 <DataGridExportButton />
               </div>
