@@ -223,6 +223,14 @@ export function eventCategoryById(categoryId: string): SearchEventCategory | und
   return SEARCH_EVENT_CATEGORIES.find((category) => category.id === categoryId);
 }
 
+export function searchEventById(eventId: string): SearchEventOption | undefined {
+  for (const category of SEARCH_EVENT_CATEGORIES) {
+    const match = category.events.find((event) => event.id === eventId);
+    if (match) return match;
+  }
+  return undefined;
+}
+
 export function selectionEventIconClassName(selection: SearchScopeSelection | null): string | null {
   if (!selection || selection.kind !== "events") return null;
   return eventCategoryById(selection.option.categoryId)?.iconClassName ?? null;

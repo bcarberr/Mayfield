@@ -1,11 +1,10 @@
 import { useCallback, useEffect, useId, useMemo, useRef, useState, type CSSProperties, type DragEvent, type PointerEvent, type ReactNode } from "react";
-import { CircleX, Eye, EyeOff, Info } from "lucide-react";
+import { CircleX, Eye, EyeOff, Info, Loader2 } from "lucide-react";
 import { Checkbox, Icon } from "../../design-system";
 import { Button } from "@/components/shadcn/button";
 import {
   DropdownMenu,
   DropdownMenuContent,
-  DropdownMenuItem,
   DropdownMenuTrigger,
 } from "@/components/shadcn/dropdown-menu";
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/shadcn/tooltip";
@@ -23,6 +22,8 @@ import { DataTable, type DataTableColumn } from "../ui/DataTable";
 import { Input } from "../ui/Input";
 import { Switch } from "../ui/Switch";
 import { CopilotSparkMark } from "../SearchCopilotPanel";
+import { SearchEventClassPicker } from "../SearchEventClassPicker";
+import { searchEventById } from "../../data/searchEntityOptions";
 
 const MAP_SCHEMA_DRAG_MIME = "application/x-query-map-field";
 
@@ -163,6 +164,42 @@ const INITIAL_ROWS: MappingRow[] = [
   { source: "user_agent", sample: "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36", mapped: false },
 ];
 
+const DEFAULT_EVENT_CLASS_ID = "http_activity";
+
+/** Demo OCSF target tags — ~93% of source fields mapped (all except `bwclassname`). */
+const DEMO_SOURCE_FIELD_TAGS: Record<string, string[]> = {
+  action: ["activity_name"],
+  appclass: ["category_name"],
+  appname: ["type_name"],
+  bytes_in: ["traffic_bytes_in"],
+  bytes_out: ["traffic_bytes_out"],
+  client_ip: ["src_endpoint_ip"],
+  dest_port: ["dst_endpoint_port"],
+  duration_ms: ["time"],
+  hostname: ["dst_endpoint_domain"],
+  http_method: ["http_request_http_method"],
+  http_status: ["http_response_code"],
+  protocol: ["http_request_version"],
+  request_path: ["http_request_url"],
+  user_agent: ["http_request_user_agent"],
+};
+
+function aiMappingDelayMs(): number {
+  return 6000 + Math.floor(Math.random() * 2001);
+}
+
+function buildDemoMappedRows(sourceRows: readonly MappingRow[]): MappingRow[] {
+  return sourceRows.map((row) => {
+    const tags = DEMO_SOURCE_FIELD_TAGS[row.source];
+    if (!tags?.length) return { ...row, mapped: false, tags: undefined };
+    return { ...row, mapped: true, tags: [...tags] };
+  });
+}
+
+function buildUnmappedRows(sourceRows: readonly MappingRow[]): MappingRow[] {
+  return sourceRows.map((row) => ({ ...row, mapped: false, tags: undefined }));
+}
+
 const MAPPING_FIELD_COLGROUP = (
   <colgroup>
     <col style={{ width: "calc((100% - 3rem) / 2)" }} />
@@ -189,8 +226,6 @@ function Tag({ children, onRemove }: { children: string; onRemove?: () => void }
     </span>
   );
 }
-
-const MAP_SCHEMA_EVENT_CLASS = "http_activity" as const;
 
 type MapSchemaRecommendedRow =
   | { kind: "field"; name: string; enum?: boolean; info?: boolean }
@@ -550,15 +585,18 @@ function MapSchemaRecommendedFieldRow({ row }: { row: MapSchemaRecommendedRow })
   );
 }
 
-function MapSchemaOverviewCard() {
+function MapSchemaOverviewCard({ eventClassId }: { eventClassId: string }) {
   const [treeView, setTreeView] = useState(false);
   const [entitiesOpen, setEntitiesOpen] = useState(true);
   const [recommendedOpen, setRecommendedOpen] = useState(true);
   const [expandedEntityIds, setExpandedEntityIds] = useState<ReadonlySet<string>>(() => new Set());
 
+  const selectedEventClass = searchEventById(eventClassId);
+
   const mapSchemaEntities = useMemo(
-    () => getMapSchemaEntitiesForEventClass(MAP_SCHEMA_EVENT_CLASS),
-    [],
+    () =>
+      eventClassId === "http_activity" ? getMapSchemaEntitiesForEventClass("http_activity") : [],
+    [eventClassId],
   );
 
   const toggleEntity = useCallback((entityId: string) => {
@@ -592,7 +630,9 @@ function MapSchemaOverviewCard() {
             </button>
           </div>
           <div className="mt-4">
-            <p className="text-left text-[14px] font-bold leading-5 tracking-[0.4px] text-text-primary">HTTP Activity</p>
+            <p className="text-left text-[14px] font-bold leading-5 tracking-[0.4px] text-text-primary">
+              {selectedEventClass?.label ?? "Event class"}
+            </p>
           </div>
           <div className="mt-3 border-t border-border-rule pt-3">
             <div className="w-[240px] shrink-0">
@@ -678,78 +718,142 @@ function MapSchemaOverviewCard() {
   );
 }
 
-const AI_ASSISTED_MAPPING_OPTIONS = ["Recommended fields", "All suggested fields", "Off"] as const;
+type AiAssistedMappingSettings = {
+  suggestEventClass: boolean;
+  suggestMappingsForEventClass: boolean;
+};
 
-type AiAssistedMappingMode = (typeof AI_ASSISTED_MAPPING_OPTIONS)[number];
+const DEFAULT_AI_ASSISTED_MAPPING_SETTINGS: AiAssistedMappingSettings = {
+  suggestEventClass: true,
+  suggestMappingsForEventClass: true,
+};
 
 function AiAssistedMappingControl({
-  mode,
-  onModeChange,
+  settings,
+  onSuggest,
+  isMapping = false,
 }: {
-  mode: AiAssistedMappingMode;
-  onModeChange: (next: AiAssistedMappingMode) => void;
+  settings: AiAssistedMappingSettings;
+  onSuggest: (next: AiAssistedMappingSettings) => void;
+  isMapping?: boolean;
 }) {
+  const [open, setOpen] = useState(false);
+  const [draft, setDraft] = useState(settings);
+
+  const handleOpenChange = (nextOpen: boolean) => {
+    if (nextOpen) {
+      setDraft(settings);
+    }
+    setOpen(nextOpen);
+  };
+
+  const applyDraft = () => {
+    onSuggest(draft);
+    setOpen(false);
+  };
+
   return (
     <div className="flex shrink-0 items-center gap-2">
       <CopilotSparkMark className="size-[21.6px]" />
-      <span className="text-sm font-semibold leading-[18px] text-text-primary">AI Assisted Mapping</span>
-      <DropdownMenu>
+      <DropdownMenu open={open} onOpenChange={handleOpenChange} modal={false}>
         <DropdownMenuTrigger asChild>
-          <button
+          <Button
             type="button"
-            className="flex h-7 shrink-0 items-center gap-1 rounded border border-border-rule bg-surface-modal px-2 text-left hover:bg-overlay-subtle focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-interactive-active"
-            aria-label={`AI assisted mapping mode: ${mode}`}
+            variant="secondary-outline"
+            size="sm"
+            className="h-7 gap-1 border-border-rule bg-surface-modal px-2 font-semibold text-text-primary"
+            aria-label="AI assisted mapping options"
           >
-            <span className="max-w-[9rem] truncate text-sm font-semibold text-text-primary">{mode}</span>
+            AI Assisted Mapping
             <Icon name="chevron-down" size={16} className="shrink-0 text-text-secondary" />
-          </button>
+          </Button>
         </DropdownMenuTrigger>
         <DropdownMenuContent
           align="start"
-          className="min-w-[11rem] border-border-container bg-surface-modal py-1 ring-1 ring-border-container"
+          className="w-[min(360px,calc(100vw-2.5rem))] rounded-[4px] border border-border-container bg-surface-modal p-4 text-text-primary shadow-[0_3px_14px_2px_rgba(0,0,0,0.12),0_8px_10px_1px_rgba(0,0,0,0.14),0_5px_5px_-3px_rgba(0,0,0,0.2)] ring-0"
+          onCloseAutoFocus={(event) => event.preventDefault()}
+          onPointerDown={(event) => event.stopPropagation()}
         >
-          {AI_ASSISTED_MAPPING_OPTIONS.map((option) => (
-            <DropdownMenuItem
-              key={option}
-              className={cx(
-                "cursor-pointer text-sm font-semibold focus:bg-overlay-subtle",
-                option === mode ? "text-text-primary" : "text-text-secondary focus:text-text-primary",
-              )}
-              onClick={() => onModeChange(option)}
-            >
-              {option}
-            </DropdownMenuItem>
-          ))}
+          <div role="dialog" aria-label="AI assisted mapping">
+            <p className="text-sm italic leading-[18px] text-text-tertiary">
+              AI assisted mapping will make best suggestions to help you quickly map your data...
+            </p>
+            <div className="mt-4 space-y-3">
+              <Switch
+                checked={draft.suggestEventClass}
+                onCheckedChange={(checked) =>
+                  setDraft((current) => ({
+                    ...current,
+                    suggestEventClass: checked,
+                    suggestMappingsForEventClass: checked ? current.suggestMappingsForEventClass : false,
+                  }))
+                }
+                label="Suggest Event Class"
+                labelClassName={
+                  draft.suggestEventClass ? "text-text-primary" : "text-text-tertiary hover:text-text-secondary"
+                }
+              />
+              <Switch
+                checked={draft.suggestMappingsForEventClass}
+                disabled={!draft.suggestEventClass}
+                onCheckedChange={(checked) =>
+                  setDraft((current) => ({ ...current, suggestMappingsForEventClass: checked }))
+                }
+                label="Suggest Mappings for Suggested Event Class"
+                labelClassName={
+                  !draft.suggestEventClass
+                    ? "text-text-disabled"
+                    : draft.suggestMappingsForEventClass
+                      ? "text-text-primary"
+                      : "text-text-tertiary hover:text-text-secondary"
+                }
+              />
+            </div>
+            <div className="mt-4 flex justify-end gap-2">
+              <Button type="button" variant="secondary-outline" size="sm" className="h-8" onClick={() => setOpen(false)}>
+                Cancel
+              </Button>
+              <Button type="button" variant="default" size="sm" className="h-8" onClick={applyDraft}>
+                Suggest
+              </Button>
+            </div>
+          </div>
         </DropdownMenuContent>
       </DropdownMenu>
+      {isMapping ? (
+        <Loader2
+          size={16}
+          strokeWidth={2}
+          className="size-4 shrink-0 animate-spin text-interactive-active"
+          aria-label="AI assisted mapping in progress"
+        />
+      ) : null}
     </div>
   );
 }
 
-function MappingToolbarV2({ hasMappedFields }: { hasMappedFields: boolean }) {
+function MappingToolbarV2({
+  hasMappedFields,
+  selectedEventClassId,
+  onEventClassChange,
+  isAiMapping,
+  aiAssistedMappingSettings,
+  onAiAssistedMappingSuggest,
+}: {
+  hasMappedFields: boolean;
+  selectedEventClassId: string;
+  onEventClassChange: (eventClassId: string) => void;
+  isAiMapping: boolean;
+  aiAssistedMappingSettings: AiAssistedMappingSettings;
+  onAiAssistedMappingSuggest: (settings: AiAssistedMappingSettings) => void;
+}) {
   const [allowAutosave, setAllowAutosave] = useState(true);
-  const [aiAssistedMappingMode, setAiAssistedMappingMode] = useState<AiAssistedMappingMode>(
-    AI_ASSISTED_MAPPING_OPTIONS[0],
-  );
-
   return (
     <div className="bg-surface-modal">
       <p className="text-base-semibold text-text-primary">Event Class to Map</p>
       <div className="mt-2 flex min-h-[32px] flex-wrap items-center justify-between gap-x-3 gap-y-2">
         <div className="flex min-w-0 flex-wrap items-center gap-x-3 gap-y-2">
-          <button
-            type="button"
-            className="flex h-7 w-60 shrink-0 items-center gap-1 rounded border border-border-rule bg-surface-modal px-3 text-left hover:bg-overlay-subtle"
-          >
-            <Icon
-              name="network-activity"
-              size={16}
-              className="shrink-0 text-datavis-data-peanut-orange"
-              title="Network activity"
-            />
-            <span className="min-w-0 flex-1 truncate text-sm font-semibold text-text-primary">HTTP Activity</span>
-            <Icon name="chevron-down" className="shrink-0 text-text-secondary" />
-          </button>
+          <SearchEventClassPicker value={selectedEventClassId} onChange={onEventClassChange} />
           <button
             type="button"
             className="shrink-0 rounded p-0.5 text-text-tertiary hover:bg-overlay-subtle hover:text-text-secondary"
@@ -757,7 +861,11 @@ function MappingToolbarV2({ hasMappedFields }: { hasMappedFields: boolean }) {
           >
             <Info size={16} strokeWidth={1.5} aria-hidden />
           </button>
-          <AiAssistedMappingControl mode={aiAssistedMappingMode} onModeChange={setAiAssistedMappingMode} />
+          <AiAssistedMappingControl
+            settings={aiAssistedMappingSettings}
+            onSuggest={onAiAssistedMappingSuggest}
+            isMapping={isAiMapping}
+          />
         </div>
         <div className="flex shrink-0 flex-wrap items-center gap-x-6 gap-y-2">
           <Switch
@@ -870,6 +978,12 @@ export function AmazonAthenaMapReviewStep({
   onHasMappedFieldsChange?: (hasMappedFields: boolean) => void;
 }) {
   const [rows, setRows] = useState<MappingRow[]>(() => INITIAL_ROWS.map((row) => ({ ...row })));
+  const [selectedEventClassId, setSelectedEventClassId] = useState(DEFAULT_EVENT_CLASS_ID);
+  const [isAiMapping, setIsAiMapping] = useState(true);
+  const [aiAssistedMappingSettings, setAiAssistedMappingSettings] = useState<AiAssistedMappingSettings>(
+    DEFAULT_AI_ASSISTED_MAPPING_SETTINGS,
+  );
+  const aiMappingRunRef = useRef(0);
   const [mapVisibility, setMapVisibility] = useState<MapVisibilityMode>("all");
   const [hiddenFields, setHiddenFields] = useState<Set<string>>(() => new Set());
   const [showHiddenFields, setShowHiddenFields] = useState(false);
@@ -877,6 +991,48 @@ export function AmazonAthenaMapReviewStep({
   const [mapSchemaPanelWidth, setMapSchemaPanelWidth] = useState(MAP_SCHEMA_PANEL_DEFAULT_WIDTH);
   const [isResizingMapSchemaPanel, setIsResizingMapSchemaPanel] = useState(false);
   const mapSchemaResizeRef = useRef<{ startX: number; startWidth: number } | null>(null);
+
+  const runAiMappingDemo = useCallback((settings: AiAssistedMappingSettings) => {
+    const runId = ++aiMappingRunRef.current;
+    setIsAiMapping(true);
+    setAiAssistedMappingSettings(settings);
+
+    if (settings.suggestEventClass) {
+      setSelectedEventClassId(DEFAULT_EVENT_CLASS_ID);
+    }
+
+    window.setTimeout(() => {
+      if (aiMappingRunRef.current !== runId) return;
+
+      setRows(
+        settings.suggestMappingsForEventClass
+          ? buildDemoMappedRows(INITIAL_ROWS)
+          : buildUnmappedRows(INITIAL_ROWS),
+      );
+      setIsAiMapping(false);
+    }, aiMappingDelayMs());
+  }, []);
+
+  useEffect(() => {
+    runAiMappingDemo(DEFAULT_AI_ASSISTED_MAPPING_SETTINGS);
+    return () => {
+      aiMappingRunRef.current += 1;
+    };
+  }, [runAiMappingDemo]);
+
+  const handleEventClassChange = useCallback((eventClassId: string) => {
+    aiMappingRunRef.current += 1;
+    setIsAiMapping(false);
+    setSelectedEventClassId(eventClassId);
+    setRows(buildUnmappedRows(INITIAL_ROWS));
+  }, []);
+
+  const handleAiAssistedMappingSuggest = useCallback(
+    (settings: AiAssistedMappingSettings) => {
+      runAiMappingDemo(settings);
+    },
+    [runAiMappingDemo],
+  );
 
   const handleMapSchemaPanelResizePointerDown = useCallback((event: PointerEvent<HTMLButtonElement>) => {
     event.preventDefault();
@@ -904,8 +1060,12 @@ export function AmazonAthenaMapReviewStep({
   const toggleFieldVisibility = useCallback((source: string) => {
     setHiddenFields((current) => {
       const next = new Set(current);
-      if (next.has(source)) next.delete(source);
-      else next.add(source);
+      if (next.has(source)) {
+        next.delete(source);
+      } else {
+        next.add(source);
+        setShowHiddenFields(true);
+      }
       return next;
     });
   }, []);
@@ -1043,7 +1203,14 @@ export function AmazonAthenaMapReviewStep({
       <div className="flex min-h-0 flex-1 flex-col bg-surface-modal md:flex-row md:items-stretch">
         <div className="flex min-h-0 min-w-0 flex-1 flex-col overflow-hidden">
           <div className="shrink-0 border-b border-border-rule px-0 py-4">
-            <MappingToolbarV2 hasMappedFields={hasMappedFields} />
+            <MappingToolbarV2
+              hasMappedFields={hasMappedFields}
+              selectedEventClassId={selectedEventClassId}
+              onEventClassChange={handleEventClassChange}
+              isAiMapping={isAiMapping}
+              aiAssistedMappingSettings={aiAssistedMappingSettings}
+              onAiAssistedMappingSuggest={handleAiAssistedMappingSuggest}
+            />
           </div>
           <FieldMappingBar
             rows={rows}
@@ -1101,7 +1268,7 @@ export function AmazonAthenaMapReviewStep({
               aria-hidden
             />
           </button>
-          <MapSchemaOverviewCard />
+          <MapSchemaOverviewCard eventClassId={selectedEventClassId} />
         </div>
       </div>
     </>

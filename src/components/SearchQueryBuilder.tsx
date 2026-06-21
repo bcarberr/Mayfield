@@ -3,13 +3,13 @@ import { Plus, Info } from "lucide-react";
 import { Icon } from "../design-system";
 import {
   SEARCH_ENTITY_COLUMNS,
-  SEARCH_EVENT_CATEGORIES,
   eventCategoryById,
   type SearchEntityOption,
   type SearchEventOption,
 } from "../data/searchEntityOptions";
 import { getFieldsForCategory } from "../data/ocsfEventFields";
 import { SearchCriteriaSelect } from "./SearchCriteriaSelect";
+import { EventPickerPopover } from "./SearchEventClassPicker";
 import { Button } from "@/components/shadcn/button";
 import { Checkbox } from "@/components/shadcn/checkbox";
 import {
@@ -19,7 +19,6 @@ import {
 } from "@/components/shadcn/collapsible";
 import { Field, FieldLabel } from "@/components/shadcn/field";
 import { Input } from "@/components/shadcn/input";
-import { cn } from "@/lib/utils";
 
 const cx = (...c: (string | false | undefined)[]) => c.filter(Boolean).join(" ");
 
@@ -503,105 +502,6 @@ function EventBlockComp({
           <Plus size={9} strokeWidth={2} className="shrink-0 text-current" aria-hidden />
           Add Condition
         </Button>
-      </div>
-    </div>
-  );
-}
-
-// ─── EventPickerPopover ───────────────────────────────────────────────────────
-
-function EventPickerPopover({
-  onSelect,
-  onClose,
-}: {
-  onSelect: (option: SearchEventOption) => void;
-  onClose: () => void;
-}) {
-  const containerRef = useRef<HTMLDivElement>(null);
-  const [activeCategoryId, setActiveCategoryId] = useState(SEARCH_EVENT_CATEGORIES[0]!.id);
-
-  useEffect(() => {
-    const onPointerDown = (e: PointerEvent) => {
-      if (!containerRef.current?.contains(e.target as Node)) onClose();
-    };
-    const onKey = (e: KeyboardEvent) => {
-      if (e.key === "Escape") onClose();
-    };
-    document.addEventListener("pointerdown", onPointerDown);
-    document.addEventListener("keydown", onKey);
-    return () => {
-      document.removeEventListener("pointerdown", onPointerDown);
-      document.removeEventListener("keydown", onKey);
-    };
-  }, [onClose]);
-
-  const activeCategory =
-    SEARCH_EVENT_CATEGORIES.find((c) => c.id === activeCategoryId) ?? SEARCH_EVENT_CATEGORIES[0]!;
-
-  return (
-    <div
-      ref={containerRef}
-      className="absolute left-0 top-[calc(100%+4px)] z-50 flex overflow-hidden rounded-[4px] border border-border-rule bg-surface-modal shadow-[0px_5px_5px_-3px_rgba(0,0,0,0.2),0px_8px_10px_1px_rgba(0,0,0,0.14),0px_3px_14px_2px_rgba(0,0,0,0.12)]"
-      style={{ width: 560, maxHeight: 400 }}
-      role="dialog"
-      aria-label="Pick an event"
-    >
-      {/* Left: categories */}
-      <div className="w-44 shrink-0 overflow-y-auto border-r border-border-rule">
-        <p className="px-4 pt-3 text-xs font-bold uppercase leading-[14px] tracking-[0.4px] text-text-tertiary">
-          Event categories
-        </p>
-        <div className="pb-2 pt-1">
-          {SEARCH_EVENT_CATEGORIES.map((cat) => (
-            <Button
-              key={cat.id}
-              type="button"
-              variant="ghost"
-              className={cn(
-                "h-9 w-full justify-start gap-2 rounded-none px-4 text-left text-sm font-semibold text-text-primary hover:bg-interactive-secondary-hover",
-                cat.id === activeCategoryId && "bg-interactive-secondary-hover",
-              )}
-              onMouseEnter={() => setActiveCategoryId(cat.id)}
-              onClick={() => setActiveCategoryId(cat.id)}
-            >
-              <Icon name={cat.icon} size={16} className={cx("shrink-0", cat.iconClassName)} aria-hidden />
-              <span className="min-w-0 truncate">{cat.label}</span>
-            </Button>
-          ))}
-        </div>
-      </div>
-
-      {/* Right: events in active category */}
-      <div className="flex-1 overflow-y-auto px-3 py-3">
-        <div
-          className={cx(
-            "grid gap-x-3",
-            activeCategory.events.length > 6 ? "grid-cols-2" : "grid-cols-1",
-          )}
-        >
-          {activeCategory.events.map((event) => (
-            <Button
-              key={event.id}
-              type="button"
-              variant="ghost"
-              className="h-8 w-full min-w-0 justify-start gap-2 rounded px-1 text-left hover:bg-interactive-secondary-hover"
-              onClick={() => {
-                onSelect(event);
-                onClose();
-              }}
-            >
-              <Icon
-                name={event.icon}
-                size={16}
-                className={cx("shrink-0", activeCategory.iconClassName)}
-                aria-hidden
-              />
-              <span className="min-w-0 truncate text-sm font-semibold text-text-secondary">
-                {event.label}
-              </span>
-            </Button>
-          ))}
-        </div>
       </div>
     </div>
   );

@@ -5,8 +5,40 @@ export type TimeframeRange = {
   to: Date;
 };
 
-export const DEFAULT_TIMEFRAME_FROM = new Date(2025, 9, 27, 15, 29);
-export const DEFAULT_TIMEFRAME_TO = new Date(2025, 9, 28, 15, 29);
+const MS_HOUR = 3_600_000;
+const MS_DAY = 24 * MS_HOUR;
+
+export type TimeframePreset = {
+  id: string;
+  label: string;
+  durationMs: number;
+};
+
+export const TIMEFRAME_PRESETS: readonly TimeframePreset[] = [
+  { id: "1h", label: "Last hour", durationMs: MS_HOUR },
+  { id: "24h", label: "Last 24 hours", durationMs: 24 * MS_HOUR },
+  { id: "7d", label: "Last 7 days", durationMs: 7 * MS_DAY },
+  { id: "14d", label: "Last 14 days", durationMs: 14 * MS_DAY },
+  { id: "30d", label: "Last 30 days", durationMs: 30 * MS_DAY },
+  { id: "60d", label: "Last 60 days", durationMs: 60 * MS_DAY },
+] as const;
+
+export const DEFAULT_TIMEFRAME_PRESET = TIMEFRAME_PRESETS.find((preset) => preset.id === "14d")!;
+
+export function createRelativeTimeframeRange(durationMs: number, end: Date = new Date()): TimeframeRange {
+  const to = new Date(end);
+  const from = new Date(to.getTime() - durationMs);
+  return normalizeTimeframeRange(from, to);
+}
+
+export function createDefaultTimeframeRange(): TimeframeRange {
+  return createRelativeTimeframeRange(DEFAULT_TIMEFRAME_PRESET.durationMs);
+}
+
+/** @deprecated Prefer {@link createDefaultTimeframeRange} — fixed at module load when used directly. */
+export const DEFAULT_TIMEFRAME_FROM = createDefaultTimeframeRange().from;
+/** @deprecated Prefer {@link createDefaultTimeframeRange} — fixed at module load when used directly. */
+export const DEFAULT_TIMEFRAME_TO = createDefaultTimeframeRange().to;
 
 export function normalizeTimeframeRange(from: Date, to: Date): TimeframeRange {
   if (from.getTime() <= to.getTime()) return { from, to };
@@ -44,12 +76,8 @@ type TimeframeContextValue = {
 const TimeframeContext = createContext<TimeframeContextValue | null>(null);
 
 export function TimeframeProvider({ children }: { children: ReactNode }) {
-  const [range, setRangeState] = useState<TimeframeRange>(() =>
-    normalizeTimeframeRange(DEFAULT_TIMEFRAME_FROM, DEFAULT_TIMEFRAME_TO),
-  );
-  const [analyticsBaselineRange, setAnalyticsBaselineRange] = useState<TimeframeRange>(() =>
-    cloneTimeframeRange(normalizeTimeframeRange(DEFAULT_TIMEFRAME_FROM, DEFAULT_TIMEFRAME_TO)),
-  );
+  const [range, setRangeState] = useState<TimeframeRange>(createDefaultTimeframeRange);
+  const [analyticsBaselineRange, setAnalyticsBaselineRange] = useState<TimeframeRange>(createDefaultTimeframeRange);
   const [isAnalyticsChartZoomed, setIsAnalyticsChartZoomed] = useState(false);
 
   const setRange = useCallback((next: TimeframeRange) => {

@@ -1,10 +1,10 @@
 import { useState } from "react";
 import { Icon } from "../design-system";
 import {
-  DEFAULT_TIMEFRAME_FROM,
-  DEFAULT_TIMEFRAME_TO,
+  createRelativeTimeframeRange,
   formatTimeframeLabel,
   normalizeTimeframeRange,
+  TIMEFRAME_PRESETS,
   useTimeframe,
 } from "../context/TimeframeContext";
 import { Button } from "@/components/shadcn/button";
@@ -40,8 +40,8 @@ function fromDatetimeLocalValue(value: string): Date | null {
 export function TimeframeFilterDropdown() {
   const { range, commitAnalyticsTimeframe } = useTimeframe();
   const [open, setOpen] = useState(false);
-  const [draftFrom, setDraftFrom] = useState(() => toDatetimeLocalValue(DEFAULT_TIMEFRAME_FROM));
-  const [draftTo, setDraftTo] = useState(() => toDatetimeLocalValue(DEFAULT_TIMEFRAME_TO));
+  const [draftFrom, setDraftFrom] = useState(() => toDatetimeLocalValue(range.from));
+  const [draftTo, setDraftTo] = useState(() => toDatetimeLocalValue(range.to));
 
   const handleOpenChange = (nextOpen: boolean) => {
     if (nextOpen) {
@@ -51,12 +51,23 @@ export function TimeframeFilterDropdown() {
     setOpen(nextOpen);
   };
 
-  const applyRange = () => {
+  const applyRange = (from: Date, to: Date) => {
+    commitAnalyticsTimeframe(normalizeTimeframeRange(from, to));
+    setOpen(false);
+  };
+
+  const applyDraftRange = () => {
     const from = fromDatetimeLocalValue(draftFrom);
     const to = fromDatetimeLocalValue(draftTo);
     if (!from || !to) return;
-    commitAnalyticsTimeframe(normalizeTimeframeRange(from, to));
-    setOpen(false);
+    applyRange(from, to);
+  };
+
+  const applyPreset = (durationMs: number) => {
+    const next = createRelativeTimeframeRange(durationMs);
+    setDraftFrom(toDatetimeLocalValue(next.from));
+    setDraftTo(toDatetimeLocalValue(next.to));
+    applyRange(next.from, next.to);
   };
 
   const draftFromDate = fromDatetimeLocalValue(draftFrom);
@@ -91,32 +102,53 @@ export function TimeframeFilterDropdown() {
         onPointerDown={(event) => event.stopPropagation()}
       >
         <div className="space-y-3" role="dialog" aria-label="Choose timeframe">
-          <label className="block">
-            <span className="text-xs font-bold uppercase tracking-wide text-text-tertiary">From</span>
-            <Input
-              type="datetime-local"
-              value={draftFrom}
-              onChange={(event) => setDraftFrom(event.target.value)}
-              className={TIMEFRAME_INPUT_CLASS}
-              aria-label="Timeframe from"
-            />
-          </label>
-          <label className="block">
-            <span className="text-xs font-bold uppercase tracking-wide text-text-tertiary">To</span>
-            <Input
-              type="datetime-local"
-              value={draftTo}
-              onChange={(event) => setDraftTo(event.target.value)}
-              className={TIMEFRAME_INPUT_CLASS}
-              aria-label="Timeframe to"
-            />
-          </label>
+          <div>
+            <span className="text-xs font-bold uppercase tracking-wide text-text-tertiary">Quick ranges</span>
+            <div className="mt-2 flex flex-wrap gap-2">
+              {TIMEFRAME_PRESETS.map((preset) => (
+                <Button
+                  key={preset.id}
+                  type="button"
+                  variant="secondary-outline"
+                  size="xs"
+                  onClick={() => applyPreset(preset.durationMs)}
+                >
+                  {preset.label}
+                </Button>
+              ))}
+            </div>
+          </div>
+          <div>
+            <span className="text-xs font-bold uppercase tracking-wide text-text-tertiary">Custom range</span>
+            <div className="mt-2 space-y-3">
+              <label className="block">
+                <span className="text-xs font-bold uppercase tracking-wide text-text-tertiary">From</span>
+                <Input
+                  type="datetime-local"
+                  value={draftFrom}
+                  onChange={(event) => setDraftFrom(event.target.value)}
+                  className={TIMEFRAME_INPUT_CLASS}
+                  aria-label="Timeframe from"
+                />
+              </label>
+              <label className="block">
+                <span className="text-xs font-bold uppercase tracking-wide text-text-tertiary">To</span>
+                <Input
+                  type="datetime-local"
+                  value={draftTo}
+                  onChange={(event) => setDraftTo(event.target.value)}
+                  className={TIMEFRAME_INPUT_CLASS}
+                  aria-label="Timeframe to"
+                />
+              </label>
+            </div>
+          </div>
         </div>
         <div className="mt-4 flex justify-end gap-2">
           <Button type="button" variant="secondary-outline" className="h-8 ring-offset-surface-modal" onClick={() => setOpen(false)}>
             Cancel
           </Button>
-          <Button type="button" variant="default" className="h-8" disabled={!canApply} onClick={applyRange}>
+          <Button type="button" variant="default" className="h-8" disabled={!canApply} onClick={applyDraftRange}>
             Apply
           </Button>
         </div>
