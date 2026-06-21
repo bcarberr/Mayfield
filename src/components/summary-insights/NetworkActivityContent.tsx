@@ -30,10 +30,10 @@ import { TimeSeriesAreaChart } from "./timeSeriesAreaChart";
 import {
   buildHourlyAxisTicks,
   buildHourlyBuckets,
-  findSpikeBucketIndex,
   formatBucketTimeLabel,
   shouldIncludeDateInBucketLabels,
   hourlySeverityValues,
+  resolveAnalyticsSpikeIndices,
   SPIKE_CLOCK_HOUR,
 } from "./timeframeChartUtils";
 
@@ -251,6 +251,48 @@ const NETWORK_ACTIVITY_ROWS: NetworkActivityRow[] = [
     sourceIp: "192.168.10.5",
     destinationIp: "8.8.8.8",
     connector: demoTableConnector(9),
+  },
+];
+
+const NETWORK_SECONDARY_SPIKE_ROWS: NetworkActivityRow[] = [
+  {
+    id: "s1",
+    severity: "Critical",
+    time: "21:30:08",
+    eventType: "HTTP Activity",
+    title: "HTTPS beaconing to newly registered domain after business hours",
+    activity: "Traffic",
+    status: "Success",
+    trafficType: "HTTP",
+    sourceIp: "10.0.4.92",
+    destinationIp: "185.220.101.44",
+    connector: demoTableConnector(0),
+  },
+  {
+    id: "s2",
+    severity: "Critical",
+    time: "21:30:18",
+    eventType: "DNS Activity",
+    title: "High-entropy DNS queries to rare TLD suggest tunneling from finance subnet",
+    activity: "Traffic",
+    status: "Success",
+    trafficType: "DNS",
+    sourceIp: "10.0.8.14",
+    destinationIp: "8.8.8.8",
+    connector: demoTableConnector(1),
+  },
+  {
+    id: "s3",
+    severity: "High",
+    time: "21:30:28",
+    eventType: "SSH Activity",
+    title: "Lateral SSH movement from workstation to domain controller subnet",
+    activity: "Traffic",
+    status: "Failure",
+    trafficType: "SSH",
+    sourceIp: "10.0.2.55",
+    destinationIp: "10.0.0.12",
+    connector: demoTableConnector(2),
   },
 ];
 
@@ -612,11 +654,16 @@ export function NetworkActivityContent() {
 
   const tableRows = useMemo(
     () =>
-      buildHourlyEventRows(NETWORK_ACTIVITY_ROWS, initialTimeframe, (template, id, eventTime) => ({
-        ...template,
-        id,
-        time: formatAnalyticsRowTime(eventTime),
-      })),
+      buildHourlyEventRows(
+        NETWORK_ACTIVITY_ROWS,
+        initialTimeframe,
+        (template, id, eventTime) => ({
+          ...template,
+          id,
+          time: formatAnalyticsRowTime(eventTime),
+        }),
+        { secondarySpikeTemplates: NETWORK_SECONDARY_SPIKE_ROWS },
+      ),
     [initialTimeframe],
   );
 
@@ -713,7 +760,7 @@ export function NetworkActivityContent() {
 
   const eventsPerHourChart = useMemo(() => {
     const buckets = buildHourlyBuckets(timeframe);
-    const spikeIndex = findSpikeBucketIndex(buckets, timeframe.to);
+    const { spikeIndex, secondarySpikeIndex } = resolveAnalyticsSpikeIndices(buckets, timeframe.to);
     const includeDate = shouldIncludeDateInBucketLabels(timeframe);
     const xLabels = buckets.map((bucket) => formatBucketTimeLabel(bucket.start, includeDate));
     const { indices: xTickIndices, labels: xTickLabels } = buildHourlyAxisTicks(buckets, timeframe);
@@ -724,21 +771,21 @@ export function NetworkActivityContent() {
         label: "Medium",
         color: SEV_BAR.Medium,
         icon: SEV_ICONS.Medium,
-        values: hourlySeverityValues(14, buckets, spikeIndex),
+        values: hourlySeverityValues(14, buckets, spikeIndex, secondarySpikeIndex),
       },
       {
         id: "High",
         label: "High",
         color: SEV_BAR.High,
         icon: SEV_ICONS.High,
-        values: hourlySeverityValues(10, buckets, spikeIndex),
+        values: hourlySeverityValues(10, buckets, spikeIndex, secondarySpikeIndex),
       },
       {
         id: "Critical",
         label: "Critical",
         color: SEV_BAR.Critical,
         icon: SEV_ICONS.Critical,
-        values: hourlySeverityValues(4, buckets, spikeIndex),
+        values: hourlySeverityValues(4, buckets, spikeIndex, secondarySpikeIndex),
       },
     ] as const;
 
@@ -835,7 +882,7 @@ export function NetworkActivityContent() {
                     setSearchQuery("");
                   }}
                 >
-                  <Icon name="action-filter-list" size={12} aria-hidden />
+                  <Icon name="action-filter-list" size={14} aria-hidden />
                   Clear all filters
                 </Button>
               ) : null}

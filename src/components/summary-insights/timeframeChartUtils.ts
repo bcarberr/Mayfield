@@ -5,6 +5,46 @@ export type HourBucket = {
 };
 
 export const SPIKE_CLOCK_HOUR = 13;
+/** Evening activity bump — hour bucket covering ~21:00–21:59 (clustered ~21:30). */
+export const SECONDARY_SPIKE_CLOCK_HOUR = 21;
+export const SECONDARY_SPIKE_CLUSTER_MINUTES = 30;
+
+/** @deprecated Use {@link SECONDARY_SPIKE_CLOCK_HOUR}. */
+export const FINDINGS_SECONDARY_SPIKE_CLOCK_HOUR = SECONDARY_SPIKE_CLOCK_HOUR;
+
+export function resolveAnalyticsSpikeIndices(
+  buckets: readonly HourBucket[],
+  to: Date,
+  primarySpikeHour: number = SPIKE_CLOCK_HOUR,
+): { spikeIndex: number | null; secondarySpikeIndex: number | null } {
+  return {
+    spikeIndex: findSpikeBucketIndex(buckets, to, primarySpikeHour),
+    secondarySpikeIndex: findSpikeBucketIndexByClockHour(buckets, SECONDARY_SPIKE_CLOCK_HOUR),
+  };
+}
+
+export function eventTimeForAnalyticsBucket(
+  bucket: HourBucket,
+  eventIndex: number,
+  eventCount: number,
+  fromMs: number,
+  toMs: number,
+  clusterAtMinutes?: number,
+): Date {
+  const bucketStart = Math.max(bucket.start.getTime(), fromMs);
+  const bucketEnd = Math.min(bucket.start.getTime() + 3_600_000, toMs);
+  const bucketSpan = Math.max(bucketEnd - bucketStart, 60_000);
+
+  if (clusterAtMinutes != null) {
+    const clusterStart = bucket.start.getTime() + clusterAtMinutes * 60_000;
+    const jitterSeconds = (eventIndex % 6) * 10;
+    const eventMs = clusterStart + jitterSeconds * 1000;
+    return new Date(Math.min(Math.max(eventMs, bucketStart), toMs));
+  }
+
+  const eventMs = bucketStart + (bucketSpan * (eventIndex + 0.5)) / eventCount;
+  return new Date(Math.min(eventMs, toMs));
+}
 
 function pad2(value: number): string {
   return String(value).padStart(2, "0");
@@ -117,6 +157,18 @@ export function findSpikeBucketIndex(
   return idx >= 0 ? idx : null;
 }
 
+/** Last hourly bucket in range with the given clock hour (e.g. 21:00 for ~21:03 activity). */
+export function findSpikeBucketIndexByClockHour(
+  buckets: readonly HourBucket[],
+  clockHour: number,
+): number | null {
+  let lastMatch: number | null = null;
+  buckets.forEach((bucket, index) => {
+    if (bucket.start.getHours() === clockHour) lastMatch = index;
+  });
+  return lastMatch;
+}
+
 export function buildHourlyAxisTicks(
   buckets: readonly HourBucket[],
   range: TimeframeRange,
@@ -149,9 +201,14 @@ export function buildHourlyAxisTicks(
   return { indices, labels };
 }
 
-/** Baseline ramp with a pronounced spike bucket when present in the range. */
-export function hourlyEventMultiplier(clockHour: number, isSpikeBucket: boolean) {
+/** Baseline ramp with primary and optional secondary spike buckets. */
+export function hourlyEventMultiplier(
+  clockHour: number,
+  isSpikeBucket: boolean,
+  isSecondarySpikeBucket = false,
+) {
   if (isSpikeBucket) return 3.8;
+  if (isSecondarySpikeBucket) return 2.5;
   if (clockHour < 6) return 0.25;
   if (clockHour < 12) return 0.35 + (clockHour - 6) * 0.08;
   if (clockHour === 12 || clockHour === 14) return 2;
@@ -164,10 +221,12 @@ export function hourlySeverityValues(
   base: number,
   buckets: readonly HourBucket[],
   spikeIndex: number | null,
+  secondarySpikeIndex: number | null = null,
 ): number[] {
   return buckets.map((bucket, index) => {
     const isSpike = spikeIndex === index;
-    const multiplier = hourlyEventMultiplier(bucket.start.getHours(), isSpike);
+    const isSecondarySpike = secondarySpikeIndex === index;
+    const multiplier = hourlyEventMultiplier(bucket.start.getHours(), isSpike, isSecondarySpike);
     return Math.max(1, Math.round(base * multiplier * (0.92 + (index % 3) * 0.04)));
   });
 }

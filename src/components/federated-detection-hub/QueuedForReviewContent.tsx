@@ -256,7 +256,7 @@ function ReviewActions({
               aria-label="Clear from review"
               onClick={onDelete}
             >
-              <Icon name="action-clear" size={12} />
+              <Icon name="action-close" size={12} />
             </Button>
           </TooltipTrigger>
           <TooltipContent>Clear from review</TooltipContent>
@@ -540,7 +540,7 @@ function QueuedReviewTable({
               className="h-8 shrink-0 gap-1.5 px-2 text-base-small text-text-tertiary hover:text-text-primary [&_svg]:!h-2 [&_svg]:!w-3"
               onClick={onClearFilters}
             >
-              <Icon name="action-filter-list" size={12} aria-hidden />
+              <Icon name="action-filter-list" size={14} aria-hidden />
               Clear all filters
             </Button>
           ) : null}

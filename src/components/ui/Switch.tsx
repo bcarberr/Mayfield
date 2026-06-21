@@ -7,6 +7,7 @@ export type SwitchProps = {
   checked: boolean;
   disabled?: boolean;
   label?: ReactNode;
+  labelClassName?: string;
   onCheckedChange?: (checked: boolean) => void;
   className?: string;
   /** Optional stable id; otherwise `useId` is used for label association */
@@ -15,10 +16,9 @@ export type SwitchProps = {
 
 /**
  * Query DS Switch (Figma: component `1509:4265`, e.g. light/off `1603:3601`).
- * 36×18px track, 12px thumb. Themes follow `data-theme` via `tokens.css` / `--color-*`.
- * Interactive hover/pressed use `--color-primary-hover` and `--color-primary-pressed`.
+ * 36×18px track, 12px thumb. Off = outlined track + gray thumb; on = teal fill + button-color thumb.
  */
-export function Switch({ checked, disabled, label, onCheckedChange, className, id: idProp }: SwitchProps) {
+export function Switch({ checked, disabled, label, labelClassName, onCheckedChange, className, id: idProp }: SwitchProps) {
   const uid = useId().replace(/:/g, "");
   const switchId = idProp ?? uid;
   const toggle = () => {
@@ -31,7 +31,7 @@ export function Switch({ checked, disabled, label, onCheckedChange, className, i
     <span
       aria-hidden
       className={cx(
-        "pointer-events-none absolute inset-0 rounded-[9px] transition-colors duration-150 ease-out",
+        "pointer-events-none absolute inset-0 box-border rounded-[9px] transition-colors duration-150 ease-out",
         disabled &&
           (checked
             ? "bg-[var(--color-switch-track-on-disabled)]"
@@ -42,7 +42,9 @@ export function Switch({ checked, disabled, label, onCheckedChange, className, i
             "bg-interactive-active",
             "enabled:group-hover:bg-[var(--color-primary-hover)] enabled:group-active:bg-[var(--color-primary-pressed)]",
           ),
-        !disabled && !checked && "bg-text-tertiary",
+        !disabled &&
+          !checked &&
+          "border border-solid border-[var(--color-switch-track-off)] bg-transparent",
       )}
     />
   );
@@ -53,9 +55,9 @@ export function Switch({ checked, disabled, label, onCheckedChange, className, i
       className={cx(
         "pointer-events-none absolute top-[3px] size-3 rounded-full transition-[left,background-color] duration-150 ease-out",
         disabled && checked && "left-[21px] bg-[var(--color-switch-thumb-on-disabled)]",
-        disabled && !checked && "left-1 bg-[var(--color-switch-off-disabled)]",
+        disabled && !checked && "left-1 bg-[var(--color-switch-thumb-off-disabled)]",
         !disabled && checked && "left-[21px] bg-text-on-primary",
-        !disabled && !checked && "left-1 bg-text-primary",
+        !disabled && !checked && "left-1 bg-[var(--color-switch-thumb-off)]",
       )}
     />
   );
@@ -70,7 +72,7 @@ export function Switch({ checked, disabled, label, onCheckedChange, className, i
       disabled={disabled}
       onClick={toggle}
       className={cx(
-        "group relative h-[18px] w-9 shrink-0 overflow-hidden rounded-[9px] p-0 outline-none",
+        "group relative box-border h-[18px] w-9 shrink-0 overflow-hidden rounded-[9px] p-0 outline-none",
         "focus-visible:ring-1 focus-visible:ring-interactive-active",
         interactive ? "cursor-pointer" : "cursor-default",
       )}
@@ -97,7 +99,8 @@ export function Switch({ checked, disabled, label, onCheckedChange, className, i
       {control}
       <span
         className={cx(
-          "text-sm font-semibold leading-[18px] text-text-tertiary",
+          "text-sm font-semibold leading-[18px]",
+          labelClassName ?? "text-text-tertiary",
           disabled && "opacity-60",
         )}
       >

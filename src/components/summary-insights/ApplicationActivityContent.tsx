@@ -31,10 +31,10 @@ import { TimeSeriesAreaChart } from "./timeSeriesAreaChart";
 import {
   buildHourlyAxisTicks,
   buildHourlyBuckets,
-  findSpikeBucketIndex,
   formatBucketTimeLabel,
   shouldIncludeDateInBucketLabels,
   hourlySeverityValues,
+  resolveAnalyticsSpikeIndices,
 } from "./timeframeChartUtils";
 
 const APPLICATION_SPIKE_HOUR = 10;
@@ -227,6 +227,45 @@ const APPLICATION_ACTIVITY_ROW_TEMPLATES: ApplicationActivityRow[] = [
     app: "GitHub",
     user: "release-bot",
     connector: demoTableConnector(9),
+  },
+];
+
+const APPLICATION_SECONDARY_SPIKE_ROWS: ApplicationActivityRow[] = [
+  {
+    id: "s1",
+    severity: "Critical",
+    title: "Mass M365 file download by terminated employee account after hours",
+    time: "21:30:08",
+    activity: "Read",
+    eventClass: "File Hosting Activity",
+    activityClass: "File Hosting",
+    app: "M365",
+    user: "former.contractor",
+    connector: demoTableConnector(0),
+  },
+  {
+    id: "s2",
+    severity: "Critical",
+    title: "Snowflake COPY INTO external stage exported 2.1M rows overnight",
+    time: "21:30:18",
+    activity: "Query",
+    eventClass: "Datastore Activity",
+    activityClass: "Datastore Activity",
+    app: "Snowflake",
+    user: "svc-etl",
+    connector: demoTableConnector(1),
+  },
+  {
+    id: "s3",
+    severity: "High",
+    title: "OAuth consent grant to unverified app from Global Admin account",
+    time: "21:30:28",
+    activity: "Authorize",
+    eventClass: "API Activity",
+    activityClass: "API Activity",
+    app: "M365",
+    user: "global.admin",
+    connector: demoTableConnector(2),
   },
 ];
 
@@ -506,11 +545,19 @@ export function ApplicationActivityContent() {
 
   const tableRows = useMemo(
     () =>
-      buildHourlyEventRows(APPLICATION_ACTIVITY_ROW_TEMPLATES, initialTimeframe, (template, id, eventTime) => ({
-        ...template,
-        id,
-        time: formatAnalyticsRowTime(eventTime),
-      })),
+      buildHourlyEventRows(
+        APPLICATION_ACTIVITY_ROW_TEMPLATES,
+        initialTimeframe,
+        (template, id, eventTime) => ({
+          ...template,
+          id,
+          time: formatAnalyticsRowTime(eventTime),
+        }),
+        {
+          primarySpikeHour: APPLICATION_SPIKE_HOUR,
+          secondarySpikeTemplates: APPLICATION_SECONDARY_SPIKE_ROWS,
+        },
+      ),
     [initialTimeframe],
   );
 
@@ -595,7 +642,11 @@ export function ApplicationActivityContent() {
 
   const eventsPerHourChart = useMemo(() => {
     const buckets = buildHourlyBuckets(timeframe);
-    const spikeIndex = findSpikeBucketIndex(buckets, timeframe.to, APPLICATION_SPIKE_HOUR);
+    const { spikeIndex, secondarySpikeIndex } = resolveAnalyticsSpikeIndices(
+      buckets,
+      timeframe.to,
+      APPLICATION_SPIKE_HOUR,
+    );
     const includeDate = shouldIncludeDateInBucketLabels(timeframe);
     const xLabels = buckets.map((bucket) => formatBucketTimeLabel(bucket.start, includeDate));
     const { indices: xTickIndices, labels: xTickLabels } = buildHourlyAxisTicks(buckets, timeframe);
@@ -606,21 +657,21 @@ export function ApplicationActivityContent() {
         label: "Medium",
         color: SEV_BAR.Medium,
         icon: SEV_ICONS.Medium,
-        values: hourlySeverityValues(14, buckets, spikeIndex),
+        values: hourlySeverityValues(14, buckets, spikeIndex, secondarySpikeIndex),
       },
       {
         id: "High",
         label: "High",
         color: SEV_BAR.High,
         icon: SEV_ICONS.High,
-        values: hourlySeverityValues(10, buckets, spikeIndex),
+        values: hourlySeverityValues(10, buckets, spikeIndex, secondarySpikeIndex),
       },
       {
         id: "Critical",
         label: "Critical",
         color: SEV_BAR.Critical,
         icon: SEV_ICONS.Critical,
-        values: hourlySeverityValues(4, buckets, spikeIndex),
+        values: hourlySeverityValues(4, buckets, spikeIndex, secondarySpikeIndex),
       },
     ] as const;
 
@@ -720,7 +771,7 @@ export function ApplicationActivityContent() {
                     setSearchQuery("");
                   }}
                 >
-                  <Icon name="action-filter-list" size={12} aria-hidden />
+                  <Icon name="action-filter-list" size={14} aria-hidden />
                   Clear all filters
                 </Button>
               ) : null}

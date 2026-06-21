@@ -1,4 +1,5 @@
 import { type KeyboardEvent, useCallback, useEffect, useRef, useState } from "react";
+import { Search } from "lucide-react";
 import { Icon } from "../design-system";
 import {
   type CopilotAssistantResponse,
@@ -95,7 +96,7 @@ function CopilotResponseBlock({
               className="w-full"
               onClick={() => onSendToFsqlSearch(block.text.trim())}
             >
-              <Icon name="action-search" className="shrink-0 text-current" aria-hidden />
+              <Search size={16} strokeWidth={1.5} className="shrink-0 text-current" aria-hidden />
               Send to Query
             </Button>
           ) : null}

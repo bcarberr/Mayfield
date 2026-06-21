@@ -1,5 +1,5 @@
 import { forwardRef, type InputHTMLAttributes, type ReactNode } from "react";
-import { Icon } from "../../design-system";
+import { CircleX } from "lucide-react";
 
 const base =
   "flex w-full min-w-0 items-center gap-1 rounded border border-border-rule bg-surface-modal px-1.5 text-sm text-text-primary outline-none transition-[box-shadow] focus-within:ring-1 focus-within:ring-interactive-active";
@@ -45,7 +45,7 @@ export const Input = forwardRef<HTMLInputElement, InputProps>(function Input(
           onClick={onClear}
           aria-label="Clear"
         >
-          <Icon name="action-cancel-clear" size={14} />
+          <CircleX size={14} strokeWidth={1.5} />
         </button>
       ) : null}
     </div>

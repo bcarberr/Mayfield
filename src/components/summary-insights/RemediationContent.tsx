@@ -31,10 +31,10 @@ import { TimeSeriesAreaChart } from "./timeSeriesAreaChart";
 import {
   buildHourlyAxisTicks,
   buildHourlyBuckets,
-  findSpikeBucketIndex,
   formatBucketTimeLabel,
   shouldIncludeDateInBucketLabels,
   hourlySeverityValues,
+  resolveAnalyticsSpikeIndices,
 } from "./timeframeChartUtils";
 
 const REMEDIATION_SPIKE_HOUR = 10;
@@ -230,6 +230,45 @@ const REMEDIATION_ROW_TEMPLATES: RemediationRow[] = [
     entity: "hr-laptop-22",
     status: "Succeeded",
     connector: demoTableConnector(9),
+  },
+];
+
+const REMEDIATION_SECONDARY_SPIKE_ROWS: RemediationRow[] = [
+  {
+    id: "s1",
+    severity: "Critical",
+    title: "Auto-isolate failed — compromised host still beaconing to C2",
+    time: "21:30:08",
+    activity: "Isolate",
+    eventClass: "Network Remediation Activity",
+    activityClass: "Network Remediation",
+    entity: "FIN-WS-014",
+    status: "Failed",
+    connector: demoTableConnector(0),
+  },
+  {
+    id: "s2",
+    severity: "High",
+    title: "Emergency block on C2 IP queued pending SOC approval",
+    time: "21:30:18",
+    activity: "Block",
+    eventClass: "Network Remediation Activity",
+    activityClass: "Network Remediation",
+    entity: "185.220.101.44:443",
+    status: "Pending",
+    connector: demoTableConnector(1),
+  },
+  {
+    id: "s3",
+    severity: "High",
+    title: "Kill process action failed on persistent malware parent chain",
+    time: "21:30:28",
+    activity: "Kill Process",
+    eventClass: "Process Remediation Activity",
+    activityClass: "Process Remediation",
+    entity: "beacon.exe (PID 4412)",
+    status: "Failed",
+    connector: demoTableConnector(2),
   },
 ];
 
@@ -515,11 +554,19 @@ export function RemediationContent() {
 
   const tableRows = useMemo(
     () =>
-      buildHourlyEventRows(REMEDIATION_ROW_TEMPLATES, initialTimeframe, (template, id, eventTime) => ({
-        ...template,
-        id,
-        time: formatAnalyticsRowTime(eventTime),
-      })),
+      buildHourlyEventRows(
+        REMEDIATION_ROW_TEMPLATES,
+        initialTimeframe,
+        (template, id, eventTime) => ({
+          ...template,
+          id,
+          time: formatAnalyticsRowTime(eventTime),
+        }),
+        {
+          primarySpikeHour: REMEDIATION_SPIKE_HOUR,
+          secondarySpikeTemplates: REMEDIATION_SECONDARY_SPIKE_ROWS,
+        },
+      ),
     [initialTimeframe],
   );
 
@@ -604,7 +651,11 @@ export function RemediationContent() {
 
   const eventsPerHourChart = useMemo(() => {
     const buckets = buildHourlyBuckets(timeframe);
-    const spikeIndex = findSpikeBucketIndex(buckets, timeframe.to, REMEDIATION_SPIKE_HOUR);
+    const { spikeIndex, secondarySpikeIndex } = resolveAnalyticsSpikeIndices(
+      buckets,
+      timeframe.to,
+      REMEDIATION_SPIKE_HOUR,
+    );
     const includeDate = shouldIncludeDateInBucketLabels(timeframe);
     const xLabels = buckets.map((bucket) => formatBucketTimeLabel(bucket.start, includeDate));
     const { indices: xTickIndices, labels: xTickLabels } = buildHourlyAxisTicks(buckets, timeframe);
@@ -615,21 +666,21 @@ export function RemediationContent() {
         label: "Medium",
         color: SEV_BAR.Medium,
         icon: SEV_ICONS.Medium,
-        values: hourlySeverityValues(14, buckets, spikeIndex),
+        values: hourlySeverityValues(14, buckets, spikeIndex, secondarySpikeIndex),
       },
       {
         id: "High",
         label: "High",
         color: SEV_BAR.High,
         icon: SEV_ICONS.High,
-        values: hourlySeverityValues(10, buckets, spikeIndex),
+        values: hourlySeverityValues(10, buckets, spikeIndex, secondarySpikeIndex),
       },
       {
         id: "Critical",
         label: "Critical",
         color: SEV_BAR.Critical,
         icon: SEV_ICONS.Critical,
-        values: hourlySeverityValues(4, buckets, spikeIndex),
+        values: hourlySeverityValues(4, buckets, spikeIndex, secondarySpikeIndex),
       },
     ] as const;
 
@@ -729,7 +780,7 @@ export function RemediationContent() {
                     setSearchQuery("");
                   }}
                 >
-                  <Icon name="action-filter-list" size={12} aria-hidden />
+                  <Icon name="action-filter-list" size={14} aria-hidden />
                   Clear all filters
                 </Button>
               ) : null}

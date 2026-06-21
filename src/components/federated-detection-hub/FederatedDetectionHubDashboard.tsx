@@ -19,6 +19,7 @@ import {
   DATA_GRID_TOOLBAR_STICKY_CLASS,
 } from "../ui/dataGridTableStyles";
 import { useDataGridStickyToolbar } from "../ui/useDataGridStickyToolbar";
+import { Plus } from "lucide-react";
 import { Checkbox, Icon, Switch, type SeverityShapeIconName } from "../../design-system";
 import { Button } from "@/components/shadcn/button";
 import { ColumnHeaderMenu } from "../ui/ColumnHeaderMenu";
@@ -767,7 +768,7 @@ function DetectionsTable({
               className="h-8 shrink-0 gap-1.5 px-2 text-base-small text-text-tertiary hover:text-text-primary [&_svg]:!h-2 [&_svg]:!w-3"
               onClick={onClearFilters}
             >
-              <Icon name="action-filter-list" size={12} aria-hidden />
+              <Icon name="action-filter-list" size={14} aria-hidden />
               Clear all filters
             </Button>
           ) : null}
@@ -1498,12 +1499,7 @@ export function FederatedDetectionHubDashboard({
             setCreateDetectionOpen(true);
           }}
         >
-          <Icon
-            name="action-add"
-            size={12}
-            className="size-3 shrink-0 text-current [&>svg]:!size-[12px]"
-            aria-hidden
-          />
+          <Plus size={12} strokeWidth={1.5} className="size-3 shrink-0 text-current" aria-hidden />
           Create New Detection
         </Button>
       </div>

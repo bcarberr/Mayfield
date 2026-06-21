@@ -7,6 +7,7 @@ import {
   DATA_GRID_TABLE_SCROLL_CLASS,
   DATA_GRID_THEAD_CLASS,
 } from "../ui/dataGridTableStyles";
+import { Search } from "lucide-react";
 import { Checkbox, Icon, type SeverityShapeIconName } from "../../design-system";
 import { type TimeframeRange } from "../../context/TimeframeContext";
 import { Button } from "@/components/shadcn/button";
@@ -248,7 +249,7 @@ function EntityCardHeaderActions() {
       <Tooltip>
         <TooltipTrigger asChild>
           <Button variant="ghost" size="icon-xs" className="p-0 text-text-tertiary hover:text-text-primary" aria-label="Pivot search">
-            <Icon name="action-search" size={16} />
+            <Search size={16} strokeWidth={1.5} />
           </Button>
         </TooltipTrigger>
         <TooltipContent>Pivot search</TooltipContent>
@@ -908,7 +909,7 @@ function EntitiesAggregatedPanel({ rows }: { rows: AggregatedEntityRow[] }) {
                 className="h-8 shrink-0 gap-1.5 px-2 text-base-small text-text-tertiary hover:text-text-primary [&_svg]:!h-2 [&_svg]:!w-3"
                 onClick={() => setSearchQuery("")}
               >
-                <Icon name="action-filter-list" size={12} aria-hidden />
+                <Icon name="action-filter-list" size={14} aria-hidden />
                 Clear all filters
               </Button>
             ) : null}

@@ -10,6 +10,8 @@ export const ROUTES = {
   settings: "/settings",
   addons: "/addons",
   adminSettings: "/admin-settings",
+  /** Hidden design-system explorer — not shown in main nav. */
+  designSystem: "/design-system",
 } as const;
 
 /** Default landing page — rendered at `/` and aliased at `ROUTES.summaryInsights`. */

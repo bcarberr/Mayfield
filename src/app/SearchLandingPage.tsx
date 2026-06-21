@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useRef, useState, type ReactNode } from "react";
 import { Link } from "react-router-dom";
+import { BookSearch, CircleX, Plus, Search } from "lucide-react";
 import { Icon } from "../design-system";
 import { ROUTES } from "./routes";
 import { FsqlSearchTextarea } from "../components/FsqlSearchTextarea";
@@ -36,7 +37,7 @@ import { Snackbar } from "../components/ui/Snackbar";
 import { useDetectionHub } from "../context/DetectionHubContext";
 
 const TOOLBAR_SECONDARY_BTN_CLASS = "shrink-0 ring-offset-surface-page";
-const TOOLBAR_ICON_CLASS = "size-3 shrink-0 text-current [&>svg]:!size-[12px]";
+const TOOLBAR_ICON_CLASS = "size-3.5 shrink-0 text-current";
 const TOOLBAR_PRIMARY_BUTTON_CLASS =
   "h-8 shrink-0 bg-interactive-active text-text-on-primary hover:bg-interactive-active/90 focus-visible:ring-interactive-active ring-offset-surface-page";
 
@@ -173,7 +174,7 @@ function SearchToolbarActions({
                 disabled={!hasFsqlQuery}
                 onClick={onClearSearch}
               >
-                <Icon name="action-cancel-clear" size={12} className={TOOLBAR_ICON_CLASS} aria-hidden />
+                <CircleX size={14} strokeWidth={1.5} className={TOOLBAR_ICON_CLASS} aria-hidden />
                 Clear Search
               </Button>
               <Button
@@ -183,11 +184,11 @@ function SearchToolbarActions({
                 disabled={!hasFsqlQuery}
                 onClick={onCreateDetection}
               >
-                <Icon name="action-add" size={12} className={TOOLBAR_ICON_CLASS} aria-hidden />
+                <Plus size={14} strokeWidth={1.5} className={TOOLBAR_ICON_CLASS} aria-hidden />
                 Create New Detection
               </Button>
               <Button type="button" variant="secondary-outline" className={TOOLBAR_SECONDARY_BTN_CLASS} disabled={!hasFsqlQuery}>
-                <Icon name="action-saved-search" size={12} className={TOOLBAR_ICON_CLASS} aria-hidden />
+                <BookSearch size={14} strokeWidth={1.5} className={TOOLBAR_ICON_CLASS} aria-hidden />
                 Save Search
               </Button>
               <Button
@@ -196,7 +197,7 @@ function SearchToolbarActions({
                 disabled={!hasFsqlQuery}
                 onClick={onFsqlSearch}
               >
-                <Icon name="action-search" size={12} className={TOOLBAR_ICON_CLASS} aria-hidden />
+                <Search size={14} strokeWidth={1.5} className={TOOLBAR_ICON_CLASS} aria-hidden />
                 Search
               </Button>
             </>
@@ -209,7 +210,7 @@ function SearchToolbarActions({
                 disabled={!queryBuilderValid}
                 onClick={onClearSearch}
               >
-                <Icon name="action-cancel-clear" size={12} className={TOOLBAR_ICON_CLASS} aria-hidden />
+                <CircleX size={14} strokeWidth={1.5} className={TOOLBAR_ICON_CLASS} aria-hidden />
                 Clear Search
               </Button>
               <Button
@@ -219,15 +220,15 @@ function SearchToolbarActions({
                 disabled={!queryBuilderValid}
                 onClick={onCreateDetection}
               >
-                <Icon name="action-add" size={12} className={TOOLBAR_ICON_CLASS} aria-hidden />
+                <Plus size={14} strokeWidth={1.5} className={TOOLBAR_ICON_CLASS} aria-hidden />
                 Create New Detection
               </Button>
               <Button type="button" variant="secondary-outline" className={TOOLBAR_SECONDARY_BTN_CLASS} disabled={!queryBuilderValid}>
-                <Icon name="action-saved-search" size={12} className={TOOLBAR_ICON_CLASS} aria-hidden />
+                <BookSearch size={14} strokeWidth={1.5} className={TOOLBAR_ICON_CLASS} aria-hidden />
                 Save Search
               </Button>
               <Button type="button" className={TOOLBAR_PRIMARY_BUTTON_CLASS} disabled={!canSearch}>
-                <Icon name="action-search" size={12} className={TOOLBAR_ICON_CLASS} aria-hidden />
+                <Search size={14} strokeWidth={1.5} className={TOOLBAR_ICON_CLASS} aria-hidden />
                 Search
               </Button>
             </>

@@ -10,6 +10,7 @@ import {
   DATA_GRID_TABLE_SCROLL_CLASS,
   DATA_GRID_THEAD_CLASS,
   DATA_GRID_TOOLBAR_STICKY_CLASS,
+  DATA_GRID_RESULTS_SEARCH_PLACEHOLDER,
 } from "../ui/dataGridTableStyles";
 import { useDataGridStickyToolbar } from "../ui/useDataGridStickyToolbar";
 import { Checkbox, Icon, Switch } from "../../design-system";
@@ -18,6 +19,7 @@ import { ColumnHeaderMenu } from "../ui/ColumnHeaderMenu";
 import { compareBooleans, compareNumbers, compareStrings, useColumnSort } from "../ui/useColumnSort";
 import { FilterColumnPanel, type FilterColumnPanelTool } from "../ui/FilterColumnPanel";
 import { DataGridExportButton } from "../ui/DataGridExportButton";
+import { Input } from "../ui/Input";
 import { TruncatedText } from "../ui/TruncatedText";
 import { useResizableColumns } from "../ui/useResizableColumns";
 import { DatavisGridlineRule } from "../summary-insights/datavisCard";
@@ -176,6 +178,8 @@ function PipelinesTable({
   onToggleExpand,
   onToggleExpandAll,
   statFilterLabel,
+  searchQuery,
+  onSearchQueryChange,
   onClearFilters,
   hasActiveFilters,
   eventLogEnabledByPipeline,
@@ -190,6 +194,8 @@ function PipelinesTable({
   onToggleExpand: (id: string) => void;
   onToggleExpandAll: () => void;
   statFilterLabel: string | null;
+  searchQuery: string;
+  onSearchQueryChange: (query: string) => void;
   onClearFilters: () => void;
   hasActiveFilters: boolean;
   eventLogEnabledByPipeline: Record<string, Record<string, boolean>>;
@@ -247,7 +253,19 @@ function PipelinesTable({
           <p className="shrink-0 text-base-small text-text-secondary">
             {rows.length} of {DATA_PIPELINE_ROWS.length} Results
             {statFilterLabel ? ` · ${statFilterLabel}` : ""}
+            {searchQuery.trim() ? ` · “${searchQuery.trim()}”` : ""}
           </p>
+          <div className="w-[300px] shrink-0">
+            <Input
+              variant="search"
+              placeholder={DATA_GRID_RESULTS_SEARCH_PLACEHOLDER}
+              value={searchQuery}
+              onChange={(event) => onSearchQueryChange(event.target.value)}
+              onClear={() => onSearchQueryChange("")}
+              className="!bg-datavis-card-bg"
+              aria-label="Search data pipelines"
+            />
+          </div>
           {hasActiveFilters ? (
             <Button
               type="button"
@@ -255,7 +273,7 @@ function PipelinesTable({
               className="h-8 shrink-0 gap-1.5 px-2 text-base-small text-text-tertiary hover:text-text-primary [&_svg]:!h-2 [&_svg]:!w-3"
               onClick={onClearFilters}
             >
-              <Icon name="action-filter-list" size={12} aria-hidden />
+              <Icon name="action-filter-list" size={14} aria-hidden />
               Clear All Filters
             </Button>
           ) : null}
@@ -560,6 +578,8 @@ export function DataPipelinesDashboard({ searchQuery, onSearchQueryChange }: Dat
         onToggleExpand={toggleExpand}
         onToggleExpandAll={toggleExpandAll}
         statFilterLabel={statFilterLabel}
+        searchQuery={searchQuery}
+        onSearchQueryChange={onSearchQueryChange}
         onClearFilters={clearFilters}
         hasActiveFilters={hasActiveFilters}
         eventLogEnabledByPipeline={eventLogEnabledByPipeline}

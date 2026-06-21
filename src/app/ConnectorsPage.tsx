@@ -1,4 +1,5 @@
 import { lazy, Suspense, useCallback, useEffect, useState } from "react";
+import { Download, Plus } from "lucide-react";
 import { Icon } from "../design-system";
 import { AddConnectorDrawer } from "../components/connectors/AddConnectorDrawer";
 import { ConnectorsDashboard } from "../components/connectors/ConnectorsDashboard";
@@ -205,11 +206,11 @@ export function ConnectorsPage() {
                 className="h-8 shrink-0 ring-offset-surface-page"
                 onClick={openAddConnector}
               >
-                <Icon name="action-add" size={12} className="size-3 shrink-0 text-current [&>svg]:!size-[12px]" aria-hidden />
+                <Plus size={14} strokeWidth={1.5} className="size-3.5 shrink-0 text-current" aria-hidden />
                 Add Connector
               </Button>
               <Button type="button" variant="secondary-outline" className="h-8 shrink-0 ring-offset-surface-page">
-                <Icon name="action-file-upload" size={12} className="size-3 shrink-0 text-current [&>svg]:!size-[12px]" aria-hidden />
+                <Download size={14} strokeWidth={1.5} className="size-3.5 shrink-0 text-current" aria-hidden />
                 Export Connectors
               </Button>
             </div>

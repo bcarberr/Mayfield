@@ -31,10 +31,10 @@ import { TimeSeriesAreaChart } from "./timeSeriesAreaChart";
 import {
   buildHourlyAxisTicks,
   buildHourlyBuckets,
-  findSpikeBucketIndex,
   formatBucketTimeLabel,
   shouldIncludeDateInBucketLabels,
   hourlySeverityValues,
+  resolveAnalyticsSpikeIndices,
   SPIKE_CLOCK_HOUR,
 } from "./timeframeChartUtils";
 
@@ -250,6 +250,45 @@ const SYSTEM_ACTIVITY_ROWS: SystemActivityRow[] = [
     connector: demoTableConnector(9),
     host: "WIN-DC01",
     process: "cmd.exe",
+  },
+];
+
+const SYSTEM_SECONDARY_SPIKE_ROWS: SystemActivityRow[] = [
+  {
+    id: "s1",
+    severity: "Critical",
+    title: "LSASS memory access attempt from unsigned remote process",
+    time: "21:30:08",
+    activity: "Inject",
+    eventClass: "Process Activity",
+    activityClass: "Process",
+    connector: demoTableConnector(0),
+    host: "FIN-WS-014",
+    process: "rundll32.exe",
+  },
+  {
+    id: "s2",
+    severity: "Critical",
+    title: "Cobalt Strike-like beacon spawned from w3wp.exe parent process",
+    time: "21:30:18",
+    activity: "Launch",
+    eventClass: "Process Activity",
+    activityClass: "Process",
+    connector: demoTableConnector(1),
+    host: "WEB-EDGE-07",
+    process: "beacon.exe",
+  },
+  {
+    id: "s3",
+    severity: "High",
+    title: "Remote service created via PsExec pattern from compromised jump host",
+    time: "21:30:28",
+    activity: "Create",
+    eventClass: "Process Activity",
+    activityClass: "Process",
+    connector: demoTableConnector(2),
+    host: "JUMP-HOST-01",
+    process: "PSEXESVC.exe",
   },
 ];
 
@@ -515,11 +554,16 @@ export function SystemActivityContent() {
 
   const tableRows = useMemo(
     () =>
-      buildHourlyEventRows(SYSTEM_ACTIVITY_ROWS, initialTimeframe, (template, id, eventTime) => ({
-        ...template,
-        id,
-        time: formatAnalyticsRowTime(eventTime),
-      })),
+      buildHourlyEventRows(
+        SYSTEM_ACTIVITY_ROWS,
+        initialTimeframe,
+        (template, id, eventTime) => ({
+          ...template,
+          id,
+          time: formatAnalyticsRowTime(eventTime),
+        }),
+        { secondarySpikeTemplates: SYSTEM_SECONDARY_SPIKE_ROWS },
+      ),
     [initialTimeframe],
   );
 
@@ -594,7 +638,7 @@ export function SystemActivityContent() {
 
   const eventsPerHourChart = useMemo(() => {
     const buckets = buildHourlyBuckets(timeframe);
-    const spikeIndex = findSpikeBucketIndex(buckets, timeframe.to);
+    const { spikeIndex, secondarySpikeIndex } = resolveAnalyticsSpikeIndices(buckets, timeframe.to);
     const includeDate = shouldIncludeDateInBucketLabels(timeframe);
     const xLabels = buckets.map((bucket) => formatBucketTimeLabel(bucket.start, includeDate));
     const { indices: xTickIndices, labels: xTickLabels } = buildHourlyAxisTicks(buckets, timeframe);
@@ -605,21 +649,21 @@ export function SystemActivityContent() {
         label: "Medium",
         color: SEV_BAR.Medium,
         icon: SEV_ICONS.Medium,
-        values: hourlySeverityValues(14, buckets, spikeIndex),
+        values: hourlySeverityValues(14, buckets, spikeIndex, secondarySpikeIndex),
       },
       {
         id: "High",
         label: "High",
         color: SEV_BAR.High,
         icon: SEV_ICONS.High,
-        values: hourlySeverityValues(10, buckets, spikeIndex),
+        values: hourlySeverityValues(10, buckets, spikeIndex, secondarySpikeIndex),
       },
       {
         id: "Critical",
         label: "Critical",
         color: SEV_BAR.Critical,
         icon: SEV_ICONS.Critical,
-        values: hourlySeverityValues(4, buckets, spikeIndex),
+        values: hourlySeverityValues(4, buckets, spikeIndex, secondarySpikeIndex),
       },
     ] as const;
 
@@ -719,7 +763,7 @@ export function SystemActivityContent() {
                     setSearchQuery("");
                   }}
                 >
-                  <Icon name="action-filter-list" size={12} aria-hidden />
+                  <Icon name="action-filter-list" size={14} aria-hidden />
                   Clear all filters
                 </Button>
               ) : null}

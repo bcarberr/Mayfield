@@ -14,7 +14,7 @@ import action_create_new_folder from "./action-create-new-folder.svg?raw";
 import action_comment from "./action-comment.svg?raw";
 import action_content_copy from "./action-content-copy.svg?raw";
 import action_cloud from "./action-cloud.svg?raw";
-import action_clear from "./action-clear.svg?raw";
+import action_close from "./action-close.svg?raw";
 import action_check from "./action-check.svg?raw";
 import action_help_outline from "./action-help-outline.svg?raw";
 import action_filter_list from "./action-filter-list.svg?raw";
@@ -48,7 +48,7 @@ import action_visibility from "./action-visibility.svg?raw";
 import action_view_module from "./action-view-module.svg?raw";
 import action_prompt_arrow from "./action-prompt-arrow.svg?raw";
 
-export const ACTION_ICON_NAMES = ["action-chat-bubble-outline", "action-cancel-clear", "action-autorenew", "action-archive", "action-announcement", "action-add-circle-outline", "action-add", "action-time", "action-delete", "action-date-range", "action-create-new-folder", "action-comment", "action-content-copy", "action-cloud", "action-clear", "action-check", "action-help-outline", "action-filter-list", "action-file-upload", "action-file-download", "action-edit", "action-drag-indicator", "action-description", "action-profile-settings", "action-open-in-new", "action-lock", "action-tag", "action-list", "action-link", "action-info", "action-view-column", "action-upload-file", "action-sort", "action-settings", "action-search", "action-save", "action-resolve-alert", "action-remove", "action-prompt-add", "action-saved-search", "action-ai-spark", "action-filter-line", "action-filter-solid", "action-visibility-off", "action-visibility", "action-view-module", "action-prompt-arrow"] as const;
+export const ACTION_ICON_NAMES = ["action-chat-bubble-outline", "action-cancel-clear", "action-autorenew", "action-archive", "action-announcement", "action-add-circle-outline", "action-add", "action-time", "action-delete", "action-date-range", "action-create-new-folder", "action-comment", "action-content-copy", "action-cloud", "action-close", "action-check", "action-help-outline", "action-filter-list", "action-file-upload", "action-file-download", "action-edit", "action-drag-indicator", "action-description", "action-profile-settings", "action-open-in-new", "action-lock", "action-tag", "action-list", "action-link", "action-info", "action-view-column", "action-upload-file", "action-sort", "action-settings", "action-search", "action-save", "action-resolve-alert", "action-remove", "action-prompt-add", "action-saved-search", "action-ai-spark", "action-filter-line", "action-filter-solid", "action-visibility-off", "action-visibility", "action-view-module", "action-prompt-arrow"] as const;
 
 export type ActionIconName = (typeof ACTION_ICON_NAMES)[number];
 
@@ -67,7 +67,7 @@ export const ACTION_RAW_BY_NAME: Record<ActionIconName, string> = {
   "action-comment": action_comment,
   "action-content-copy": action_content_copy,
   "action-cloud": action_cloud,
-  "action-clear": action_clear,
+  "action-close": action_close,
   "action-check": action_check,
   "action-help-outline": action_help_outline,
   "action-filter-list": action_filter_list,

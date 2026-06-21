@@ -194,8 +194,8 @@ function parseViewBoxDimensions(attrs: string): { width: number; height: number 
 
 function withDisplaySize(svg: string, size: number): string {
   return svg.replace(/<svg\b([^>]*)>/, (_match, attrs: string) => {
-    const next = stripSvgDimensions(attrs);
-    return `<svg${next} width="${size}" height="${size}">`;
+    const next = stripSvgDimensions(attrs).replace(/\spreserveAspectRatio="[^"]*"/, "");
+    return `<svg${next} width="${size}" height="${size}" preserveAspectRatio="xMidYMid meet">`;
   });
 }
 

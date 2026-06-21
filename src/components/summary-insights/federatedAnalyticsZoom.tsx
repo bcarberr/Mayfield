@@ -3,8 +3,10 @@ import { useTimeframe, type TimeframeRange } from "../../context/TimeframeContex
 import {
   buildDailyBuckets,
   buildHourlyBuckets,
-  findSpikeBucketIndex,
+  eventTimeForAnalyticsBucket,
   hourlyEventMultiplier,
+  resolveAnalyticsSpikeIndices,
+  SECONDARY_SPIKE_CLUSTER_MINUTES,
   timeframeFromBucketSelection,
   timeframeFromDailyBucketSelection,
   type HourBucket,
@@ -28,15 +30,25 @@ export function rowTimeInTimeframe(time: string, range: TimeframeRange): boolean
   return eventTime.getTime() >= range.from.getTime() && eventTime.getTime() <= range.to.getTime();
 }
 
+export type BuildHourlyEventRowsOptions<T> = {
+  primarySpikeHour?: number;
+  secondarySpikeTemplates?: readonly T[];
+};
+
 export function buildHourlyEventRows<T>(
   templates: readonly T[],
   range: TimeframeRange,
   applyRow: (template: T, id: string, eventTime: Date) => T,
+  options?: BuildHourlyEventRowsOptions<T>,
 ): T[] {
   if (templates.length === 0) return [];
 
   const buckets = buildHourlyBuckets(range);
-  const spikeIndex = findSpikeBucketIndex(buckets, range.to);
+  const { spikeIndex, secondarySpikeIndex } = resolveAnalyticsSpikeIndices(
+    buckets,
+    range.to,
+    options?.primarySpikeHour,
+  );
   const fromMs = range.from.getTime();
   const toMs = range.to.getTime();
   const rows: T[] = [];
@@ -44,17 +56,29 @@ export function buildHourlyEventRows<T>(
 
   buckets.forEach((bucket, bucketIndex) => {
     const isSpike = spikeIndex === bucketIndex;
-    const multiplier = hourlyEventMultiplier(bucket.start.getHours(), isSpike);
+    const isSecondarySpike = secondarySpikeIndex === bucketIndex;
+    const multiplier = hourlyEventMultiplier(bucket.start.getHours(), isSpike, isSecondarySpike);
     const count = Math.max(1, Math.round(multiplier * 1.2 + ((bucketIndex * 2) % 2)));
-    const bucketStart = Math.max(bucket.start.getTime(), fromMs);
-    const bucketEnd = Math.min(bucket.start.getTime() + 3_600_000, toMs);
-    const bucketSpan = Math.max(bucketEnd - bucketStart, 60_000);
+    const secondaryTemplates = options?.secondarySpikeTemplates;
 
     for (let i = 0; i < count; i++) {
-      const template = templates[templateIndex % templates.length];
-      templateIndex += 1;
-      const eventMs = bucketStart + (bucketSpan * (i + 0.5)) / count;
-      rows.push(applyRow(template, String(rows.length + 1), new Date(Math.min(eventMs, toMs))));
+      let template: T;
+      if (isSecondarySpike && secondaryTemplates?.length && i < secondaryTemplates.length) {
+        template = secondaryTemplates[i];
+      } else {
+        template = templates[templateIndex % templates.length];
+        templateIndex += 1;
+      }
+
+      const eventTime = eventTimeForAnalyticsBucket(
+        bucket,
+        i,
+        count,
+        fromMs,
+        toMs,
+        isSecondarySpike ? SECONDARY_SPIKE_CLUSTER_MINUTES : undefined,
+      );
+      rows.push(applyRow(template, String(rows.length + 1), eventTime));
     }
   });
 

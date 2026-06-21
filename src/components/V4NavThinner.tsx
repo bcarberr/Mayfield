@@ -1,6 +1,6 @@
 import type { ImgHTMLAttributes, ReactNode } from "react";
 import { Link } from "react-router-dom";
-import { SHOW_ADDONS_NAV, SHOW_AI_AGENTS_PAGE } from "../app/navRailConfig";
+import { SHOW_ADDONS_NAV, SHOW_AI_AGENTS_PAGE, SHOW_DESIGN_SYSTEM_NAV } from "../app/navRailConfig";
 
 import logomarkA from "../assets/nav-v4/logomark-a.svg?url";
 import logomarkB from "../assets/nav-v4/logomark-b.svg?url";
@@ -17,6 +17,7 @@ import searchSvg from "../assets/nav-v4/search.svg?raw";
 import settingsSvg from "../assets/nav-v4/settings.svg?raw";
 import summaryInsightsSvg from "../assets/nav-v4/summary-insights.svg?raw";
 import { ThemeToggle } from "./ThemeToggle";
+import { ROUTES } from "../app/routes";
 
 const cx = (...c: (string | false | undefined)[]) => c.filter(Boolean).join(" ");
 
@@ -201,6 +202,19 @@ export function V4NavThinner({
       </NavSlot>
 
       <div className="min-h-0 flex-1" aria-hidden />
+
+      <Link
+        to={ROUTES.designSystem}
+        aria-label="Design system"
+        className={cx(
+          "relative flex size-10 shrink-0 items-center justify-center rounded-sm transition-colors duration-150 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-nav-icon-active",
+          SHOW_DESIGN_SYSTEM_NAV
+            ? "hover:bg-nav-overlay-subtle"
+            : "opacity-0 hover:bg-transparent focus-visible:opacity-100",
+        )}
+      >
+        <div className="size-[18px] rounded-full bg-white/5 ring-1 ring-inset ring-white/10" aria-hidden />
+      </Link>
 
       <ThemeToggle />
       <NavSlot title="Chat">

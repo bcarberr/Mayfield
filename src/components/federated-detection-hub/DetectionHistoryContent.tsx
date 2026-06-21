@@ -905,7 +905,7 @@ export function DetectionHistoryContent() {
                   setSearchQuery("");
                 }}
               >
-                <Icon name="action-filter-list" size={12} aria-hidden />
+                <Icon name="action-filter-list" size={14} aria-hidden />
                 Clear all filters
               </Button>
             ) : null}

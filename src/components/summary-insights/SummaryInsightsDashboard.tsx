@@ -10,6 +10,7 @@ import {
   DATA_GRID_THEAD_CLASS,
 } from "../ui/dataGridTableStyles";
 import { useNavigate } from "react-router-dom";
+import { Search } from "lucide-react";
 import { Checkbox, Icon } from "../../design-system";
 import { DonutChartPanel } from "../ui/DonutChartPanel";
 import { FilterColumnPanel, type FilterColumnPanelTool } from "../ui/FilterColumnPanel";
@@ -60,16 +61,15 @@ import { DiscoveryContent } from "./DiscoveryContent";
 import { IdentityAccessContent } from "./IdentityAccessContent";
 import { RemediationContent } from "./RemediationContent";
 import { SystemActivityContent } from "./SystemActivityContent";
-import { ChartZoomHint } from "./federatedAnalyticsZoom";
+import { ChartZoomHint, buildHourlyEventRows } from "./federatedAnalyticsZoom";
 import { TimeSeriesAreaChart } from "./timeSeriesAreaChart";
 import {
   buildHourlyAxisTicks,
   buildHourlyBuckets,
-  findSpikeBucketIndex,
   formatBucketTimeLabel,
   shouldIncludeDateInBucketLabels,
-  hourlyEventMultiplier,
   hourlySeverityValues,
+  resolveAnalyticsSpikeIndices,
   SPIKE_CLOCK_HOUR,
   timeframeFromBucketSelection,
 } from "./timeframeChartUtils";
@@ -192,38 +192,62 @@ function findingRowInTimeframe(row: FindingRow, range: TimeframeRange): boolean 
 }
 
 function buildFindingRowsForTimeframe(templates: FindingRow[], range: TimeframeRange): FindingRow[] {
-  if (templates.length === 0) return [];
-
-  const buckets = buildHourlyBuckets(range);
-  const spikeIndex = findSpikeBucketIndex(buckets, range.to);
-  const fromMs = range.from.getTime();
-  const toMs = range.to.getTime();
-  const rows: FindingRow[] = [];
-  let templateIndex = 0;
-
-  buckets.forEach((bucket, bucketIndex) => {
-    const isSpike = spikeIndex === bucketIndex;
-    const multiplier = hourlyEventMultiplier(bucket.start.getHours(), isSpike);
-    const count = Math.max(1, Math.round(multiplier * 1.2 + ((bucketIndex * 2) % 2)));
-    const bucketStart = Math.max(bucket.start.getTime(), fromMs);
-    const bucketEnd = Math.min(bucket.start.getTime() + 3_600_000, toMs);
-    const bucketSpan = Math.max(bucketEnd - bucketStart, 60_000);
-
-    for (let i = 0; i < count; i++) {
-      const template = templates[templateIndex % templates.length];
-      templateIndex += 1;
-      const eventMs = bucketStart + (bucketSpan * (i + 0.5)) / count;
-
-      rows.push({
-        ...template,
-        id: String(rows.length + 1),
-        time: formatFindingRowTime(new Date(Math.min(eventMs, toMs))),
-      });
-    }
-  });
-
-  return rows;
+  return buildHourlyEventRows(
+    templates,
+    range,
+    (template, id, eventTime) => ({
+      ...template,
+      id,
+      time: formatFindingRowTime(eventTime),
+    }),
+    { secondarySpikeTemplates: FINDINGS_SECONDARY_SPIKE_TEMPLATES },
+  );
 }
+
+const FINDINGS_SECONDARY_SPIKE_TEMPLATES: FindingRow[] = [
+  {
+    id: "s1",
+    severity: "Critical",
+    category: "Incidents",
+    title: "Coordinated after-hours spike across identity, network, and endpoint detections",
+    description:
+      "Multiple high-severity detections clustered around 21:30 UTC across identity, network, and endpoint telemetry, matching a coordinated intrusion correlation rule.",
+    time: "2024-10-27 21:30:08",
+    activity: "Post",
+    status: "Failure",
+    findingStatus: "New",
+    eventType: "HTTP Activity",
+    connector: demoTableConnector(0),
+  },
+  {
+    id: "s2",
+    severity: "Critical",
+    category: "Detections",
+    title: "Ransomware precursor behaviors clustered in evening activity window",
+    description:
+      "Shadow copy deletion, suspicious service creation, and outbound beaconing occurred within the same ten-minute window, consistent with pre-encryption staging.",
+    time: "2024-10-27 21:30:18",
+    activity: "Delete",
+    status: "Failure",
+    findingStatus: "New",
+    eventType: "Vulnerability",
+    connector: demoTableConnector(1),
+  },
+  {
+    id: "s3",
+    severity: "High",
+    category: "Security",
+    title: "Privilege escalation chain matched correlation rule after business hours",
+    description:
+      "A standard user account escalated to admin-equivalent roles through three discrete steps within minutes, with no linked change ticket.",
+    time: "2024-10-27 21:30:28",
+    activity: "Update",
+    status: "Unknown",
+    findingStatus: "New",
+    eventType: "HTTP Activity",
+    connector: demoTableConnector(2),
+  },
+];
 
 const FINDING_CATEGORY_ORDER: FindingCategory[] = [
   "Vulnerabilities",
@@ -951,7 +975,7 @@ export function SummaryInsightsDashboard() {
 
   const eventsPerHourChart = useMemo(() => {
     const buckets = buildHourlyBuckets(timeframe);
-    const spikeIndex = findSpikeBucketIndex(buckets, timeframe.to);
+    const { spikeIndex, secondarySpikeIndex } = resolveAnalyticsSpikeIndices(buckets, timeframe.to);
     const includeDate = shouldIncludeDateInBucketLabels(timeframe);
     const xLabels = buckets.map((bucket) => formatBucketTimeLabel(bucket.start, includeDate));
     const { indices: xTickIndices, labels: xTickLabels } = buildHourlyAxisTicks(buckets, timeframe);
@@ -962,21 +986,21 @@ export function SummaryInsightsDashboard() {
         label: "Medium",
         color: SEV_BAR.Medium,
         icon: SEVERITY_ICON.Medium,
-        values: hourlySeverityValues(11, buckets, spikeIndex),
+        values: hourlySeverityValues(11, buckets, spikeIndex, secondarySpikeIndex),
       },
       {
         id: "High",
         label: "High",
         color: SEV_BAR.High,
         icon: SEVERITY_ICON.High,
-        values: hourlySeverityValues(9, buckets, spikeIndex),
+        values: hourlySeverityValues(9, buckets, spikeIndex, secondarySpikeIndex),
       },
       {
         id: "Critical",
         label: "Critical",
         color: SEV_BAR.Critical,
         icon: SEVERITY_ICON.Critical,
-        values: hourlySeverityValues(3, buckets, spikeIndex),
+        values: hourlySeverityValues(3, buckets, spikeIndex, secondarySpikeIndex),
       },
     ] as const;
 
@@ -1035,7 +1059,7 @@ export function SummaryInsightsDashboard() {
               void navigate(ROUTES.search);
             }}
           >
-            <Icon name="action-search" size={12} className="size-3 shrink-0 text-current [&>svg]:!size-[12px]" aria-hidden />
+            <Search size={14} strokeWidth={1.5} className="size-3.5 shrink-0 text-current" aria-hidden />
             Start a New Search
           </Button>
         </div>
@@ -1160,7 +1184,7 @@ export function SummaryInsightsDashboard() {
                               setSearchQuery("");
                             }}
                           >
-                            <Icon name="action-filter-list" size={12} aria-hidden />
+                            <Icon name="action-filter-list" size={14} aria-hidden />
                             Clear all filters
                           </Button>
                         ) : null}

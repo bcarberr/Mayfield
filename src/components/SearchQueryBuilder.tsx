@@ -1,4 +1,5 @@
 import { useEffect, useId, useRef, useState } from "react";
+import { Plus, Info } from "lucide-react";
 import { Icon } from "../design-system";
 import {
   SEARCH_ENTITY_COLUMNS,
@@ -187,7 +188,7 @@ function ValueChipInput({
             }}
             aria-label={`Remove ${value}`}
           >
-            <Icon name="action-clear" size={12} aria-hidden />
+            <Icon name="action-close" size={12} aria-hidden />
           </Button>
         </span>
       ))}
@@ -347,7 +348,7 @@ function ConditionRow({
           onClick={onAddBelow}
           aria-label="Add condition"
         >
-          <Icon name="action-add" size={6} className="[&>svg]:!size-[6px]" aria-hidden />
+          <Plus size={6} strokeWidth={2} className="shrink-0" aria-hidden />
         </Button>
       </div>
     </div>
@@ -499,7 +500,7 @@ function EventBlockComp({
           className="self-start"
           onClick={() => onUpdate({ ...block, groups: [...block.groups, makeEmptyGroup()] })}
         >
-          <Icon name="action-add" size={9} className="shrink-0 text-current [&>svg]:!size-[9px]" aria-hidden />
+          <Plus size={9} strokeWidth={2} className="shrink-0 text-current" aria-hidden />
           Add Condition
         </Button>
       </div>
@@ -748,7 +749,7 @@ function EntityConditionRowComp({
           onClick={onAddBelow}
           aria-label="Add condition"
         >
-          <Icon name="action-add" size={6} className="[&>svg]:!size-[6px]" aria-hidden />
+          <Plus size={6} strokeWidth={2} className="shrink-0" aria-hidden />
         </Button>
       </div>
     </div>
@@ -885,7 +886,7 @@ function EntityBlockComp({
           className="self-start"
           onClick={() => onUpdate({ ...block, groups: [...block.groups, makeEmptyEntityGroup()] })}
         >
-          <Icon name="action-add" size={9} className="shrink-0 text-current [&>svg]:!size-[9px]" aria-hidden />
+          <Plus size={9} strokeWidth={2} className="shrink-0 text-current" aria-hidden />
           Add Condition
         </Button>
       </div>
@@ -909,7 +910,7 @@ function AdvancedOptions() {
             aria-expanded={open}
           >
             Advanced Options
-            <Icon name="action-info" size={16} className="text-text-tertiary" aria-hidden />
+            <Info size={16} strokeWidth={1.5} className="text-text-tertiary" aria-hidden />
           </Button>
         </CollapsibleTrigger>
 
@@ -1067,7 +1068,7 @@ export function SearchQueryBuilder({
             variant="secondary-outline"
             onClick={() => setShowEntityPicker((v) => !v)}
           >
-            <Icon name="action-add" size={9} className="shrink-0 text-current [&>svg]:!size-[9px]" aria-hidden />
+            <Plus size={9} strokeWidth={2} className="shrink-0 text-current" aria-hidden />
             Add Entity
           </Button>
           {showEntityPicker && (
@@ -1087,7 +1088,7 @@ export function SearchQueryBuilder({
             variant="secondary-outline"
             onClick={() => setShowEventPicker((v) => !v)}
           >
-            <Icon name="action-add" size={9} className="shrink-0 text-current [&>svg]:!size-[9px]" aria-hidden />
+            <Plus size={9} strokeWidth={2} className="shrink-0 text-current" aria-hidden />
             Add Event
           </Button>
 

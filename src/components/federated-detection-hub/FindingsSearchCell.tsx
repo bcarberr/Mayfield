@@ -1,5 +1,6 @@
 import { useCallback, type ReactNode } from "react";
 import { useNavigate } from "react-router-dom";
+import { Search } from "lucide-react";
 import { Icon } from "../../design-system";
 import { ROUTES } from "../../app/routes";
 import { useCopilot } from "../../context/CopilotContext";
@@ -58,7 +59,7 @@ export function FindingsSearchCell({ findings, detectionId, detectionName }: Fin
   if (findings === "none") {
     return (
       <FindingsSearchLink detectionId={detectionId} detectionName={detectionName} ariaLabel={ariaBase}>
-        <Icon name="search" size={14} aria-hidden />
+        <Search size={14} strokeWidth={1.5} aria-hidden />
         <span>—</span>
       </FindingsSearchLink>
     );
@@ -70,7 +71,7 @@ export function FindingsSearchCell({ findings, detectionId, detectionName }: Fin
       detectionName={detectionName}
       ariaLabel={`${ariaBase} (${findings} findings)`}
     >
-      <Icon name="search" size={14} aria-hidden />
+      <Search size={14} strokeWidth={1.5} aria-hidden />
       <span className="tabular-nums">{findings}</span>
     </FindingsSearchLink>
   );

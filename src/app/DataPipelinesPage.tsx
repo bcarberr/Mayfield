@@ -1,9 +1,8 @@
 import { useEffect, useState } from "react";
-import { Icon } from "../design-system";
+import { Download, Plus } from "lucide-react";
 import { DataPipelinesDashboard } from "../components/data-pipelines/DataPipelinesDashboard";
 import { SearchTopHeader } from "../components/SearchTopHeader";
 import { Button } from "@/components/shadcn/button";
-import { Input } from "../components/ui/Input";
 import { V4NavThinner } from "../components/V4NavThinner";
 import { NAV_RAIL_TARGETS } from "./navRailTargets";
 
@@ -29,36 +28,14 @@ export function DataPipelinesPage() {
         <SearchTopHeader
           title="Security Data Pipeline"
           chromeSurface="page"
-          headerAfterTitle={
-            <div className="w-[240px] shrink-0">
-              <Input
-                variant="search"
-                placeholder="Search Pipelines"
-                value={searchQuery}
-                onChange={(event) => setSearchQuery(event.target.value)}
-                className="!bg-surface-container"
-                aria-label="Search pipelines"
-              />
-            </div>
-          }
           titleTrailing={
             <div className="flex items-center gap-4" role="toolbar" aria-label="Pipeline actions">
               <Button type="button" variant="secondary-outline" className="h-8 shrink-0 ring-offset-surface-page">
-                <Icon
-                  name="action-add"
-                  size={12}
-                  className="size-3 shrink-0 text-current [&>svg]:!size-[12px]"
-                  aria-hidden
-                />
+                <Plus size={12} strokeWidth={1.5} className="size-3 shrink-0 text-current" aria-hidden />
                 Add Data Pipeline
               </Button>
               <Button type="button" variant="secondary-outline" className="h-8 shrink-0 ring-offset-surface-page">
-                <Icon
-                  name="action-file-download"
-                  size={12}
-                  className="size-3 shrink-0 text-current [&>svg]:!size-[12px]"
-                  aria-hidden
-                />
+                <Download size={12} strokeWidth={1.5} className="size-3 shrink-0 text-current" aria-hidden />
                 Export Data Pipeline
               </Button>
             </div>

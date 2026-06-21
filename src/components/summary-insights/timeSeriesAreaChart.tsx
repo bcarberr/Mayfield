@@ -4,6 +4,7 @@ import { cx } from "./datavisCard";
 import {
   formatTimeSeriesHoverLabel,
   nearestTimeSeriesIndex,
+  seriesForHoverLegend,
   timeSeriesCrosshairPercent,
   TimeSeriesHoverRow,
   TimeSeriesHoverTooltip,
@@ -297,7 +298,7 @@ export function TimeSeriesAreaChart({
               plotX={hover.plotX}
               timeLabel={formatTimeSeriesHoverLabel(hover.index, xLabels, bucketStarts)}
             >
-              {series.map((s) => (
+              {seriesForHoverLegend(series).map((s) => (
                 <TimeSeriesHoverRow
                   key={s.id}
                   label={s.label}

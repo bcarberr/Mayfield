@@ -82,6 +82,26 @@ type TimeSeriesHoverRowProps = {
   color?: string;
 };
 
+/** Top-to-bottom hover legend order — matches stacked area layers (Critical on top). */
+const HOVER_LEGEND_ORDER: Record<string, number> = {
+  Critical: 0,
+  High: 1,
+  Medium: 2,
+  Low: 3,
+  Informational: 4,
+  Info: 4,
+};
+
+export function seriesForHoverLegend<T extends { id: string; label: string }>(
+  series: readonly T[],
+): T[] {
+  return [...series].sort((a, b) => {
+    const order = (item: { id: string; label: string }) =>
+      HOVER_LEGEND_ORDER[item.id] ?? HOVER_LEGEND_ORDER[item.label] ?? 50;
+    return order(a) - order(b);
+  });
+}
+
 export function TimeSeriesHoverRow({ label, value, color }: TimeSeriesHoverRowProps) {
   return (
     <div className="flex items-center justify-between gap-3 text-base-small">

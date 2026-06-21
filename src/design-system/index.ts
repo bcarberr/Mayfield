@@ -27,3 +27,4 @@ export { CONNECTOR_LARGE_ICON_NAMES } from "../assets/icons/connector-large-icon
 export type { ConnectorLargeIconName } from "../assets/icons/connector-large-icons";
 export { Switch, type SwitchProps } from "../components/ui/Switch";
 export { Checkbox, type CheckboxProps } from "../components/uiCheckbox";
+export { LucideIcon, type LucideIconProps } from "../components/ui/LucideIcon";

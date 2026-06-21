@@ -31,10 +31,10 @@ import { TimeSeriesAreaChart } from "./timeSeriesAreaChart";
 import {
   buildHourlyAxisTicks,
   buildHourlyBuckets,
-  findSpikeBucketIndex,
   formatBucketTimeLabel,
   shouldIncludeDateInBucketLabels,
   hourlySeverityValues,
+  resolveAnalyticsSpikeIndices,
   SPIKE_CLOCK_HOUR,
 } from "./timeframeChartUtils";
 
@@ -226,6 +226,45 @@ const IDENTITY_ACCESS_ROWS: IdentityAccessRow[] = [
     connector: demoTableConnector(7),
     user: "j.alvarez",
     sourceIp: "203.0.113.5",
+  },
+];
+
+const IDENTITY_SECONDARY_SPIKE_ROWS: IdentityAccessRow[] = [
+  {
+    id: "s1",
+    severity: "Critical",
+    title: "Impossible travel: Bucharest login followed by Virginia session 4 minutes later",
+    time: "21:30:08",
+    activity: "Logon",
+    eventClass: "Authentication",
+    authOutcome: "Success",
+    connector: demoTableConnector(0),
+    user: "c.fischer",
+    sourceIp: "185.220.101.44",
+  },
+  {
+    id: "s2",
+    severity: "Critical",
+    title: "Domain Admin sign-in without MFA after hours from Tor exit node",
+    time: "21:30:18",
+    activity: "Logon",
+    eventClass: "Authentication",
+    authOutcome: "Success",
+    connector: demoTableConnector(1),
+    user: "admin",
+    sourceIp: "198.51.100.77",
+  },
+  {
+    id: "s3",
+    severity: "High",
+    title: "Service account added to Domain Admins outside change window",
+    time: "21:30:28",
+    activity: "Add",
+    eventClass: "Group Management",
+    authOutcome: "Success",
+    connector: demoTableConnector(2),
+    user: "svc-backup",
+    sourceIp: "10.0.0.12",
   },
 ];
 
@@ -498,11 +537,16 @@ export function IdentityAccessContent() {
 
   const tableRows = useMemo(
     () =>
-      buildHourlyEventRows(IDENTITY_ACCESS_ROWS, initialTimeframe, (template, id, eventTime) => ({
-        ...template,
-        id,
-        time: formatAnalyticsRowTime(eventTime),
-      })),
+      buildHourlyEventRows(
+        IDENTITY_ACCESS_ROWS,
+        initialTimeframe,
+        (template, id, eventTime) => ({
+          ...template,
+          id,
+          time: formatAnalyticsRowTime(eventTime),
+        }),
+        { secondarySpikeTemplates: IDENTITY_SECONDARY_SPIKE_ROWS },
+      ),
     [initialTimeframe],
   );
 
@@ -580,7 +624,7 @@ export function IdentityAccessContent() {
 
   const eventsPerHourChart = useMemo(() => {
     const buckets = buildHourlyBuckets(timeframe);
-    const spikeIndex = findSpikeBucketIndex(buckets, timeframe.to);
+    const { spikeIndex, secondarySpikeIndex } = resolveAnalyticsSpikeIndices(buckets, timeframe.to);
     const includeDate = shouldIncludeDateInBucketLabels(timeframe);
     const xLabels = buckets.map((bucket) => formatBucketTimeLabel(bucket.start, includeDate));
     const { indices: xTickIndices, labels: xTickLabels } = buildHourlyAxisTicks(buckets, timeframe);
@@ -591,21 +635,21 @@ export function IdentityAccessContent() {
         label: "Medium",
         color: SEV_BAR.Medium,
         icon: SEV_ICONS.Medium,
-        values: hourlySeverityValues(12, buckets, spikeIndex),
+        values: hourlySeverityValues(12, buckets, spikeIndex, secondarySpikeIndex),
       },
       {
         id: "High",
         label: "High",
         color: SEV_BAR.High,
         icon: SEV_ICONS.High,
-        values: hourlySeverityValues(8, buckets, spikeIndex),
+        values: hourlySeverityValues(8, buckets, spikeIndex, secondarySpikeIndex),
       },
       {
         id: "Critical",
         label: "Critical",
         color: SEV_BAR.Critical,
         icon: SEV_ICONS.Critical,
-        values: hourlySeverityValues(3, buckets, spikeIndex),
+        values: hourlySeverityValues(3, buckets, spikeIndex, secondarySpikeIndex),
       },
     ] as const;
 
@@ -705,7 +749,7 @@ export function IdentityAccessContent() {
                     setSearchQuery("");
                   }}
                 >
-                  <Icon name="action-filter-list" size={12} aria-hidden />
+                  <Icon name="action-filter-list" size={14} aria-hidden />
                   Clear all filters
                 </Button>
               ) : null}

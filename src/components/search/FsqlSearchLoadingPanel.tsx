@@ -1,5 +1,5 @@
 import { useEffect, useState } from "react";
-import { Icon } from "../../design-system";
+import { Search } from "lucide-react";
 import connectionAbstractUrl from "../../assets/connection-abstract.svg";
 
 const LOADING_MESSAGES = [
@@ -36,7 +36,7 @@ export function FsqlSearchLoadingPanel() {
         />
         <div className="pointer-events-none absolute inset-0 flex items-center justify-center">
           <div className="flex size-16 items-center justify-center rounded-full bg-surface-container/90 shadow-[0_0_24px_rgba(0,196,179,0.35)] ring-1 ring-interactive-active/40 motion-safe:animate-[fsql-search-pulse_1.6s_ease-in-out_infinite]">
-            <Icon name="action-search" size={28} className="text-interactive-active" aria-hidden />
+            <Search size={28} strokeWidth={1.5} className="text-interactive-active" aria-hidden />
           </div>
         </div>
       </div>

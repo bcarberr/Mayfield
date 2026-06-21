@@ -1,4 +1,5 @@
 import { useEffect, useId, useRef, useState } from "react";
+import { Search } from "lucide-react";
 import { Icon } from "../design-system";
 import {
   DEFAULT_EVENT_CATEGORY_ID,
@@ -350,7 +351,7 @@ export function SearchEntityEventSelect({
             aria-hidden
           />
         ) : (
-          <Icon name="search" size={PICKER_ICON_SIZE} className="shrink-0 text-text-primary" aria-hidden />
+          <Search size={PICKER_ICON_SIZE} strokeWidth={1.5} className="shrink-0 text-text-primary" aria-hidden />
         )}
         <input
           ref={inputRef}

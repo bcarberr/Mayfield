@@ -29,6 +29,9 @@ const SettingsPage = lazy(() => import("./SettingsPage").then((m) => ({ default:
 const WorkspacePlaceholderPage = lazy(() =>
   import("./WorkspacePlaceholderPage").then((m) => ({ default: m.WorkspacePlaceholderPage })),
 );
+const DesignSystemPage = lazy(() =>
+  import("./DesignSystemPage").then((m) => ({ default: m.DesignSystemPage })),
+);
 
 function RouteFallback() {
   return (
@@ -91,6 +94,7 @@ function AppShell() {
               path={ROUTES.adminSettings}
               element={<WorkspacePlaceholderPage activeSection="adminSettings" title="Admin Settings" />}
             />
+            <Route path={ROUTES.designSystem} element={<DesignSystemPage />} />
           </Routes>
         </Suspense>
         {connectorsPanelOpen ? (

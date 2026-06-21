@@ -1,4 +1,5 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { CircleX } from "lucide-react";
 import {
   DATA_GRID_ABOVE_SECTION_CLASS,
   DATA_GRID_HEADER_ROW_CLASS,
@@ -414,7 +415,7 @@ export function FsqlSearchResultsView({
                       onClick={() => setResultsFilterQuery("")}
                       className="absolute inset-y-0 right-2 flex items-center text-text-tertiary hover:text-text-primary"
                     >
-                      <Icon name="action-cancel-clear" size={14} aria-hidden />
+                      <CircleX size={14} strokeWidth={1.5} aria-hidden />
                     </button>
                   ) : null}
                 </div>
