@@ -951,7 +951,7 @@ export function SummaryInsightsDashboard() {
   const tableGrid = useFindingEventsTableGrid(filteredTableRows);
 
   const hasActiveFilters =
-    categoryFilter != null || severityFilter != null || statusFilter != null || searchQuery.trim().length > 0;
+    categoryFilter != null || severityFilter != null || statusFilter != null;
 
   const drawerRow = useMemo(
     () => (drawerFindingId ? tableRows.find((row) => row.id === drawerFindingId) : undefined),

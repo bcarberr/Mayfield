@@ -493,7 +493,7 @@ export function DataPipelinesDashboard({ searchQuery, onSearchQueryChange }: Dat
 
   const statFilterLabel = statFilter ? PIPELINE_STAT_FILTER_LABELS[statFilter] : null;
 
-  const hasActiveFilters = searchQuery.trim().length > 0 || statFilter != null;
+  const hasActiveFilters = statFilter != null;
 
   const handleStatFilterClick = (filter: PipelineStatFilter) => {
     setStatFilter((current) => (current === filter ? null : filter));

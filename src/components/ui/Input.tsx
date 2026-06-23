@@ -1,5 +1,5 @@
 import { forwardRef, type InputHTMLAttributes, type ReactNode } from "react";
-import { CircleX } from "lucide-react";
+import { CircleX, Search } from "lucide-react";
 
 const base =
   "flex w-full min-w-0 items-center gap-1 rounded border border-border-rule bg-surface-modal px-1.5 text-sm text-text-primary outline-none transition-[box-shadow] focus-within:ring-1 focus-within:ring-interactive-active";
@@ -26,7 +26,7 @@ export const Input = forwardRef<HTMLInputElement, InputProps>(function Input(
     variant === "search"
       ? "h-full min-h-0 min-w-0 flex-1 bg-transparent py-0 pr-1 text-sm font-semibold outline-none file:border-0 file:bg-transparent"
       : "min-h-6 min-w-0 flex-1 bg-transparent py-1 pr-1 text-sm font-semibold outline-none file:border-0 file:bg-transparent";
-  const effectiveAdornment = startAdornment ?? null;
+  const effectiveAdornment = startAdornment ?? (variant === "search" ? <Search size={14} strokeWidth={1.5} /> : null);
   const showClear = Boolean(onClear && rest.value);
   return (
     <div className={`${base} ${shellClass} ${className}`.trim()}>

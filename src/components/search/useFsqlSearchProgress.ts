@@ -27,9 +27,22 @@ export function useFsqlSearchProgress({
   finalTotalResults: number;
   selectedConnectorCount: number;
 }): FsqlSearchProgressState {
+  // syncedKey tracks which searchKey we last applied a synchronous reset for.
+  const [syncedKey, setSyncedKey] = useState<string | null>(null);
   const [displayedTotalResults, setDisplayedTotalResults] = useState(0);
   const [queriesCompleted, setQueriesCompleted] = useState(false);
   const [returningResultsComplete, setReturningResultsComplete] = useState(false);
+
+  // Derived state: reset progress synchronously when a new search key arrives.
+  // This fires before any effects so the FsqlSearchResultsView effect that calls
+  // markSearchSessionComplete can't see a stale returningResultsComplete=true from
+  // the previous search and immediately short-circuit the new one.
+  if (searchKey !== null && syncedKey !== searchKey) {
+    setSyncedKey(searchKey);
+    setDisplayedTotalResults(0);
+    setQueriesCompleted(false);
+    setReturningResultsComplete(false);
+  }
 
   useEffect(() => {
     if (!searchKey) {
@@ -38,10 +51,6 @@ export function useFsqlSearchProgress({
       setReturningResultsComplete(true);
       return;
     }
-
-    setDisplayedTotalResults(0);
-    setQueriesCompleted(false);
-    setReturningResultsComplete(false);
 
     const queriesDuration = randomDuration(QUERIES_MIN_MS, QUERIES_MAX_MS);
     const returningDuration = queriesDuration + randomDuration(RETURNING_EXTRA_MIN_MS, RETURNING_EXTRA_MAX_MS);

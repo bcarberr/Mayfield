@@ -1,4 +1,5 @@
 import { useState } from "react";
+import { ChevronDown } from "lucide-react";
 import { Icon } from "../design-system";
 import {
   createRelativeTimeframeRange,
@@ -89,7 +90,10 @@ export function TimeframeFilterDropdown() {
             className="size-[18.4px] shrink-0 text-current [&_svg]:!size-[18.4px]"
             aria-hidden
           />
-          <span className="inline-flex shrink-0 items-center gap-1 text-sm font-semibold">Timeframe</span>
+          <span className="inline-flex shrink-0 items-center gap-1 text-sm font-semibold">
+            Timeframe
+            <ChevronDown size={14} className="shrink-0 text-current" aria-hidden />
+          </span>
           <span className="ml-0.5 min-w-0 max-w-[12rem] truncate rounded bg-surface-container px-2 py-1 text-sm font-normal text-text-primary lg:max-w-none lg:whitespace-nowrap">
             {formatTimeframeLabel(range.from, range.to)}
           </span>

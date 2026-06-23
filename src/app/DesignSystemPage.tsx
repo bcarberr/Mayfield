@@ -14,6 +14,7 @@ import { SEVERITY_SHAPE_ICON_NAMES } from "../assets/icons/severity-icons";
 import { CONNECTOR_LARGE_ICON_NAMES } from "../assets/icons/connector-large-icons";
 import { MISC_TECHNOLOGY_ICON_NAMES } from "../assets/icons/icons";
 import { Badge } from "@/components/shadcn/badge";
+import { FilterChip } from "@/components/shadcn/filter-chip";
 import { Input } from "@/components/shadcn/input";
 import { Switch } from "@/components/shadcn/switch";
 import { Checkbox } from "@/components/shadcn/checkbox";
@@ -355,6 +356,12 @@ function FormSection() {
   const [switched, setSwitched] = useState(false);
   const [disabled, setDisabled] = useState(false);
   const [invalid, setInvalid] = useState(false);
+  const [chipFilters, setChipFilters] = useState({
+    network: true,
+    identity: true,
+    findings: false,
+  });
+  const [removableFilters, setRemovableFilters] = useState(["Severity: High", "Last 24 hours"]);
 
   return (
     <section className="flex flex-col gap-3">
@@ -423,6 +430,47 @@ function FormSection() {
               <Search size={16} strokeWidth={1.5} />
             </span>
             <Input placeholder="Search…" disabled={disabled} className="pl-7" />
+          </div>
+        </div>
+        <div className="flex flex-col gap-3 sm:col-span-2">
+          <label className="text-xs font-semibold text-text-secondary">Filter chip</label>
+          <p className="text-xs text-text-tertiary">
+            Toggle chips for category filters (with optional drag handle). Removable chips for active query filters.
+          </p>
+          <div className="flex flex-wrap items-center gap-2">
+            <FilterChip
+              label="Network Activity"
+              draggable
+              checked={chipFilters.network}
+              onCheckedChange={(checked) => setChipFilters((current) => ({ ...current, network: checked }))}
+              disabled={disabled}
+            />
+            <FilterChip
+              label="Identity & Access"
+              draggable
+              checked={chipFilters.identity}
+              onCheckedChange={(checked) => setChipFilters((current) => ({ ...current, identity: checked }))}
+              disabled={disabled}
+            />
+            <FilterChip
+              label="Findings"
+              draggable
+              checked={chipFilters.findings}
+              onCheckedChange={(checked) => setChipFilters((current) => ({ ...current, findings: checked }))}
+              disabled={disabled}
+            />
+          </div>
+          <div className="flex flex-wrap items-center gap-2">
+            {removableFilters.map((filter) => (
+              <FilterChip
+                key={filter}
+                label={filter}
+                active
+                showCheckIcon={false}
+                onRemove={() => setRemovableFilters((current) => current.filter((item) => item !== filter))}
+                disabled={disabled}
+              />
+            ))}
           </div>
         </div>
       </DemoCard>

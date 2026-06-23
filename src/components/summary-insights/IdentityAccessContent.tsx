@@ -605,8 +605,7 @@ export function IdentityAccessContent() {
   const hasActiveFilters =
     eventClassFilter != null ||
     severityFilter != null ||
-    userFilter != null ||
-    searchQuery.trim().length > 0;
+    userFilter != null;
 
   const handleEventClassClick = (label: string) => {
     if (!isIdentityEventClass(label)) return;

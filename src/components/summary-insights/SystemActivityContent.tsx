@@ -620,7 +620,7 @@ export function SystemActivityContent() {
   const tableGrid = useSystemActivityTableGrid(filteredRows);
 
   const hasActiveFilters =
-    activityClassFilter != null || severityFilter != null || hostFilter != null || searchQuery.trim().length > 0;
+    activityClassFilter != null || severityFilter != null || hostFilter != null;
 
   const handleActivityClassClick = (label: string) => {
     if (!isActivityClass(label)) return;

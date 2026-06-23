@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useRef, useState, type ReactNode } from "react";
-import { Link } from "react-router-dom";
+import { Link, useLocation } from "react-router-dom";
 import { BookSearch, CircleX, Plus, Search } from "lucide-react";
 import { Icon } from "../design-system";
 import { ROUTES } from "./routes";
@@ -12,7 +12,6 @@ import { V4NavThinner } from "../components/V4NavThinner";
 
 import connectionAbstractUrl from "../assets/connection-abstract.svg";
 import { useTimeframe } from "../context/TimeframeContext";
-import { useCopilot } from "../context/CopilotContext";
 import { useSearch, type SearchCriteriaMode } from "../context/SearchContext";
 import { parseFsqlTimeframe, applyTimeframeToFsqlQuery, timeframeRangesEqual } from "../lib/fsqlTimeframeParser";
 import { FsqlSearchLoadingPanel } from "../components/search/FsqlSearchLoadingPanel";
@@ -101,34 +100,48 @@ function SearchToolbarActions({
   criteriaOpen,
   onCriteriaOpenChange,
   fsqlQuery,
+  lastExecutedFsqlQuery,
   onFsqlQueryChange,
   queryBuilderKey,
   queryBuilderValid,
+  qbHasRun,
   onQueryBuilderValidChange,
   onClearSearch,
   onFsqlSearch,
+  onQbSearch,
   onConvertToFsql,
   onCreateDetection,
   fsqlSearching,
+  fsqlSearchExecuted,
 }: {
   criteriaMode: SearchCriteriaMode;
   onCriteriaModeChange: (mode: SearchCriteriaMode) => void;
   criteriaOpen: boolean;
   onCriteriaOpenChange: (open: boolean) => void;
   fsqlQuery: string;
+  lastExecutedFsqlQuery: string;
   onFsqlQueryChange: (query: string) => void;
   queryBuilderKey: number;
   queryBuilderValid: boolean;
+  qbHasRun: boolean;
   onQueryBuilderValidChange: (valid: boolean) => void;
   onClearSearch: () => void;
   onFsqlSearch: () => void;
+  onQbSearch: () => void;
   onConvertToFsql: (query: string) => void;
   onCreateDetection: () => void;
   fsqlSearching: boolean;
+  fsqlSearchExecuted: boolean;
 }) {
   const isFsql = criteriaMode === "fsql";
   const hasFsqlQuery = fsqlQuery.trim().length > 0;
-  const canSearch = isFsql ? hasFsqlQuery : queryBuilderValid;
+  const queryChangedFromLastRun = fsqlQuery.trim() !== lastExecutedFsqlQuery.trim();
+  // Disabled while results are showing for the current query, or while a search is in flight.
+  const fsqlSearchEnabled =
+    hasFsqlQuery &&
+    !fsqlSearching &&
+    (!fsqlSearchExecuted || queryChangedFromLastRun);
+  const qbSearchEnabled = queryBuilderValid && !qbHasRun;
 
   return (
     <Collapsible
@@ -194,7 +207,7 @@ function SearchToolbarActions({
               <Button
                 type="button"
                 className={TOOLBAR_PRIMARY_BUTTON_CLASS}
-                disabled={!hasFsqlQuery}
+                disabled={!fsqlSearchEnabled}
                 onClick={onFsqlSearch}
               >
                 <Search size={14} strokeWidth={1.5} className={TOOLBAR_ICON_CLASS} aria-hidden />
@@ -227,7 +240,12 @@ function SearchToolbarActions({
                 <BookSearch size={14} strokeWidth={1.5} className={TOOLBAR_ICON_CLASS} aria-hidden />
                 Save Search
               </Button>
-              <Button type="button" className={TOOLBAR_PRIMARY_BUTTON_CLASS} disabled={!canSearch}>
+              <Button
+                type="button"
+                className={TOOLBAR_PRIMARY_BUTTON_CLASS}
+                disabled={!qbSearchEnabled}
+                onClick={onQbSearch}
+              >
                 <Search size={14} strokeWidth={1.5} className={TOOLBAR_ICON_CLASS} aria-hidden />
                 Search
               </Button>
@@ -268,8 +286,10 @@ export function SearchLandingPage() {
   const [createDetectionOpen, setCreateDetectionOpen] = useState(false);
   const [snackbarOpen, setSnackbarOpen] = useState(false);
   const [snackbarMessage, setSnackbarMessage] = useState<ReactNode>("");
+  const [qbHasRun, setQbHasRun] = useState(false);
+  const location = useLocation();
+  const prevLocationKeyRef = useRef(location.key);
   const { range: timeframe, setRange: setTimeframeRange } = useTimeframe();
-  const { pendingFsqlSearch, setPendingFsqlSearch } = useCopilot();
   const {
     criteriaMode,
     setCriteriaMode,
@@ -285,58 +305,23 @@ export function SearchLandingPage() {
     searchInitialTimeframe,
     fsqlSearchDetectionName,
     setFsqlSearchDetectionName,
-    searchSessionKey,
-    completedSearchSessionKey,
-    markSearchSessionComplete,
+    lastExecutedFsqlQuery,
+    setLastExecutedFsqlQuery,
+    skipTimeframeFsqlSyncOnce,
+    setSkipTimeframeFsqlSyncOnce,
     beginFsqlSearch,
     clearSearch,
   } = useSearch();
   const skipTimeframeToFsqlSyncRef = useRef(false);
   const fsqlQueryRef = useRef(fsqlQuery);
   fsqlQueryRef.current = fsqlQuery;
-
-  useEffect(() => {
-    return () => {
-      if (!searchSessionKey) return;
-      if (completedSearchSessionKey === searchSessionKey) return;
-      markSearchSessionComplete(searchSessionKey);
-    };
-  }, [searchSessionKey, completedSearchSessionKey, markSearchSessionComplete]);
-
-  useEffect(() => {
-    if (!pendingFsqlSearch) return;
-    const { query, autoExecute, detectionName } = pendingFsqlSearch;
-    setFsqlQuery(query);
-    setFsqlSearchDetectionName(detectionName ?? null);
-    const parsedTimeframe = parseFsqlTimeframe(query);
-    const searchTimeframe = parsedTimeframe ?? timeframe;
-    if (parsedTimeframe) {
-      skipTimeframeToFsqlSyncRef.current = true;
-      setTimeframeRange(parsedTimeframe);
-    }
-    setCriteriaMode("fsql");
-    setCriteriaOpen(true);
-    setPendingFsqlSearch(null);
-
-    if (autoExecute && query.trim()) {
-      beginFsqlSearch(query, searchTimeframe);
-    } else {
-      clearSearch("fsql");
-      setFsqlQuery(query);
-      setFsqlSearchDetectionName(detectionName ?? null);
-    }
-  }, [
-    pendingFsqlSearch,
-    setPendingFsqlSearch,
-    setTimeframeRange,
-    timeframe,
-    beginFsqlSearch,
-    clearSearch,
-    setCriteriaMode,
-    setCriteriaOpen,
-    setFsqlQuery,
-    setFsqlSearchDetectionName,
-  ]);
+  // Read skipTimeframeFsqlSyncOnce via ref so the sync effect doesn't re-run when
+  // it clears the flag (clearing via setState would add it to deps and fire a second run
+  // that appends SINCE to fsqlQuery, making it differ from lastExecutedFsqlQuery).
+  const skipTimeframeFsqlSyncOnceRef = useRef(skipTimeframeFsqlSyncOnce);
+  skipTimeframeFsqlSyncOnceRef.current = skipTimeframeFsqlSyncOnce;
+  const fsqlSearchExecutedRef = useRef(fsqlSearchExecuted);
+  fsqlSearchExecutedRef.current = fsqlSearchExecuted;
 
   const executeFsqlSearch = () => {
     if (!fsqlQuery.trim()) return;
@@ -347,7 +332,13 @@ export function SearchLandingPage() {
       skipTimeframeToFsqlSyncRef.current = true;
       setTimeframeRange(parsedTimeframe);
     }
-    beginFsqlSearch(fsqlQuery, searchTimeframe);
+    const normalizedQuery = applyTimeframeToFsqlQuery(fsqlQuery, searchTimeframe);
+    if (normalizedQuery !== fsqlQuery) {
+      skipTimeframeToFsqlSyncRef.current = true;
+      setFsqlQuery(normalizedQuery);
+    }
+    setLastExecutedFsqlQuery(normalizedQuery.trim());
+    beginFsqlSearch(normalizedQuery, searchTimeframe);
   };
 
   const handleFsqlQueryChange = (query: string) => {
@@ -363,8 +354,9 @@ export function SearchLandingPage() {
     if (criteriaMode !== "fsql") return;
     const query = fsqlQueryRef.current;
     if (!query.trim()) return;
-    if (skipTimeframeToFsqlSyncRef.current) {
+    if (skipTimeframeToFsqlSyncRef.current || skipTimeframeFsqlSyncOnceRef.current) {
       skipTimeframeToFsqlSyncRef.current = false;
+      setSkipTimeframeFsqlSyncOnce(false);
       return;
     }
 
@@ -375,8 +367,25 @@ export function SearchLandingPage() {
     if (nextQuery !== query) {
       skipTimeframeToFsqlSyncRef.current = true;
       setFsqlQuery(nextQuery);
+      if (fsqlSearchExecutedRef.current) {
+        setLastExecutedFsqlQuery(nextQuery.trim());
+      }
     }
-  }, [criteriaMode, timeframe.from.getTime(), timeframe.to.getTime(), timeframe]);
+  // skipTimeframeFsqlSyncOnce intentionally excluded from deps — read via ref above so
+  // clearing it with setSkipTimeframeFsqlSyncOnce(false) doesn't trigger a second run.
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [criteriaMode, timeframe.from.getTime(), timeframe.to.getTime(), timeframe, setSkipTimeframeFsqlSyncOnce, setFsqlQuery, setLastExecutedFsqlQuery]);
+
+  // Clicking the Federated Search nav icon while already on this page pushes a new
+  // history entry (same pathname, new key). Detect that and reset to the clean slate.
+  useEffect(() => {
+    const prevKey = prevLocationKeyRef.current;
+    prevLocationKeyRef.current = location.key;
+    if (prevKey === location.key) return; // no change (initial mount or non-nav re-render)
+    clearSearch("fsql");
+    setQbHasRun(false);
+    setCriteriaMode("fsql");
+  }, [location.key, clearSearch, setCriteriaMode]);
 
   const handleConvertToFsql = (query: string) => {
     setFsqlQuery(query);
@@ -390,7 +399,13 @@ export function SearchLandingPage() {
   };
 
   const handleClearSearch = () => {
+    setLastExecutedFsqlQuery("");
+    setQbHasRun(false);
     clearSearch(criteriaMode);
+  };
+
+  const handleQbSearch = () => {
+    setQbHasRun(true);
   };
 
   const handleCriteriaModeChange = (mode: SearchCriteriaMode) => {
@@ -453,12 +468,16 @@ export function SearchLandingPage() {
             onFsqlQueryChange={handleFsqlQueryChange}
             queryBuilderKey={queryBuilderKey}
             queryBuilderValid={queryBuilderValid}
-            onQueryBuilderValidChange={setQueryBuilderValid}
+            qbHasRun={qbHasRun}
+            onQueryBuilderValidChange={(valid) => { setQbHasRun(false); setQueryBuilderValid(valid); }}
+            lastExecutedFsqlQuery={lastExecutedFsqlQuery}
             onClearSearch={handleClearSearch}
             onFsqlSearch={executeFsqlSearch}
+            onQbSearch={handleQbSearch}
             onConvertToFsql={handleConvertToFsql}
             onCreateDetection={handleCreateDetection}
             fsqlSearching={fsqlSearching}
+            fsqlSearchExecuted={fsqlSearchExecuted}
           />
 
           <div className="relative flex min-h-0 flex-1 overflow-hidden">

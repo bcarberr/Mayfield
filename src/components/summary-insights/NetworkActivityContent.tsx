@@ -39,6 +39,11 @@ import {
 
 type NetworkSeverity = "Critical" | "High" | "Medium" | "Low" | "Informational";
 
+const NETWORK_STATUS_COLORS: Record<string, string> = {
+  Success: CHART_CATEGORY_FILL,
+  Failure: "#f28830",
+};
+
 const SEV_BAR: Record<NetworkSeverity, string> = {
   Critical: "#ff604a",
   High: "#f28830",
@@ -437,20 +442,20 @@ function SourceDestinationPairsPanel({ rows, selectedId = null, onPairClick }: S
   );
 }
 
-type NetworkSortColumn = "severity" | "time" | "eventType" | "title" | "activity" | "status" | "connector";
+type NetworkSortColumn = "severity" | "title" | "time" | "activity" | "eventClass" | "status" | "connector";
 
 const SELECT_COL_WIDTH = 40;
-const COL_DEFAULTS: readonly number[] = [SELECT_COL_WIDTH, 108, 96, 140, 280, 88, 96, 120];
-const COL_MINS: readonly number[] = [SELECT_COL_WIDTH, 72, 72, 96, 120, 56, 72, 80];
+const COL_DEFAULTS: readonly number[] = [SELECT_COL_WIDTH, 108, 280, 96, 88, 96, 140, 120];
+const COL_MINS: readonly number[] = [SELECT_COL_WIDTH, 72, 120, 72, 56, 72, 96, 80];
 
 export function useNetworkActivityTableGrid(rows: readonly Parameters<typeof NetworkActivityTable>[0]["displayRows"][number][]) {
   const sortComparators = useMemo(
     (): Record<NetworkSortColumn, (a: NetworkActivityRow, b: NetworkActivityRow) => number> => ({
       severity: (a, b) => SEVERITY_ORDER[a.severity] - SEVERITY_ORDER[b.severity],
-      time: (a, b) => compareStrings(a.time, b.time),
-      eventType: (a, b) => compareStrings(a.eventType, b.eventType),
       title: (a, b) => compareStrings(a.title, b.title),
+      time: (a, b) => compareStrings(a.time, b.time),
       activity: (a, b) => compareStrings(a.activity, b.activity),
+      eventClass: (a, b) => compareStrings(a.eventType, b.eventType),
       status: (a, b) => compareStrings(a.status, b.status),
       connector: (a, b) => compareStrings(a.connector, b.connector),
     }),
@@ -538,7 +543,7 @@ function NetworkActivityTable({ displayRows, getSortProps }: { displayRows: Netw
               style={colStyle(2)}
               className="relative border-r border-datavis-gridlines px-2 py-0 align-middle text-xs font-bold uppercase tracking-wide text-text-primary"
             >
-              <ColumnHeaderMenu label="Time" menuLabel="Time column options" {...getSortProps("time")} />
+              <ColumnHeaderMenu label="Title" menuLabel="Title column options" {...getSortProps("title")} />
               {resizeHandle(2)}
             </th>
             <th
@@ -546,7 +551,7 @@ function NetworkActivityTable({ displayRows, getSortProps }: { displayRows: Netw
               style={colStyle(3)}
               className="relative border-r border-datavis-gridlines px-2 py-0 align-middle text-xs font-bold uppercase tracking-wide text-text-primary"
             >
-              <ColumnHeaderMenu label="Type" menuLabel="Type column options" {...getSortProps("eventType")} />
+              <ColumnHeaderMenu label="Time" menuLabel="Time column options" {...getSortProps("time")} />
               {resizeHandle(3)}
             </th>
             <th
@@ -554,7 +559,7 @@ function NetworkActivityTable({ displayRows, getSortProps }: { displayRows: Netw
               style={colStyle(4)}
               className="relative border-r border-datavis-gridlines px-2 py-0 align-middle text-xs font-bold uppercase tracking-wide text-text-primary"
             >
-              <ColumnHeaderMenu label="Title" menuLabel="Title column options" {...getSortProps("title")} />
+              <ColumnHeaderMenu label="Activity" menuLabel="Activity column options" {...getSortProps("activity")} />
               {resizeHandle(4)}
             </th>
             <th
@@ -562,7 +567,7 @@ function NetworkActivityTable({ displayRows, getSortProps }: { displayRows: Netw
               style={colStyle(5)}
               className="relative border-r border-datavis-gridlines px-2 py-0 align-middle text-xs font-bold uppercase tracking-wide text-text-primary"
             >
-              <ColumnHeaderMenu label="Activity" menuLabel="Activity column options" {...getSortProps("activity")} />
+              <ColumnHeaderMenu label="Status" menuLabel="Status column options" {...getSortProps("status")} />
               {resizeHandle(5)}
             </th>
             <th
@@ -570,7 +575,7 @@ function NetworkActivityTable({ displayRows, getSortProps }: { displayRows: Netw
               style={colStyle(6)}
               className="relative border-r border-datavis-gridlines px-2 py-0 align-middle text-xs font-bold uppercase tracking-wide text-text-primary"
             >
-              <ColumnHeaderMenu label="Status" menuLabel="Status column options" {...getSortProps("status")} />
+              <ColumnHeaderMenu label="Class" menuLabel="Class column options" {...getSortProps("eventClass")} />
               {resizeHandle(6)}
             </th>
             <th
@@ -601,10 +606,29 @@ function NetworkActivityTable({ displayRows, getSortProps }: { displayRows: Netw
                   <span className="text-sm text-text-secondary">{row.severity}</span>
                 </span>
               </td>
-              <td style={colStyle(2)} className="min-w-0 px-2 py-0 align-middle tabular-nums">
+              <td style={colStyle(2)} className="min-w-0 px-2 py-0 align-middle">
+                <TruncatedText
+                  as="button"
+                  className="w-full text-left text-sm font-semibold text-interactive-active hover:underline focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-interactive-active"
+                >
+                  {row.title}
+                </TruncatedText>
+              </td>
+              <td style={colStyle(3)} className="min-w-0 px-2 py-0 align-middle tabular-nums">
                 <TruncatedText className="text-sm text-text-secondary">{row.time}</TruncatedText>
               </td>
-              <td style={colStyle(3)} className="min-w-0 overflow-hidden px-2 py-0 align-middle">
+              <td style={colStyle(4)} className="min-w-0 px-2 py-0 align-middle">
+                <TruncatedText className="text-sm text-text-secondary">{row.activity}</TruncatedText>
+              </td>
+              <td style={colStyle(5)} className="min-w-0 px-2 py-0 align-middle">
+                <TruncatedText
+                  className="text-sm font-semibold"
+                  style={{ color: NETWORK_STATUS_COLORS[row.status] }}
+                >
+                  {row.status}
+                </TruncatedText>
+              </td>
+              <td style={colStyle(6)} className="min-w-0 overflow-hidden px-2 py-0 align-middle">
                 <span className="flex w-full min-w-0 items-center gap-2">
                   <Icon
                     name="ocsf-network-activity"
@@ -616,20 +640,6 @@ function NetworkActivityTable({ displayRows, getSortProps }: { displayRows: Netw
                     {row.eventType}
                   </TruncatedText>
                 </span>
-              </td>
-              <td style={colStyle(4)} className="min-w-0 px-2 py-0 align-middle">
-                <TruncatedText
-                  as="button"
-                  className="w-full text-left text-sm font-semibold text-interactive-active hover:underline focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-interactive-active"
-                >
-                  {row.title}
-                </TruncatedText>
-              </td>
-              <td style={colStyle(5)} className="min-w-0 px-2 py-0 align-middle">
-                <TruncatedText className="text-sm text-text-secondary">{row.activity}</TruncatedText>
-              </td>
-              <td style={colStyle(6)} className="min-w-0 px-2 py-0 align-middle">
-                <TruncatedText className="text-sm text-text-secondary">{row.status}</TruncatedText>
               </td>
               <td style={colStyle(7)} className="min-w-0 px-2 py-0 align-middle">
                 <ConnectorTableCell name={row.connector} />
@@ -736,8 +746,7 @@ export function NetworkActivityContent() {
   const hasActiveFilters =
     trafficFilter != null ||
     severityFilter != null ||
-    pairFilter != null ||
-    searchQuery.trim().length > 0;
+    pairFilter != null;
 
   const handleTrafficClick = (label: string) => {
     if (!isTrafficActivityType(label)) return;

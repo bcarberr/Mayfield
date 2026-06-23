@@ -1,5 +1,4 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
-import { CircleX } from "lucide-react";
 import {
   DATA_GRID_ABOVE_SECTION_CLASS,
   DATA_GRID_HEADER_ROW_CLASS,
@@ -19,6 +18,7 @@ import { ColumnHeaderMenu } from "../ui/ColumnHeaderMenu";
 import { compareStrings } from "../ui/useColumnSort";
 import { useSortedDataGridPagination } from "../ui/useSortedDataGridPagination";
 import { DataGridSection } from "../ui/DataGridSection";
+import { Input } from "../ui/Input";
 import { DATA_GRID_RESULTS_SEARCH_PLACEHOLDER } from "../ui/dataGridTableStyles";
 import { DataGridPaginationFooter } from "../ui/DataGridTableLayout";
 import { TruncatedText } from "../ui/TruncatedText";
@@ -38,8 +38,6 @@ import { useFsqlSearchProgress } from "./useFsqlSearchProgress";
 import { useConnectorSelectionCounts } from "../connectors/connectorEnabledState";
 import { Button } from "@/components/shadcn/button";
 import { Checkbox } from "@/components/shadcn/checkbox";
-import { Input } from "@/components/shadcn/input";
-import { cn } from "@/lib/utils";
 
 const SEV_CRITICAL = "#ff604a";
 
@@ -394,30 +392,16 @@ export function FsqlSearchResultsView({
                     : `${filteredRows.length} Results`}
                   {resultsFilterQuery.trim() ? ` · “${resultsFilterQuery.trim()}”` : ""}
                 </p>
-                <div className="relative w-[300px] shrink-0">
+                <div className="w-[300px] shrink-0">
                   <Input
-                    type="text"
+                    variant="search"
                     placeholder={DATA_GRID_RESULTS_SEARCH_PLACEHOLDER}
                     value={resultsFilterQuery}
                     onChange={(event) => setResultsFilterQuery(event.target.value)}
-                    className={cn(
-                      "h-8 border-border-rule bg-datavis-card-bg text-sm font-semibold shadow-none",
-                      "placeholder:font-semibold placeholder:italic placeholder:text-text-tertiary dark:bg-datavis-card-bg",
-                      resultsFilterQuery && "pr-7",
-                    )}
+                    onClear={() => setResultsFilterQuery("")}
+                    className="!bg-datavis-card-bg"
                     aria-label="Filter search results"
                   />
-                  {resultsFilterQuery ? (
-                    <button
-                      type="button"
-                      tabIndex={-1}
-                      aria-label="Clear"
-                      onClick={() => setResultsFilterQuery("")}
-                      className="absolute inset-y-0 right-2 flex items-center text-text-tertiary hover:text-text-primary"
-                    >
-                      <CircleX size={14} strokeWidth={1.5} aria-hidden />
-                    </button>
-                  ) : null}
                 </div>
                 <DataGridExportButton />
               </div>

@@ -4,6 +4,7 @@ import { Icon, type IconName } from "../design-system";
 import { connectorsPanelLocationState, ROUTES } from "../app/routes";
 import { ConnectorSelectionCountText } from "./connectors/ConnectorSelectionCountText";
 import { TimeframeFilterDropdown } from "./TimeframeFilterDropdown";
+import { SavedRecentSearchesDropdown } from "./SavedRecentSearchesDropdown";
 import { Badge } from "@/components/shadcn/badge";
 import { Button } from "@/components/shadcn/button";
 import {
@@ -147,11 +148,7 @@ export function SearchHeaderFilters() {
         onActivate={openConnectorsPanel}
       />
       <TimeframeFilterDropdown />
-      <SearchHeaderFilterDropdown
-        icon="nav-star"
-        label="Saved/Recent Searches"
-        menuLabel="Saved and recent searches"
-      />
+      <SavedRecentSearchesDropdown />
     </div>
   );
 }

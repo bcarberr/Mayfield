@@ -643,8 +643,7 @@ export function DiscoveryContent() {
   const hasActiveFilters =
     platformFilter != null ||
     severityFilter != null ||
-    patchFilter != null ||
-    searchQuery.trim().length > 0;
+    patchFilter != null;
 
   const dailyChart = useMemo(() => buildDailyDiscoveryChart(timeframe), [timeframe]);
 

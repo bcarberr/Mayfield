@@ -53,6 +53,7 @@ export function SearchTopHeader({
           size="icon"
           className={cn(HEADER_UTILITY_ICON_BTN_CLASS, ringOffset)}
           aria-label="Help"
+          disabled
         >
           <Icon name="nav-quick-help" size={HEADER_ACTION_ICON_SIZE} />
         </Button>
@@ -62,6 +63,7 @@ export function SearchTopHeader({
           size="icon"
           className={cn(HEADER_UTILITY_ICON_BTN_CLASS, ringOffset)}
           aria-label="Notifications"
+          disabled
         >
           <Icon name="nav-notifications" size={HEADER_ACTION_ICON_SIZE} />
         </Button>

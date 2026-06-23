@@ -501,7 +501,7 @@ function LibraryDetectionsTable({
   const thClass =
     "relative border-r border-datavis-gridlines px-2 py-0 align-middle text-xs font-bold uppercase tracking-wide text-text-primary";
   const tdClass = cx(DATA_GRID_BODY_CELL_CLASS, "text-sm text-text-secondary");
-  const hasActiveFilters = searchQuery.trim().length > 0 || statFilterLabel != null;
+  const hasActiveFilters = statFilterLabel != null;
   const allExpanded = rows.length > 0 && rows.every((row) => expandedIds.has(row.id));
   const sortComparators = useMemo(
     (): Record<LibrarySortColumn, (a: LibraryDetectionRow, b: LibraryDetectionRow) => number> => ({
