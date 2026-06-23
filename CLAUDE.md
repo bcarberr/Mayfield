@@ -69,6 +69,10 @@ This is a React 19 + TypeScript SPA built with Vite and Tailwind CSS v4. It is a
 - All color, surface, and feedback tokens are exposed as Tailwind utility classes via the `@theme` block — prefer these over inline styles.
 - Font family is **Lato** (declared in `body` in `index.css`); Tailwind's default `font-sans` is not used.
 
+### Dashboard / Data Grid Conventions
+
+- **"Clear all filters" button**: only show when chart/bar/panel filters are active (e.g. `trafficFilter`, `severityFilter`, `pairFilter`). Do **not** include `searchQuery` in `hasActiveFilters` — the search field has its own inline clear icon, so showing the button for search-only state is redundant.
+
 ### Figma Integration
 
 `@figma/code-connect` is installed. Python scripts in `tools/` are used for batch-importing icons and connector logos from Figma — these are one-off development utilities, not part of the build.

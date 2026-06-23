@@ -272,11 +272,6 @@ const REMEDIATION_SECONDARY_SPIKE_ROWS: RemediationRow[] = [
   },
 ];
 
-function statusClassName(status: RemediationStatus): string {
-  if (status === "Succeeded") return "text-feedback-positive";
-  if (status === "Failed") return "text-datavis-data-peanut-orange";
-  return "text-text-tertiary";
-}
 
 function isActivityClass(label: string): label is ActivityClass {
   return (ACTIVITY_CLASS_ORDER as readonly string[]).includes(label);
@@ -326,8 +321,8 @@ type RemediationSortColumn =
   | "connector";
 
 const SELECT_COL_WIDTH = 40;
-const COL_DEFAULTS: readonly number[] = [SELECT_COL_WIDTH, 108, 280, 96, 96, 168, 140, 96, 120];
-const COL_MINS: readonly number[] = [SELECT_COL_WIDTH, 72, 120, 72, 56, 96, 80, 72, 80];
+const COL_DEFAULTS: readonly number[] = [SELECT_COL_WIDTH, 108, 280, 96, 96, 96, 168, 140, 120];
+const COL_MINS: readonly number[] = [SELECT_COL_WIDTH, 72, 120, 72, 56, 72, 96, 80, 80];
 
 export function useRemediationEventsTableGrid(rows: readonly Parameters<typeof RemediationEventsTable>[0]["displayRows"][number][]) {
   const sortComparators = useMemo(
@@ -449,7 +444,7 @@ function RemediationEventsTable({ displayRows, getSortProps }: { displayRows: Re
               style={colStyle(5)}
               className="relative border-r border-datavis-gridlines px-2 py-0 align-middle text-xs font-bold uppercase tracking-wide text-text-primary"
             >
-              <ColumnHeaderMenu label="Class" menuLabel="Class column options" {...getSortProps("eventClass")} />
+              <ColumnHeaderMenu label="Status" menuLabel="Status column options" {...getSortProps("status")} />
               {resizeHandle(5)}
             </th>
             <th
@@ -457,7 +452,7 @@ function RemediationEventsTable({ displayRows, getSortProps }: { displayRows: Re
               style={colStyle(6)}
               className="relative border-r border-datavis-gridlines px-2 py-0 align-middle text-xs font-bold uppercase tracking-wide text-text-primary"
             >
-              <ColumnHeaderMenu label="Entity" menuLabel="Entity column options" {...getSortProps("entity")} />
+              <ColumnHeaderMenu label="Class" menuLabel="Class column options" {...getSortProps("eventClass")} />
               {resizeHandle(6)}
             </th>
             <th
@@ -465,7 +460,7 @@ function RemediationEventsTable({ displayRows, getSortProps }: { displayRows: Re
               style={colStyle(7)}
               className="relative border-r border-datavis-gridlines px-2 py-0 align-middle text-xs font-bold uppercase tracking-wide text-text-primary"
             >
-              <ColumnHeaderMenu label="Status" menuLabel="Status column options" {...getSortProps("status")} />
+              <ColumnHeaderMenu label="Entity" menuLabel="Entity column options" {...getSortProps("entity")} />
               {resizeHandle(7)}
             </th>
             <th
@@ -510,7 +505,15 @@ function RemediationEventsTable({ displayRows, getSortProps }: { displayRows: Re
               <td style={colStyle(4)} className="min-w-0 px-2 py-0 align-middle">
                 <TruncatedText className="text-sm text-text-secondary">{row.activity}</TruncatedText>
               </td>
-              <td style={colStyle(5)} className="min-w-0 overflow-hidden px-2 py-0 align-middle">
+              <td style={colStyle(5)} className="min-w-0 px-2 py-0 align-middle">
+                <TruncatedText
+                  className="text-sm font-semibold"
+                  style={{ color: STATUS_COLORS[row.status] }}
+                >
+                  {row.status}
+                </TruncatedText>
+              </td>
+              <td style={colStyle(6)} className="min-w-0 overflow-hidden px-2 py-0 align-middle">
                 <span className="flex w-full min-w-0 items-center gap-2">
                   <Icon
                     name="ocsf-remediation"
@@ -523,13 +526,8 @@ function RemediationEventsTable({ displayRows, getSortProps }: { displayRows: Re
                   </TruncatedText>
                 </span>
               </td>
-              <td style={colStyle(6)} className="min-w-0 px-2 py-0 align-middle">
-                <TruncatedText className="text-sm text-text-secondary">{row.entity}</TruncatedText>
-              </td>
               <td style={colStyle(7)} className="min-w-0 px-2 py-0 align-middle">
-                <TruncatedText className={cx("text-sm font-semibold", statusClassName(row.status))}>
-                  {row.status}
-                </TruncatedText>
+                <TruncatedText className="text-sm text-text-secondary">{row.entity}</TruncatedText>
               </td>
               <td style={colStyle(8)} className="min-w-0 px-2 py-0 align-middle">
                 <ConnectorTableCell name={row.connector} />
@@ -626,8 +624,7 @@ export function RemediationContent() {
   const hasActiveFilters =
     activityClassFilter != null ||
     severityFilter != null ||
-    statusFilter != null ||
-    searchQuery.trim().length > 0;
+    statusFilter != null;
 
   const handleActivityClassClick = (label: string) => {
     if (!isActivityClass(label)) return;

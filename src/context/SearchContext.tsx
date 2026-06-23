@@ -40,6 +40,11 @@ type SearchContextValue = {
   searchInitialTimeframe: TimeframeRange | null;
   fsqlSearchDetectionName: string | null;
   setFsqlSearchDetectionName: (name: string | null) => void;
+  /** Last FSQL query executed — Search button disabled while current query matches. */
+  lastExecutedFsqlQuery: string;
+  setLastExecutedFsqlQuery: (query: string) => void;
+  skipTimeframeFsqlSyncOnce: boolean;
+  setSkipTimeframeFsqlSyncOnce: (skip: boolean) => void;
   beginFsqlSearch: (query: string, searchTimeframe: TimeframeRange) => void;
   markSearchSessionComplete: (sessionKey: string) => void;
   clearSearch: (mode: SearchCriteriaMode) => void;
@@ -67,6 +72,8 @@ export function SearchProvider({ children }: { children: ReactNode }) {
   const [completedSearchSessionKey, setCompletedSearchSessionKey] = useState<string | null>(null);
   const [searchInitialTimeframe, setSearchInitialTimeframe] = useState<TimeframeRange | null>(null);
   const [fsqlSearchDetectionName, setFsqlSearchDetectionName] = useState<string | null>(null);
+  const [lastExecutedFsqlQuery, setLastExecutedFsqlQuery] = useState("");
+  const [skipTimeframeFsqlSyncOnce, setSkipTimeframeFsqlSyncOnce] = useState(false);
   const [resultsFilterQuery, setResultsFilterQuery] = useState("");
   const [resultsTableTool, setResultsTableTool] = useState<FilterColumnPanelTool | null>(null);
   const [resultsChartZoomed, setResultsChartZoomed] = useState(false);
@@ -84,6 +91,9 @@ export function SearchProvider({ children }: { children: ReactNode }) {
     (query: string, searchTimeframe: TimeframeRange) => {
       if (!query.trim()) return;
       resetResultsViewState();
+      // Always set lastExecutedFsqlQuery here so it matches exactly what was executed,
+      // regardless of call order from any launch path.
+      setLastExecutedFsqlQuery(query.trim());
       setSearchInitialTimeframe(cloneTimeframeRange(searchTimeframe));
       setSearchSessionKey(buildSearchSessionKey(query, searchTimeframe));
       setCompletedSearchSessionKey(null);
@@ -113,6 +123,7 @@ export function SearchProvider({ children }: { children: ReactNode }) {
     (mode: SearchCriteriaMode) => {
       if (mode === "fsql") {
         setFsqlQuery("");
+        setLastExecutedFsqlQuery("");
         setFsqlSearchExecuted(false);
         setFsqlSearching(false);
         setSearchInitialTimeframe(null);
@@ -161,6 +172,10 @@ export function SearchProvider({ children }: { children: ReactNode }) {
     searchInitialTimeframe,
     fsqlSearchDetectionName,
     setFsqlSearchDetectionName,
+    lastExecutedFsqlQuery,
+    setLastExecutedFsqlQuery,
+    skipTimeframeFsqlSyncOnce,
+    setSkipTimeframeFsqlSyncOnce,
     beginFsqlSearch,
     markSearchSessionComplete,
     clearSearch,

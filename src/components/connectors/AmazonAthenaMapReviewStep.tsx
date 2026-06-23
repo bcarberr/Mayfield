@@ -5,6 +5,7 @@ import { Button } from "@/components/shadcn/button";
 import {
   DropdownMenu,
   DropdownMenuContent,
+  DropdownMenuItem,
   DropdownMenuTrigger,
 } from "@/components/shadcn/dropdown-menu";
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/shadcn/tooltip";
@@ -12,6 +13,14 @@ import {
   getMapSchemaEntitiesForEventClass,
   type MapSchemaEntity,
 } from "../../data/httpActivityMapSchemaEntities";
+import {
+  getHttpActivityEnumValues,
+  getHttpActivityFullSchemaPaths,
+  isHttpActivityArrayField,
+  isHttpActivityEnumField,
+  isHttpActivitySimpleMappableField,
+} from "../../data/httpActivityFullSchema";
+import treeBranchSvg from "../../assets/icons/tree.svg?raw";
 import {
   formatOcsfPathLabel,
   getOcsfEntityCategoryDescription,
@@ -25,18 +34,20 @@ import { CopilotSparkMark } from "../SearchCopilotPanel";
 import { SearchEventClassPicker } from "../SearchEventClassPicker";
 import { searchEventById } from "../../data/searchEntityOptions";
 
+const cx = (...c: (string | false | undefined)[]) => c.filter(Boolean).join(" ");
+
 const MAP_SCHEMA_DRAG_MIME = "application/x-query-map-field";
 
 const MAP_SCHEMA_PANEL_DEFAULT_WIDTH = 300;
 const MAP_SCHEMA_PANEL_MIN_WIDTH = 240;
 const MAP_SCHEMA_PANEL_MAX_WIDTH = 520;
 const MAP_SCHEMA_TREE_INDENT_PX = 12;
+const MAP_SCHEMA_MOVE_SLOT_CLASS = "inline-flex w-[11px] shrink-0 items-center justify-center";
+const MAP_SCHEMA_TREE_SLOT_CLASS = "inline-flex w-3 shrink-0 items-start justify-center";
 
 function clampMapSchemaPanelWidth(width: number) {
   return Math.round(Math.min(MAP_SCHEMA_PANEL_MAX_WIDTH, Math.max(MAP_SCHEMA_PANEL_MIN_WIDTH, width)));
 }
-
-const cx = (...c: (string | false | undefined)[]) => c.filter(Boolean).join(" ");
 
 export const ADVANCED_MODE_CALLOUT =
   "Advanced Mode allows mapping of more details and will give more context for investigations and threat hunting.";
@@ -279,25 +290,71 @@ function MapSchemaFieldInfoPopover({
   );
 }
 
+function MapSchemaFieldRowShell({
+  fieldPath,
+  label,
+  contentIndent = 0,
+  draggable = false,
+  onDragStart,
+  rowClassName,
+  contentClassName,
+  children,
+}: {
+  fieldPath: string;
+  label: string;
+  contentIndent?: number;
+  draggable?: boolean;
+  onDragStart?: (event: DragEvent<HTMLDivElement>) => void;
+  rowClassName?: string;
+  contentClassName?: string;
+  children: ReactNode;
+}) {
+  return (
+    <div
+      draggable={draggable}
+      onDragStart={onDragStart}
+      className={cx(
+        "flex h-7 w-full min-w-0 items-center gap-2 rounded py-1 hover:bg-overlay-subtle",
+        draggable && "cursor-grab active:cursor-grabbing",
+        rowClassName,
+      )}
+    >
+      <MapSchemaFieldInfoPopover fieldPath={fieldPath} label={label} />
+      <div
+        className={cx("flex min-w-0 flex-1 items-center gap-2", contentClassName)}
+        style={contentIndent > 0 ? { paddingLeft: `${contentIndent}px` } : undefined}
+      >
+        {children}
+      </div>
+    </div>
+  );
+}
+
 function MapSchemaDraggableFieldRow({
   fieldPath,
   label,
   indent = 24,
   enumLabel,
-  suffix,
+  typeSuffix,
   onDragStart,
 }: {
   fieldPath: string;
   label?: string;
   indent?: number;
   enumLabel?: boolean;
-  suffix?: ReactNode;
+  typeSuffix?: ReactNode;
   onDragStart?: (event: DragEvent<HTMLDivElement>, fieldPath: string) => void;
 }) {
   const displayLabel = label ?? formatOcsfPathLabel(fieldPath);
+  const resolvedTypeSuffix =
+    typeSuffix ??
+    (enumLabel ? <span className="font-semibold italic text-[#b4b0ff]">enum</span> : undefined);
 
   return (
-    <div
+    <MapSchemaFieldRowShell
+      fieldPath={fieldPath}
+      label={displayLabel}
+      contentIndent={indent}
       draggable
       onDragStart={(event) => {
         event.dataTransfer.setData(MAP_SCHEMA_DRAG_MIME, fieldPath);
@@ -305,23 +362,14 @@ function MapSchemaDraggableFieldRow({
         event.dataTransfer.effectAllowed = "copy";
         onDragStart?.(event, fieldPath);
       }}
-      className="flex h-7 w-full min-w-0 cursor-grab items-center gap-2 rounded py-1 active:cursor-grabbing hover:bg-overlay-subtle"
-      style={{ paddingLeft: `${indent}px` }}
     >
-      <MapSchemaFieldInfoPopover fieldPath={fieldPath} label={displayLabel} />
-      <Icon name="action-drag-indicator" size={11} className="shrink-0 text-text-tertiary" aria-hidden />
-      <span className="min-w-0 truncate text-xs font-semibold leading-4 tracking-[0.4px] text-text-primary">
-        {enumLabel ? (
-          <>
-            <span>{displayLabel} </span>
-            <span className="font-semibold italic text-[#b4b0ff]">enum</span>
-          </>
-        ) : (
-          displayLabel
-        )}
-      </span>
-      {suffix}
-    </div>
+      <MapSchemaAttributeRowContent
+        showMove
+        showTreeBranch={false}
+        label={displayLabel}
+        typeSuffix={resolvedTypeSuffix}
+      />
+    </MapSchemaFieldRowShell>
   );
 }
 
@@ -331,7 +379,216 @@ function MapSchemaRequiredTimeRow() {
       fieldPath="time"
       label="time*"
       indent={0}
-      suffix={<span className="shrink-0 font-semibold italic text-accent-required">required</span>}
+      typeSuffix={
+        <span className="font-semibold italic text-accent-required">required</span>
+      }
+    />
+  );
+}
+
+function MapSchemaExpandCollapseButton({
+  expanded,
+  onToggle,
+  label,
+}: {
+  expanded: boolean;
+  onToggle: () => void;
+  label: string;
+}) {
+  return (
+    <button
+      type="button"
+      className="shrink-0 rounded p-0 text-text-tertiary hover:text-text-primary"
+      aria-expanded={expanded}
+      aria-label={`${expanded ? "Collapse" : "Expand"} ${label}`}
+      onClick={(event) => {
+        event.stopPropagation();
+        onToggle();
+      }}
+    >
+      <Icon name={expanded ? "action-remove" : "action-add"} size={8} className="block" aria-hidden />
+    </button>
+  );
+}
+
+function MapSchemaTreeBranchIcon() {
+  return (
+    <span
+      className="inline-flex h-3.5 w-3 shrink-0 items-start justify-center text-border-rule [&>svg]:h-3.5 [&>svg]:w-3"
+      dangerouslySetInnerHTML={{ __html: treeBranchSvg }}
+      aria-hidden
+    />
+  );
+}
+
+function MapSchemaMoveSlot({ active }: { active: boolean }) {
+  return (
+    <span className={MAP_SCHEMA_MOVE_SLOT_CLASS} aria-hidden={!active}>
+      {active ? <Icon name="action-drag-indicator" size={11} className="text-text-tertiary" /> : null}
+    </span>
+  );
+}
+
+function MapSchemaTreeSlot({ show }: { show: boolean }) {
+  return <span className={MAP_SCHEMA_TREE_SLOT_CLASS}>{show ? <MapSchemaTreeBranchIcon /> : null}</span>;
+}
+
+function MapSchemaAttributeRowContent({
+  showMove,
+  showTreeBranch,
+  labelClassName = "text-text-primary",
+  label,
+  typeSuffix,
+  trailing,
+  expand,
+}: {
+  showMove: boolean;
+  showTreeBranch: boolean;
+  labelClassName?: string;
+  label: ReactNode;
+  typeSuffix?: ReactNode;
+  trailing?: ReactNode;
+  expand?: { expanded: boolean; onToggle: () => void; label: string };
+}) {
+  return (
+    <>
+      <MapSchemaMoveSlot active={showMove} />
+      <MapSchemaTreeSlot show={showTreeBranch} />
+      <span
+        className={cx(
+          "inline-flex min-w-0 flex-1 items-center gap-1 truncate text-xs font-semibold leading-4 tracking-[0.4px]",
+          labelClassName,
+        )}
+      >
+        <span className="truncate">{label}</span>
+        {typeSuffix}
+        {trailing}
+      </span>
+      {expand ? (
+        <MapSchemaExpandCollapseButton
+          expanded={expand.expanded}
+          onToggle={expand.onToggle}
+          label={expand.label}
+        />
+      ) : null}
+    </>
+  );
+}
+
+function MapSchemaEnumValueFieldRow({
+  fieldPath,
+  value,
+  indent,
+}: {
+  fieldPath: string;
+  value: { id: number; label: string };
+  indent: number;
+}) {
+  const displayLabel = `${value.id} - ${value.label.toLowerCase()}`;
+
+  return (
+    <MapSchemaFieldRowShell
+      fieldPath={fieldPath}
+      label={displayLabel}
+      contentIndent={indent}
+      draggable
+      onDragStart={(event) => {
+        event.dataTransfer.setData(MAP_SCHEMA_DRAG_MIME, fieldPath);
+        event.dataTransfer.setData("text/plain", fieldPath);
+        event.dataTransfer.effectAllowed = "copy";
+      }}
+    >
+      <MapSchemaAttributeRowContent
+        showMove
+        showTreeBranch
+        labelClassName="text-text-secondary"
+        label={displayLabel}
+      />
+    </MapSchemaFieldRowShell>
+  );
+}
+
+function MapSchemaExpandableEnumFieldRow({
+  fieldPath,
+  label,
+  indent = 0,
+  showParentDrag = true,
+  showTreeBranch = false,
+}: {
+  fieldPath: string;
+  label?: string;
+  indent?: number;
+  showParentDrag?: boolean;
+  showTreeBranch?: boolean;
+}) {
+  const [expanded, setExpanded] = useState(false);
+  const displayLabel = label ?? formatOcsfPathLabel(fieldPath);
+  const enumValues = getHttpActivityEnumValues(fieldPath);
+
+  return (
+    <>
+      <MapSchemaFieldRowShell
+        fieldPath={fieldPath}
+        label={displayLabel}
+        contentIndent={indent}
+        draggable={showParentDrag}
+        onDragStart={
+          showParentDrag
+            ? (event) => {
+                event.dataTransfer.setData(MAP_SCHEMA_DRAG_MIME, fieldPath);
+                event.dataTransfer.setData("text/plain", fieldPath);
+                event.dataTransfer.effectAllowed = "copy";
+              }
+            : undefined
+        }
+      >
+        <MapSchemaAttributeRowContent
+          showMove={showParentDrag}
+          showTreeBranch={showTreeBranch}
+          label={displayLabel}
+          typeSuffix={<span className="font-semibold italic text-[#b4b0ff]">enum</span>}
+          expand={{
+            expanded,
+            onToggle: () => setExpanded((current) => !current),
+            label: displayLabel,
+          }}
+        />
+      </MapSchemaFieldRowShell>
+      {expanded
+        ? enumValues.map((value) => (
+            <MapSchemaEnumValueFieldRow
+              key={value.id}
+              fieldPath={fieldPath}
+              value={value}
+              indent={indent + MAP_SCHEMA_TREE_INDENT_PX}
+            />
+          ))
+        : null}
+    </>
+  );
+}
+
+function MapSchemaFieldRow({
+  fieldPath,
+  label,
+  indent = 0,
+  enumLabel,
+}: {
+  fieldPath: string;
+  label?: string;
+  indent?: number;
+  enumLabel?: boolean;
+}) {
+  if (isHttpActivityEnumField(fieldPath) && getHttpActivityEnumValues(fieldPath).length > 0) {
+    return <MapSchemaExpandableEnumFieldRow fieldPath={fieldPath} label={label} indent={indent} />;
+  }
+
+  return (
+    <MapSchemaDraggableFieldRow
+      fieldPath={fieldPath}
+      label={label}
+      indent={indent}
+      enumLabel={enumLabel ?? isHttpActivityEnumField(fieldPath)}
     />
   );
 }
@@ -340,7 +597,12 @@ type OcsfPathTreeNode = {
   segment: string;
   fullPath?: string;
   children: OcsfPathTreeNode[];
+  isEnumValue?: boolean;
 };
+
+function resolveOcsfPathTreeChildren(node: OcsfPathTreeNode): OcsfPathTreeNode[] {
+  return node.children;
+}
 
 function buildOcsfPathTree(paths: readonly string[]): OcsfPathTreeNode[] {
   type MutableNode = { segment: string; fullPath?: string; children: Map<string, MutableNode> };
@@ -367,27 +629,66 @@ function buildOcsfPathTree(paths: readonly string[]): OcsfPathTreeNode[] {
       children: toArray(node.children),
     }));
 
-  return toArray(root);
+  return toArray(root).sort((a, b) => a.segment.localeCompare(b.segment));
 }
 
-function MapSchemaOcsfPathTreeRow({
+function sortOcsfPathTree(nodes: OcsfPathTreeNode[]): OcsfPathTreeNode[] {
+  return [...nodes]
+    .sort((a, b) => a.segment.localeCompare(b.segment))
+    .map((node) => ({
+      ...node,
+      children: sortOcsfPathTree(node.children),
+    }));
+}
+
+function MapSchemaFieldTypeSuffix({ fieldPath }: { fieldPath: string }) {
+  if (isHttpActivityEnumField(fieldPath)) {
+    return <span className="font-semibold italic text-[#b4b0ff]">enum</span>;
+  }
+  if (isHttpActivityArrayField(fieldPath)) {
+    return <span className="font-semibold italic text-datavis-data-smalt-green-40">array</span>;
+  }
+  return null;
+}
+
+function MapSchemaExpandablePathTreeRow({
   segment,
   fieldPath,
   depth,
-  isLeaf,
+  hasPathChildren,
+  hasChildren,
+  isExpanded,
+  onToggleExpand,
+  isEnumValue = false,
 }: {
   segment: string;
   fieldPath: string;
   depth: number;
-  isLeaf: boolean;
+  hasPathChildren: boolean;
+  hasChildren: boolean;
+  isExpanded: boolean;
+  onToggleExpand?: () => void;
+  isEnumValue?: boolean;
 }) {
-  const label = segment.toLowerCase();
+  const label = isEnumValue ? segment : segment.toLowerCase();
+  const isMappable = isHttpActivitySimpleMappableField(fieldPath, {
+    hasPathChildren,
+    isEnumValue,
+  });
+  const showTypeSuffix =
+    !isEnumValue &&
+    (isHttpActivityEnumField(fieldPath) || isHttpActivityArrayField(fieldPath)) &&
+    hasChildren;
+  const contentIndent = depth * MAP_SCHEMA_TREE_INDENT_PX;
 
   return (
-    <div
-      draggable={isLeaf}
+    <MapSchemaFieldRowShell
+      fieldPath={fieldPath}
+      label={label}
+      contentIndent={contentIndent}
+      draggable={isMappable}
       onDragStart={
-        isLeaf
+        isMappable
           ? (event) => {
               event.dataTransfer.setData(MAP_SCHEMA_DRAG_MIME, fieldPath);
               event.dataTransfer.setData("text/plain", fieldPath);
@@ -395,75 +696,141 @@ function MapSchemaOcsfPathTreeRow({
             }
           : undefined
       }
-      style={depth > 0 ? { paddingLeft: `${depth * MAP_SCHEMA_TREE_INDENT_PX}px` } : undefined}
-      className={cx(
-        "flex h-7 w-full min-w-0 items-center gap-2 rounded py-0.5 hover:bg-overlay-subtle",
-        isLeaf && "cursor-grab active:cursor-grabbing",
-      )}
     >
-      <MapSchemaFieldInfoPopover fieldPath={fieldPath} label={label} />
-      {isLeaf ? (
-        <Icon name="action-drag-indicator" size={11} className="shrink-0 text-text-tertiary" aria-hidden />
-      ) : (
-        <span className="inline-block w-[11px] shrink-0" aria-hidden />
-      )}
-      <span className="min-w-0 truncate text-xs font-semibold leading-4 tracking-[0.4px] text-text-primary">
-        {depth > 0 ? (
-          <>
-            <span className="text-text-tertiary">- </span>
-            {label}
-          </>
-        ) : (
-          label
-        )}
-      </span>
-      <span className="shrink-0 text-xs font-semibold leading-4 text-text-tertiary" aria-hidden>
-        -
-      </span>
-    </div>
+      <MapSchemaAttributeRowContent
+        showMove={isMappable}
+        showTreeBranch={depth > 0}
+        labelClassName="text-text-secondary"
+        label={label}
+        typeSuffix={showTypeSuffix ? <MapSchemaFieldTypeSuffix fieldPath={fieldPath} /> : undefined}
+        expand={
+          hasChildren
+            ? {
+                expanded: isExpanded,
+                onToggle: () => onToggleExpand?.(),
+                label,
+              }
+            : undefined
+        }
+      />
+    </MapSchemaFieldRowShell>
   );
 }
 
-function MapSchemaOcsfPathTreeBranch({
+function MapSchemaExpandablePathTreeBranch({
   node,
   depth,
   pathPrefix,
+  pathKey,
+  expandedPaths,
+  onToggleExpand,
 }: {
   node: OcsfPathTreeNode;
   depth: number;
   pathPrefix: readonly string[];
+  pathKey: string;
+  expandedPaths: ReadonlySet<string>;
+  onToggleExpand: (pathKey: string) => void;
 }) {
   const segments = [...pathPrefix, node.segment];
   const fieldPath = node.fullPath ?? segments.join(".").toLowerCase();
-  const isLeaf = node.children.length === 0;
+  const hasPathChildren = node.children.length > 0;
+
+  if (
+    !hasPathChildren &&
+    isHttpActivityEnumField(fieldPath) &&
+    getHttpActivityEnumValues(fieldPath).length > 0
+  ) {
+    return (
+      <MapSchemaExpandableEnumFieldRow
+        fieldPath={fieldPath}
+        indent={depth * MAP_SCHEMA_TREE_INDENT_PX}
+        showParentDrag={false}
+        showTreeBranch={depth > 0}
+      />
+    );
+  }
+
+  const displayChildren = resolveOcsfPathTreeChildren(node);
+  const hasChildren = displayChildren.length > 0;
+  const isExpanded = expandedPaths.has(pathKey);
 
   return (
     <>
-      <MapSchemaOcsfPathTreeRow segment={node.segment} fieldPath={fieldPath} depth={depth} isLeaf={isLeaf} />
-      {node.children.map((child) => (
-        <MapSchemaOcsfPathTreeBranch
-          key={`${fieldPath}-${child.segment}`}
-          node={child}
-          pathPrefix={segments}
-          depth={depth + 1}
-        />
-      ))}
+      <MapSchemaExpandablePathTreeRow
+        segment={node.segment}
+        fieldPath={fieldPath}
+        depth={depth}
+        hasPathChildren={hasPathChildren}
+        hasChildren={hasChildren}
+        isExpanded={isExpanded}
+        onToggleExpand={hasChildren ? () => onToggleExpand(pathKey) : undefined}
+        isEnumValue={node.isEnumValue}
+      />
+      {hasChildren && isExpanded
+        ? displayChildren.map((child) => {
+            const childPathKey = child.isEnumValue
+              ? `${pathKey}.__enum.${child.segment}`
+              : pathKey
+                ? `${pathKey}.${child.segment}`
+                : child.segment;
+            return (
+              <MapSchemaExpandablePathTreeBranch
+                key={childPathKey}
+                node={child}
+                depth={depth + 1}
+                pathPrefix={segments}
+                pathKey={childPathKey}
+                expandedPaths={expandedPaths}
+                onToggleExpand={onToggleExpand}
+              />
+            );
+          })
+        : null}
     </>
   );
 }
 
-function MapSchemaEntityOcsfPathTree({ paths }: { paths: readonly string[] }) {
-  const tree = useMemo(() => buildOcsfPathTree(paths), [paths]);
+function MapSchemaExpandablePathTree({
+  paths,
+  className,
+}: {
+  paths: readonly string[];
+  className?: string;
+}) {
+  const tree = useMemo(() => sortOcsfPathTree(buildOcsfPathTree(paths)), [paths]);
+  const [expandedPaths, setExpandedPaths] = useState<ReadonlySet<string>>(() => new Set());
+
+  const toggleExpanded = useCallback((pathKey: string) => {
+    setExpandedPaths((current) => {
+      const next = new Set(current);
+      if (next.has(pathKey)) next.delete(pathKey);
+      else next.add(pathKey);
+      return next;
+    });
+  }, []);
 
   if (tree.length === 0) return null;
 
   return (
-    <div className="flex flex-col pl-6">
+    <div className={cx("flex flex-col gap-px", className)}>
       {tree.map((node) => (
-        <MapSchemaOcsfPathTreeBranch key={node.segment} node={node} pathPrefix={[]} depth={0} />
+        <MapSchemaExpandablePathTreeBranch
+          key={node.segment}
+          node={node}
+          pathPrefix={[]}
+          pathKey={node.segment}
+          depth={0}
+          expandedPaths={expandedPaths}
+          onToggleExpand={toggleExpanded}
+        />
       ))}
     </div>
   );
+}
+
+function MapSchemaEntityOcsfPathTree({ paths }: { paths: readonly string[] }) {
+  return <MapSchemaExpandablePathTree paths={paths} />;
 }
 
 function TargetMappingDropZone({
@@ -545,6 +912,10 @@ function MapSchemaEntityRow({
           !expandable && "cursor-default",
         )}
       >
+        <MapSchemaFieldInfoPopover
+          label={entity.label}
+          description={getOcsfEntityCategoryDescription(entity)}
+        />
         <Icon
           name="chevron-down"
           size={12}
@@ -555,10 +926,6 @@ function MapSchemaEntityRow({
           )}
           aria-hidden
         />
-        <MapSchemaFieldInfoPopover
-          label={entity.label}
-          description={getOcsfEntityCategoryDescription(entity)}
-        />
         <span className="min-w-0 truncate text-xs font-semibold leading-4 tracking-[0.4px] text-text-primary">
           {entity.label}
         </span>
@@ -567,7 +934,7 @@ function MapSchemaEntityRow({
         ? treeView ? (
             <MapSchemaEntityOcsfPathTree paths={entity.paths} />
           ) : (
-            entity.paths.map((path) => <MapSchemaDraggableFieldRow key={path} fieldPath={path} />)
+            entity.paths.map((path) => <MapSchemaFieldRow key={path} fieldPath={path} indent={24} />)
           )
         : null}
     </>
@@ -576,7 +943,7 @@ function MapSchemaEntityRow({
 
 function MapSchemaRecommendedFieldRow({ row }: { row: MapSchemaRecommendedRow }) {
   return (
-    <MapSchemaDraggableFieldRow
+    <MapSchemaFieldRow
       fieldPath={row.name}
       label={row.name}
       indent={0}
@@ -585,7 +952,92 @@ function MapSchemaRecommendedFieldRow({ row }: { row: MapSchemaRecommendedRow })
   );
 }
 
-function MapSchemaOverviewCard({ eventClassId }: { eventClassId: string }) {
+type MapSchemaMode = "basic" | "advanced";
+
+const MAP_SCHEMA_MODE_OPTIONS: {
+  id: MapSchemaMode;
+  label: string;
+  description: string;
+}[] = [
+  {
+    id: "basic",
+    label: "Basic Mode",
+    description: "Observable entities and recommended fields to get started quickly.",
+  },
+  {
+    id: "advanced",
+    label: "Advanced Mode",
+    description: "Full OCSF schema with every mappable field on the event class.",
+  },
+];
+
+function MapSchemaModeDropdown({
+  mode,
+  onModeChange,
+}: {
+  mode: MapSchemaMode;
+  onModeChange: (next: MapSchemaMode) => void;
+}) {
+  const selected = MAP_SCHEMA_MODE_OPTIONS.find((option) => option.id === mode) ?? MAP_SCHEMA_MODE_OPTIONS[0]!;
+
+  return (
+    <DropdownMenu modal={false}>
+      <DropdownMenuTrigger asChild>
+        <button
+          type="button"
+          aria-label={`Map schema mode: ${selected.label}`}
+          className={cx(
+            "flex h-7 min-w-0 flex-1 items-center justify-between gap-2 rounded-full border px-3 text-left transition-colors",
+            "border-border-container bg-surface-container text-text-secondary hover:text-text-primary",
+          )}
+        >
+          <span className="min-w-0 truncate text-[14px] font-bold leading-5 tracking-[0.4px]">{selected.label}</span>
+          <Icon name="chevron-down" size={20} className="shrink-0" />
+        </button>
+      </DropdownMenuTrigger>
+      <DropdownMenuContent
+        align="start"
+        className="w-[min(360px,calc(100vw-2.5rem))] rounded-[4px] border border-border-container bg-surface-modal p-2 text-text-primary shadow-[0_3px_14px_2px_rgba(0,0,0,0.12),0_8px_10px_1px_rgba(0,0,0,0.14),0_5px_5px_-3px_rgba(0,0,0,0.2)] ring-0"
+      >
+        {MAP_SCHEMA_MODE_OPTIONS.map((option) => {
+          const isSelected = option.id === mode;
+          return (
+            <DropdownMenuItem
+              key={option.id}
+              className="flex cursor-pointer flex-col items-start gap-1 rounded px-3 py-2 focus:bg-overlay-subtle"
+              onSelect={() => onModeChange(option.id)}
+            >
+              <div className="flex w-full items-center justify-between gap-2">
+                <span
+                  className={cx(
+                    "text-sm font-semibold leading-[18px]",
+                    isSelected ? "text-text-primary" : "text-text-secondary",
+                  )}
+                >
+                  {option.label}
+                </span>
+                {isSelected ? (
+                  <Icon name="action-check" size={12} className="shrink-0 text-interactive-active" aria-hidden />
+                ) : null}
+              </div>
+              <span className="text-xs font-normal leading-4 text-text-tertiary">{option.description}</span>
+            </DropdownMenuItem>
+          );
+        })}
+      </DropdownMenuContent>
+    </DropdownMenu>
+  );
+}
+
+function MapSchemaOverviewCard({
+  eventClassId,
+  mode,
+  onModeChange,
+}: {
+  eventClassId: string;
+  mode: MapSchemaMode;
+  onModeChange: (next: MapSchemaMode) => void;
+}) {
   const [treeView, setTreeView] = useState(false);
   const [entitiesOpen, setEntitiesOpen] = useState(true);
   const [recommendedOpen, setRecommendedOpen] = useState(true);
@@ -598,6 +1050,18 @@ function MapSchemaOverviewCard({ eventClassId }: { eventClassId: string }) {
       eventClassId === "http_activity" ? getMapSchemaEntitiesForEventClass("http_activity") : [],
     [eventClassId],
   );
+
+  const fullSchemaPaths = useMemo(
+    () => (eventClassId === "http_activity" ? getHttpActivityFullSchemaPaths() : []),
+    [eventClassId],
+  );
+
+  const isAdvanced = mode === "advanced";
+  const supportsSchema = eventClassId === "http_activity";
+
+  useEffect(() => {
+    setExpandedEntityIds(new Set());
+  }, [eventClassId]);
 
   const toggleEntity = useCallback((entityId: string) => {
     setExpandedEntityIds((current) => {
@@ -617,99 +1081,136 @@ function MapSchemaOverviewCard({ eventClassId }: { eventClassId: string }) {
             <p className="shrink-0 text-[12px] font-bold uppercase leading-[14px] tracking-[0.4px] text-text-tertiary">
               MAP Schema
             </p>
-            <button
-              type="button"
-              aria-label="Map schema mode: Basic Mode"
-              className={cx(
-                "flex h-7 min-w-0 flex-1 items-center justify-between gap-2 rounded-full border px-3 text-left transition-colors",
-                "border-border-container bg-surface-container text-text-secondary hover:text-text-primary",
-              )}
-            >
-              <span className="min-w-0 truncate text-[14px] font-bold leading-5 tracking-[0.4px]">Basic Mode</span>
-              <Icon name="chevron-down" size={20} className="shrink-0" />
-            </button>
+            <MapSchemaModeDropdown mode={mode} onModeChange={onModeChange} />
           </div>
           <div className="mt-4">
             <p className="text-left text-[14px] font-bold leading-5 tracking-[0.4px] text-text-primary">
               {selectedEventClass?.label ?? "Event class"}
             </p>
           </div>
-          <div className="mt-3 border-t border-border-rule pt-3">
-            <div className="w-[240px] shrink-0">
-              <Input
-                variant="search"
-                readOnly
-                tabIndex={-1}
-                placeholder="Search"
-                className="border-border-rule px-1.5"
-              />
-            </div>
-          </div>
-          <div className="mt-3">
-            <MapSchemaRequiredTimeRow />
-          </div>
+          {isAdvanced ? (
+            <>
+              <div className="mt-3 border-t border-border-rule pt-3">
+                <button
+                  type="button"
+                  className="flex w-full items-center gap-1 rounded py-0.5 text-left text-sm font-semibold leading-[18px] hover:bg-overlay-subtle focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-interactive-active"
+                  aria-haspopup="listbox"
+                  aria-label="Attributes filter"
+                >
+                  <span className="text-text-primary">Attributes:</span>
+                  <span className="text-interactive-active">Show All</span>
+                  <Icon name="chevron-down" size={12} className="ml-0.5 shrink-0 text-interactive-active" aria-hidden />
+                </button>
+              </div>
+              <div className="mt-3">
+                <div className="w-[240px] shrink-0">
+                  <Input
+                    variant="search"
+                    readOnly
+                    tabIndex={-1}
+                    placeholder="Search attributes"
+                    className="border-border-rule px-1.5"
+                  />
+                </div>
+              </div>
+            </>
+          ) : (
+            <>
+              <div className="mt-3 border-t border-border-rule pt-3">
+                <div className="w-[240px] shrink-0">
+                  <Input
+                    variant="search"
+                    readOnly
+                    tabIndex={-1}
+                    placeholder="Search attributes"
+                    className="border-border-rule px-1.5"
+                  />
+                </div>
+              </div>
+              <div className="mt-3">
+                <MapSchemaRequiredTimeRow />
+              </div>
+            </>
+          )}
         </div>
 
         <div className="mt-3 min-h-0 flex-1 overflow-y-auto">
           <div className="flex flex-col gap-px">
-            <div className="flex h-7 w-full min-h-7 flex-wrap items-center gap-2 py-1">
-              <button
-                type="button"
-                onClick={() => setEntitiesOpen((v) => !v)}
-                aria-expanded={entitiesOpen}
-                className="flex min-w-0 shrink-0 items-center gap-2 rounded py-0.5 pr-1 text-left text-text-primary hover:bg-overlay-subtle focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-interactive-active"
-              >
-                <Icon
-                  name="chevron-down"
-                  size={12}
-                  className={cx("shrink-0 transition-transform duration-150", !entitiesOpen && "-rotate-90")}
-                  aria-hidden
-                />
-                <span className="text-xs font-semibold uppercase leading-4 tracking-[0.4px]">Entities</span>
-              </button>
-              <span className="ml-auto flex min-w-0 flex-1 items-center justify-end gap-2 pl-2">
-                <Checkbox
-                  checked={treeView}
-                  onCheckedChange={setTreeView}
-                  label="Show As Tree View"
-                  labelClassName="text-base-small text-text-secondary"
-                />
-              </span>
-            </div>
+            {isAdvanced ? (
+              <>
+                {!supportsSchema ? (
+                  <p className="py-2 text-xs font-semibold text-text-tertiary">
+                    Full OCSF schema is available for HTTP Activity.
+                  </p>
+                ) : (
+                  <>
+                    <MapSchemaRequiredTimeRow />
+                    <MapSchemaExpandablePathTree paths={fullSchemaPaths} />
+                  </>
+                )}
+              </>
+            ) : (
+              <>
+                <div className="flex h-7 w-full min-h-7 flex-wrap items-center gap-2 py-1">
+                  <button
+                    type="button"
+                    onClick={() => setEntitiesOpen((v) => !v)}
+                    aria-expanded={entitiesOpen}
+                    className="flex min-w-0 shrink-0 items-center gap-2 rounded py-0.5 pr-1 text-left text-text-primary hover:bg-overlay-subtle focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-interactive-active"
+                  >
+                    <Icon
+                      name="chevron-down"
+                      size={12}
+                      className={cx("shrink-0 transition-transform duration-150", !entitiesOpen && "-rotate-90")}
+                      aria-hidden
+                    />
+                    <span className="text-xs font-semibold uppercase leading-4 tracking-[0.4px]">Entities</span>
+                  </button>
+                  <span className="ml-auto flex min-w-0 flex-1 items-center justify-end gap-2 pl-2">
+                    <Checkbox
+                      checked={treeView}
+                      onCheckedChange={setTreeView}
+                      label="Show As Tree View"
+                      labelClassName="text-base-small text-text-secondary"
+                    />
+                  </span>
+                </div>
 
-            {entitiesOpen
-              ? mapSchemaEntities.map((entity) => (
-                  <MapSchemaEntityRow
-                    key={entity.id}
-                    entity={entity}
-                    expanded={expandedEntityIds.has(entity.id)}
-                    onToggle={() => toggleEntity(entity.id)}
-                    treeView={treeView}
-                  />
-                ))
-              : null}
+                {entitiesOpen
+                  ? mapSchemaEntities.map((entity) => (
+                      <MapSchemaEntityRow
+                        key={entity.id}
+                        entity={entity}
+                        expanded={expandedEntityIds.has(entity.id)}
+                        onToggle={() => toggleEntity(entity.id)}
+                        treeView={treeView}
+                      />
+                    ))
+                  : null}
 
-            <div className="flex h-7 w-full min-h-7 items-center gap-2 py-1">
-              <button
-                type="button"
-                onClick={() => setRecommendedOpen((v) => !v)}
-                aria-expanded={recommendedOpen}
-                className="flex min-w-0 items-center gap-2 rounded py-0.5 pr-1 text-left text-text-primary hover:bg-overlay-subtle focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-interactive-active"
-              >
-                <Icon
-                  name="chevron-down"
-                  size={12}
-                  className={cx("shrink-0 transition-transform duration-150", !recommendedOpen && "-rotate-90")}
-                  aria-hidden
-                />
-                <span className="text-xs font-semibold uppercase leading-4 tracking-[0.4px]">Recommended</span>
-              </button>
-            </div>
-            {recommendedOpen
-              ? MAP_SCHEMA_RECOMMENDED.map((row, i) => (
-                  <MapSchemaRecommendedFieldRow key={`${row.kind}-${"name" in row ? row.name : i}`} row={row} />
-                ))
-              : null}
+                <div className="flex h-7 w-full min-h-7 items-center gap-2 py-1">
+                  <button
+                    type="button"
+                    onClick={() => setRecommendedOpen((v) => !v)}
+                    aria-expanded={recommendedOpen}
+                    className="flex min-w-0 items-center gap-2 rounded py-0.5 pr-1 text-left text-text-primary hover:bg-overlay-subtle focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-interactive-active"
+                  >
+                    <Icon
+                      name="chevron-down"
+                      size={12}
+                      className={cx("shrink-0 transition-transform duration-150", !recommendedOpen && "-rotate-90")}
+                      aria-hidden
+                    />
+                    <span className="text-xs font-semibold uppercase leading-4 tracking-[0.4px]">Recommended</span>
+                  </button>
+                </div>
+                {recommendedOpen
+                  ? MAP_SCHEMA_RECOMMENDED.map((row, i) => (
+                      <MapSchemaRecommendedFieldRow key={`${row.kind}-${"name" in row ? row.name : i}`} row={row} />
+                    ))
+                  : null}
+              </>
+            )}
           </div>
         </div>
       </div>
@@ -978,8 +1479,8 @@ export function AmazonAthenaMapReviewStep({
   onHasMappedFieldsChange?: (hasMappedFields: boolean) => void;
 }) {
   const [rows, setRows] = useState<MappingRow[]>(() => INITIAL_ROWS.map((row) => ({ ...row })));
-  const [selectedEventClassId, setSelectedEventClassId] = useState(DEFAULT_EVENT_CLASS_ID);
-  const [isAiMapping, setIsAiMapping] = useState(true);
+  const [selectedEventClassId, setSelectedEventClassId] = useState("");
+  const [isAiMapping, setIsAiMapping] = useState(false);
   const [aiAssistedMappingSettings, setAiAssistedMappingSettings] = useState<AiAssistedMappingSettings>(
     DEFAULT_AI_ASSISTED_MAPPING_SETTINGS,
   );
@@ -990,6 +1491,7 @@ export function AmazonAthenaMapReviewStep({
   const [sourceSearchQuery, setSourceSearchQuery] = useState("");
   const [mapSchemaPanelWidth, setMapSchemaPanelWidth] = useState(MAP_SCHEMA_PANEL_DEFAULT_WIDTH);
   const [isResizingMapSchemaPanel, setIsResizingMapSchemaPanel] = useState(false);
+  const [mapSchemaMode, setMapSchemaMode] = useState<MapSchemaMode>("basic");
   const mapSchemaResizeRef = useRef<{ startX: number; startWidth: number } | null>(null);
 
   const runAiMappingDemo = useCallback((settings: AiAssistedMappingSettings) => {
@@ -1012,13 +1514,6 @@ export function AmazonAthenaMapReviewStep({
       setIsAiMapping(false);
     }, aiMappingDelayMs());
   }, []);
-
-  useEffect(() => {
-    runAiMappingDemo(DEFAULT_AI_ASSISTED_MAPPING_SETTINGS);
-    return () => {
-      aiMappingRunRef.current += 1;
-    };
-  }, [runAiMappingDemo]);
 
   const handleEventClassChange = useCallback((eventClassId: string) => {
     aiMappingRunRef.current += 1;
@@ -1198,7 +1693,9 @@ export function AmazonAthenaMapReviewStep({
 
   return (
     <>
-      <p className="shrink-0 py-3 text-base-semibold italic text-text-tertiary">{ADVANCED_MODE_CALLOUT}</p>
+      {mapSchemaMode === "advanced" ? (
+        <p className="shrink-0 py-3 text-base-semibold italic text-text-tertiary">{ADVANCED_MODE_CALLOUT}</p>
+      ) : null}
 
       <div className="flex min-h-0 flex-1 flex-col bg-surface-modal md:flex-row md:items-stretch">
         <div className="flex min-h-0 min-w-0 flex-1 flex-col overflow-hidden">
@@ -1268,7 +1765,11 @@ export function AmazonAthenaMapReviewStep({
               aria-hidden
             />
           </button>
-          <MapSchemaOverviewCard eventClassId={selectedEventClassId} />
+          <MapSchemaOverviewCard
+            eventClassId={selectedEventClassId}
+            mode={mapSchemaMode}
+            onModeChange={setMapSchemaMode}
+          />
         </div>
       </div>
     </>

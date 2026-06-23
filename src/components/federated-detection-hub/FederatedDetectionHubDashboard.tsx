@@ -684,8 +684,7 @@ function DetectionsTable({
   const hasActiveFilters =
     detectionNameFilter != null ||
     severityFilter != null ||
-    systemHealthFilter != null ||
-    searchQuery.trim().length > 0;
+    systemHealthFilter != null;
   const allExpanded = rows.length > 0 && rows.every((row) => expandedIds.has(row.id));
   const sortComparators = useMemo(
     (): Record<DetectionSortColumn, (a: DetectionRow, b: DetectionRow) => number> => ({

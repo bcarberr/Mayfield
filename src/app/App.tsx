@@ -5,6 +5,7 @@ import { CopilotProvider, useCopilot } from "../context/CopilotContext";
 import { SearchProvider } from "../context/SearchContext";
 import { DetectionHubProvider } from "../context/DetectionHubContext";
 import { SearchCopilotSidePanel } from "../components/SearchCopilotPanel";
+import { PendingFsqlSearchLauncher } from "../components/search/PendingFsqlSearchLauncher";
 import { DEFAULT_ROUTE, ROUTES, type ConnectorsLocationState } from "./routes";
 import { SHOW_AI_AGENTS_PAGE } from "./navRailConfig";
 
@@ -68,13 +69,14 @@ function AppShell() {
 
   const handleSendToFsqlSearch = useCallback(
     (query: string) => {
-      setPendingFsqlSearch({ query });
+      setPendingFsqlSearch({ query, autoExecute: true });
       navigate(ROUTES.search);
     },
     [setPendingFsqlSearch, navigate],
   );
   return (
     <div className="flex h-full min-h-screen">
+      <PendingFsqlSearchLauncher />
       <div className="relative flex min-h-0 min-w-0 flex-1 flex-col">
         <Suspense fallback={<RouteFallback />}>
           <Routes location={routesLocation}>

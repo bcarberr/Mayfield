@@ -618,8 +618,7 @@ export function ApplicationActivityContent() {
   const hasActiveFilters =
     activityClassFilter != null ||
     severityFilter != null ||
-    appFilter != null ||
-    searchQuery.trim().length > 0;
+    appFilter != null;
 
   const handleActivityClassClick = (label: string) => {
     if (!isActivityClass(label)) return;

@@ -803,8 +803,7 @@ export function DetectionHistoryContent() {
   const hasActiveFilters =
     runHistoryFilter != null ||
     detectionNameFilter != null ||
-    severityFilter != null ||
-    searchQuery.trim().length > 0;
+    severityFilter != null;
 
   const handleRunHistoryFilterClick = (filter: RunHistoryFilter) => {
     setRunHistoryFilter((current) => (current === filter ? null : filter));
