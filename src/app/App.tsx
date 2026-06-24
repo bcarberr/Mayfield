@@ -1,5 +1,6 @@
 import { lazy, Suspense, useCallback } from "react";
 import { matchPath, Route, Routes, useLocation, useNavigate } from "react-router-dom";
+import { Analytics } from "@vercel/analytics/react";
 import { TimeframeProvider } from "../context/TimeframeContext";
 import { CopilotProvider, useCopilot } from "../context/CopilotContext";
 import { SearchProvider } from "../context/SearchContext";
@@ -119,6 +120,7 @@ export function App() {
         <SearchProvider>
           <DetectionHubProvider>
             <AppShell />
+            <Analytics />
           </DetectionHubProvider>
         </SearchProvider>
       </CopilotProvider>
