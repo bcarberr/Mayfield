@@ -1,6 +1,6 @@
 import { useMemo, useState } from "react";
 import { DATA_GRID_ABOVE_SECTION_CLASS, DATA_GRID_HEADER_ROW_CLASS, DATA_GRID_RESULTS_SEARCH_PLACEHOLDER, DATA_GRID_TABLE_CLASS, DATA_GRID_TABLE_SCROLL_CLASS, DATA_GRID_THEAD_CLASS } from "../ui/dataGridTableStyles";
-import { Checkbox, Icon, type SeverityShapeIconName } from "../../design-system";
+import { Checkbox, Icon, type SeverityShapeIconName, withCategoricalColors } from "../../design-system";
 import { Button } from "@/components/shadcn/button";
 import { ColumnHeaderMenu } from "../ui/ColumnHeaderMenu";
 import { DonutChartPanel } from "../ui/DonutChartPanel";
@@ -26,7 +26,7 @@ import {
   rowTimeInTimeframe,
   useFederatedAnalyticsTimeframeZoom,
 } from "./federatedAnalyticsZoom";
-import { HorizontalBarPanel, CHART_CATEGORY_FILL } from "./horizontalBarPanel";
+import { HorizontalBarPanel } from "./horizontalBarPanel";
 import { TimeSeriesAreaChart } from "./timeSeriesAreaChart";
 import {
   buildHourlyAxisTicks,
@@ -38,8 +38,6 @@ import {
 } from "./timeframeChartUtils";
 
 const REMEDIATION_SPIKE_HOUR = 10;
-const STATUS_UNKNOWN_FILL = "#717882";
-
 type RemediationSeverity = "Critical" | "High" | "Medium" | "Low" | "Informational";
 
 const SEV_BAR: Record<RemediationSeverity, string> = {
@@ -103,12 +101,6 @@ const ACTIVITY_CLASS_ORDER = [
 const SEVERITY_CHART_ORDER = ["Critical", "High", "Medium", "Low", "Info"] as const;
 
 const STATUS_ORDER = ["Succeeded", "Failed", "Pending"] as const;
-
-const STATUS_COLORS: Record<RemediationStatus, string> = {
-  Succeeded: CHART_CATEGORY_FILL,
-  Failed: "#f28830",
-  Pending: STATUS_UNKNOWN_FILL,
-};
 
 const REMEDIATION_ROW_TEMPLATES: RemediationRow[] = [
   {
@@ -506,12 +498,7 @@ function RemediationEventsTable({ displayRows, getSortProps }: { displayRows: Re
                 <TruncatedText className="text-sm text-text-secondary">{row.activity}</TruncatedText>
               </td>
               <td style={colStyle(5)} className="min-w-0 px-2 py-0 align-middle">
-                <TruncatedText
-                  className="text-sm font-semibold"
-                  style={{ color: STATUS_COLORS[row.status] }}
-                >
-                  {row.status}
-                </TruncatedText>
+                <TruncatedText className="text-sm text-text-secondary">{row.status}</TruncatedText>
               </td>
               <td style={colStyle(6)} className="min-w-0 overflow-hidden px-2 py-0 align-middle">
                 <span className="flex w-full min-w-0 items-center gap-2">
@@ -601,10 +588,7 @@ export function RemediationContent() {
 
   const statusSegments = useMemo(
     () =>
-      countByLabel(timeframeScopedRows, STATUS_ORDER, (row) => row.status).map((row) => ({
-        ...row,
-        color: STATUS_COLORS[row.label as RemediationStatus],
-      })),
+      withCategoricalColors(countByLabel(timeframeScopedRows, STATUS_ORDER, (row) => row.status)),
     [timeframeScopedRows],
   );
 

@@ -1,9 +1,10 @@
 import { type KeyboardEvent, useCallback, useEffect, useRef, useState } from "react";
-import { Search } from "lucide-react";
+import { Copy, Search, ThumbsDown, ThumbsUp } from "lucide-react";
 import { Icon } from "../design-system";
 import {
   type CopilotAssistantResponse,
   type CopilotMessageBlock,
+  extractFsqlFromCopilotResponse,
   formatCopilotResponseForCopy,
   getCopilotWelcomeResponse,
   isExecutableFsqlQuery,
@@ -15,6 +16,9 @@ import aiAgentsNavSvg from "../assets/nav-v4/ai-agents.svg?raw";
 import copilotSparklesUrl from "../assets/icons/copilot-sparkles.svg?url";
 
 const cx = (...c: (string | false | undefined)[]) => c.filter(Boolean).join(" ");
+
+const COPILOT_ACTION_BTN_CLASS =
+  "size-7 p-0 text-text-tertiary hover:bg-overlay-subtle hover:text-text-primary active:bg-interactive-secondary-pressed active:text-text-primary disabled:pointer-events-none disabled:!opacity-40";
 
 const COPILOT_PANEL_WIDTH = 360;
 const COPILOT_PANEL_MIN_WIDTH = 280;
@@ -43,32 +47,39 @@ function CopilotSparkMark({ className }: { className?: string }) {
   );
 }
 
-function ThumbUpIcon({ className }: { className?: string }) {
+function CopilotMessageActions({
+  response,
+  onCopy,
+}: {
+  response?: CopilotAssistantResponse;
+  onCopy: () => void;
+}) {
+  if (!response) return null;
+
+  const hasCopyContent = Boolean(extractFsqlFromCopilotResponse(response) || formatCopilotResponseForCopy(response));
+
   return (
-    <svg className={className} width="16" height="16" viewBox="0 0 24 24" fill="none" aria-hidden>
-      <path
-        d="M7 10v10H4V10h3zm1.5-1h8.2c.8 0 1.4.6 1.5 1.4l1.1 6.5c.1.9-.6 1.6-1.5 1.6H11l-2.2-9.5V9z"
-        stroke="currentColor"
-        strokeWidth="1.5"
-        strokeLinejoin="round"
-      />
-    </svg>
+    <div className="mt-3 flex items-center justify-end gap-1">
+      <Button type="button" variant="ghost" size="icon-sm" className={COPILOT_ACTION_BTN_CLASS} aria-label="Helpful response">
+        <ThumbsUp size={14} strokeWidth={1.5} className="text-current" aria-hidden />
+      </Button>
+      <Button type="button" variant="ghost" size="icon-sm" className={COPILOT_ACTION_BTN_CLASS} aria-label="Unhelpful response">
+        <ThumbsDown size={14} strokeWidth={1.5} className="text-current" aria-hidden />
+      </Button>
+      <Button
+        type="button"
+        variant="ghost"
+        size="icon-sm"
+        className={COPILOT_ACTION_BTN_CLASS}
+        aria-label="Copy message"
+        disabled={!hasCopyContent}
+        onClick={onCopy}
+      >
+        <Copy size={14} strokeWidth={1.5} className="text-current" aria-hidden />
+      </Button>
+    </div>
   );
 }
-
-function ThumbDownIcon({ className }: { className?: string }) {
-  return (
-    <svg className={className} width="16" height="16" viewBox="0 0 24 24" fill="none" aria-hidden>
-      <path
-        d="M7 14V4H4v10h3zm1.5 1h8.2c.8 0 1.4-.6 1.5-1.4l1.1-6.5c.1-.9-.6-1.6-1.5-1.6H11l-2.2 9.5V15z"
-        stroke="currentColor"
-        strokeWidth="1.5"
-        strokeLinejoin="round"
-      />
-    </svg>
-  );
-}
-
 function CopilotResponseBlock({
   block,
   onSendToFsqlSearch,
@@ -111,49 +122,7 @@ function CopilotResponseBlock({
           ))}
         </ul>
       );
-    case "link":
-      return (
-        <a
-          href={block.href}
-          target="_blank"
-          rel="noopener noreferrer"
-          className="inline-flex text-sm font-semibold text-interactive-active hover:underline"
-        >
-          {block.label}
-        </a>
-      );
   }
-}
-
-function CopilotMessageActions({
-  response,
-  onCopy,
-}: {
-  response?: CopilotAssistantResponse;
-  onCopy: () => void;
-}) {
-  if (!response) return null;
-
-  return (
-    <div className="mt-3 flex items-center justify-end gap-1">
-      <Button type="button" variant="ghost" size="icon-sm" className="p-0 text-text-tertiary hover:text-text-primary" aria-label="Helpful response">
-        <ThumbUpIcon className="size-4" />
-      </Button>
-      <Button type="button" variant="ghost" size="icon-sm" className="p-0 text-text-tertiary hover:text-text-primary" aria-label="Unhelpful response">
-        <ThumbDownIcon className="size-4" />
-      </Button>
-      <Button
-        type="button"
-        variant="ghost"
-        size="icon-sm"
-        className="p-0 text-text-tertiary hover:text-text-primary"
-        aria-label="Copy copilot message"
-        onClick={onCopy}
-      >
-        <Icon name="action-content-copy" size={14} />
-      </Button>
-    </div>
-  );
 }
 
 function CopilotMessageBubble({
@@ -169,13 +138,16 @@ function CopilotMessageBubble({
 
   const handleCopy = async () => {
     if (!message.response) return;
-    await navigator.clipboard.writeText(formatCopilotResponseForCopy(message.response));
+    const content = extractFsqlFromCopilotResponse(message.response) || formatCopilotResponseForCopy(message.response);
+    if (!content) return;
+    await navigator.clipboard.writeText(content);
   };
 
   return (
+    <div className={cx(isUser ? "ml-12" : "mr-12")}>
     <div
       className={cx(
-        "rounded border px-4 py-3",
+        "rounded-[8px] border px-4 py-3",
         isUser
           ? "border-border-rule bg-surface-modal"
           : "border-border-rule bg-surface-container",
@@ -214,6 +186,7 @@ function CopilotMessageBubble({
           <CopilotMessageActions response={message.response} onCopy={handleCopy} />
         </div>
       )}
+    </div>
     </div>
   );
 }
@@ -360,7 +333,7 @@ function CopilotChatView({
           />
         ))}
         {isThinking ? (
-          <div className="rounded border border-border-rule bg-surface-container px-4 py-3 text-sm text-text-tertiary">
+          <div className="rounded-[8px] border border-border-rule bg-surface-container px-4 py-3 text-sm text-text-tertiary">
             Thinking...
           </div>
         ) : null}

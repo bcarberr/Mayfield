@@ -54,6 +54,15 @@ export const darkPalette = {
     gridlines: "#424242",
     titlesValues: "#f5f5f5",
     axis: "#9e9e9e",
+    /** Categorical palette — base swatches for donut / multi-series charts. */
+    categorical: [
+      "#d675bc",
+      "#a9e7f3",
+      "#6dc6a1",
+      "#ff9393",
+      "#f0a060",
+      "#b1edd4",
+    ],
     dataPeanutOrange: "#f0a060",
     dataSmaltGreen20: "#b1edd4",
     dataSmaltGreen40: "#6dc6a1",
@@ -115,6 +124,15 @@ export const lightPalette = {
     gridlines: "#e0e0e0",
     titlesValues: "#212121",
     axis: "#737373",
+    /** Categorical palette — base swatches for donut / multi-series charts. */
+    categorical: [
+      "#a04692",
+      "#5eb0c2",
+      "#469a72",
+      "#d46b6b",
+      "#b85c2e",
+      "#7ec4a3",
+    ],
     dataPeanutOrange: "#b85c2e",
     dataSmaltGreen20: "#7ec4a3",
     dataSmaltGreen40: "#469a72",

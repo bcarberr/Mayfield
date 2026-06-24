@@ -1,5 +1,7 @@
 import { useCallback } from "react";
+import { Info } from "lucide-react";
 import { useTimeframe, type TimeframeRange } from "../../context/TimeframeContext";
+import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/shadcn/tooltip";
 import {
   buildDailyBuckets,
   buildHourlyBuckets,
@@ -199,11 +201,19 @@ export function ChartZoomHint({
   onReset: () => void;
 }) {
   return (
-    <p className="mb-2 pl-9 text-base-small text-text-tertiary">
-      {unit} · drag to zoom
+    <p className="mb-2 flex items-center pl-9 text-base-small text-text-tertiary">
+      <span>{unit} · drag to zoom</span>
+      <Tooltip>
+        <TooltipTrigger className="ml-1 inline-flex cursor-default items-center focus-visible:outline-none">
+          <Info size={12} className="text-text-tertiary" aria-label="About zoom" />
+        </TooltipTrigger>
+        <TooltipContent side="top" className="max-w-[260px]">
+          Zoom stays with you. Drag to zoom on any chart and the selected time range persists across all tabs and search results, until you're ready to reset it.
+        </TooltipContent>
+      </Tooltip>
       {isChartZoomed ? (
-        <>
-          {" · "}
+        <span className="ml-2 inline-flex items-center gap-1">
+          <span aria-hidden>·</span>
           <button
             type="button"
             className="font-semibold text-feedback-caution hover:underline"
@@ -211,7 +221,7 @@ export function ChartZoomHint({
           >
             Reset
           </button>
-        </>
+        </span>
       ) : null}
     </p>
   );

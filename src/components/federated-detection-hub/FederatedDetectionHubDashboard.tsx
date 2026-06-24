@@ -45,6 +45,7 @@ import { DonutChartPanel } from "../ui/DonutChartPanel";
 import { useResizableColumns } from "../ui/useResizableColumns";
 import { useDataGridPagination } from "../ui/useDataGridPagination";
 import { InsightCard } from "../summary-insights/datavisCard";
+import { getCategoricalPaletteColor } from "../../design-system";
 import { HorizontalBarPanel } from "../summary-insights/horizontalBarPanel";
 import type { DetectionRow } from "./detectionHubTypes";
 import { useDetectionHub } from "../../context/DetectionHubContext";
@@ -307,9 +308,9 @@ function SystemHealthCard({
 }
 
 const TOP_FINDINGS_SEGMENTS = [
-  { label: "Suspicious PowerShell Execution", color: "#b4549a", value: 861 },
-  { label: "Privilege Escalation Attempts", color: "#817cf6", value: 319 },
-  { label: "Credential Dumping Activity", color: "#5fd3f8", value: 209 },
+  { label: "Suspicious PowerShell Execution", color: getCategoricalPaletteColor(0), value: 861 },
+  { label: "Privilege Escalation Attempts", color: getCategoricalPaletteColor(1), value: 319 },
+  { label: "Credential Dumping Activity", color: getCategoricalPaletteColor(2), value: 209 },
 ] as const;
 
 function TopFindingsCard({

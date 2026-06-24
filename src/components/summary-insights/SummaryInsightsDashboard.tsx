@@ -11,7 +11,7 @@ import {
 } from "../ui/dataGridTableStyles";
 import { useNavigate } from "react-router-dom";
 import { Search } from "lucide-react";
-import { Checkbox, Icon } from "../../design-system";
+import { Checkbox, Icon, withCategoricalColors } from "../../design-system";
 import { DonutChartPanel } from "../ui/DonutChartPanel";
 import { FilterColumnPanel, type FilterColumnPanelTool } from "../ui/FilterColumnPanel";
 import { SeverityTableIcon } from "../ui/SeverityTableIcon";
@@ -55,7 +55,7 @@ import {
   readDefaultFederatedView,
   type FederatedViewId,
 } from "./FederatedAnalyticsBreadcrumb";
-import { CHART_CATEGORY_FILL, HorizontalBarPanel } from "./horizontalBarPanel";
+import { HorizontalBarPanel } from "./horizontalBarPanel";
 import { ApplicationActivityContent } from "./ApplicationActivityContent";
 import { DiscoveryContent } from "./DiscoveryContent";
 import { IdentityAccessContent } from "./IdentityAccessContent";
@@ -110,8 +110,6 @@ function isFindingCategory(label: string): label is FindingCategory {
 type FindingEventType = "HTTP Activity" | "Vulnerability";
 
 type FindingStatus = "New" | "In Progress" | "Resolved" | "Suppressed";
-
-const STATUS_UNKNOWN_FILL = "#717882";
 
 function isFindingStatus(label: string): label is FindingStatus {
   return label === "New" || label === "In Progress" || label === "Resolved" || label === "Suppressed";
@@ -261,13 +259,6 @@ const FINDING_CATEGORY_ORDER: FindingCategory[] = [
 const FINDING_SEVERITY_CHART_ORDER: SeverityLevel[] = ["Critical", "High", "Medium", "Low", "Informational"];
 
 const FINDING_STATUS_ORDER: FindingStatus[] = ["New", "In Progress", "Resolved", "Suppressed"];
-
-const FINDING_STATUS_COLORS: Record<FindingStatus, string> = {
-  New: SEV_BAR.Critical,
-  "In Progress": SEV_BAR.High,
-  Resolved: CHART_CATEGORY_FILL,
-  Suppressed: STATUS_UNKNOWN_FILL,
-};
 
 function horizontalBarScale(values: readonly number[]) {
   const peak = Math.max(...values, 1);
@@ -930,11 +921,12 @@ export function SummaryInsightsDashboard() {
     for (const row of timeframeScopedRows) {
       counts.set(row.findingStatus, (counts.get(row.findingStatus) ?? 0) + 1);
     }
-    return FINDING_STATUS_ORDER.map((label) => ({
-      label,
-      color: FINDING_STATUS_COLORS[label],
-      value: counts.get(label) ?? 0,
-    }));
+    return withCategoricalColors(
+      FINDING_STATUS_ORDER.map((label) => ({
+        label,
+        value: counts.get(label) ?? 0,
+      })),
+    );
   }, [timeframeScopedRows]);
 
     const filteredTableRows = useMemo(

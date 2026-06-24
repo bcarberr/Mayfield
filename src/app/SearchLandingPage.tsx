@@ -507,7 +507,7 @@ export function SearchLandingPage() {
               >
                 <div className="mt-[60px] flex w-full max-w-[720px] flex-col items-stretch">
                   <h1 className="text-center text-3xl font-bold leading-9 tracking-[0.5px] text-text-primary sm:text-4xl sm:leading-tight">
-                    Welcome Bonnie Carberry!
+                    Welcome Chanice Kobolowski!
                   </h1>
                   <p className="mx-auto mt-4 max-w-[560px] text-center text-base leading-6 text-text-secondary">
                     Query every connected source from a single field. Combine field paths, identifiers, and

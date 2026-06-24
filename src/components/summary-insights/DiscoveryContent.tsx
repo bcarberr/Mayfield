@@ -1,6 +1,6 @@
 import { useMemo, useState } from "react";
 import { DATA_GRID_ABOVE_SECTION_CLASS, DATA_GRID_HEADER_ROW_CLASS, DATA_GRID_RESULTS_SEARCH_PLACEHOLDER, DATA_GRID_TABLE_CLASS, DATA_GRID_TABLE_SCROLL_CLASS, DATA_GRID_THEAD_CLASS } from "../ui/dataGridTableStyles";
-import { Checkbox, Icon, type SeverityShapeIconName } from "../../design-system";
+import { Checkbox, Icon, type SeverityShapeIconName, withCategoricalColors } from "../../design-system";
 import type { TimeframeRange } from "../../context/TimeframeContext";
 import { Button } from "@/components/shadcn/button";
 import { ColumnHeaderMenu } from "../ui/ColumnHeaderMenu";
@@ -26,7 +26,7 @@ import {
   rowTimeInTimeframe,
   useFederatedAnalyticsTimeframeZoom,
 } from "./federatedAnalyticsZoom";
-import { CHART_CATEGORY_FILL, HorizontalBarPanel } from "./horizontalBarPanel";
+import { CHART_CATEGORY_FILL, HorizontalBarPanel, TIME_SERIES_BAR_FILL } from "./horizontalBarPanel";
 import { cx, InsightCard } from "./datavisCard";
 import { TimeSeriesBarChart } from "./timeSeriesBarChart";
 import { buildDailyBuckets, type HourBucket } from "./timeframeChartUtils";
@@ -57,8 +57,6 @@ const SEVERITY_ORDER: Record<DiscoverySeverity, number> = {
   Informational: 4,
 };
 
-const PLATFORM_UNKNOWN_FILL = "#717882";
-const NEW_ASSETS_LINE = "#4a9eff";
 
 type DevicePlatform = "Windows" | "macOS" | "Linux" | "Cloud / SaaS" | "Unknown";
 
@@ -148,13 +146,6 @@ const PATCH_STATUS_ORDER = [
   "Missing critical",
   "Unknown",
 ] as const satisfies readonly PatchStatus[];
-
-const PATCH_COLORS: Record<PatchStatus, string> = {
-  "Up to date": CHART_CATEGORY_FILL,
-  "Missing non-crit": "#f28830",
-  "Missing critical": "#ff604a",
-  Unknown: PLATFORM_UNKNOWN_FILL,
-};
 
 const DISCOVERY_ROWS: DiscoveryRow[] = [
   {
@@ -588,7 +579,7 @@ export function DiscoveryContent() {
     () =>
       countByLabel(timeframeScopedRows, PLATFORM_ORDER, (row) => row.platform).map((row) => ({
         ...row,
-        color: row.label === "Unknown" ? PLATFORM_UNKNOWN_FILL : CHART_CATEGORY_FILL,
+        color: CHART_CATEGORY_FILL,
       })),
     [timeframeScopedRows],
   );
@@ -614,11 +605,9 @@ export function DiscoveryContent() {
 
   const patchSegments = useMemo(
     () =>
-      countByLabel(timeframeScopedRows, PATCH_STATUS_ORDER, (row) => row.patchStatus).map((row) => ({
-        label: row.label,
-        value: row.value,
-        color: PATCH_COLORS[row.label as PatchStatus],
-      })),
+      withCategoricalColors(
+        countByLabel(timeframeScopedRows, PATCH_STATUS_ORDER, (row) => row.patchStatus),
+      ),
     [timeframeScopedRows],
   );
 
@@ -670,7 +659,7 @@ export function DiscoveryContent() {
         <TimeSeriesBarChart
           values={dailyChart.values}
           xLabels={dailyChart.xLabels}
-          barColor={NEW_ASSETS_LINE}
+          barColor={TIME_SERIES_BAR_FILL}
           spikeHighlight={
             dailyChart.spikeIndex != null
               ? { index: dailyChart.spikeIndex, label: `spike ${dailyChart.xLabels[dailyChart.spikeIndex]}` }

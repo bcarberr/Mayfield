@@ -27,6 +27,9 @@ const AiAgentsPage = SHOW_AI_AGENTS_PAGE
   ? lazy(() => import("./AiAgentsPage").then((m) => ({ default: m.AiAgentsPage })))
   : null;
 const SettingsPage = lazy(() => import("./SettingsPage").then((m) => ({ default: m.SettingsPage })));
+const AdminSettingsPage = lazy(() =>
+  import("./AdminSettingsPage").then((m) => ({ default: m.AdminSettingsPage })),
+);
 const WorkspacePlaceholderPage = lazy(() =>
   import("./WorkspacePlaceholderPage").then((m) => ({ default: m.WorkspacePlaceholderPage })),
 );
@@ -70,9 +73,11 @@ function AppShell() {
   const handleSendToFsqlSearch = useCallback(
     (query: string) => {
       setPendingFsqlSearch({ query, autoExecute: true });
-      navigate(ROUTES.search);
+      // Navigation when leaving another route is handled by PendingFsqlSearchLauncher.
+      // Do not navigate here when already on search — that pushes a duplicate history
+      // entry and SearchLandingPage resets via location.key.
     },
-    [setPendingFsqlSearch, navigate],
+    [setPendingFsqlSearch],
   );
   return (
     <div className="flex h-full min-h-screen">
@@ -92,10 +97,7 @@ function AppShell() {
               <Route path={ROUTES.aiAgents} element={<AiAgentsPage />} />
             ) : null}
             <Route path={ROUTES.settings} element={<SettingsPage />} />
-            <Route
-              path={ROUTES.adminSettings}
-              element={<WorkspacePlaceholderPage activeSection="adminSettings" title="Admin Settings" />}
-            />
+            <Route path={ROUTES.adminSettings} element={<AdminSettingsPage />} />
             <Route path={ROUTES.designSystem} element={<DesignSystemPage />} />
           </Routes>
         </Suspense>

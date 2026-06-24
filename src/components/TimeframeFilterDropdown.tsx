@@ -39,7 +39,7 @@ function fromDatetimeLocalValue(value: string): Date | null {
 
 /** Federated Search header control — choose a from/to datetime range. */
 export function TimeframeFilterDropdown() {
-  const { range, commitAnalyticsTimeframe } = useTimeframe();
+  const { range, commitAnalyticsTimeframe, isAnalyticsChartZoomed } = useTimeframe();
   const [open, setOpen] = useState(false);
   const [draftFrom, setDraftFrom] = useState(() => toDatetimeLocalValue(range.from));
   const [draftTo, setDraftTo] = useState(() => toDatetimeLocalValue(range.to));
@@ -94,8 +94,22 @@ export function TimeframeFilterDropdown() {
             Timeframe
             <ChevronDown size={14} className="shrink-0 text-current" aria-hidden />
           </span>
-          <span className="ml-0.5 min-w-0 max-w-[12rem] truncate rounded bg-surface-container px-2 py-1 text-sm font-normal text-text-primary lg:max-w-none lg:whitespace-nowrap">
-            {formatTimeframeLabel(range.from, range.to)}
+          <span
+            className={cn(
+              "ml-0.5 inline-flex min-w-0 max-w-[12rem] items-center gap-1.5 rounded bg-surface-container px-2 py-1 lg:max-w-none",
+              isAnalyticsChartZoomed && "pr-1.5",
+            )}
+            title={isAnalyticsChartZoomed ? "Chart zoom active — use Reset to restore the full timeframe" : undefined}
+          >
+            <span className="min-w-0 truncate text-sm font-normal text-text-primary lg:whitespace-nowrap">
+              {formatTimeframeLabel(range.from, range.to)}
+            </span>
+            {isAnalyticsChartZoomed ? (
+              <span
+                className="size-1.5 shrink-0 rounded-full bg-feedback-caution"
+                aria-label="Chart zoom active"
+              />
+            ) : null}
           </span>
         </Button>
       </DropdownMenuTrigger>

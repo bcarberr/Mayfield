@@ -194,12 +194,19 @@ const COLOR_GROUPS = [
   {
     group: "Datavis",
     tokens: [
-      { name: "data-peanut-orange", var: "--color-datavis-data-peanut-orange" },
-      { name: "data-smalt-green-20", var: "--color-datavis-data-smalt-green-20" },
-      { name: "data-smalt-green-40", var: "--color-datavis-data-smalt-green-40" },
-      { name: "data-weak-red-30", var: "--color-datavis-data-weak-red-30" },
-      { name: "data-rouge-40", var: "--color-datavis-data-rouge-40" },
-      { name: "data-pop-teal-20", var: "--color-datavis-data-pop-teal-20" },
+      { name: "datavis-card-bg", var: "--color-datavis-card-bg" },
+      { name: "datavis-gridlines", var: "--color-datavis-gridlines" },
+    ],
+  },
+  {
+    group: "Categorical Palette",
+    tokens: [
+      { name: "rouge-40", var: "--color-datavis-data-rouge-40" },
+      { name: "pop-teal-20", var: "--color-datavis-data-pop-teal-20" },
+      { name: "smalt-green-40", var: "--color-datavis-data-smalt-green-40" },
+      { name: "weak-red-30", var: "--color-datavis-data-weak-red-30" },
+      { name: "peanut-orange", var: "--color-datavis-data-peanut-orange" },
+      { name: "smalt-green-20", var: "--color-datavis-data-smalt-green-20" },
     ],
   },
 ];

@@ -26,7 +26,7 @@ import {
   topCountsByLabel,
   useFederatedAnalyticsTimeframeZoom,
 } from "./federatedAnalyticsZoom";
-import { HorizontalBarPanel } from "./horizontalBarPanel";
+import { CHART_CATEGORY_FILL, HorizontalBarPanel } from "./horizontalBarPanel";
 import { TimeSeriesAreaChart } from "./timeSeriesAreaChart";
 import {
   buildHourlyAxisTicks,
@@ -123,7 +123,6 @@ const SEVERITY_ROWS = [
   { label: "Informational", value: 623, color: SEV_BAR.Informational },
 ] as const;
 
-const TOP_USERS_BAR = "#4a9eff";
 
 const IAM_MANAGEMENT_CLASS_ORDER = IAM_MANAGEMENT_CLASS_ROWS.map((row) => row.label);
 const SEVERITY_CHART_ORDER = SEVERITY_ROWS.map((row) => row.label);
@@ -580,7 +579,7 @@ export function IdentityAccessContent() {
   );
 
   const topUsersChartRows = useMemo(
-    () => topCountsByLabel(timeframeScopedRows, (row) => row.user, 4, TOP_USERS_BAR),
+    () => topCountsByLabel(timeframeScopedRows, (row) => row.user, 4, CHART_CATEGORY_FILL),
     [timeframeScopedRows],
   );
 

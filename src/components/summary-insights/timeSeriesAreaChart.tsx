@@ -209,6 +209,8 @@ export function TimeSeriesAreaChart({
     );
   }, [series, xLabels.length]);
 
+  const legendSeries = useMemo(() => seriesForHoverLegend(series), [series]);
+
   const yMax = yMaxProp ?? Math.max(...stackedTotals, 1);
   const yTicks = yTicksProp ?? [0, Math.round(yMax / 4), Math.round(yMax / 2), Math.round((yMax * 3) / 4), yMax];
 
@@ -298,7 +300,7 @@ export function TimeSeriesAreaChart({
               plotX={hover.plotX}
               timeLabel={formatTimeSeriesHoverLabel(hover.index, xLabels, bucketStarts)}
             >
-              {seriesForHoverLegend(series).map((s) => (
+              {legendSeries.map((s) => (
                 <TimeSeriesHoverRow
                   key={s.id}
                   label={s.label}
@@ -501,7 +503,7 @@ export function TimeSeriesAreaChart({
       </div>
 
       <ul className="mt-5 flex shrink-0 flex-wrap gap-x-3 gap-y-1 pl-9">
-        {series.map((s) => {
+        {legendSeries.map((s) => {
           const marker = (
             <span
               className="size-2 shrink-0 rounded-full"

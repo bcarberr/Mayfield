@@ -1,14 +1,11 @@
 export type CopilotMessageBlock =
   | { type: "text"; text: string }
   | { type: "code"; language: "fsql"; text: string }
-  | { type: "list"; items: string[] }
-  | { type: "link"; label: string; href: string };
+  | { type: "list"; items: string[] };
 
 export type CopilotAssistantResponse = {
   blocks: CopilotMessageBlock[];
 };
-
-const FSQL_DOCS_URL = "https://docs.query.ai/docs/fsql";
 
 type KnowledgeTopic = {
   id: string;
@@ -36,7 +33,6 @@ const KNOWLEDGE_TOPICS: KnowledgeTopic[] = [
             "Flexible time controls and rich filtering",
           ],
         },
-        { type: "link", label: "FSQL documentation", href: FSQL_DOCS_URL },
       ],
     },
   },
@@ -72,7 +68,6 @@ const KNOWLEDGE_TOPICS: KnowledgeTopic[] = [
             "LIMIT — cap result count",
           ],
         },
-        { type: "link", label: "Query Syntax Reference", href: "https://docs.query.ai/docs/query-syntax" },
       ],
     },
   },
@@ -99,7 +94,6 @@ LIMIT 1000`,
           type: "text",
           text: "Omit FROM to search all enabled connectors. Omit SINCE and UNTIL to use the default 30-minute window.",
         },
-        { type: "link", label: "Quick Start guide", href: "https://docs.query.ai/docs/quick-start" },
       ],
     },
   },
@@ -132,7 +126,6 @@ WITH %ip = '10.0.0.1'`,
             "%url / %url_string — all URL fields",
           ],
         },
-        { type: "link", label: "Entities reference", href: "https://docs.query.ai/docs/entities" },
       ],
     },
   },
@@ -161,7 +154,8 @@ WITH %ip = '10.0.0.1'`,
         {
           type: "code",
           language: "fsql",
-          text: `WITH (process_activity.process.name IN 'powershell.exe', 'cmd.exe')
+          text: `QUERY
+WITH (process_activity.process.name IN 'powershell.exe', 'cmd.exe')
 AND (process_activity.process.cmd_line CONTAINS 'hidden'
      OR process_activity.process.cmd_line CONTAINS 'encode')`,
         },
@@ -169,7 +163,6 @@ AND (process_activity.process.cmd_line CONTAINS 'hidden'
           type: "text",
           text: "For array fields, use ANY or ALL quantifiers: WITH ANY field.list CONTAINS 'value'",
         },
-        { type: "link", label: "Search Filter Operators", href: "https://docs.query.ai/docs/search-filter-operators" },
       ],
     },
   },
@@ -194,7 +187,6 @@ UNTIL 1746109163`,
           type: "text",
           text: "Units include m/min, h/hr/hrs, d/day, w/wk/weeks, and mo/month. If you omit both clauses, FSQL defaults to the last 30 minutes.",
         },
-        { type: "link", label: "Dates and Times", href: "https://docs.query.ai/docs/dates-and-times" },
       ],
     },
   },
@@ -227,7 +219,6 @@ FROM 1940, 2015`,
           type: "text",
           text: "Run EXPLAIN CONNECTORS to list available connectors, aliases, and tags.",
         },
-        { type: "link", label: "Query Syntax — FROM", href: "https://docs.query.ai/docs/query-syntax" },
       ],
     },
   },
@@ -257,7 +248,6 @@ FROM 1940, 2015`,
 SHOW authentication.**
 WITH authentication.status_id = FAILURE`,
         },
-        { type: "link", label: "Attribute Selectors", href: "https://docs.query.ai/docs/attribute-selectors" },
       ],
     },
   },
@@ -282,7 +272,6 @@ SINCE 24hrs`,
           type: "list",
           items: ["COUNT", "COUNT DISTINCT", "MIN", "MAX", "AVG", "SUM"],
         },
-        { type: "link", label: "Analytics Functions", href: "https://docs.query.ai/docs/analytics-functions" },
       ],
     },
   },
@@ -305,7 +294,6 @@ EXPLAIN CONNECTORS
 EXPLAIN QUERY <query>
 VALIDATE QUERY <query>`,
         },
-        { type: "link", label: "Other Commands", href: "https://docs.query.ai/docs/other-commands" },
       ],
     },
   },
@@ -335,7 +323,6 @@ VALIDATE QUERY <query>`,
           type: "text",
           text: "Categories like #network, #iam, #findings, and #application group related event classes.",
         },
-        { type: "link", label: "Data Model Primer", href: "https://docs.query.ai/docs/data-model-primer" },
       ],
     },
   },
@@ -348,7 +335,6 @@ VALIDATE QUERY <query>`,
           type: "text",
           text: "If you are coming from Splunk SPL, Query provides a side-by-side comparison of common patterns and how they map to FSQL.",
         },
-        { type: "link", label: "FSQL for SPL Users", href: "https://docs.query.ai/docs/fsql-for-spl-users" },
       ],
     },
   },
@@ -361,7 +347,6 @@ VALIDATE QUERY <query>`,
           type: "text",
           text: "If you are coming from Microsoft Sentinel or Defender KQL, see the dedicated migration guide for equivalent FSQL patterns.",
         },
-        { type: "link", label: "FSQL for KQL Users", href: "https://docs.query.ai/docs/fsql-for-kql-users" },
       ],
     },
   },
@@ -372,9 +357,8 @@ VALIDATE QUERY <query>`,
       blocks: [
         {
           type: "text",
-          text: "The FSQL cheat sheet is a single-page quick reference for query structure, selectors, operators, entities, time syntax, and SUMMARIZE.",
+          text: "The FSQL cheat sheet covers query structure, selectors, operators, entities, time syntax, and SUMMARIZE in a single page. Ask me for any specific section and I can show you an example.",
         },
-        { type: "link", label: "FSQL Cheat Sheet", href: "https://docs.query.ai/docs/cheat-sheet" },
       ],
     },
   },
@@ -402,48 +386,96 @@ function scoreTopic(topic: KnowledgeTopic, prompt: string): number {
   return score;
 }
 
+function extractQuotedValue(prompt: string): string | null {
+  const m = prompt.match(/['"]([^'"]+)['"]/);
+  return m?.[1] ?? null;
+}
+
 function buildQuerySuggestion(prompt: string): CopilotAssistantResponse | null {
   const normalized = normalizePrompt(prompt);
 
-  if (/\b(ip|address|host)\b/.test(normalized)) {
-    const ipMatch = prompt.match(/\b(?:\d{1,3}\.){3}\d{1,3}(?:\/\d{1,2})?\b/);
-    const ip = ipMatch?.[0] ?? "10.0.0.1";
+  // Failed login / brute force
+  if (/\b(failed login|login fail|brute|authentication fail|auth fail|password spray|credential stuff)\b/.test(normalized)) {
     return {
       blocks: [
-        {
-          type: "text",
-          text: "Use an entity shortcut to hunt an IP across every mapped field in your federated sources:",
-        },
+        { type: "text", text: "Searching for failed authentication events across identity providers:" },
         {
           type: "code",
           language: "fsql",
           text: `QUERY
-SHOW #network.**
-WITH %ip = '${ip}'
+SHOW authentication.user.username, authentication.src_endpoint.ip, authentication.time
+WITH authentication.status_id = FAILURE
 SINCE 24hrs
-LIMIT 500`,
-        },
-        {
-          type: "text",
-          text: "For a CIDR range on a specific field, use the CIDR operator instead: WITH network_activity.src_endpoint.ip CIDR '10.0.0.0/8'",
+FROM 'Active Directory', 'Okta'
+ORDER BY authentication.time DESC
+LIMIT 1000`,
         },
       ],
     };
   }
 
-  if (/\b(powershell|cmd\.exe|process)\b/.test(normalized)) {
+  // IP address hunt
+  if (/\b(ip|ip address|address|cidr)\b/.test(normalized)) {
+    const ipMatch = prompt.match(/\b(?:\d{1,3}\.){3}\d{1,3}(?:\/\d{1,2})?\b/);
+    const ip = ipMatch?.[0] ?? "10.0.0.1";
+    const isCidr = ip.includes("/");
     return {
       blocks: [
         {
           type: "text",
-          text: "This template finds suspicious process execution across federated endpoint telemetry:",
+          text: isCidr
+            ? `Hunting CIDR range ${ip} across all network fields:`
+            : `Hunting ${ip} across every mapped IP address field:`,
         },
+        {
+          type: "code",
+          language: "fsql",
+          text: isCidr
+            ? `QUERY
+SHOW #network.**
+WITH network_activity.src_endpoint.ip CIDR '${ip}'
+SINCE 24hrs
+LIMIT 500`
+            : `QUERY
+SHOW #network.**
+WITH %ip = '${ip}'
+SINCE 24hrs
+LIMIT 500`,
+        },
+      ],
+    };
+  }
+
+  // Hostname / endpoint / machine
+  if (/\b(hostname|host|endpoint|machine|device|workstation|server|computer)\b/.test(normalized)) {
+    const host = extractQuotedValue(prompt) ?? "host.example.com";
+    return {
+      blocks: [
+        { type: "text", text: "Searching all events tied to this host across every mapped hostname field:" },
+        {
+          type: "code",
+          language: "fsql",
+          text: `QUERY
+SHOW **
+WITH %hostname = '${host}'
+SINCE 24hrs
+LIMIT 1000`,
+        },
+      ],
+    };
+  }
+
+  // PowerShell / cmd / process execution
+  if (/\b(powershell|cmd\.exe|wscript|wmic|mshta|cscript|process|execution|spawn|command line|cmdline|lolbin)\b/.test(normalized)) {
+    return {
+      blocks: [
+        { type: "text", text: "Searching for suspicious process execution across endpoint telemetry:" },
         {
           type: "code",
           language: "fsql",
           text: `QUERY
 SHOW process_activity.**
-WITH process_activity.process.name IN 'powershell.exe', 'cmd.exe'
+WITH process_activity.process.name IN 'powershell.exe', 'cmd.exe', 'wscript.exe', 'mshta.exe'
 AND process_activity.process.cmd_line CONTAINS 'hidden'
 SINCE 7d
 LIMIT 1000`,
@@ -452,19 +484,38 @@ LIMIT 1000`,
     };
   }
 
-  if (/\b(dns|domain)\b/.test(normalized)) {
+  // File hash / malware indicator
+  if (/\b(hash|md5|sha1|sha256|malware|indicator|ioc|file hash)\b/.test(normalized)) {
+    const hashMatch = prompt.match(/\b[0-9a-fA-F]{32,64}\b/);
+    const hash = hashMatch?.[0] ?? "44d88612fea8a8f36de82e1278abb02f";
     return {
       blocks: [
+        { type: "text", text: "Searching for this file hash across every mapped hash field:" },
         {
-          type: "text",
-          text: "Search DNS activity across connectors with an OCSF-aligned filter:",
+          type: "code",
+          language: "fsql",
+          text: `QUERY
+SHOW file_activity.**
+WITH %hash = '${hash}'
+SINCE 7d
+LIMIT 500`,
         },
+      ],
+    };
+  }
+
+  // DNS / domain
+  if (/\b(dns|domain|lookup|nslookup|resolve|hostname lookup)\b/.test(normalized)) {
+    const domain = extractQuotedValue(prompt) ?? "example.com";
+    return {
+      blocks: [
+        { type: "text", text: "Searching DNS activity across connectors:" },
         {
           type: "code",
           language: "fsql",
           text: `QUERY
 SHOW dns_activity.**
-WITH dns_activity.query.hostname CONTAINS 'example.com'
+WITH dns_activity.query.hostname CONTAINS '${domain}'
 SINCE 24hrs
 LIMIT 500`,
         },
@@ -472,40 +523,203 @@ LIMIT 500`,
     };
   }
 
-  if (/\b(hash|malware|file)\b/.test(normalized)) {
+  // Network connections / traffic / flows
+  if (/\b(network|connection|traffic|flow|packet|port|outbound|inbound|east[-.]west)\b/.test(normalized)) {
+    const portMatch = prompt.match(/\bport\s+(\d+)\b/i);
+    const portFilter = portMatch
+      ? `\nAND network_activity.dst_endpoint.port = ${portMatch[1]}`
+      : "";
     return {
       blocks: [
-        {
-          type: "text",
-          text: "Track a file hash across all mapped hash fields with the %hash entity shortcut:",
-        },
+        { type: "text", text: "Searching network connection activity across connected sources:" },
         {
           type: "code",
           language: "fsql",
           text: `QUERY
-SHOW file_activity.**
-WITH %hash = '44d88612fea8a8f36de82e1278abb02f'
-SINCE 7d`,
+SHOW network_activity.**${portFilter}
+SINCE 24hrs
+ORDER BY network_activity.time DESC
+LIMIT 1000`,
         },
       ],
     };
   }
 
-  if (/\b(failed login|login fail|brute|authentication)\b/.test(normalized)) {
+  // HTTP / web requests
+  if (/\b(http|https|web|url|request|response|proxy|wget|curl)\b/.test(normalized)) {
+    const urlVal = extractQuotedValue(prompt);
+    const withClause = urlVal
+      ? `WITH %url = '${urlVal}'`
+      : "WITH http_activity.http_response.code >= 400";
     return {
       blocks: [
-        {
-          type: "text",
-          text: "Here is the documented pattern for failed authentication events:",
-        },
+        { type: "text", text: "Searching HTTP activity across web proxies and endpoint sources:" },
         {
           type: "code",
           language: "fsql",
           text: `QUERY
-SHOW authentication.user.username, authentication.src_endpoint.ip
-WITH authentication.status_id = FAILURE
-SINCE 48hrs UNTIL 24hrs
-FROM 'Active Directory', 'Okta'
+SHOW http_activity.**
+${withClause}
+SINCE 24hrs
+LIMIT 500`,
+        },
+      ],
+    };
+  }
+
+  // Detections / alerts / findings / threats
+  if (/\b(detection|alert|finding|threat|rule|signal|incident|high|critical|severity)\b/.test(normalized)) {
+    return {
+      blocks: [
+        { type: "text", text: "Searching for high and critical severity detections across all SIEM sources:" },
+        {
+          type: "code",
+          language: "fsql",
+          text: `QUERY
+SHOW detection_finding.**
+WITH detection_finding.severity_id IN HIGH, CRITICAL
+SINCE 24hrs
+FROM #siem
+ORDER BY detection_finding.time DESC
+LIMIT 500`,
+        },
+      ],
+    };
+  }
+
+  // Cloud API / AWS / Azure / GCP
+  if (/\b(api|cloud|aws|azure|gcp|s3|iam|sts|assume role|cloud trail|cloudtrail)\b/.test(normalized)) {
+    return {
+      blocks: [
+        { type: "text", text: "Searching cloud API activity across connected cloud connectors:" },
+        {
+          type: "code",
+          language: "fsql",
+          text: `QUERY
+SHOW api_activity.**
+WITH api_activity.status_id != SUCCESS
+SINCE 24hrs
+FROM #cloud
+ORDER BY api_activity.time DESC
+LIMIT 1000`,
+        },
+      ],
+    };
+  }
+
+  // Lateral movement / RDP / SMB / remote
+  if (/\b(lateral|rdp|smb|remote desktop|psexec|wmi|pass.the.hash|pth|remote exec)\b/.test(normalized)) {
+    return {
+      blocks: [
+        { type: "text", text: "Searching for lateral movement patterns including RDP and SMB activity:" },
+        {
+          type: "code",
+          language: "fsql",
+          text: `QUERY
+SHOW network_activity.**
+WITH network_activity.dst_endpoint.port IN 3389, 445, 135
+AND network_activity.direction_id = OUTBOUND
+SINCE 24hrs
+LIMIT 1000`,
+        },
+      ],
+    };
+  }
+
+  // Privilege escalation / sudo / admin
+  if (/\b(privilege|escalat|sudo|admin|root|elevat|uac|local admin|domain admin)\b/.test(normalized)) {
+    return {
+      blocks: [
+        { type: "text", text: "Searching for privilege escalation and high-privilege account activity:" },
+        {
+          type: "code",
+          language: "fsql",
+          text: `QUERY
+SHOW (authentication + process_activity).**
+WITH authentication.user.type_id = ADMIN
+   OR process_activity.process.name IMATCHES '.*sudo.*|.*runas.*'
+SINCE 24hrs
+LIMIT 1000`,
+        },
+      ],
+    };
+  }
+
+  // Data exfiltration / large transfers / upload
+  if (/\b(exfil|exfiltrat|upload|transfer|large file|data loss|dlp|outbound data)\b/.test(normalized)) {
+    return {
+      blocks: [
+        { type: "text", text: "Searching for potential data exfiltration signals in network and file activity:" },
+        {
+          type: "code",
+          language: "fsql",
+          text: `QUERY
+SHOW network_activity.**
+WITH network_activity.traffic.bytes_out > 10000000
+AND network_activity.direction_id = OUTBOUND
+SINCE 24hrs
+ORDER BY network_activity.traffic.bytes_out DESC
+LIMIT 500`,
+        },
+      ],
+    };
+  }
+
+  // Email / phishing / attachment
+  if (/\b(email|phish|phishing|attachment|spam|spear|malicious link|sender)\b/.test(normalized)) {
+    const senderMatch = extractQuotedValue(prompt);
+    const withClause = senderMatch ? `\nWITH %email = '${senderMatch}'` : "";
+    return {
+      blocks: [
+        { type: "text", text: "Searching for email-related activity and phishing indicators:" },
+        {
+          type: "code",
+          language: "fsql",
+          text: `QUERY
+SHOW #email.**${withClause}
+SINCE 24hrs
+LIMIT 500`,
+        },
+      ],
+    };
+  }
+
+  // User / account / username (generic — after more-specific auth patterns)
+  if (/\b(user|username|account|identity|logon|login|session)\b/.test(normalized)) {
+    const user = extractQuotedValue(prompt) ?? "jdoe";
+    return {
+      blocks: [
+        { type: "text", text: "Searching all events for this user across every mapped username field:" },
+        {
+          type: "code",
+          language: "fsql",
+          text: `QUERY
+SHOW **
+WITH %username = '${user}'
+SINCE 24hrs
+ORDER BY authentication.time DESC
+LIMIT 1000`,
+        },
+      ],
+    };
+  }
+
+  // File activity
+  if (/\b(file|file activity|file create|file delete|file write|file read|ransomware|encrypt)\b/.test(normalized)) {
+    const filename = extractQuotedValue(prompt);
+    const withClause = filename
+      ? `WITH %filename = '${filename}'`
+      : "WITH file_activity.activity_id IN CREATE, DELETE, RENAME";
+    return {
+      blocks: [
+        { type: "text", text: "Searching file system activity across endpoint sources:" },
+        {
+          type: "code",
+          language: "fsql",
+          text: `QUERY
+SHOW file_activity.**
+${withClause}
+SINCE 24hrs
 LIMIT 1000`,
         },
       ],
@@ -561,7 +775,6 @@ SINCE 24hrs`,
     type: "text",
     text: "Run VALIDATE QUERY or EXPLAIN QUERY in FSQL to check interpretation before searching.",
   });
-  blocks.push({ type: "link", label: "Query Syntax Reference", href: "https://docs.query.ai/docs/query-syntax" });
 
   return { blocks };
 }
@@ -571,18 +784,17 @@ function defaultResponse(): CopilotAssistantResponse {
     blocks: [
       {
         type: "text",
-        text: "I can help with FSQL using Query's official documentation. Try asking about query structure, entity shortcuts, filters, time ranges, connectors, or request an example query.",
+        text: "I can help write FSQL queries or explain the query language. Try describing what you're hunting — an IP, username, process, domain, hash, alert type, or a scenario — and I'll generate a query for it.",
       },
       {
         type: "list",
         items: [
-          "How do I write an FSQL search query?",
-          "What are entity shortcuts like %ip?",
-          "Show me filter operators",
-          "How do I scope to specific connectors?",
+          "Show me failed logins in the last 24 hours",
+          "Find all activity for IP 10.0.0.1",
+          "Search for PowerShell with encoded commands",
+          "Look for high and critical detections",
         ],
       },
-      { type: "link", label: "FSQL documentation", href: FSQL_DOCS_URL },
     ],
   };
 }
@@ -606,9 +818,8 @@ export function getCopilotWelcomeResponse(): CopilotAssistantResponse {
       },
       {
         type: "text",
-        text: "What would you like help with? Answers are based on the official FSQL docs.",
+        text: "What would you like help with? Describe what you're investigating and I'll write a query for it.",
       },
-      { type: "link", label: "docs.query.ai/docs/fsql", href: FSQL_DOCS_URL },
     ],
   };
 }
@@ -647,7 +858,7 @@ export function resolveCopilotPrompt(prompt: string, currentFsqlQuery = ""): Cop
       blocks: [
         {
           type: "text",
-          text: "Here is a flexible starter template you can adapt. Replace the event class, filters, and connectors for your investigation:",
+          text: "Here is a flexible starter template for detection findings. Replace the event class, filters, and connectors for your investigation:",
         },
         {
           type: "code",
@@ -662,9 +873,8 @@ LIMIT 500`,
         },
         {
           type: "text",
-          text: "Tell me what you are hunting — IP, username, process, DNS, hash — and I can suggest a more specific query.",
+          text: "Tell me what you are hunting — IP, username, process, DNS, hash — and I can write a more targeted query.",
         },
-        { type: "link", label: "Quick Start", href: "https://docs.query.ai/docs/quick-start" },
       ],
     };
   }
@@ -682,10 +892,16 @@ export function formatCopilotResponseForCopy(response: CopilotAssistantResponse)
           return block.text;
         case "list":
           return block.items.map((item) => `• ${item}`).join("\n");
-        case "link":
-          return `${block.label}: ${block.href}`;
       }
     })
+    .join("\n\n");
+}
+
+/** FSQL code blocks from an assistant response — used by copilot copy action. */
+export function extractFsqlFromCopilotResponse(response: CopilotAssistantResponse): string {
+  return response.blocks
+    .filter((block): block is Extract<CopilotMessageBlock, { type: "code" }> => block.type === "code" && block.language === "fsql")
+    .map((block) => block.text.trim())
     .join("\n\n");
 }
 

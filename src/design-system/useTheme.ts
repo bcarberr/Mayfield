@@ -14,7 +14,6 @@ function readInitialTheme(): Theme {
   } catch {
     /* ignore storage failures (private mode, etc.) */
   }
-  if (window.matchMedia?.("(prefers-color-scheme: light)").matches) return "light";
   return "dark";
 }
 
@@ -33,9 +32,8 @@ export function initTheme(): Theme {
 }
 
 /**
- * Reads / writes the active theme. Updates `<html data-theme>`, syncs
- * `localStorage`, and listens for OS-level changes when no explicit value
- * is stored.
+ * Reads / writes the active theme. Updates `<html data-theme>` and syncs
+ * `localStorage`. Defaults to dark when no explicit value is stored.
  */
 export function useTheme(): {
   theme: Theme;

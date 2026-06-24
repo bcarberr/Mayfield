@@ -52,8 +52,6 @@ type SearchContextValue = {
   setResultsFilterQuery: (query: string) => void;
   resultsTableTool: FilterColumnPanelTool | null;
   setResultsTableTool: (tool: FilterColumnPanelTool | null) => void;
-  resultsChartZoomed: boolean;
-  setResultsChartZoomed: (zoomed: boolean) => void;
   resultsPage: number;
   setResultsPage: (page: number) => void;
 };
@@ -76,14 +74,12 @@ export function SearchProvider({ children }: { children: ReactNode }) {
   const [skipTimeframeFsqlSyncOnce, setSkipTimeframeFsqlSyncOnce] = useState(false);
   const [resultsFilterQuery, setResultsFilterQuery] = useState("");
   const [resultsTableTool, setResultsTableTool] = useState<FilterColumnPanelTool | null>(null);
-  const [resultsChartZoomed, setResultsChartZoomed] = useState(false);
   const [resultsPage, setResultsPage] = useState(0);
   const searchTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   const resetResultsViewState = useCallback(() => {
     setResultsFilterQuery("");
     setResultsTableTool(null);
-    setResultsChartZoomed(false);
     setResultsPage(0);
   }, []);
 
@@ -183,8 +179,6 @@ export function SearchProvider({ children }: { children: ReactNode }) {
     setResultsFilterQuery,
     resultsTableTool,
     setResultsTableTool,
-    resultsChartZoomed,
-    setResultsChartZoomed,
     resultsPage,
     setResultsPage,
   };

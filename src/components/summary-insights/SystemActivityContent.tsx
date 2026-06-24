@@ -26,7 +26,7 @@ import {
   topCountsByLabel,
   useFederatedAnalyticsTimeframeZoom,
 } from "./federatedAnalyticsZoom";
-import { HorizontalBarPanel } from "./horizontalBarPanel";
+import { CHART_CATEGORY_FILL, HorizontalBarPanel } from "./horizontalBarPanel";
 import { TimeSeriesAreaChart } from "./timeSeriesAreaChart";
 import {
   buildHourlyAxisTicks,
@@ -64,7 +64,6 @@ const SEVERITY_ORDER: Record<SystemSeverity, number> = {
   Informational: 4,
 };
 
-const HOST_BAR_FILL = "#4a9eff";
 
 type ActivityClass =
   | "Process"
@@ -597,7 +596,7 @@ export function SystemActivityContent() {
   );
 
   const hostChartRows = useMemo(
-    () => topCountsByLabel(timeframeScopedRows, (row) => row.host, 4, HOST_BAR_FILL),
+    () => topCountsByLabel(timeframeScopedRows, (row) => row.host, 4, CHART_CATEGORY_FILL),
     [timeframeScopedRows],
   );
 

@@ -33,10 +33,10 @@ import {
   type FsqlSearchResultRow,
 } from "./fsqlSearchResultsData";
 import { timeframeFromBucketSelection } from "../summary-insights/timeframeChartUtils";
+import { ChartZoomHint } from "../summary-insights/federatedAnalyticsZoom";
 import { FsqlSearchProgressStats } from "./FsqlSearchProgressStats";
 import { useFsqlSearchProgress } from "./useFsqlSearchProgress";
 import { useConnectorSelectionCounts } from "../connectors/connectorEnabledState";
-import { Button } from "@/components/shadcn/button";
 import { Checkbox } from "@/components/shadcn/checkbox";
 
 const SEV_CRITICAL = "#ff604a";
@@ -247,14 +247,18 @@ export function FsqlSearchResultsView({
   searchInitialTimeframe: TimeframeRange | null;
   detectionName?: string | null;
 }) {
-  const { range: timeframe, setRange } = useTimeframe();
+  const {
+    range: timeframe,
+    setRange,
+    applyAnalyticsChartZoom,
+    isAnalyticsChartZoomed,
+    analyticsBaselineRange,
+  } = useTimeframe();
   const {
     resultsFilterQuery,
     setResultsFilterQuery,
     resultsTableTool,
     setResultsTableTool,
-    resultsChartZoomed,
-    setResultsChartZoomed,
     resultsPage,
     setResultsPage,
     fsqlSearching,
@@ -284,24 +288,18 @@ export function FsqlSearchResultsView({
     ({ startIndex, endIndex }: { startIndex: number; endIndex: number }) => {
       const nextRange = timeframeFromBucketSelection(timeframe, timeline.buckets, startIndex, endIndex);
       if (!nextRange) return;
-      setResultsChartZoomed(true);
-      setRange(nextRange);
+      applyAnalyticsChartZoom(nextRange);
     },
-    [timeframe, timeline.buckets, setRange, setResultsChartZoomed],
+    [timeframe, timeline.buckets, applyAnalyticsChartZoom],
   );
 
   const handleChartZoomReset = useCallback(() => {
-    if (!searchInitialTimeframe) return;
+    const baseline = searchInitialTimeframe ?? analyticsBaselineRange;
     setRange({
-      from: new Date(searchInitialTimeframe.from),
-      to: new Date(searchInitialTimeframe.to),
+      from: new Date(baseline.from),
+      to: new Date(baseline.to),
     });
-    setResultsChartZoomed(false);
-  }, [searchInitialTimeframe, setRange, setResultsChartZoomed]);
-
-  useEffect(() => {
-    setResultsChartZoomed(false);
-  }, [searchInitialTimeframe?.from.getTime(), searchInitialTimeframe?.to.getTime(), setResultsChartZoomed]);
+  }, [searchInitialTimeframe, analyticsBaselineRange, setRange]);
 
   useEffect(() => {
     if (!searchSessionKey) return;
@@ -347,22 +345,11 @@ export function FsqlSearchResultsView({
         <div className={DATA_GRID_ABOVE_SECTION_CLASS}>
           <InsightCard title={resultsTitle}>
           <div className="flex shrink-0 flex-col">
-            <p className="mb-2 pl-9 text-base-small text-text-tertiary">
-              Hours · drag to zoom
-              {resultsChartZoomed && searchInitialTimeframe ? (
-                <>
-                  {" · "}
-                  <Button
-                    type="button"
-                    variant="link"
-                    className="h-auto p-0 font-semibold text-feedback-caution hover:text-feedback-caution"
-                    onClick={handleChartZoomReset}
-                  >
-                    Reset
-                  </Button>
-                </>
-              ) : null}
-            </p>
+            <ChartZoomHint
+              unit="Hours"
+              isChartZoomed={isAnalyticsChartZoomed}
+              onReset={handleChartZoomReset}
+            />
             {showChartLoading ? (
               <div className="flex h-[140px] items-center justify-center text-sm text-text-tertiary">Searching…</div>
             ) : (

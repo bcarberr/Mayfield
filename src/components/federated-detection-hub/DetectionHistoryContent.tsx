@@ -31,6 +31,7 @@ import { TruncatedText } from "../ui/TruncatedText";
 import { useResizableColumns } from "../ui/useResizableColumns";
 import { useDataGridPagination } from "../ui/useDataGridPagination";
 import { InsightCard } from "../summary-insights/datavisCard";
+import { getCategoricalPaletteColor } from "../../design-system";
 import { HorizontalBarPanel } from "../summary-insights/horizontalBarPanel";
 import { FindingsSearchCell, type DetectionFindings } from "./FindingsSearchCell";
 
@@ -94,9 +95,9 @@ const RUNS_ERRORED_COUNT = 9;
 const RUNS_SKIPPED_COUNT = 3;
 
 const TOP_TRIGGERED_SEGMENTS = [
-  { label: "Suspicious PowerShell Execution", color: "#b4549a", value: 861 },
-  { label: "Privilege Escalation Attempts", color: "#817cf6", value: 319 },
-  { label: "Credential Dumping Activity", color: "#5fd3f8", value: 209 },
+  { label: "Suspicious PowerShell Execution", color: getCategoricalPaletteColor(0), value: 861 },
+  { label: "Privilege Escalation Attempts", color: getCategoricalPaletteColor(1), value: 319 },
+  { label: "Credential Dumping Activity", color: getCategoricalPaletteColor(2), value: 209 },
 ] as const;
 
 const TOP_TRIGGERED_TOTAL = 1389;
@@ -466,7 +467,7 @@ function RunStatusCell({ status }: { status: RunStatus }) {
   if (status === "Skipped (disabled)") {
     return <span className="text-sm text-text-secondary">Skipped (disabled)</span>;
   }
-  return <span className="text-sm font-semibold text-feedback-positive">Success</span>;
+  return <span className="text-sm text-text-secondary">{status}</span>;
 }
 
 function runHistoryFindings(findingsGenerated: number | null, status: RunStatus): DetectionFindings {

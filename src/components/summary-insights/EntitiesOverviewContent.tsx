@@ -1,4 +1,9 @@
-import { useMemo, useState } from "react";
+import { useCallback, useMemo, useState } from "react";
+import { useCopilot } from "../../context/CopilotContext";
+import {
+  buildAggregatedEntitiesFsqlQuery,
+  buildCategoryEntitiesFsqlQuery,
+} from "../../lib/buildEntitiesFsqlQuery";
 import {
   DATA_GRID_ABOVE_SECTION_CLASS,
   DATA_GRID_HEADER_ROW_CLASS,
@@ -44,15 +49,12 @@ import {
   rowTimeInTimeframe,
   useFederatedAnalyticsTimeframeZoom,
 } from "./federatedAnalyticsZoom";
-import { CHART_CATEGORY_FILL, HorizontalBarPanel } from "./horizontalBarPanel";
+import { CHART_CATEGORY_FILL, HorizontalBarPanel, TIME_SERIES_BAR_FILL } from "./horizontalBarPanel";
 import { cx, InsightCard } from "./datavisCard";
 import { TimeSeriesBarChart } from "./timeSeriesBarChart";
 import { buildDailyBuckets, type HourBucket } from "./timeframeChartUtils";
 
-const ENTITY_BAR_FILL = "#6dc6a1";
 const ENTITY_BAR_TRACK = "rgba(158, 158, 158, 0.2)";
-const NEW_ENTITIES_BAR = "#4a9eff";
-const TOP_ENTITY_VOLUME_BAR = "#4a9eff";
 
 const WEEKDAY_SHORT = ["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"] as const;
 
@@ -178,10 +180,10 @@ const ENTITY_CATEGORY_CARDS: EntityCategoryCardData[] = [
     uniqueSeenLabel: "unique usernames seen",
     totalCount: 25,
     items: [
-      { label: "bcarberr", value: 2654 },
-      { label: "carberry", value: 1400 },
+      { label: "cKopolowski", value: 2654 },
+      { label: "kopolowsk", value: 1400 },
       { label: "bonwoncar", value: 1200 },
-      { label: "BCarberry", value: 894 },
+      { label: "CKopolowski", value: 894 },
       { label: "Slingercar", value: 762 },
     ],
   },
@@ -285,14 +287,26 @@ function EntityAmountBar({ value, maxValue }: { value: number; maxValue: number 
       <div className="absolute inset-0 rounded-sm" style={{ backgroundColor: ENTITY_BAR_TRACK }} aria-hidden />
       <div
         className="absolute inset-y-0 left-0 rounded-sm"
-        style={{ width: `${pct}%`, backgroundColor: ENTITY_BAR_FILL }}
+        style={{ width: `${pct}%`, backgroundColor: CHART_CATEGORY_FILL }}
         aria-hidden
       />
     </div>
   );
 }
 
-function EntityCategoryCard({ data }: { data: EntityCategoryCardData }) {
+function categorySelectionKey(cardTitle: string, label: string): string {
+  return `${cardTitle}::${label}`;
+}
+
+function EntityCategoryCard({
+  data,
+  selectedKeys,
+  onToggleItem,
+}: {
+  data: EntityCategoryCardData;
+  selectedKeys: ReadonlySet<string>;
+  onToggleItem: (cardTitle: string, label: string, checked: boolean) => void;
+}) {
   const maxItemValue = data.items[0]?.value ?? 1;
 
   return (
@@ -305,7 +319,11 @@ function EntityCategoryCard({ data }: { data: EntityCategoryCardData }) {
         <ol className="mt-3 min-h-0 flex-1 divide-y divide-datavis-gridlines">
           {data.items.map((item, index) => (
             <li key={`${item.label}-${index}`} className="flex items-center gap-2 py-2.5 sm:gap-3">
-              <Checkbox checked={false} onCheckedChange={() => {}} aria-label={`Select ${item.label}`} />
+              <Checkbox
+                checked={selectedKeys.has(categorySelectionKey(data.title, item.label))}
+                onCheckedChange={(checked) => onToggleItem(data.title, item.label, checked === true)}
+                aria-label={`Select ${item.label}`}
+              />
               <span className="w-5 shrink-0 text-base-semibold tabular-nums text-text-tertiary">
                 {String(index + 1).padStart(2, "0")}
               </span>
@@ -590,7 +608,7 @@ function topEntitiesByEventVolume(rows: readonly AggregatedEntityRow[], limit: n
   return [...totals.entries()]
     .sort((a, b) => b[1] - a[1])
     .slice(0, limit)
-    .map(([label, value]) => ({ label, value, color: TOP_ENTITY_VOLUME_BAR }));
+    .map(([label, value]) => ({ label, value, color: CHART_CATEGORY_FILL }));
 }
 
 function aggregatedMatchesSearch(row: AggregatedEntityRow, query: string): boolean {
@@ -658,8 +676,17 @@ export function useEntitiesAggregatedTableGrid(rows: readonly Parameters<typeof 
   return useSortedDataGridPagination(rows, sortComparators);
 }
 
-function EntitiesAggregatedTable({ displayRows, getSortProps }: { displayRows: AggregatedEntityRow[]; getSortProps: ReturnType<typeof useEntitiesAggregatedTableGrid>["getSortProps"] }) {
-  const [selected, setSelected] = useState<Set<string>>(() => new Set());
+function EntitiesAggregatedTable({
+  displayRows,
+  getSortProps,
+  selected,
+  onSelectedChange,
+}: {
+  displayRows: AggregatedEntityRow[];
+  getSortProps: ReturnType<typeof useEntitiesAggregatedTableGrid>["getSortProps"];
+  selected: ReadonlySet<string>;
+  onSelectedChange: (next: Set<string>) => void;
+}) {
   const {
     containerRef,
     colStyle,
@@ -682,16 +709,14 @@ function EntitiesAggregatedTable({ displayRows, getSortProps }: { displayRows: A
   const someSelected = selectedOnPage > 0 && !allSelected;
 
   const toggleAll = (checked: boolean) => {
-    setSelected(checked ? new Set(allIds) : new Set());
+    onSelectedChange(checked ? new Set([...selected, ...allIds]) : new Set());
   };
 
   const toggleRow = (id: string, checked: boolean) => {
-    setSelected((prev) => {
-      const next = new Set(prev);
-      if (checked) next.add(id);
-      else next.delete(id);
-      return next;
-    });
+    const next = new Set(selected);
+    if (checked) next.add(id);
+    else next.delete(id);
+    onSelectedChange(next);
   };
 
 
@@ -871,15 +896,37 @@ function EntitiesDetailTabs({
   );
 }
 
-function EntitiesAggregatedPanel({ rows }: { rows: AggregatedEntityRow[] }) {
+function EntitiesAggregatedPanel({
+  rows,
+  selectedIds,
+  onSelectedIdsChange,
+  onSearchSelected,
+}: {
+  rows: AggregatedEntityRow[];
+  selectedIds: ReadonlySet<string>;
+  onSelectedIdsChange: (next: Set<string>) => void;
+  onSearchSelected: (rows: AggregatedEntityRow[]) => void;
+}) {
   const [searchQuery, setSearchQuery] = useState("");
   const [tableTool, setTableTool] = useState<FilterColumnPanelTool | null>(null);
 
-    const filteredRows = useMemo(
+  const filteredRows = useMemo(
     () => rows.filter((row) => aggregatedMatchesSearch(row, searchQuery)),
     [rows, searchQuery],
   );
   const tableGrid = useEntitiesAggregatedTableGrid(filteredRows);
+
+  const selectedRows = useMemo(
+    () => rows.filter((row) => selectedIds.has(row.id)),
+    [rows, selectedIds],
+  );
+
+  const handleSelectedChange = useCallback(
+    (next: Set<string>) => {
+      onSelectedIdsChange(next);
+    },
+    [onSelectedIdsChange],
+  );
 
   return (
     <DataGridSection
@@ -913,6 +960,17 @@ function EntitiesAggregatedPanel({ rows }: { rows: AggregatedEntityRow[] }) {
                 Clear all filters
               </Button>
             ) : null}
+            {selectedRows.length > 0 ? (
+              <Button
+                type="button"
+                variant="secondary-outline"
+                className="h-8 shrink-0 gap-1.5"
+                onClick={() => onSearchSelected(selectedRows)}
+              >
+                <Search size={14} strokeWidth={1.5} className="size-3.5 shrink-0 text-current" aria-hidden />
+                Search {selectedRows.length} selected
+              </Button>
+            ) : null}
             <DataGridExportButton />
           </div>
         </>
@@ -924,7 +982,14 @@ function EntitiesAggregatedPanel({ rows }: { rows: AggregatedEntityRow[] }) {
           onColumnsClick={() => setTableTool(tableTool === "columns" ? null : "columns")}
         />
       }
-      table={<EntitiesAggregatedTable displayRows={tableGrid.displayRows} getSortProps={tableGrid.getSortProps} />}
+      table={
+        <EntitiesAggregatedTable
+          displayRows={tableGrid.displayRows}
+          getSortProps={tableGrid.getSortProps}
+          selected={selectedIds}
+          onSelectedChange={handleSelectedChange}
+        />
+      }
       footer={<DataGridPaginationFooter grid={tableGrid} />}
     />
   );
@@ -932,9 +997,49 @@ function EntitiesAggregatedPanel({ rows }: { rows: AggregatedEntityRow[] }) {
 
 /** Figma `1595:48982` — Entities Overview body for Federated Analytics. */
 export function EntitiesOverviewContent() {
+  const { setPendingFsqlSearch } = useCopilot();
   const { timeframe, initialTimeframe, isChartZoomed, handleTimelineBrush, handleChartZoomReset } =
     useFederatedAnalyticsTimeframeZoom("daily");
   const [activeDetailTab, setActiveDetailTab] = useState<EntitiesDetailTab>("entities");
+  const [aggregatedSelectedIds, setAggregatedSelectedIds] = useState<Set<string>>(() => new Set());
+  const [categorySelectedKeys, setCategorySelectedKeys] = useState<Set<string>>(() => new Set());
+
+  const launchEntitiesFsqlSearch = useCallback(
+    (query: string, onLaunched?: () => void) => {
+      if (!query.trim()) return;
+      setPendingFsqlSearch({ query, autoExecute: true });
+      onLaunched?.();
+    },
+    [setPendingFsqlSearch],
+  );
+
+  const handleSearchAggregatedSelection = useCallback(
+    (selectedRows: AggregatedEntityRow[]) => {
+      const query = buildAggregatedEntitiesFsqlQuery(selectedRows);
+      launchEntitiesFsqlSearch(query, () => setAggregatedSelectedIds(new Set()));
+    },
+    [launchEntitiesFsqlSearch],
+  );
+
+  const handleToggleCategoryItem = useCallback((cardTitle: string, label: string, checked: boolean) => {
+    const key = categorySelectionKey(cardTitle, label);
+    setCategorySelectedKeys((prev) => {
+      const next = new Set(prev);
+      if (checked) next.add(key);
+      else next.delete(key);
+      return next;
+    });
+  }, []);
+
+  const handleSearchCategorySelection = useCallback(() => {
+    const selections = [...categorySelectedKeys].flatMap((key) => {
+      const separator = key.indexOf("::");
+      if (separator === -1) return [];
+      return [{ cardTitle: key.slice(0, separator), label: key.slice(separator + 2) }];
+    });
+    const query = buildCategoryEntitiesFsqlQuery(selections);
+    launchEntitiesFsqlSearch(query, () => setCategorySelectedKeys(new Set()));
+  }, [categorySelectedKeys, launchEntitiesFsqlSearch]);
 
   const tableRows = useMemo(
     () =>
@@ -1001,7 +1106,7 @@ export function EntitiesOverviewContent() {
         <TimeSeriesBarChart
           values={dailyChart.values}
           xLabels={dailyChart.xLabels}
-          barColor={NEW_ENTITIES_BAR}
+          barColor={TIME_SERIES_BAR_FILL}
           spikeHighlight={
             dailyChart.spikeIndex != null
               ? { index: dailyChart.spikeIndex, label: `spike ${dailyChart.xLabels[dailyChart.spikeIndex]}` }
@@ -1045,13 +1150,49 @@ export function EntitiesOverviewContent() {
       <EntitiesDetailTabs active={activeDetailTab} onChange={setActiveDetailTab} />
 
       {activeDetailTab === "entities" ? (
-        <div className="grid min-h-0 grid-cols-1 gap-4 lg:grid-cols-3">
-          {ENTITY_CATEGORY_CARDS.map((card) => (
-            <EntityCategoryCard key={card.title} data={card} />
-          ))}
-        </div>
+        <>
+          {categorySelectedKeys.size > 0 ? (
+            <div className="flex flex-wrap items-center gap-3">
+              <p className="text-base-small text-text-secondary">
+                {categorySelectedKeys.size} entit{categorySelectedKeys.size === 1 ? "y" : "ies"} selected
+              </p>
+              <Button
+                type="button"
+                variant="secondary-outline"
+                className="h-8 shrink-0 gap-1.5"
+                onClick={handleSearchCategorySelection}
+              >
+                <Search size={14} strokeWidth={1.5} className="size-3.5 shrink-0 text-current" aria-hidden />
+                Search selected
+              </Button>
+              <Button
+                type="button"
+                variant="ghost"
+                className="h-8 shrink-0 px-2 text-base-small text-text-tertiary hover:text-text-primary"
+                onClick={() => setCategorySelectedKeys(new Set())}
+              >
+                Clear selection
+              </Button>
+            </div>
+          ) : null}
+          <div className="grid min-h-0 grid-cols-1 gap-4 lg:grid-cols-3">
+            {ENTITY_CATEGORY_CARDS.map((card) => (
+              <EntityCategoryCard
+                key={card.title}
+                data={card}
+                selectedKeys={categorySelectedKeys}
+                onToggleItem={handleToggleCategoryItem}
+              />
+            ))}
+          </div>
+        </>
       ) : (
-        <EntitiesAggregatedPanel rows={timeframeScopedRows} />
+        <EntitiesAggregatedPanel
+          rows={timeframeScopedRows}
+          selectedIds={aggregatedSelectedIds}
+          onSelectedIdsChange={setAggregatedSelectedIds}
+          onSearchSelected={handleSearchAggregatedSelection}
+        />
       )}
     </div>
   );

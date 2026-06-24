@@ -39,11 +39,6 @@ import {
 
 type NetworkSeverity = "Critical" | "High" | "Medium" | "Low" | "Informational";
 
-const NETWORK_STATUS_COLORS: Record<string, string> = {
-  Success: CHART_CATEGORY_FILL,
-  Failure: "#f28830",
-};
-
 const SEV_BAR: Record<NetworkSeverity, string> = {
   Critical: "#ff604a",
   High: "#f28830",
@@ -114,7 +109,6 @@ type SourceDestPair = {
   value: number;
 };
 
-const PAIR_BAR_FILL = "#4a9eff";
 
 const TRAFFIC_ORDER = TRAFFIC_ACTIVITY_ROWS.map((row) => row.label);
 const SEVERITY_CHART_ORDER = SEVERITY_ROWS.map((row) => row.label);
@@ -395,7 +389,7 @@ function SourceDestinationPairsPanel({ rows, selectedId = null, onPairClick }: S
                     )}
                     style={{
                       width: `min(${pct}%, calc(100% - 3.25rem))`,
-                      backgroundColor: PAIR_BAR_FILL,
+                      backgroundColor: CHART_CATEGORY_FILL,
                     }}
                   />
                   <span
@@ -621,12 +615,7 @@ function NetworkActivityTable({ displayRows, getSortProps }: { displayRows: Netw
                 <TruncatedText className="text-sm text-text-secondary">{row.activity}</TruncatedText>
               </td>
               <td style={colStyle(5)} className="min-w-0 px-2 py-0 align-middle">
-                <TruncatedText
-                  className="text-sm font-semibold"
-                  style={{ color: NETWORK_STATUS_COLORS[row.status] }}
-                >
-                  {row.status}
-                </TruncatedText>
+                <TruncatedText className="text-sm text-text-secondary">{row.status}</TruncatedText>
               </td>
               <td style={colStyle(6)} className="min-w-0 overflow-hidden px-2 py-0 align-middle">
                 <span className="flex w-full min-w-0 items-center gap-2">
