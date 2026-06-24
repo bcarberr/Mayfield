@@ -7,12 +7,20 @@ import { DonutChartPanel } from "../ui/DonutChartPanel";
 import { FilterColumnPanel, type FilterColumnPanelTool } from "../ui/FilterColumnPanel";
 import { Input } from "../ui/Input";
 import { DataGridExportButton } from "../ui/DataGridExportButton";
+import { Snackbar } from "../ui/Snackbar";
+import { useDataGridJsonExport } from "../ui/useDataGridJsonExport";
 import { SeverityTableIcon } from "../ui/SeverityTableIcon";
 import { compareStrings } from "../ui/useColumnSort";
 import { useSortedDataGridPagination } from "../ui/useSortedDataGridPagination";
 import { DataGridSection } from "../ui/DataGridSection";
 import { DataGridPaginationFooter } from "../ui/DataGridTableLayout";
-import { useResizableColumns } from "../ui/useResizableColumns";
+import { REMEDIATION_DATA_GRID_COLUMNS } from "../ui/dataGridColumnCatalog";
+import { useDataGridColumnPanel } from "../ui/dataGridColumnTypes";
+import {
+  dataGridBodyCellClass,
+  dataGridHeaderCellClass,
+  useDynamicResizableColumns,
+} from "../ui/dataGridDynamicTableHelpers";
 import { TruncatedText } from "../ui/TruncatedText";
 import { demoTableConnector } from "../connectors/demoTableConnectors";
 import { ConnectorTableCell } from "../ui/ConnectorTableCell";
@@ -312,9 +320,16 @@ type RemediationSortColumn =
   | "status"
   | "connector";
 
-const SELECT_COL_WIDTH = 40;
-const COL_DEFAULTS: readonly number[] = [SELECT_COL_WIDTH, 108, 280, 96, 96, 96, 168, 140, 120];
-const COL_MINS: readonly number[] = [SELECT_COL_WIDTH, 72, 120, 72, 56, 72, 96, 80, 80];
+const REMEDIATION_SORTABLE_COLUMN_LABELS: Record<RemediationSortColumn, string> = {
+  severity: "Severity",
+  title: "Title",
+  time: "Time",
+  activity: "Activity",
+  status: "Status",
+  eventClass: "Class",
+  entity: "Entity",
+  connector: "Connectors",
+};
 
 export function useRemediationEventsTableGrid(rows: readonly Parameters<typeof RemediationEventsTable>[0]["displayRows"][number][]) {
   const sortComparators = useMemo(
@@ -333,7 +348,15 @@ export function useRemediationEventsTableGrid(rows: readonly Parameters<typeof R
   return useSortedDataGridPagination(rows, sortComparators);
 }
 
-function RemediationEventsTable({ displayRows, getSortProps }: { displayRows: RemediationRow[]; getSortProps: ReturnType<typeof useRemediationEventsTableGrid>["getSortProps"] }) {
+function RemediationEventsTable({
+  displayRows,
+  getSortProps,
+  tableColumnIds,
+}: {
+  displayRows: RemediationRow[];
+  getSortProps: ReturnType<typeof useRemediationEventsTableGrid>["getSortProps"];
+  tableColumnIds: readonly string[];
+}) {
   const [selected, setSelected] = useState<Set<string>>(() => new Set());
   const {
     containerRef,
@@ -344,11 +367,7 @@ function RemediationEventsTable({ displayRows, getSortProps }: { displayRows: Re
     resizeHandle,
     displayWidths,
     minTableWidth,
-  } = useResizableColumns({
-    selectColWidth: SELECT_COL_WIDTH,
-    colDefaults: COL_DEFAULTS,
-    colMins: COL_MINS,
-  });
+  } = useDynamicResizableColumns(tableColumnIds);
 
   const allIds = useMemo(() => displayRows.map((r) => r.id), [displayRows]);
   const total = allIds.length;
@@ -369,10 +388,149 @@ function RemediationEventsTable({ displayRows, getSortProps }: { displayRows: Re
     });
   };
 
+  const renderHeaderCell = (columnId: string, colIndex: number) => {
+    const headerClass = dataGridHeaderCellClass(colIndex, tableColumnIds.length, columnId);
 
+    switch (columnId) {
+      case "select":
+        return (
+          <th key={columnId} scope="col" style={colStyle(colIndex)} className={headerClass}>
+            <div className="flex items-center justify-center">
+              <Checkbox
+                checked={allSelected}
+                indeterminate={someSelected}
+                onCheckedChange={toggleAll}
+                aria-label="Select all rows"
+              />
+            </div>
+            {resizeHandle(colIndex)}
+          </th>
+        );
+      case "severity":
+      case "title":
+      case "time":
+      case "activity":
+      case "status":
+      case "eventClass":
+      case "entity":
+      case "connector": {
+        const label = REMEDIATION_SORTABLE_COLUMN_LABELS[columnId];
+        return (
+          <th key={columnId} scope="col" style={colStyle(colIndex)} className={headerClass}>
+            <ColumnHeaderMenu label={label} menuLabel={`${label} column options`} {...getSortProps(columnId)} />
+            {resizeHandle(colIndex)}
+          </th>
+        );
+      }
+      default:
+        return (
+          <th key={columnId} scope="col" style={colStyle(colIndex)} className={headerClass}>
+            <span className="block translate-y-px truncate">
+              {REMEDIATION_DATA_GRID_COLUMNS.find((col) => col.id === columnId)?.label ?? columnId}
+            </span>
+            {resizeHandle(colIndex)}
+          </th>
+        );
+    }
+  };
+
+  const renderBodyCell = (columnId: string, row: RemediationRow, colIndex: number) => {
+    const cellClass = dataGridBodyCellClass(columnId);
+
+    switch (columnId) {
+      case "select":
+        return (
+          <td key={columnId} style={colStyle(colIndex)} className={cellClass}>
+            <div className="flex items-center justify-center">
+              <Checkbox
+                checked={selected.has(row.id)}
+                onCheckedChange={(c) => toggleRow(row.id, c)}
+                aria-label={`Select remediation event ${row.id}`}
+              />
+            </div>
+          </td>
+        );
+      case "severity":
+        return (
+          <td key={columnId} style={colStyle(colIndex)} className={cellClass}>
+            <span className="inline-flex items-center gap-2">
+              <SeverityTableIcon name={SEV_ICONS[row.severity]} color={SEV_BAR[row.severity]} />
+              <span className="text-sm text-text-secondary">{row.severity}</span>
+            </span>
+          </td>
+        );
+      case "title":
+        return (
+          <td key={columnId} style={colStyle(colIndex)} className={cx(cellClass, "min-w-0")}>
+            <TruncatedText
+              as="button"
+              className="w-full text-left text-sm font-semibold text-interactive-active hover:underline focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-interactive-active"
+            >
+              {row.title}
+            </TruncatedText>
+          </td>
+        );
+      case "time":
+        return (
+          <td key={columnId} style={colStyle(colIndex)} className={cx(cellClass, "min-w-0 tabular-nums")}>
+            <TruncatedText className="text-sm text-text-secondary">{row.time}</TruncatedText>
+          </td>
+        );
+      case "activity":
+        return (
+          <td key={columnId} style={colStyle(colIndex)} className={cx(cellClass, "min-w-0")}>
+            <TruncatedText className="text-sm text-text-secondary">{row.activity}</TruncatedText>
+          </td>
+        );
+      case "status":
+        return (
+          <td key={columnId} style={colStyle(colIndex)} className={cx(cellClass, "min-w-0")}>
+            <TruncatedText className="text-sm text-text-secondary">{row.status}</TruncatedText>
+          </td>
+        );
+      case "eventClass":
+        return (
+          <td key={columnId} style={colStyle(colIndex)} className={cx(cellClass, "min-w-0 overflow-hidden")}>
+            <span className="flex w-full min-w-0 items-center gap-2">
+              <Icon
+                name="ocsf-remediation"
+                size={16}
+                className="size-4 shrink-0 text-datavis-data-pop-teal-20 [&_svg]:!size-4"
+                aria-hidden
+              />
+              <TruncatedText className="w-full text-sm text-text-secondary" wrapperClassName="min-w-0 flex-1">
+                {row.eventClass}
+              </TruncatedText>
+            </span>
+          </td>
+        );
+      case "entity":
+        return (
+          <td key={columnId} style={colStyle(colIndex)} className={cx(cellClass, "min-w-0")}>
+            <TruncatedText className="text-sm text-text-secondary">{row.entity}</TruncatedText>
+          </td>
+        );
+      case "connector":
+        return (
+          <td key={columnId} style={colStyle(colIndex)} className={cx(cellClass, "min-w-0")}>
+            <ConnectorTableCell name={row.connector} />
+          </td>
+        );
+      default:
+        return (
+          <td key={columnId} style={colStyle(colIndex)} className={cx(cellClass, "min-w-0")}>
+            <TruncatedText className="text-sm text-text-secondary">—</TruncatedText>
+          </td>
+        );
+    }
+  };
 
   return (
-    <div ref={containerRef} className={cx(DATA_GRID_TABLE_SCROLL_CLASS, isResizing && "select-none")}>
+    <div
+      key={tableColumnIds.join("|")}
+      ref={containerRef}
+      className={cx(DATA_GRID_TABLE_SCROLL_CLASS, isResizing && "select-none")}
+    >
       <table
         className={DATA_GRID_TABLE_CLASS}
         style={{
@@ -388,137 +546,13 @@ function RemediationEventsTable({ displayRows, getSortProps }: { displayRows: Re
         </colgroup>
         <thead className={DATA_GRID_THEAD_CLASS}>
           <tr className={DATA_GRID_HEADER_ROW_CLASS}>
-            <th scope="col" style={colStyle(0)} className="relative border-r border-datavis-gridlines px-0 py-0 align-middle">
-              <div className="flex items-center justify-center">
-                <Checkbox
-                  checked={allSelected}
-                  indeterminate={someSelected}
-                  onCheckedChange={toggleAll}
-                  aria-label="Select all rows"
-                />
-              </div>
-              {resizeHandle(0)}
-            </th>
-            <th
-              scope="col"
-              style={colStyle(1)}
-              className="relative border-r border-datavis-gridlines px-2 py-0 align-middle text-xs font-bold uppercase tracking-wide text-text-primary"
-            >
-              <ColumnHeaderMenu label="Severity" menuLabel="Severity column options" {...getSortProps("severity")} />
-              {resizeHandle(1)}
-            </th>
-            <th
-              scope="col"
-              style={colStyle(2)}
-              className="relative border-r border-datavis-gridlines px-2 py-0 align-middle text-xs font-bold uppercase tracking-wide text-text-primary"
-            >
-              <ColumnHeaderMenu label="Title" menuLabel="Title column options" {...getSortProps("title")} />
-              {resizeHandle(2)}
-            </th>
-            <th
-              scope="col"
-              style={colStyle(3)}
-              className="relative border-r border-datavis-gridlines px-2 py-0 align-middle text-xs font-bold uppercase tracking-wide text-text-primary"
-            >
-              <ColumnHeaderMenu label="Time" menuLabel="Time column options" {...getSortProps("time")} />
-              {resizeHandle(3)}
-            </th>
-            <th
-              scope="col"
-              style={colStyle(4)}
-              className="relative border-r border-datavis-gridlines px-2 py-0 align-middle text-xs font-bold uppercase tracking-wide text-text-primary"
-            >
-              <ColumnHeaderMenu label="Activity" menuLabel="Activity column options" {...getSortProps("activity")} />
-              {resizeHandle(4)}
-            </th>
-            <th
-              scope="col"
-              style={colStyle(5)}
-              className="relative border-r border-datavis-gridlines px-2 py-0 align-middle text-xs font-bold uppercase tracking-wide text-text-primary"
-            >
-              <ColumnHeaderMenu label="Status" menuLabel="Status column options" {...getSortProps("status")} />
-              {resizeHandle(5)}
-            </th>
-            <th
-              scope="col"
-              style={colStyle(6)}
-              className="relative border-r border-datavis-gridlines px-2 py-0 align-middle text-xs font-bold uppercase tracking-wide text-text-primary"
-            >
-              <ColumnHeaderMenu label="Class" menuLabel="Class column options" {...getSortProps("eventClass")} />
-              {resizeHandle(6)}
-            </th>
-            <th
-              scope="col"
-              style={colStyle(7)}
-              className="relative border-r border-datavis-gridlines px-2 py-0 align-middle text-xs font-bold uppercase tracking-wide text-text-primary"
-            >
-              <ColumnHeaderMenu label="Entity" menuLabel="Entity column options" {...getSortProps("entity")} />
-              {resizeHandle(7)}
-            </th>
-            <th
-              scope="col"
-              style={colStyle(8)}
-              className="relative px-2 py-0 align-middle text-xs font-bold uppercase tracking-wide text-text-primary"
-            >
-              <ColumnHeaderMenu label="Connectors" menuLabel="Connectors column options" {...getSortProps("connector")} />
-              {resizeHandle(8)}
-            </th>
+            {tableColumnIds.map((columnId, colIndex) => renderHeaderCell(columnId, colIndex))}
           </tr>
         </thead>
         <tbody>
           {displayRows.map((row) => (
             <tr key={row.id} className="border-b border-datavis-gridlines hover:bg-overlay-subtle">
-              <td style={colStyle(0)} className="px-0 py-0 align-middle">
-                <div className="flex items-center justify-center">
-                  <Checkbox
-                    checked={selected.has(row.id)}
-                    onCheckedChange={(c) => toggleRow(row.id, c)}
-                    aria-label={`Select remediation event ${row.id}`}
-                  />
-                </div>
-              </td>
-              <td style={colStyle(1)} className="px-2 py-0 align-middle">
-                <span className="inline-flex items-center gap-2">
-                  <SeverityTableIcon name={SEV_ICONS[row.severity]} color={SEV_BAR[row.severity]} />
-                  <span className="text-sm text-text-secondary">{row.severity}</span>
-                </span>
-              </td>
-              <td style={colStyle(2)} className="min-w-0 px-2 py-0 align-middle">
-                <TruncatedText
-                  as="button"
-                  className="w-full text-left text-sm font-semibold text-interactive-active hover:underline focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-interactive-active"
-                >
-                  {row.title}
-                </TruncatedText>
-              </td>
-              <td style={colStyle(3)} className="min-w-0 px-2 py-0 align-middle tabular-nums">
-                <TruncatedText className="text-sm text-text-secondary">{row.time}</TruncatedText>
-              </td>
-              <td style={colStyle(4)} className="min-w-0 px-2 py-0 align-middle">
-                <TruncatedText className="text-sm text-text-secondary">{row.activity}</TruncatedText>
-              </td>
-              <td style={colStyle(5)} className="min-w-0 px-2 py-0 align-middle">
-                <TruncatedText className="text-sm text-text-secondary">{row.status}</TruncatedText>
-              </td>
-              <td style={colStyle(6)} className="min-w-0 overflow-hidden px-2 py-0 align-middle">
-                <span className="flex w-full min-w-0 items-center gap-2">
-                  <Icon
-                    name="ocsf-remediation"
-                    size={16}
-                    className="size-4 shrink-0 text-datavis-data-pop-teal-20 [&_svg]:!size-4"
-                    aria-hidden
-                  />
-                  <TruncatedText className="w-full text-sm text-text-secondary" wrapperClassName="min-w-0 flex-1">
-                    {row.eventClass}
-                  </TruncatedText>
-                </span>
-              </td>
-              <td style={colStyle(7)} className="min-w-0 px-2 py-0 align-middle">
-                <TruncatedText className="text-sm text-text-secondary">{row.entity}</TruncatedText>
-              </td>
-              <td style={colStyle(8)} className="min-w-0 px-2 py-0 align-middle">
-                <ConnectorTableCell name={row.connector} />
-              </td>
+              {tableColumnIds.map((columnId, colIndex) => renderBodyCell(columnId, row, colIndex))}
             </tr>
           ))}
         </tbody>
@@ -604,6 +638,10 @@ export function RemediationContent() {
     [timeframeScopedRows, activityClassFilter, severityFilter, statusFilter, searchQuery],
   );
   const tableGrid = useRemediationEventsTableGrid(filteredRows);
+  const { exportAll, snackbarProps } = useDataGridJsonExport(filteredRows, "remediation-events");
+  const { tableColumnIds, filterColumnPanelColumnProps } = useDataGridColumnPanel(
+    REMEDIATION_DATA_GRID_COLUMNS,
+  );
 
   const hasActiveFilters =
     activityClassFilter != null ||
@@ -765,7 +803,7 @@ export function RemediationContent() {
                   Clear all filters
                 </Button>
               ) : null}
-              <DataGridExportButton />
+              <DataGridExportButton onClick={exportAll} />
             </div>
           </>
         }
@@ -774,11 +812,19 @@ export function RemediationContent() {
             active={tableTool}
             onFilterClick={() => setTableTool(tableTool === "filter" ? null : "filter")}
             onColumnsClick={() => setTableTool(tableTool === "columns" ? null : "columns")}
+            {...filterColumnPanelColumnProps}
           />
         }
-        table={<RemediationEventsTable displayRows={tableGrid.displayRows} getSortProps={tableGrid.getSortProps} />}
+        table={
+          <RemediationEventsTable
+            displayRows={tableGrid.displayRows}
+            getSortProps={tableGrid.getSortProps}
+            tableColumnIds={tableColumnIds}
+          />
+        }
         footer={<DataGridPaginationFooter grid={tableGrid} />}
       />
+      <Snackbar {...snackbarProps} />
     </div>
   );
 }

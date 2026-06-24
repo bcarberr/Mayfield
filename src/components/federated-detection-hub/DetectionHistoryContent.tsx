@@ -2,7 +2,6 @@ import { Fragment, useMemo, useState } from "react";
 import {
   DATA_GRID_ABOVE_SECTION_CLASS,
   DATA_GRID_BODY_CELL_CENTER_CLASS,
-  DATA_GRID_BODY_CELL_CLASS,
   DATA_GRID_BODY_ROW_CLASS,
   DATA_GRID_EXPANDED_CELL_CLASS,
   DATA_GRID_EXPANDED_ROW_CLASS,
@@ -24,11 +23,19 @@ import { compareStrings, useColumnSort } from "../ui/useColumnSort";
 import { FilterColumnPanel, type FilterColumnPanelTool } from "../ui/FilterColumnPanel";
 import { Input } from "../ui/Input";
 import { DataGridExportButton } from "../ui/DataGridExportButton";
+import { Snackbar } from "../ui/Snackbar";
+import { useDataGridJsonExport } from "../ui/useDataGridJsonExport";
 import { DataGridPagination } from "../ui/DataGridPagination";
 import { DonutChartPanel } from "../ui/DonutChartPanel";
 import { SeverityTableIcon } from "../ui/SeverityTableIcon";
 import { TruncatedText } from "../ui/TruncatedText";
-import { useResizableColumns } from "../ui/useResizableColumns";
+import { DETECTION_HISTORY_DATA_GRID_COLUMNS } from "../ui/dataGridColumnCatalog";
+import { useDataGridColumnPanel } from "../ui/dataGridColumnTypes";
+import {
+  dataGridBodyCellClass,
+  dataGridHeaderCellClass,
+  useDynamicResizableColumns,
+} from "../ui/dataGridDynamicTableHelpers";
 import { useDataGridPagination } from "../ui/useDataGridPagination";
 import { InsightCard } from "../summary-insights/datavisCard";
 import { getCategoricalPaletteColor } from "../../design-system";
@@ -64,10 +71,6 @@ type RunHistoryRow = {
   triggeredBy: string;
   details: string;
 };
-
-const RUN_HISTORY_SELECT_COL_WIDTH = 40;
-const RUN_HISTORY_EXPAND_COL_WIDTH = 40;
-const RUN_HISTORY_COLUMN_COUNT = 9;
 
 const SEV_COLORS: Record<DetectionSeverity, string> = {
   Critical: "#ff604a",
@@ -485,29 +488,6 @@ type RunHistorySortColumn =
   | "duration"
   | "triggeredBy";
 
-const RUN_HISTORY_COL_DEFAULTS: readonly number[] = [
-  RUN_HISTORY_SELECT_COL_WIDTH,
-  RUN_HISTORY_EXPAND_COL_WIDTH,
-  280,
-  115,
-  130,
-  130,
-  140,
-  90,
-  180,
-];
-const RUN_HISTORY_COL_MINS: readonly number[] = [
-  RUN_HISTORY_SELECT_COL_WIDTH,
-  RUN_HISTORY_EXPAND_COL_WIDTH,
-  160,
-  72,
-  100,
-  100,
-  100,
-  72,
-  120,
-];
-
 function RunHistoryTable({
   rows,
   expandedIds,
@@ -524,6 +504,9 @@ function RunHistoryTable({
   onTableToolChange: (tool: FilterColumnPanelTool | null) => void;
 }) {
   const [selected, setSelected] = useState<Set<string>>(() => new Set());
+  const { tableColumnIds, filterColumnPanelColumnProps } = useDataGridColumnPanel(
+    DETECTION_HISTORY_DATA_GRID_COLUMNS,
+  );
   const {
     containerRef,
     colStyle,
@@ -533,12 +516,7 @@ function RunHistoryTable({
     resizeHandle,
     displayWidths,
     minTableWidth,
-  } = useResizableColumns({
-    selectColWidth: RUN_HISTORY_SELECT_COL_WIDTH,
-    colDefaults: RUN_HISTORY_COL_DEFAULTS,
-    colMins: RUN_HISTORY_COL_MINS,
-    minTableWidth: 960,
-  });
+  } = useDynamicResizableColumns(tableColumnIds);
 
   const allIds = useMemo(() => rows.map((row) => row.id), [rows]);
   const total = allIds.length;
@@ -560,9 +538,10 @@ function RunHistoryTable({
     });
   };
 
-  const thClass =
-    "relative border-r border-datavis-gridlines px-2 py-0 align-middle text-xs font-bold uppercase tracking-wide text-text-primary";
-  const tdClass = cx(DATA_GRID_BODY_CELL_CLASS, "text-sm text-text-secondary");
+  const thClass = (colIndex: number, columnId: string) =>
+    dataGridHeaderCellClass(colIndex, tableColumnIds.length, columnId);
+  const tdClass = (columnId: string) =>
+    cx(dataGridBodyCellClass(columnId), "text-sm text-text-secondary");
 
   const sortComparators = useMemo(
     (): Record<RunHistorySortColumn, (a: RunHistoryRow, b: RunHistoryRow) => number> => ({
@@ -591,6 +570,164 @@ function RunHistoryTable({
     itemCount,
   } = useDataGridPagination(sorted);
 
+  const renderHeaderCell = (columnId: string, colIndex: number) => {
+    switch (columnId) {
+      case "select":
+        return (
+          <th key={columnId} scope="col" style={colStyle(colIndex)} className={thClass(colIndex, columnId)}>
+            <div className="flex items-center justify-center">
+              <Checkbox checked={allSelected} indeterminate={someSelected} onCheckedChange={toggleAll} aria-label="Select all rows" />
+            </div>
+            {resizeHandle(colIndex)}
+          </th>
+        );
+      case "expand":
+        return (
+          <th key={columnId} scope="col" style={colStyle(colIndex)} className={thClass(colIndex, columnId)}>
+            <div className="flex justify-center">
+              <button type="button" className="inline-flex items-center p-0 text-text-tertiary hover:text-text-primary" aria-expanded={allExpanded} aria-label={allExpanded ? "Collapse all run details" : "Expand all run details"} onClick={onToggleExpandAll}>
+                <Icon name="navi-arrow-drop-down" size={32} className={cx("block shrink-0 transition-transform", allExpanded ? "rotate-0" : "-rotate-90")} aria-hidden />
+                <Icon name="navi-chevron-right" size={20} className="-ml-4 block shrink-0" aria-hidden />
+              </button>
+            </div>
+            {resizeHandle(colIndex)}
+          </th>
+        );
+      case "detectionName":
+        return (
+          <th key={columnId} scope="col" style={colStyle(colIndex)} className={thClass(colIndex, columnId)}>
+            <ColumnHeaderMenu label="Detection" menuLabel="Detection column options" {...getSortProps("detectionName")} />
+            {resizeHandle(colIndex)}
+          </th>
+        );
+      case "severity":
+        return (
+          <th key={columnId} scope="col" style={colStyle(colIndex)} className={thClass(colIndex, columnId)}>
+            <ColumnHeaderMenu label="Severity" menuLabel="Severity column options" {...getSortProps("severity")} />
+            {resizeHandle(colIndex)}
+          </th>
+        );
+      case "runTime":
+        return (
+          <th key={columnId} scope="col" style={colStyle(colIndex)} className={thClass(colIndex, columnId)}>
+            <ColumnHeaderMenu label="Run Time" menuLabel="Run Time column options" {...getSortProps("runTime")} />
+            {resizeHandle(colIndex)}
+          </th>
+        );
+      case "status":
+        return (
+          <th key={columnId} scope="col" style={colStyle(colIndex)} className={thClass(colIndex, columnId)}>
+            <ColumnHeaderMenu label="Status" menuLabel="Status column options" {...getSortProps("status")} />
+            {resizeHandle(colIndex)}
+          </th>
+        );
+      case "findingsGenerated":
+        return (
+          <th key={columnId} scope="col" style={colStyle(colIndex)} className={thClass(colIndex, columnId)}>
+            <ColumnHeaderMenu label="Findings Generated" menuLabel="Findings Generated column options" {...getSortProps("findingsGenerated")} />
+            {resizeHandle(colIndex)}
+          </th>
+        );
+      case "duration":
+        return (
+          <th key={columnId} scope="col" style={colStyle(colIndex)} className={thClass(colIndex, columnId)}>
+            <ColumnHeaderMenu label="Duration" menuLabel="Duration column options" {...getSortProps("duration")} />
+            {resizeHandle(colIndex)}
+          </th>
+        );
+      case "triggeredBy":
+        return (
+          <th key={columnId} scope="col" style={colStyle(colIndex)} className={thClass(colIndex, columnId)}>
+            <ColumnHeaderMenu label="Triggered By" menuLabel="Triggered By column options" {...getSortProps("triggeredBy")} />
+            {resizeHandle(colIndex)}
+          </th>
+        );
+      default:
+        return (
+          <th key={columnId} scope="col" style={colStyle(colIndex)} className={thClass(colIndex, columnId)}>
+            <span className="block translate-y-px truncate">
+              {DETECTION_HISTORY_DATA_GRID_COLUMNS.find((col) => col.id === columnId)?.label ?? columnId}
+            </span>
+            {resizeHandle(colIndex)}
+          </th>
+        );
+    }
+  };
+
+  const renderBodyCell = (columnId: string, row: RunHistoryRow, colIndex: number, expanded: boolean) => {
+    switch (columnId) {
+      case "select":
+        return (
+          <td key={columnId} style={colStyle(colIndex)} className={tdClass(columnId)}>
+            <div className={DATA_GRID_BODY_CELL_CENTER_CLASS}>
+              <Checkbox checked={selected.has(row.id)} onCheckedChange={(checked) => toggleRow(row.id, checked)} aria-label={`Select ${row.detectionName}`} />
+            </div>
+          </td>
+        );
+      case "expand":
+        return (
+          <td key={columnId} style={colStyle(colIndex)} className={tdClass(columnId)}>
+            <div className={DATA_GRID_BODY_CELL_CENTER_CLASS}>
+              <button type="button" className={DATA_GRID_ROW_EXPAND_BTN_CLASS} aria-expanded={expanded} aria-label={expanded ? `Collapse run details for ${row.detectionName}` : `Expand run details for ${row.detectionName}`} onClick={() => onToggleExpand(row.id)}>
+                <Icon name="navi-arrow-drop-down" size={DATA_GRID_ROW_EXPAND_ICON_SIZE} className={cx("block transition-transform", expanded ? "rotate-0" : "-rotate-90")} aria-hidden />
+              </button>
+            </div>
+          </td>
+        );
+      case "detectionName":
+        return (
+          <td key={columnId} style={colStyle(colIndex)} className={cx(tdClass(columnId), "min-w-0")}>
+            <TruncatedText className="w-full font-semibold text-interactive-active">{row.detectionName}</TruncatedText>
+          </td>
+        );
+      case "severity":
+        return (
+          <td key={columnId} style={colStyle(colIndex)} className={tdClass(columnId)}>
+            <span className="inline-flex items-center gap-2">
+              <SeverityTableIcon name={SEV_ICONS[row.severity]} color={SEV_COLORS[row.severity]} />
+              <span className="font-semibold text-text-primary">{row.severity}</span>
+            </span>
+          </td>
+        );
+      case "runTime":
+        return (
+          <td key={columnId} style={colStyle(colIndex)} className={tdClass(columnId)}>
+            {row.runTime}
+          </td>
+        );
+      case "status":
+        return (
+          <td key={columnId} style={colStyle(colIndex)} className={tdClass(columnId)}>
+            <RunStatusCell status={row.status} />
+          </td>
+        );
+      case "findingsGenerated":
+        return (
+          <td key={columnId} style={colStyle(colIndex)} className={tdClass(columnId)}>
+            <FindingsSearchCell findings={runHistoryFindings(row.findingsGenerated, row.status)} detectionId={row.id} detectionName={row.detectionName} />
+          </td>
+        );
+      case "duration":
+        return (
+          <td key={columnId} style={colStyle(colIndex)} className={tdClass(columnId)}>
+            {row.duration ?? "—"}
+          </td>
+        );
+      case "triggeredBy":
+        return (
+          <td key={columnId} style={colStyle(colIndex)} className={tdClass(columnId)}>
+            {row.triggeredBy}
+          </td>
+        );
+      default:
+        return (
+          <td key={columnId} style={colStyle(colIndex)} className={cx(tdClass(columnId), "min-w-0")}>
+            —
+          </td>
+        );
+    }
+  };
+
   return (
     <div className="flex min-w-0 flex-col bg-datavis-card-bg">
       <div className={DATA_GRID_FILTER_ROW_CLASS}>
@@ -598,171 +735,51 @@ function RunHistoryTable({
           active={tableTool}
           onFilterClick={() => onTableToolChange(tableTool === "filter" ? null : "filter")}
           onColumnsClick={() => onTableToolChange(tableTool === "columns" ? null : "columns")}
+          {...filterColumnPanelColumnProps}
         />
         <div
+          key={tableColumnIds.join("|")}
           ref={containerRef}
           className={cx(DATA_GRID_TABLE_SCROLL_CLASS, isResizing && "select-none")}
         >
-      <table
-        className={DATA_GRID_TABLE_CLASS}
-        style={{
-          width: tableFillsContainer ? "100%" : baseTotal,
-          minWidth: Math.max(minTableWidth, baseTotal),
-        }}
-      >
-        <caption className="sr-only">Detection run history</caption>
-        <colgroup>
-          {displayWidths.map((w, i) => (
-            <col key={i} style={{ width: w }} />
-          ))}
-        </colgroup>
-        <thead className={DATA_GRID_THEAD_CLASS}>
-          <tr className={DATA_GRID_HEADER_ROW_CLASS}>
-            <th scope="col" style={colStyle(0)} className="relative border-r border-datavis-gridlines px-0 py-0 align-middle">
-              <div className="flex items-center justify-center">
-                <Checkbox
-                  checked={allSelected}
-                  indeterminate={someSelected}
-                  onCheckedChange={toggleAll}
-                  aria-label="Select all rows"
-                />
-              </div>
-              {resizeHandle(0)}
-            </th>
-            <th scope="col" style={colStyle(1)} className={cx(thClass, "px-0")}>
-              <div className="flex justify-center">
-                <button
-                  type="button"
-                  className="inline-flex items-center p-0 text-text-tertiary hover:text-text-primary"
-                  aria-expanded={allExpanded}
-                  aria-label={allExpanded ? "Collapse all run details" : "Expand all run details"}
-                  onClick={onToggleExpandAll}
-                >
-                  <Icon
-                    name="navi-arrow-drop-down"
-                    size={32}
-                    className={cx("block shrink-0 transition-transform", allExpanded ? "rotate-0" : "-rotate-90")}
-                    aria-hidden
-                  />
-                  <Icon name="navi-chevron-right" size={20} className="-ml-4 block shrink-0" aria-hidden />
-                </button>
-              </div>
-              {resizeHandle(1)}
-            </th>
-            <th scope="col" style={colStyle(2)} className={thClass}>
-              <ColumnHeaderMenu label="Detection" menuLabel="Detection column options" {...getSortProps("detectionName")} />
-              {resizeHandle(2)}
-            </th>
-            <th scope="col" style={colStyle(3)} className={thClass}>
-              <ColumnHeaderMenu label="Severity" menuLabel="Severity column options" {...getSortProps("severity")} />
-              {resizeHandle(3)}
-            </th>
-            <th scope="col" style={colStyle(4)} className={thClass}>
-              <ColumnHeaderMenu label="Run Time" menuLabel="Run Time column options" {...getSortProps("runTime")} />
-              {resizeHandle(4)}
-            </th>
-            <th scope="col" style={colStyle(5)} className={thClass}>
-              <ColumnHeaderMenu label="Status" menuLabel="Status column options" {...getSortProps("status")} />
-              {resizeHandle(5)}
-            </th>
-            <th scope="col" style={colStyle(6)} className={thClass}>
-              <ColumnHeaderMenu
-                label="Findings Generated"
-                menuLabel="Findings Generated column options"
-                {...getSortProps("findingsGenerated")}
-              />
-              {resizeHandle(6)}
-            </th>
-            <th scope="col" style={colStyle(7)} className={thClass}>
-              <ColumnHeaderMenu label="Duration" menuLabel="Duration column options" {...getSortProps("duration")} />
-              {resizeHandle(7)}
-            </th>
-            <th scope="col" style={colStyle(8)} className={thClass}>
-              <ColumnHeaderMenu
-                label="Triggered By"
-                menuLabel="Triggered By column options"
-                {...getSortProps("triggeredBy")}
-              />
-              {resizeHandle(8)}
-            </th>
-          </tr>
-        </thead>
-        <tbody>
-          {displayRows.map((row) => {
-            const expanded = expandedIds.has(row.id);
-            return (
-              <Fragment key={row.id}>
-                <tr className={DATA_GRID_BODY_ROW_CLASS}>
-                  <td style={colStyle(0)} className="px-0 py-0 align-middle">
-                    <div className={DATA_GRID_BODY_CELL_CENTER_CLASS}>
-                      <Checkbox
-                        checked={selected.has(row.id)}
-                        onCheckedChange={(checked) => toggleRow(row.id, checked)}
-                        aria-label={`Select ${row.detectionName}`}
-                      />
-                    </div>
-                  </td>
-                  <td style={colStyle(1)} className="px-0 py-0 align-middle">
-                    <div className={DATA_GRID_BODY_CELL_CENTER_CLASS}>
-                      <button
-                        type="button"
-                        className={DATA_GRID_ROW_EXPAND_BTN_CLASS}
-                        aria-expanded={expanded}
-                        aria-label={
-                          expanded ? `Collapse run details for ${row.detectionName}` : `Expand run details for ${row.detectionName}`
-                        }
-                        onClick={() => onToggleExpand(row.id)}
-                      >
-                        <Icon
-                          name="navi-arrow-drop-down"
-                          size={DATA_GRID_ROW_EXPAND_ICON_SIZE}
-                          className={cx("block transition-transform", expanded ? "rotate-0" : "-rotate-90")}
-                          aria-hidden
-                        />
-                      </button>
-                    </div>
-                  </td>
-                  <td style={colStyle(2)} className={cx(tdClass, "min-w-0")}>
-                    <TruncatedText className="w-full font-semibold text-interactive-active">{row.detectionName}</TruncatedText>
-                  </td>
-                  <td style={colStyle(3)} className={tdClass}>
-                    <span className="inline-flex items-center gap-2">
-                      <SeverityTableIcon name={SEV_ICONS[row.severity]} color={SEV_COLORS[row.severity]} />
-                      <span className="font-semibold text-text-primary">{row.severity}</span>
-                    </span>
-                  </td>
-                  <td style={colStyle(4)} className={tdClass}>
-                    {row.runTime}
-                  </td>
-                  <td style={colStyle(5)} className={tdClass}>
-                    <RunStatusCell status={row.status} />
-                  </td>
-                  <td style={colStyle(6)} className={tdClass}>
-                    <FindingsSearchCell
-                      findings={runHistoryFindings(row.findingsGenerated, row.status)}
-                      detectionId={row.id}
-                      detectionName={row.detectionName}
-                    />
-                  </td>
-                  <td style={colStyle(7)} className={tdClass}>
-                    {row.duration ?? "—"}
-                  </td>
-                  <td style={colStyle(8)} className={tdClass}>
-                    {row.triggeredBy}
-                  </td>
-                </tr>
-                {expanded ? (
-                  <tr className={DATA_GRID_EXPANDED_ROW_CLASS}>
-                    <td colSpan={RUN_HISTORY_COLUMN_COUNT} className={cx(DATA_GRID_EXPANDED_CELL_CLASS, "!pb-4")}>
-                      <p className="text-sm leading-relaxed text-text-secondary">{row.details}</p>
-                    </td>
-                  </tr>
-                ) : null}
-              </Fragment>
-            );
-          })}
-        </tbody>
-      </table>
+          <table
+            className={DATA_GRID_TABLE_CLASS}
+            style={{
+              width: tableFillsContainer ? "100%" : baseTotal,
+              minWidth: Math.max(minTableWidth, baseTotal),
+            }}
+          >
+            <caption className="sr-only">Detection run history</caption>
+            <colgroup>
+              {displayWidths.map((w, i) => (
+                <col key={i} style={{ width: w }} />
+              ))}
+            </colgroup>
+            <thead className={DATA_GRID_THEAD_CLASS}>
+              <tr className={DATA_GRID_HEADER_ROW_CLASS}>
+                {tableColumnIds.map((columnId, colIndex) => renderHeaderCell(columnId, colIndex))}
+              </tr>
+            </thead>
+            <tbody>
+              {displayRows.map((row) => {
+                const expanded = expandedIds.has(row.id);
+                return (
+                  <Fragment key={row.id}>
+                    <tr className={DATA_GRID_BODY_ROW_CLASS}>
+                      {tableColumnIds.map((columnId, colIndex) => renderBodyCell(columnId, row, colIndex, expanded))}
+                    </tr>
+                    {expanded ? (
+                      <tr className={DATA_GRID_EXPANDED_ROW_CLASS}>
+                        <td colSpan={tableColumnIds.length} className={cx(DATA_GRID_EXPANDED_CELL_CLASS, "!pb-4")}>
+                          <p className="text-sm leading-relaxed text-text-secondary">{row.details}</p>
+                        </td>
+                      </tr>
+                    ) : null}
+                  </Fragment>
+                );
+              })}
+            </tbody>
+          </table>
         </div>
       </div>
       {showPagination ? (
@@ -800,6 +817,7 @@ export function DetectionHistoryContent() {
       }),
     [runHistoryFilter, detectionNameFilter, severityFilter, searchQuery],
   );
+  const { exportAll, snackbarProps } = useDataGridJsonExport(filteredRows, "detection-run-history");
 
   const hasActiveFilters =
     runHistoryFilter != null ||
@@ -909,7 +927,7 @@ export function DetectionHistoryContent() {
                 Clear all filters
               </Button>
             ) : null}
-            <DataGridExportButton />
+            <DataGridExportButton onClick={exportAll} />
           </div>
         </div>
           <DatavisGridlineRule inset={false} />
@@ -923,6 +941,7 @@ export function DetectionHistoryContent() {
           onTableToolChange={setTableTool}
         />
       </section>
+      <Snackbar {...snackbarProps} />
     </div>
   );
 }

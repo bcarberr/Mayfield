@@ -19,9 +19,17 @@ import { ColumnHeaderMenu } from "../ui/ColumnHeaderMenu";
 import { compareBooleans, compareNumbers, compareStrings, useColumnSort } from "../ui/useColumnSort";
 import { FilterColumnPanel, type FilterColumnPanelTool } from "../ui/FilterColumnPanel";
 import { DataGridExportButton } from "../ui/DataGridExportButton";
+import { Snackbar } from "../ui/Snackbar";
+import { useDataGridJsonExport } from "../ui/useDataGridJsonExport";
 import { Input } from "../ui/Input";
 import { TruncatedText } from "../ui/TruncatedText";
-import { useResizableColumns } from "../ui/useResizableColumns";
+import { DATA_PIPELINES_DATA_GRID_COLUMNS } from "../ui/dataGridColumnCatalog";
+import { useDataGridColumnPanel } from "../ui/dataGridColumnTypes";
+import {
+  dataGridBodyCellClass,
+  dataGridHeaderCellClass,
+  useDynamicResizableColumns,
+} from "../ui/dataGridDynamicTableHelpers";
 import { DatavisGridlineRule } from "../summary-insights/datavisCard";
 import { DATA_PIPELINE_ROWS, pipelineMatchesSearch, type DataPipelineRow } from "./dataPipelinesData";
 
@@ -43,30 +51,7 @@ const PIPELINE_STAT_FILTER_LABELS: Record<PipelineStatFilter, string> = {
   "highest-records": "Highest Number of Records",
 };
 
-const PIPELINE_EXPAND_COL_WIDTH = 40;
-const PIPELINE_COLUMN_COUNT = 8;
-
-const PIPELINE_COL_DEFAULTS: readonly number[] = [
-  PIPELINE_EXPAND_COL_WIDTH,
-  280,
-  160,
-  160,
-  120,
-  100,
-  120,
-  56,
-];
-
-const PIPELINE_COL_MINS: readonly number[] = [
-  PIPELINE_EXPAND_COL_WIDTH,
-  180,
-  120,
-  120,
-  96,
-  80,
-  96,
-  48,
-];
+type PipelineSortColumn = "name" | "source" | "destination" | "state" | "records" | "lastRun";
 
 function PipelineStatCard({
   label,
@@ -168,7 +153,6 @@ function PipelineExpandedRow({
   );
 }
 
-type PipelineSortColumn = "name" | "source" | "destination" | "state" | "records" | "lastRun";
 
 function PipelinesTable({
   rows,
@@ -203,6 +187,10 @@ function PipelinesTable({
   activeById: Record<string, boolean>;
   onActiveChange: (id: string, active: boolean) => void;
 }) {
+  const { tableColumnIds, filterColumnPanelColumnProps } = useDataGridColumnPanel(
+    DATA_PIPELINES_DATA_GRID_COLUMNS,
+  );
+  const { exportAll, snackbarProps } = useDataGridJsonExport(rows, "data-pipelines");
   const {
     containerRef,
     colStyle,
@@ -212,16 +200,12 @@ function PipelinesTable({
     resizeHandle,
     displayWidths,
     minTableWidth,
-  } = useResizableColumns({
-    selectColWidth: PIPELINE_EXPAND_COL_WIDTH,
-    colDefaults: PIPELINE_COL_DEFAULTS,
-    colMins: PIPELINE_COL_MINS,
-    minTableWidth: 980,
-  });
+  } = useDynamicResizableColumns(tableColumnIds);
 
-  const thClass =
-    "relative border-r border-datavis-gridlines px-2 py-0 align-middle text-xs font-bold uppercase tracking-wide text-text-primary";
-  const tdClass = "px-2 py-0 align-middle text-sm text-text-secondary";
+  const thClass = (colIndex: number, columnId: string) =>
+    dataGridHeaderCellClass(colIndex, tableColumnIds.length, columnId);
+  const tdClass = (columnId: string) =>
+    cx(dataGridBodyCellClass(columnId), "text-sm text-text-secondary");
 
   const allExpanded = rows.length > 0 && rows.every((row) => expandedIds.has(row.id));
 
@@ -241,6 +225,148 @@ function PipelinesTable({
   const displayRows = sortedRows(rows);
 
   const { toolbarRef, sectionStyle } = useDataGridStickyToolbar();
+
+  const renderHeaderCell = (columnId: string, colIndex: number) => {
+    switch (columnId) {
+      case "expand":
+        return (
+          <th key={columnId} scope="col" style={colStyle(colIndex)} className={thClass(colIndex, columnId)}>
+            <div className="flex justify-center">
+              <button type="button" className="inline-flex items-center p-0 text-text-tertiary hover:text-text-primary" aria-expanded={allExpanded} aria-label={allExpanded ? "Collapse all pipeline details" : "Expand all pipeline details"} onClick={onToggleExpandAll}>
+                <Icon name="navi-arrow-drop-down" size={32} className={cx("block shrink-0 transition-transform", allExpanded ? "rotate-0" : "-rotate-90")} aria-hidden />
+                <Icon name="navi-chevron-right" size={20} className="-ml-4 block shrink-0" aria-hidden />
+              </button>
+            </div>
+            {resizeHandle(colIndex)}
+          </th>
+        );
+      case "name":
+        return (
+          <th key={columnId} scope="col" style={colStyle(colIndex)} className={thClass(colIndex, columnId)}>
+            <ColumnHeaderMenu label="Pipeline Name" menuLabel="Pipeline Name column options" {...getSortProps("name")} />
+            {resizeHandle(colIndex)}
+          </th>
+        );
+      case "source":
+        return (
+          <th key={columnId} scope="col" style={colStyle(colIndex)} className={thClass(colIndex, columnId)}>
+            <ColumnHeaderMenu label="Source" menuLabel="Source column options" {...getSortProps("source")} />
+            {resizeHandle(colIndex)}
+          </th>
+        );
+      case "destination":
+        return (
+          <th key={columnId} scope="col" style={colStyle(colIndex)} className={thClass(colIndex, columnId)}>
+            <ColumnHeaderMenu label="Destination" menuLabel="Destination column options" {...getSortProps("destination")} />
+            {resizeHandle(colIndex)}
+          </th>
+        );
+      case "state":
+        return (
+          <th key={columnId} scope="col" style={colStyle(colIndex)} className={thClass(colIndex, columnId)}>
+            <ColumnHeaderMenu label="Pipeline State" menuLabel="Pipeline State column options" {...getSortProps("state")} />
+            {resizeHandle(colIndex)}
+          </th>
+        );
+      case "records":
+        return (
+          <th key={columnId} scope="col" style={colStyle(colIndex)} className={thClass(colIndex, columnId)}>
+            <ColumnHeaderMenu label="Records" menuLabel="Records column options" {...getSortProps("records")} />
+            {resizeHandle(colIndex)}
+          </th>
+        );
+      case "lastRun":
+        return (
+          <th key={columnId} scope="col" style={colStyle(colIndex)} className={thClass(colIndex, columnId)}>
+            <ColumnHeaderMenu label="Last Run" menuLabel="Last Run column options" {...getSortProps("lastRun")} />
+            {resizeHandle(colIndex)}
+          </th>
+        );
+      case "actions":
+        return (
+          <th key={columnId} scope="col" style={colStyle(colIndex)} className={thClass(colIndex, columnId)}>
+            <span className="px-1">Actions</span>
+            {resizeHandle(colIndex)}
+          </th>
+        );
+      default:
+        return (
+          <th key={columnId} scope="col" style={colStyle(colIndex)} className={thClass(colIndex, columnId)}>
+            <span className="block translate-y-px truncate">
+              {DATA_PIPELINES_DATA_GRID_COLUMNS.find((col) => col.id === columnId)?.label ?? columnId}
+            </span>
+            {resizeHandle(colIndex)}
+          </th>
+        );
+    }
+  };
+
+  const renderBodyCell = (columnId: string, row: DataPipelineRow, colIndex: number, expanded: boolean) => {
+    switch (columnId) {
+      case "expand":
+        return (
+          <td key={columnId} style={colStyle(colIndex)} className={tdClass(columnId)}>
+            <div className="flex justify-center">
+              <button type="button" className="p-1 text-text-tertiary hover:text-text-primary" aria-expanded={expanded} aria-label={expanded ? `Collapse details for ${row.name}` : `Expand details for ${row.name}`} onClick={() => onToggleExpand(row.id)}>
+                <Icon name="navi-arrow-drop-down" size={32} className={cx("block transition-transform", expanded ? "rotate-0" : "-rotate-90")} aria-hidden />
+              </button>
+            </div>
+          </td>
+        );
+      case "name":
+        return (
+          <td key={columnId} style={colStyle(colIndex)} className={cx(tdClass(columnId), "min-w-0")}>
+            <TruncatedText className="w-full font-semibold text-interactive-active">{row.name}</TruncatedText>
+          </td>
+        );
+      case "source":
+        return (
+          <td key={columnId} style={colStyle(colIndex)} className={cx(tdClass(columnId), "min-w-0")}>
+            <TruncatedText className="w-full">{row.source}</TruncatedText>
+          </td>
+        );
+      case "destination":
+        return (
+          <td key={columnId} style={colStyle(colIndex)} className={cx(tdClass(columnId), "min-w-0")}>
+            <TruncatedText className="w-full">{row.destination}</TruncatedText>
+          </td>
+        );
+      case "state":
+        return (
+          <td key={columnId} style={colStyle(colIndex)} className={tdClass(columnId)}>
+            <Switch checked={pipelineIsActive(row, activeById)} onCheckedChange={(checked) => onActiveChange(row.id, checked)} aria-label={`Toggle ${row.name}`} />
+          </td>
+        );
+      case "records":
+        return (
+          <td key={columnId} style={colStyle(colIndex)} className={tdClass(columnId)}>
+            <span className="font-semibold tabular-nums text-text-primary">{row.records}</span>
+          </td>
+        );
+      case "lastRun":
+        return (
+          <td key={columnId} style={colStyle(colIndex)} className={tdClass(columnId)}>
+            {row.lastRun}
+          </td>
+        );
+      case "actions":
+        return (
+          <td key={columnId} style={colStyle(colIndex)} className="px-0 py-0 align-middle">
+            <div className="flex justify-center">
+              <Button type="button" variant="ghost" size="icon" className="p-0 text-text-tertiary hover:text-text-primary" aria-label={`Actions for ${row.name}`}>
+                <Icon name="navi-more-vert" size={16} />
+              </Button>
+            </div>
+          </td>
+        );
+      default:
+        return (
+          <td key={columnId} style={colStyle(colIndex)} className={cx(tdClass(columnId), "min-w-0")}>
+            —
+          </td>
+        );
+    }
+  };
 
   return (
     <section
@@ -277,7 +403,7 @@ function PipelinesTable({
               Clear All Filters
             </Button>
           ) : null}
-          <DataGridExportButton />
+          <DataGridExportButton onClick={exportAll} />
         </div>
       </div>
         <DatavisGridlineRule inset={false} />
@@ -287,8 +413,10 @@ function PipelinesTable({
           active={tableTool}
           onFilterClick={() => onTableToolChange(tableTool === "filter" ? null : "filter")}
           onColumnsClick={() => onTableToolChange(tableTool === "columns" ? null : "columns")}
+          {...filterColumnPanelColumnProps}
         />
         <div
+          key={tableColumnIds.join("|")}
           ref={containerRef}
           className={cx(DATA_GRID_TABLE_SCROLL_CLASS, isResizing && "select-none")}
         >
@@ -307,62 +435,7 @@ function PipelinesTable({
             </colgroup>
             <thead className={DATA_GRID_THEAD_CLASS}>
               <tr className={DATA_GRID_HEADER_ROW_CLASS}>
-                <th scope="col" style={colStyle(0)} className={cx(thClass, "px-0")}>
-                  <div className="flex justify-center">
-                    <button
-                      type="button"
-                      className="inline-flex items-center p-0 text-text-tertiary hover:text-text-primary"
-                      aria-expanded={allExpanded}
-                      aria-label={allExpanded ? "Collapse all pipeline details" : "Expand all pipeline details"}
-                      onClick={onToggleExpandAll}
-                    >
-                      <Icon
-                        name="navi-arrow-drop-down"
-                        size={32}
-                        className={cx("block shrink-0 transition-transform", allExpanded ? "rotate-0" : "-rotate-90")}
-                        aria-hidden
-                      />
-                      <Icon name="navi-chevron-right" size={20} className="-ml-4 block shrink-0" aria-hidden />
-                    </button>
-                  </div>
-                  {resizeHandle(0)}
-                </th>
-                <th scope="col" style={colStyle(1)} className={thClass}>
-                  <ColumnHeaderMenu label="Pipeline Name" menuLabel="Pipeline Name column options" {...getSortProps("name")} />
-                  {resizeHandle(1)}
-                </th>
-                <th scope="col" style={colStyle(2)} className={thClass}>
-                  <ColumnHeaderMenu label="Source" menuLabel="Source column options" {...getSortProps("source")} />
-                  {resizeHandle(2)}
-                </th>
-                <th scope="col" style={colStyle(3)} className={thClass}>
-                  <ColumnHeaderMenu
-                    label="Destination"
-                    menuLabel="Destination column options"
-                    {...getSortProps("destination")}
-                  />
-                  {resizeHandle(3)}
-                </th>
-                <th scope="col" style={colStyle(4)} className={thClass}>
-                  <ColumnHeaderMenu
-                    label="Pipeline State"
-                    menuLabel="Pipeline State column options"
-                    {...getSortProps("state")}
-                  />
-                  {resizeHandle(4)}
-                </th>
-                <th scope="col" style={colStyle(5)} className={thClass}>
-                  <ColumnHeaderMenu label="Records" menuLabel="Records column options" {...getSortProps("records")} />
-                  {resizeHandle(5)}
-                </th>
-                <th scope="col" style={colStyle(6)} className={thClass}>
-                  <ColumnHeaderMenu label="Last Run" menuLabel="Last Run column options" {...getSortProps("lastRun")} />
-                  {resizeHandle(6)}
-                </th>
-                <th scope="col" style={colStyle(7)} className={thClass}>
-                  <span className="px-1">Actions</span>
-                  {resizeHandle(7)}
-                </th>
+                {tableColumnIds.map((columnId, colIndex) => renderHeaderCell(columnId, colIndex))}
               </tr>
             </thead>
             <tbody>
@@ -371,65 +444,11 @@ function PipelinesTable({
                 return (
                   <Fragment key={row.id}>
                     <tr className="border-b border-datavis-gridlines hover:bg-overlay-subtle">
-                      <td style={colStyle(0)} className="px-0 py-0 align-middle">
-                        <div className="flex justify-center">
-                          <button
-                            type="button"
-                            className="p-1 text-text-tertiary hover:text-text-primary"
-                            aria-expanded={expanded}
-                            aria-label={
-                              expanded ? `Collapse details for ${row.name}` : `Expand details for ${row.name}`
-                            }
-                            onClick={() => onToggleExpand(row.id)}
-                          >
-                            <Icon
-                              name="navi-arrow-drop-down"
-                              size={32}
-                              className={cx("block transition-transform", expanded ? "rotate-0" : "-rotate-90")}
-                              aria-hidden
-                            />
-                          </button>
-                        </div>
-                      </td>
-                      <td style={colStyle(1)} className={cx(tdClass, "min-w-0")}>
-                        <TruncatedText className="w-full font-semibold text-interactive-active">{row.name}</TruncatedText>
-                      </td>
-                      <td style={colStyle(2)} className={cx(tdClass, "min-w-0")}>
-                        <TruncatedText className="w-full">{row.source}</TruncatedText>
-                      </td>
-                      <td style={colStyle(3)} className={cx(tdClass, "min-w-0")}>
-                        <TruncatedText className="w-full">{row.destination}</TruncatedText>
-                      </td>
-                      <td style={colStyle(4)} className={tdClass}>
-                        <Switch
-                          checked={pipelineIsActive(row, activeById)}
-                          onCheckedChange={(checked) => onActiveChange(row.id, checked)}
-                          aria-label={`Toggle ${row.name}`}
-                        />
-                      </td>
-                      <td style={colStyle(5)} className={tdClass}>
-                        <span className="font-semibold tabular-nums text-text-primary">{row.records}</span>
-                      </td>
-                      <td style={colStyle(6)} className={tdClass}>
-                        {row.lastRun}
-                      </td>
-                      <td style={colStyle(7)} className="px-0 py-0 align-middle">
-                        <div className="flex justify-center">
-                          <Button
-                            type="button"
-                            variant="ghost"
-                            size="icon"
-                            className="p-0 text-text-tertiary hover:text-text-primary"
-                            aria-label={`Actions for ${row.name}`}
-                          >
-                            <Icon name="navi-more-vert" size={16} />
-                          </Button>
-                        </div>
-                      </td>
+                      {tableColumnIds.map((columnId, colIndex) => renderBodyCell(columnId, row, colIndex, expanded))}
                     </tr>
                     {expanded ? (
                       <tr className={DATA_GRID_EXPANDED_ROW_CLASS}>
-                        <td colSpan={PIPELINE_COLUMN_COUNT} className={DATA_GRID_EXPANDED_CELL_WIDE_CLASS}>
+                        <td colSpan={tableColumnIds.length} className={DATA_GRID_EXPANDED_CELL_WIDE_CLASS}>
                           <PipelineExpandedRow
                             row={row}
                             eventLogEnabled={eventLogEnabledByPipeline[row.id] ?? {}}
@@ -445,6 +464,7 @@ function PipelinesTable({
           </table>
         </div>
       </div>
+      <Snackbar {...snackbarProps} />
     </section>
   );
 }

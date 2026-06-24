@@ -1,7 +1,6 @@
 import { Fragment, useEffect, useMemo, useState } from "react";
 import {
   DATA_GRID_BODY_CELL_CENTER_CLASS,
-  DATA_GRID_BODY_CELL_CLASS,
   DATA_GRID_BODY_ROW_CLASS,
   DATA_GRID_EXPANDED_CELL_CLASS,
   DATA_GRID_EXPANDED_ROW_CLASS,
@@ -28,11 +27,19 @@ import {
 import { FilterColumnPanel, type FilterColumnPanelTool } from "../ui/FilterColumnPanel";
 import { Input } from "../ui/Input";
 import { DataGridExportButton } from "../ui/DataGridExportButton";
+import { Snackbar } from "../ui/Snackbar";
+import { useDataGridJsonExport } from "../ui/useDataGridJsonExport";
 import { DataGridPagination } from "../ui/DataGridPagination";
 import { SeverityTableIcon } from "../ui/SeverityTableIcon";
 import { type ContentAreaSlideOverState } from "../ui/SlideOver";
 import { TruncatedText } from "../ui/TruncatedText";
-import { useResizableColumns } from "../ui/useResizableColumns";
+import { QUEUED_FOR_REVIEW_DATA_GRID_COLUMNS } from "../ui/dataGridColumnCatalog";
+import { useDataGridColumnPanel } from "../ui/dataGridColumnTypes";
+import {
+  dataGridBodyCellClass,
+  dataGridHeaderCellClass,
+  useDynamicResizableColumns,
+} from "../ui/dataGridDynamicTableHelpers";
 import { useDataGridPagination } from "../ui/useDataGridPagination";
 import {
   DetectionConnectorsRunPanel,
@@ -368,32 +375,6 @@ const QUEUED_SEVERITY_ORDER: Record<DetectionSeverity, number> = {
 
 type QueuedSortColumn = "name" | "state" | "queuedBy" | "queuedDate" | "severity" | "findings";
 
-const REVIEW_SELECT_COL_WIDTH = 40;
-const REVIEW_EXPAND_COL_WIDTH = 40;
-const REVIEW_COLUMN_COUNT = 9;
-const REVIEW_COL_DEFAULTS: readonly number[] = [
-  REVIEW_SELECT_COL_WIDTH,
-  REVIEW_EXPAND_COL_WIDTH,
-  280,
-  72,
-  120,
-  120,
-  115,
-  130,
-  100,
-];
-const REVIEW_COL_MINS: readonly number[] = [
-  REVIEW_SELECT_COL_WIDTH,
-  REVIEW_EXPAND_COL_WIDTH,
-  160,
-  56,
-  88,
-  96,
-  72,
-  88,
-  88,
-];
-
 function QueuedReviewTable({
   rows,
   tableTool,
@@ -434,6 +415,10 @@ function QueuedReviewTable({
   statFilterLabel: string | null;
 }) {
   const [selected, setSelected] = useState<Set<string>>(() => new Set());
+  const { tableColumnIds, filterColumnPanelColumnProps } = useDataGridColumnPanel(
+    QUEUED_FOR_REVIEW_DATA_GRID_COLUMNS,
+  );
+  const { exportAll, snackbarProps } = useDataGridJsonExport(rows, "queued-for-review");
   const {
     containerRef,
     colStyle,
@@ -443,12 +428,7 @@ function QueuedReviewTable({
     resizeHandle,
     displayWidths,
     minTableWidth,
-  } = useResizableColumns({
-    selectColWidth: REVIEW_SELECT_COL_WIDTH,
-    colDefaults: REVIEW_COL_DEFAULTS,
-    colMins: REVIEW_COL_MINS,
-    minTableWidth: 960,
-  });
+  } = useDynamicResizableColumns(tableColumnIds);
 
   const allIds = useMemo(() => rows.map((r) => r.id), [rows]);
   const total = allIds.length;
@@ -469,9 +449,10 @@ function QueuedReviewTable({
     });
   };
 
-  const thClass =
-    "relative border-r border-datavis-gridlines px-2 py-0 align-middle text-xs font-bold uppercase tracking-wide text-text-primary";
-  const tdClass = cx(DATA_GRID_BODY_CELL_CLASS, "text-sm text-text-secondary");
+  const thClass = (colIndex: number, columnId: string) =>
+    dataGridHeaderCellClass(colIndex, tableColumnIds.length, columnId);
+  const tdClass = (columnId: string) =>
+    cx(dataGridBodyCellClass(columnId), "text-sm text-text-secondary");
   const hasActiveFilters = statFilterLabel != null;
   const allExpanded = rows.length > 0 && rows.every((row) => expandedIds.has(row.id));
   const sortComparators = useMemo(
@@ -506,7 +487,189 @@ function QueuedReviewTable({
 
   const { toolbarRef, sectionStyle } = useDataGridStickyToolbar();
 
+  const renderHeaderCell = (columnId: string, colIndex: number) => {
+    switch (columnId) {
+      case "select":
+        return (
+          <th key={columnId} scope="col" style={colStyle(colIndex)} className={thClass(colIndex, columnId)}>
+            <div className="flex items-center justify-center">
+              <Checkbox checked={allSelected} indeterminate={someSelected} onCheckedChange={toggleAll} aria-label="Select all rows" />
+            </div>
+            {resizeHandle(colIndex)}
+          </th>
+        );
+      case "expand":
+        return (
+          <th key={columnId} scope="col" style={colStyle(colIndex)} className={thClass(colIndex, columnId)}>
+            <div className="flex justify-center">
+              <button
+                type="button"
+                className="inline-flex items-center p-0 text-text-tertiary hover:text-text-primary"
+                aria-expanded={allExpanded}
+                aria-label={allExpanded ? "Collapse all detection descriptions" : "Expand all detection descriptions"}
+                onClick={onToggleExpandAll}
+              >
+                <Icon name="navi-arrow-drop-down" size={32} className={cx("block shrink-0 transition-transform", allExpanded ? "rotate-0" : "-rotate-90")} aria-hidden />
+                <Icon name="navi-chevron-right" size={20} className="-ml-4 block shrink-0" aria-hidden />
+              </button>
+            </div>
+            {resizeHandle(colIndex)}
+          </th>
+        );
+      case "name":
+        return (
+          <th key={columnId} scope="col" style={colStyle(colIndex)} className={thClass(colIndex, columnId)}>
+            <ColumnHeaderMenu label="Detections" menuLabel="Detections column options" {...getSortProps("name")} />
+            {resizeHandle(colIndex)}
+          </th>
+        );
+      case "state":
+        return (
+          <th key={columnId} scope="col" style={colStyle(colIndex)} className={thClass(colIndex, columnId)}>
+            <ColumnHeaderMenu label="State" menuLabel="State column options" {...getSortProps("state")} />
+            {resizeHandle(colIndex)}
+          </th>
+        );
+      case "queuedBy":
+        return (
+          <th key={columnId} scope="col" style={colStyle(colIndex)} className={thClass(colIndex, columnId)}>
+            <ColumnHeaderMenu label="Queued By" menuLabel="Queued By column options" {...getSortProps("queuedBy")} />
+            {resizeHandle(colIndex)}
+          </th>
+        );
+      case "queuedDate":
+        return (
+          <th key={columnId} scope="col" style={colStyle(colIndex)} className={thClass(colIndex, columnId)}>
+            <ColumnHeaderMenu label="Queued Date" menuLabel="Queued Date column options" {...getSortProps("queuedDate")} />
+            {resizeHandle(colIndex)}
+          </th>
+        );
+      case "severity":
+        return (
+          <th key={columnId} scope="col" style={colStyle(colIndex)} className={thClass(colIndex, columnId)}>
+            <ColumnHeaderMenu label="Severity" menuLabel="Severity column options" {...getSortProps("severity")} />
+            {resizeHandle(colIndex)}
+          </th>
+        );
+      case "findings":
+        return (
+          <th key={columnId} scope="col" style={colStyle(colIndex)} className={thClass(colIndex, columnId)}>
+            <ColumnHeaderMenu label="Detection Findings" menuLabel="Detection Findings column options" {...getSortProps("findings")} />
+            {resizeHandle(colIndex)}
+          </th>
+        );
+      case "actions":
+        return (
+          <th key={columnId} scope="col" style={colStyle(colIndex)} className={thClass(colIndex, columnId)}>
+            <span className="block translate-y-px truncate">Actions</span>
+            {resizeHandle(colIndex)}
+          </th>
+        );
+      default:
+        return (
+          <th key={columnId} scope="col" style={colStyle(colIndex)} className={thClass(colIndex, columnId)}>
+            <span className="block translate-y-px truncate">
+              {QUEUED_FOR_REVIEW_DATA_GRID_COLUMNS.find((col) => col.id === columnId)?.label ?? columnId}
+            </span>
+            {resizeHandle(colIndex)}
+          </th>
+        );
+    }
+  };
+
+  const renderBodyCell = (
+    columnId: string,
+    row: QueuedDetectionRow,
+    colIndex: number,
+    opts: { expanded: boolean; inactiveCellClass: string },
+  ) => {
+    const { expanded, inactiveCellClass } = opts;
+    switch (columnId) {
+      case "select":
+        return (
+          <td key={columnId} style={colStyle(colIndex)} className={cx(tdClass(columnId), inactiveCellClass)}>
+            <div className={DATA_GRID_BODY_CELL_CENTER_CLASS}>
+              <Checkbox checked={selected.has(row.id)} onCheckedChange={(checked) => toggleRow(row.id, checked)} aria-label={`Select ${row.name}`} />
+            </div>
+          </td>
+        );
+      case "expand":
+        return (
+          <td key={columnId} style={colStyle(colIndex)} className={cx(tdClass(columnId), inactiveCellClass)}>
+            <div className={DATA_GRID_BODY_CELL_CENTER_CLASS}>
+              <button type="button" className={DATA_GRID_ROW_EXPAND_BTN_CLASS} aria-expanded={expanded} aria-label={expanded ? `Collapse description for ${row.name}` : `Expand description for ${row.name}`} onClick={() => onToggleExpand(row.id)}>
+                <Icon name="navi-arrow-drop-down" size={DATA_GRID_ROW_EXPAND_ICON_SIZE} className={cx("block transition-transform", expanded ? "rotate-0" : "-rotate-90")} aria-hidden />
+              </button>
+            </div>
+          </td>
+        );
+      case "name":
+        return (
+          <td key={columnId} style={colStyle(colIndex)} className={cx(tdClass(columnId), "min-w-0", inactiveCellClass)}>
+            <TruncatedText as="button" className="w-full text-left font-semibold text-interactive-active hover:underline focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-interactive-active" onClick={() => onOpenDetection(row.id)}>
+              {row.name}
+            </TruncatedText>
+          </td>
+        );
+      case "state":
+        return (
+          <td key={columnId} style={colStyle(colIndex)} className={cx(tdClass(columnId), inactiveCellClass)}>
+            <Switch checked={getDetectionEnabled(row.name, row.enabled, enabledByName)} onCheckedChange={(checked) => onEnabledChange(row.name, checked)} aria-label={`Toggle ${row.name}`} />
+          </td>
+        );
+      case "queuedBy":
+        return (
+          <td key={columnId} style={colStyle(colIndex)} className={cx(tdClass(columnId), inactiveCellClass)}>
+            {row.queuedBy}
+          </td>
+        );
+      case "queuedDate":
+        return (
+          <td key={columnId} style={colStyle(colIndex)} className={cx(tdClass(columnId), "tabular-nums", inactiveCellClass)}>
+            {row.queuedDate}
+          </td>
+        );
+      case "severity":
+        return (
+          <td key={columnId} style={colStyle(colIndex)} className={cx(tdClass(columnId), inactiveCellClass)}>
+            <span className="inline-flex items-center gap-2">
+              <SeverityTableIcon name={SEV_ICONS[row.severity]} color={SEV_COLORS[row.severity]} />
+              <span>{row.severity}</span>
+            </span>
+          </td>
+        );
+      case "findings":
+        return (
+          <td key={columnId} style={colStyle(colIndex)} className={tdClass(columnId)}>
+            <FindingsSearchCell findings={row.findings} detectionId={row.id} detectionName={row.name} />
+          </td>
+        );
+      case "actions":
+        return (
+          <td key={columnId} style={colStyle(colIndex)} className={tdClass(columnId)}>
+            <div className="flex items-center justify-start overflow-hidden">
+              <ReviewActions
+                name={row.name}
+                onEdit={() => onEditDetection(row.id)}
+                onRunNow={() => onRunNow(row.name)}
+                onCopy={() => onCopyDetection(row.id)}
+                onDelete={() => onDeleteDetection(row.id)}
+                onQueueForReview={() => {}}
+              />
+            </div>
+          </td>
+        );
+      default:
+        return (
+          <td key={columnId} style={colStyle(colIndex)} className={cx(tdClass(columnId), "min-w-0", inactiveCellClass)}>
+            —
+          </td>
+        );
+    }
+  };
+
   return (
+    <>
     <section
       className={DATA_GRID_SECTION_CLASS}
       style={sectionStyle}
@@ -544,7 +707,7 @@ function QueuedReviewTable({
               Clear all filters
             </Button>
           ) : null}
-          <DataGridExportButton />
+          <DataGridExportButton onClick={exportAll} />
         </div>
       </div>
         <DatavisGridlineRule inset={false} />
@@ -554,8 +717,10 @@ function QueuedReviewTable({
           active={tableTool}
           onFilterClick={() => onTableToolChange(tableTool === "filter" ? null : "filter")}
           onColumnsClick={() => onTableToolChange(tableTool === "columns" ? null : "columns")}
+          {...filterColumnPanelColumnProps}
         />
         <div
+          key={tableColumnIds.join("|")}
           ref={containerRef}
           className={cx(DATA_GRID_TABLE_SCROLL_CLASS, isResizing && "select-none")}
         >
@@ -574,83 +739,7 @@ function QueuedReviewTable({
             </colgroup>
             <thead className={DATA_GRID_THEAD_CLASS}>
               <tr className={DATA_GRID_HEADER_ROW_CLASS}>
-                <th scope="col" style={colStyle(0)} className="relative border-r border-datavis-gridlines px-0 py-0 align-middle">
-                  <div className="flex items-center justify-center">
-                    <Checkbox
-                      checked={allSelected}
-                      indeterminate={someSelected}
-                      onCheckedChange={toggleAll}
-                      aria-label="Select all rows"
-                    />
-                  </div>
-                  {resizeHandle(0)}
-                </th>
-                <th scope="col" style={colStyle(1)} className={cx(thClass, "px-0")}>
-                  <div className="flex justify-center">
-                    <button
-                      type="button"
-                      className="inline-flex items-center p-0 text-text-tertiary hover:text-text-primary"
-                      aria-expanded={allExpanded}
-                      aria-label={
-                        allExpanded ? "Collapse all detection descriptions" : "Expand all detection descriptions"
-                      }
-                      onClick={onToggleExpandAll}
-                    >
-                      <Icon
-                        name="navi-arrow-drop-down"
-                        size={32}
-                        className={cx("block shrink-0 transition-transform", allExpanded ? "rotate-0" : "-rotate-90")}
-                        aria-hidden
-                      />
-                      <Icon name="navi-chevron-right" size={20} className="-ml-4 block shrink-0" aria-hidden />
-                    </button>
-                  </div>
-                  {resizeHandle(1)}
-                </th>
-                <th scope="col" style={colStyle(2)} className={thClass}>
-                  <ColumnHeaderMenu
-                    label="Detections"
-                    menuLabel="Detections column options"
-                    {...getSortProps("name")}
-                  />
-                  {resizeHandle(2)}
-                </th>
-                <th scope="col" style={colStyle(3)} className={thClass}>
-                  <ColumnHeaderMenu label="State" menuLabel="State column options" {...getSortProps("state")} />
-                  {resizeHandle(3)}
-                </th>
-                <th scope="col" style={colStyle(4)} className={thClass}>
-                  <ColumnHeaderMenu label="Queued By" menuLabel="Queued By column options" {...getSortProps("queuedBy")} />
-                  {resizeHandle(4)}
-                </th>
-                <th scope="col" style={colStyle(5)} className={thClass}>
-                  <ColumnHeaderMenu
-                    label="Queued Date"
-                    menuLabel="Queued Date column options"
-                    {...getSortProps("queuedDate")}
-                  />
-                  {resizeHandle(5)}
-                </th>
-                <th scope="col" style={colStyle(6)} className={thClass}>
-                  <ColumnHeaderMenu
-                    label="Severity"
-                    menuLabel="Severity column options"
-                    {...getSortProps("severity")}
-                  />
-                  {resizeHandle(6)}
-                </th>
-                <th scope="col" style={colStyle(7)} className={thClass}>
-                  <ColumnHeaderMenu
-                    label="Detection Findings"
-                    menuLabel="Detection Findings column options"
-                    {...getSortProps("findings")}
-                  />
-                  {resizeHandle(7)}
-                </th>
-                <th scope="col" style={colStyle(8)} className="relative px-2 py-0 align-middle text-xs font-bold uppercase tracking-wide text-text-primary">
-                  <span className="block translate-y-px truncate">Actions</span>
-                  {resizeHandle(8)}
-                </th>
+                {tableColumnIds.map((columnId, colIndex) => renderHeaderCell(columnId, colIndex))}
               </tr>
             </thead>
             <tbody>
@@ -661,88 +750,13 @@ function QueuedReviewTable({
                 return (
                   <Fragment key={row.id}>
                     <tr className={DATA_GRID_BODY_ROW_CLASS}>
-                      <td style={colStyle(0)} className={cx("px-0 py-0 align-middle", inactiveCellClass)}>
-                        <div className={DATA_GRID_BODY_CELL_CENTER_CLASS}>
-                          <Checkbox
-                            checked={selected.has(row.id)}
-                            onCheckedChange={(checked) => toggleRow(row.id, checked)}
-                            aria-label={`Select ${row.name}`}
-                          />
-                        </div>
-                      </td>
-                      <td style={colStyle(1)} className={cx("px-0 py-0 align-middle", inactiveCellClass)}>
-                        <div className={DATA_GRID_BODY_CELL_CENTER_CLASS}>
-                          <button
-                            type="button"
-                            className={DATA_GRID_ROW_EXPAND_BTN_CLASS}
-                            aria-expanded={expanded}
-                            aria-label={
-                              expanded ? `Collapse description for ${row.name}` : `Expand description for ${row.name}`
-                            }
-                            onClick={() => onToggleExpand(row.id)}
-                          >
-                            <Icon
-                              name="navi-arrow-drop-down"
-                              size={DATA_GRID_ROW_EXPAND_ICON_SIZE}
-                              className={cx("block transition-transform", expanded ? "rotate-0" : "-rotate-90")}
-                              aria-hidden
-                            />
-                          </button>
-                        </div>
-                      </td>
-                      <td style={colStyle(2)} className={cx(tdClass, "min-w-0", inactiveCellClass)}>
-                        <TruncatedText
-                          as="button"
-                          className="w-full text-left font-semibold text-interactive-active hover:underline focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-interactive-active"
-                          onClick={() => onOpenDetection(row.id)}
-                        >
-                          {row.name}
-                        </TruncatedText>
-                      </td>
-                      <td style={colStyle(3)} className={cx(tdClass, inactiveCellClass)}>
-                        <Switch
-                          checked={getDetectionEnabled(row.name, row.enabled, enabledByName)}
-                          onCheckedChange={(checked) => onEnabledChange(row.name, checked)}
-                          aria-label={`Toggle ${row.name}`}
-                        />
-                      </td>
-                      <td style={colStyle(4)} className={cx(tdClass, inactiveCellClass)}>
-                        {row.queuedBy}
-                      </td>
-                      <td style={colStyle(5)} className={cx(tdClass, "tabular-nums", inactiveCellClass)}>
-                        {row.queuedDate}
-                      </td>
-                      <td style={colStyle(6)} className={cx(tdClass, inactiveCellClass)}>
-                        <span className="inline-flex items-center gap-2">
-                          <SeverityTableIcon name={SEV_ICONS[row.severity]} color={SEV_COLORS[row.severity]} />
-                          <span>{row.severity}</span>
-                        </span>
-                      </td>
-                      <td style={colStyle(7)} className={tdClass}>
-                        <FindingsSearchCell
-                          findings={row.findings}
-                          detectionId={row.id}
-                          detectionName={row.name}
-                        />
-                      </td>
-                      <td style={colStyle(8)} className={tdClass}>
-                        <div className="flex items-center justify-start overflow-hidden">
-                        <ReviewActions
-                          name={row.name}
-                          onEdit={() => onEditDetection(row.id)}
-                          onRunNow={() => onRunNow(row.name)}
-                          onCopy={() => onCopyDetection(row.id)}
-                          onDelete={() => onDeleteDetection(row.id)}
-                          onQueueForReview={() => {}}
-                        />
-                        </div>
-                      </td>
+                      {tableColumnIds.map((columnId, colIndex) =>
+                        renderBodyCell(columnId, row, colIndex, { expanded, inactiveCellClass }),
+                      )}
                     </tr>
                     {expanded ? (
-                      <tr
-                        className={cx(DATA_GRID_EXPANDED_ROW_CLASS, !enabled && "opacity-70")}
-                      >
-                        <td colSpan={REVIEW_COLUMN_COUNT} className={DATA_GRID_EXPANDED_CELL_CLASS}>
+                      <tr className={cx(DATA_GRID_EXPANDED_ROW_CLASS, !enabled && "opacity-70")}>
+                        <td colSpan={tableColumnIds.length} className={DATA_GRID_EXPANDED_CELL_CLASS}>
                           <DetectionExpandedDetails description={row.description} detectionId={row.id} />
                         </td>
                       </tr>
@@ -767,6 +781,8 @@ function QueuedReviewTable({
         />
       ) : null}
     </section>
+    <Snackbar {...snackbarProps} />
+    </>
   );
 }
 
