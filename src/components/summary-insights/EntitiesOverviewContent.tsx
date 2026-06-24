@@ -20,12 +20,20 @@ import { ColumnHeaderMenu } from "../ui/ColumnHeaderMenu";
 import { FilterColumnPanel, type FilterColumnPanelTool } from "../ui/FilterColumnPanel";
 import { Input } from "../ui/Input";
 import { DataGridExportButton } from "../ui/DataGridExportButton";
+import { Snackbar } from "../ui/Snackbar";
+import { useDataGridJsonExport } from "../ui/useDataGridJsonExport";
 import { SeverityTableIcon } from "../ui/SeverityTableIcon";
 import { compareStrings } from "../ui/useColumnSort";
 import { useSortedDataGridPagination } from "../ui/useSortedDataGridPagination";
 import { DataGridSection } from "../ui/DataGridSection";
 import { DataGridPaginationFooter } from "../ui/DataGridTableLayout";
-import { useResizableColumns } from "../ui/useResizableColumns";
+import { ENTITIES_AGGREGATED_DATA_GRID_COLUMNS } from "../ui/dataGridColumnCatalog";
+import { useDataGridColumnPanel } from "../ui/dataGridColumnTypes";
+import {
+  dataGridBodyCellClass,
+  dataGridHeaderCellClass,
+  useDynamicResizableColumns,
+} from "../ui/dataGridDynamicTableHelpers";
 import { TruncatedText } from "../ui/TruncatedText";
 import { demoTableConnector } from "../connectors/demoTableConnectors";
 import { ConnectorTableCell } from "../ui/ConnectorTableCell";
@@ -122,6 +130,9 @@ const ENTITY_RISK_ROWS = [
 const ENTITY_TYPE_ORDER = ENTITY_TYPE_ROWS.map((row) => row.label);
 const ENTITY_RISK_CHART_ORDER = ENTITY_RISK_ROWS.map((row) => row.label);
 
+type EntityTypeChartLabel = (typeof ENTITY_TYPE_ORDER)[number];
+type EntityRiskChartLabel = (typeof ENTITY_RISK_CHART_ORDER)[number];
+
 const ENTITY_RISK_CHART_COLORS: Record<(typeof ENTITY_RISK_CHART_ORDER)[number], string> = {
   Critical: "#ff604a",
   High: "#f28830",
@@ -159,87 +170,6 @@ type EntityCategoryCardData = {
   items: EntityListItem[];
   totalCount: number;
 };
-
-const ENTITY_CATEGORY_CARDS: EntityCategoryCardData[] = [
-  {
-    title: "Top IP Addresses",
-    total: "5.6K",
-    uniqueSeenLabel: "unique IPs seen",
-    totalCount: 25,
-    items: [
-      { label: "207.32.75.34", value: 1240 },
-      { label: "145.27.84.12", value: 985 },
-      { label: "168.33.72.10", value: 605 },
-      { label: "168.12.89.11", value: 435 },
-      { label: "2001:0D88:AC10:FE01", value: 175 },
-    ],
-  },
-  {
-    title: "Top Usernames",
-    total: "7.6K",
-    uniqueSeenLabel: "unique usernames seen",
-    totalCount: 25,
-    items: [
-      { label: "cKopolowski", value: 2654 },
-      { label: "kopolowsk", value: 1400 },
-      { label: "bonwoncar", value: 1200 },
-      { label: "CKopolowski", value: 894 },
-      { label: "Slingercar", value: 762 },
-    ],
-  },
-  {
-    title: "Top Hostnames",
-    total: "2.6K",
-    uniqueSeenLabel: "unique hostnames seen",
-    totalCount: 25,
-    items: [
-      { label: "norma-laptop", value: 1240 },
-      { label: "https://thisandthat.com", value: 985 },
-      { label: "slingerdingerdoodle-pc", value: 605 },
-      { label: "https://leaveittobeaver.com", value: 435 },
-      { label: "www.facebooksucks.com", value: 175 },
-    ],
-  },
-  {
-    title: "Top CVEs",
-    total: "2.4K",
-    uniqueSeenLabel: "unique CVEs seen",
-    totalCount: 25,
-    items: [
-      { label: "www.normansrestaurant.com", value: 1240 },
-      { label: "http://thisandthat.com", value: 985 },
-      { label: "slingerdingerdoodles.com", value: 605 },
-      { label: "https://leaveittobeaver.com", value: 435 },
-      { label: "www.facebooksucks.com", value: 175 },
-    ],
-  },
-  {
-    title: "MAC Addresses",
-    total: "2.1K",
-    uniqueSeenLabel: "unique MAC addresses seen",
-    totalCount: 25,
-    items: [
-      { label: "www.normansrestaurant.com", value: 1240 },
-      { label: "http://thisandthat.com", value: 985 },
-      { label: "slingerdingerdoodles.com", value: 605 },
-      { label: "https://leaveittobeaver.com", value: 435 },
-      { label: "www.facebooksucks.com", value: 175 },
-    ],
-  },
-  {
-    title: "Top URLs",
-    total: "1.9K",
-    uniqueSeenLabel: "unique URLs seen",
-    totalCount: 25,
-    items: [
-      { label: "207.32.75.34", value: 1240 },
-      { label: "145.27.84.12", value: 985 },
-      { label: "168.33.72.10", value: 605 },
-      { label: "168.12.89.11", value: 435 },
-      { label: "2001:0D88:AC10:FE01", value: 175 },
-    ],
-  },
-];
 
 function formatCount(value: number): string {
   return value.toLocaleString("en-US");
@@ -599,6 +529,99 @@ const AGGREGATED_ENTITY_ROWS: AggregatedEntityRow[] = [
   },
 ];
 
+const ENTITY_CATEGORY_CARD_SPECS = [
+  {
+    title: "Top IP Addresses",
+    uniqueSeenLabel: "unique IPs seen",
+    matchesRow: (row: AggregatedEntityRow) => row.categories.includes("Network Activity"),
+  },
+  {
+    title: "Top Usernames",
+    uniqueSeenLabel: "unique usernames seen",
+    matchesRow: (row: AggregatedEntityRow) => row.type === "User",
+  },
+  {
+    title: "Top Hostnames",
+    uniqueSeenLabel: "unique hostnames seen",
+    matchesRow: (row: AggregatedEntityRow) => row.type === "Device",
+  },
+  {
+    title: "Top CVEs",
+    uniqueSeenLabel: "unique CVEs seen",
+    matchesRow: (row: AggregatedEntityRow) => row.categories.includes("Findings"),
+  },
+  {
+    title: "MAC Addresses",
+    uniqueSeenLabel: "unique MAC addresses seen",
+    matchesRow: (row: AggregatedEntityRow) => row.type === "Device",
+  },
+  {
+    title: "Top URLs",
+    uniqueSeenLabel: "unique URLs seen",
+    matchesRow: (row: AggregatedEntityRow) => row.type === "Cloud Resource",
+  },
+] as const;
+
+function formatTotalCompact(value: number): string {
+  if (value >= 1000) {
+    const thousands = value / 1000;
+    return thousands >= 10 ? `${Math.round(thousands)}K` : `${thousands.toFixed(1)}K`;
+  }
+  return formatCount(value);
+}
+
+function buildEntityCategoryCards(rows: readonly AggregatedEntityRow[]): EntityCategoryCardData[] {
+  return ENTITY_CATEGORY_CARD_SPECS.map((spec) => {
+    const scoped = rows.filter(spec.matchesRow);
+    const totals = new Map<string, number>();
+    for (const row of scoped) {
+      totals.set(row.entity, (totals.get(row.entity) ?? 0) + row.eventCount);
+    }
+
+    const sorted = [...totals.entries()].sort((a, b) => b[1] - a[1]);
+    const items = sorted.slice(0, 5).map(([label, value]) => ({ label, value }));
+    const eventTotal = sorted.reduce((sum, [, value]) => sum + value, 0);
+
+    return {
+      title: spec.title,
+      total: formatTotalCompact(eventTotal),
+      uniqueSeenLabel: spec.uniqueSeenLabel,
+      totalCount: Math.max(totals.size, items.length),
+      items,
+    };
+  });
+}
+
+function isEntityTypeChartLabel(label: string): label is EntityTypeChartLabel {
+  return (ENTITY_TYPE_ORDER as readonly string[]).includes(label);
+}
+
+function isEntityRiskChartLabel(label: string): label is EntityRiskChartLabel {
+  return (ENTITY_RISK_CHART_ORDER as readonly string[]).includes(label);
+}
+
+function applyEntityWidgetFilters(
+  rows: readonly AggregatedEntityRow[],
+  filters: {
+    entityTypeFilter: EntityTypeChartLabel | null;
+    entityRiskFilter: EntityRiskChartLabel | null;
+    entityVolumeFilter: string | null;
+  },
+): AggregatedEntityRow[] {
+  return rows.filter((row) => {
+    if (filters.entityTypeFilter && entityTypeChartLabel(row.type) !== filters.entityTypeFilter) {
+      return false;
+    }
+    if (filters.entityRiskFilter && row.risk !== filters.entityRiskFilter) {
+      return false;
+    }
+    if (filters.entityVolumeFilter && row.entity !== filters.entityVolumeFilter) {
+      return false;
+    }
+    return true;
+  });
+}
+
 function topEntitiesByEventVolume(rows: readonly AggregatedEntityRow[], limit: number) {
   const totals = new Map<string, number>();
   for (const row of rows) {
@@ -638,28 +661,6 @@ type AggregatedSortColumn =
   | "categories"
   | "connector";
 
-const SELECT_COL_WIDTH = 40;
-const AGGREGATED_COL_DEFAULTS: readonly number[] = [
-  SELECT_COL_WIDTH,
-  108,
-  140,
-  120,
-  96,
-  96,
-  260,
-  120,
-];
-const AGGREGATED_COL_MINS: readonly number[] = [
-  SELECT_COL_WIDTH,
-  72,
-  96,
-  88,
-  72,
-  72,
-  140,
-  88,
-];
-
 export function useEntitiesAggregatedTableGrid(rows: readonly Parameters<typeof EntitiesAggregatedTable>[0]["displayRows"][number][]) {
   const sortComparators = useMemo(
     (): Record<AggregatedSortColumn, (a: AggregatedEntityRow, b: AggregatedEntityRow) => number> => ({
@@ -681,11 +682,13 @@ function EntitiesAggregatedTable({
   getSortProps,
   selected,
   onSelectedChange,
+  tableColumnIds,
 }: {
   displayRows: AggregatedEntityRow[];
   getSortProps: ReturnType<typeof useEntitiesAggregatedTableGrid>["getSortProps"];
   selected: ReadonlySet<string>;
   onSelectedChange: (next: Set<string>) => void;
+  tableColumnIds: readonly string[];
 }) {
   const {
     containerRef,
@@ -696,11 +699,7 @@ function EntitiesAggregatedTable({
     resizeHandle,
     displayWidths,
     minTableWidth,
-  } = useResizableColumns({
-    selectColWidth: SELECT_COL_WIDTH,
-    colDefaults: AGGREGATED_COL_DEFAULTS,
-    colMins: AGGREGATED_COL_MINS,
-  });
+  } = useDynamicResizableColumns(tableColumnIds);
 
   const allIds = useMemo(() => displayRows.map((r) => r.id), [displayRows]);
   const total = allIds.length;
@@ -719,10 +718,178 @@ function EntitiesAggregatedTable({
     onSelectedChange(next);
   };
 
+  const renderHeaderCell = (columnId: string, colIndex: number) => {
+    const headerClass = dataGridHeaderCellClass(colIndex, tableColumnIds.length, columnId);
 
+    switch (columnId) {
+      case "select":
+        return (
+          <th key={columnId} scope="col" style={colStyle(colIndex)} className={headerClass}>
+            <div className="flex items-center justify-center">
+              <Checkbox
+                checked={allSelected}
+                indeterminate={someSelected}
+                onCheckedChange={toggleAll}
+                aria-label="Select all rows"
+              />
+            </div>
+            {resizeHandle(colIndex)}
+          </th>
+        );
+      case "risk":
+        return (
+          <th key={columnId} scope="col" style={colStyle(colIndex)} className={headerClass}>
+            <ColumnHeaderMenu label="Risk" menuLabel="Risk column options" {...getSortProps("risk")} />
+            {resizeHandle(colIndex)}
+          </th>
+        );
+      case "entity":
+        return (
+          <th key={columnId} scope="col" style={colStyle(colIndex)} className={headerClass}>
+            <ColumnHeaderMenu label="Entity" menuLabel="Entity column options" {...getSortProps("entity")} />
+            {resizeHandle(colIndex)}
+          </th>
+        );
+      case "type":
+        return (
+          <th key={columnId} scope="col" style={colStyle(colIndex)} className={headerClass}>
+            <ColumnHeaderMenu label="Type" menuLabel="Type column options" {...getSortProps("type")} />
+            {resizeHandle(colIndex)}
+          </th>
+        );
+      case "lastSeen":
+        return (
+          <th key={columnId} scope="col" style={colStyle(colIndex)} className={headerClass}>
+            <ColumnHeaderMenu label="Last Seen" menuLabel="Last seen column options" {...getSortProps("lastSeen")} />
+            {resizeHandle(colIndex)}
+          </th>
+        );
+      case "eventCount":
+        return (
+          <th key={columnId} scope="col" style={colStyle(colIndex)} className={headerClass}>
+            <ColumnHeaderMenu label="# Events" menuLabel="Events column options" {...getSortProps("eventCount")} />
+            {resizeHandle(colIndex)}
+          </th>
+        );
+      case "categories":
+        return (
+          <th key={columnId} scope="col" style={colStyle(colIndex)} className={headerClass}>
+            <ColumnHeaderMenu
+              label="Categories Involved"
+              menuLabel="Categories involved column options"
+              {...getSortProps("categories")}
+            />
+            {resizeHandle(colIndex)}
+          </th>
+        );
+      case "connector":
+        return (
+          <th key={columnId} scope="col" style={colStyle(colIndex)} className={headerClass}>
+            <ColumnHeaderMenu
+              label="Connectors"
+              menuLabel="Connectors column options"
+              {...getSortProps("connector")}
+            />
+            {resizeHandle(colIndex)}
+          </th>
+        );
+      default:
+        return (
+          <th key={columnId} scope="col" style={colStyle(colIndex)} className={headerClass}>
+            <span className="block translate-y-px truncate">
+              {ENTITIES_AGGREGATED_DATA_GRID_COLUMNS.find((col) => col.id === columnId)?.label ?? columnId}
+            </span>
+            {resizeHandle(colIndex)}
+          </th>
+        );
+    }
+  };
+
+  const renderBodyCell = (columnId: string, row: AggregatedEntityRow, colIndex: number) => {
+    const cellClass = dataGridBodyCellClass(columnId);
+
+    switch (columnId) {
+      case "select":
+        return (
+          <td key={columnId} style={colStyle(colIndex)} className={cellClass}>
+            <div className="flex items-center justify-center">
+              <Checkbox
+                checked={selected.has(row.id)}
+                onCheckedChange={(c) => toggleRow(row.id, c)}
+                aria-label={`Select entity ${row.entity}`}
+              />
+            </div>
+          </td>
+        );
+      case "risk":
+        return (
+          <td key={columnId} style={colStyle(colIndex)} className={cellClass}>
+            <span className="inline-flex items-center gap-2">
+              <SeverityTableIcon name={ENTITY_RISK_ICONS[row.risk]} color={ENTITY_RISK_BAR[row.risk]} />
+              <span className="text-sm text-text-secondary">{row.risk}</span>
+            </span>
+          </td>
+        );
+      case "entity":
+        return (
+          <td key={columnId} style={colStyle(colIndex)} className={cx(cellClass, "min-w-0")}>
+            <TruncatedText
+              as="button"
+              className="w-full text-left text-sm font-semibold text-interactive-active hover:underline focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-interactive-active"
+            >
+              {row.entity}
+            </TruncatedText>
+          </td>
+        );
+      case "type":
+        return (
+          <td key={columnId} style={colStyle(colIndex)} className={cx(cellClass, "min-w-0")}>
+            <TruncatedText className="text-sm text-text-secondary">{row.type}</TruncatedText>
+          </td>
+        );
+      case "lastSeen":
+        return (
+          <td key={columnId} style={colStyle(colIndex)} className={cx(cellClass, "min-w-0 tabular-nums")}>
+            <TruncatedText className="text-sm text-text-secondary">{row.lastSeen}</TruncatedText>
+          </td>
+        );
+      case "eventCount":
+        return (
+          <td key={columnId} style={colStyle(colIndex)} className={cx(cellClass, "min-w-0 tabular-nums")}>
+            <TruncatedText className="text-sm text-text-secondary">{formatCount(row.eventCount)}</TruncatedText>
+          </td>
+        );
+      case "categories":
+        return (
+          <td key={columnId} style={colStyle(colIndex)} className={cx(cellClass, "min-w-0")}>
+            <TruncatedText className="text-sm text-text-secondary">{row.categories}</TruncatedText>
+          </td>
+        );
+      case "connector":
+        return (
+          <td key={columnId} style={colStyle(colIndex)} className={cx(cellClass, "min-w-0 overflow-hidden")}>
+            <ConnectorTableCell
+              name={row.connector}
+              className="w-full"
+              textClassName="w-full text-sm text-text-secondary"
+            />
+          </td>
+        );
+      default:
+        return (
+          <td key={columnId} style={colStyle(colIndex)} className={cx(cellClass, "min-w-0")}>
+            <TruncatedText className="text-sm text-text-secondary">—</TruncatedText>
+          </td>
+        );
+    }
+  };
 
   return (
-    <div ref={containerRef} className={cx(DATA_GRID_TABLE_SCROLL_CLASS, isResizing && "select-none")}>
+    <div
+      key={tableColumnIds.join("|")}
+      ref={containerRef}
+      className={cx(DATA_GRID_TABLE_SCROLL_CLASS, isResizing && "select-none")}
+    >
       <table
         className={DATA_GRID_TABLE_CLASS}
         style={{
@@ -738,124 +905,13 @@ function EntitiesAggregatedTable({
         </colgroup>
         <thead className={DATA_GRID_THEAD_CLASS}>
           <tr className={DATA_GRID_HEADER_ROW_CLASS}>
-            <th scope="col" style={colStyle(0)} className="relative border-r border-datavis-gridlines px-0 py-0 align-middle">
-              <div className="flex items-center justify-center">
-                <Checkbox
-                  checked={allSelected}
-                  indeterminate={someSelected}
-                  onCheckedChange={toggleAll}
-                  aria-label="Select all rows"
-                />
-              </div>
-              {resizeHandle(0)}
-            </th>
-            <th
-              scope="col"
-              style={colStyle(1)}
-              className="relative border-r border-datavis-gridlines px-2 py-0 align-middle text-xs font-bold uppercase tracking-wide text-text-primary"
-            >
-              <ColumnHeaderMenu label="Risk" menuLabel="Risk column options" {...getSortProps("risk")} />
-              {resizeHandle(1)}
-            </th>
-            <th
-              scope="col"
-              style={colStyle(2)}
-              className="relative border-r border-datavis-gridlines px-2 py-0 align-middle text-xs font-bold uppercase tracking-wide text-text-primary"
-            >
-              <ColumnHeaderMenu label="Entity" menuLabel="Entity column options" {...getSortProps("entity")} />
-              {resizeHandle(2)}
-            </th>
-            <th
-              scope="col"
-              style={colStyle(3)}
-              className="relative border-r border-datavis-gridlines px-2 py-0 align-middle text-xs font-bold uppercase tracking-wide text-text-primary"
-            >
-              <ColumnHeaderMenu label="Type" menuLabel="Type column options" {...getSortProps("type")} />
-              {resizeHandle(3)}
-            </th>
-            <th
-              scope="col"
-              style={colStyle(4)}
-              className="relative border-r border-datavis-gridlines px-2 py-0 align-middle text-xs font-bold uppercase tracking-wide text-text-primary"
-            >
-              <ColumnHeaderMenu label="Last Seen" menuLabel="Last seen column options" {...getSortProps("lastSeen")} />
-              {resizeHandle(4)}
-            </th>
-            <th
-              scope="col"
-              style={colStyle(5)}
-              className="relative border-r border-datavis-gridlines px-2 py-0 align-middle text-xs font-bold uppercase tracking-wide text-text-primary"
-            >
-              <ColumnHeaderMenu label="# Events" menuLabel="Events column options" {...getSortProps("eventCount")} />
-              {resizeHandle(5)}
-            </th>
-            <th
-              scope="col"
-              style={colStyle(6)}
-              className="relative border-r border-datavis-gridlines px-2 py-0 align-middle text-xs font-bold uppercase tracking-wide text-text-primary"
-            >
-              <ColumnHeaderMenu
-                label="Categories Involved"
-                menuLabel="Categories involved column options"
-                {...getSortProps("categories")}
-              />
-              {resizeHandle(6)}
-            </th>
-            <th
-              scope="col"
-              style={colStyle(7)}
-              className="relative px-2 py-0 align-middle text-xs font-bold uppercase tracking-wide text-text-primary"
-            >
-              <ColumnHeaderMenu label="Connectors" menuLabel="Connectors column options" {...getSortProps("connector")} />
-              {resizeHandle(7)}
-            </th>
+            {tableColumnIds.map((columnId, colIndex) => renderHeaderCell(columnId, colIndex))}
           </tr>
         </thead>
         <tbody>
           {displayRows.map((row) => (
             <tr key={row.id} className="border-b border-datavis-gridlines hover:bg-overlay-subtle">
-              <td style={colStyle(0)} className="px-0 py-0 align-middle">
-                <div className="flex items-center justify-center">
-                  <Checkbox
-                    checked={selected.has(row.id)}
-                    onCheckedChange={(c) => toggleRow(row.id, c)}
-                    aria-label={`Select entity ${row.entity}`}
-                  />
-                </div>
-              </td>
-              <td style={colStyle(1)} className="px-2 py-0 align-middle">
-                <span className="inline-flex items-center gap-2">
-                  <SeverityTableIcon name={ENTITY_RISK_ICONS[row.risk]} color={ENTITY_RISK_BAR[row.risk]} />
-                  <span className="text-sm text-text-secondary">{row.risk}</span>
-                </span>
-              </td>
-              <td style={colStyle(2)} className="min-w-0 px-2 py-0 align-middle">
-                <TruncatedText
-                  as="button"
-                  className="w-full text-left text-sm font-semibold text-interactive-active hover:underline focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-interactive-active"
-                >
-                  {row.entity}
-                </TruncatedText>
-              </td>
-              <td style={colStyle(3)} className="min-w-0 px-2 py-0 align-middle">
-                <TruncatedText className="text-sm text-text-secondary">{row.type}</TruncatedText>
-              </td>
-              <td style={colStyle(4)} className="min-w-0 px-2 py-0 align-middle tabular-nums">
-                <TruncatedText className="text-sm text-text-secondary">{row.lastSeen}</TruncatedText>
-              </td>
-              <td style={colStyle(5)} className="min-w-0 px-2 py-0 align-middle tabular-nums">
-                <TruncatedText className="text-sm text-text-secondary">{formatCount(row.eventCount)}</TruncatedText>
-              </td>
-              <td style={colStyle(6)} className="min-w-0 px-2 py-0 align-middle">
-                <TruncatedText className="text-sm text-text-secondary">{row.categories}</TruncatedText>
-              </td>
-              <td style={colStyle(7)} className="min-w-0 overflow-hidden px-2 py-0 align-middle">
-                <ConnectorTableCell
-                  name={row.connector}
-                  className="w-full"
-                  textClassName="w-full text-sm text-text-secondary"
-                />
-              </td>
+              {tableColumnIds.map((columnId, colIndex) => renderBodyCell(columnId, row, colIndex))}
             </tr>
           ))}
         </tbody>
@@ -898,23 +954,31 @@ function EntitiesDetailTabs({
 
 function EntitiesAggregatedPanel({
   rows,
+  scopedRowCount,
+  activeFilterLabels,
   selectedIds,
   onSelectedIdsChange,
   onSearchSelected,
 }: {
   rows: AggregatedEntityRow[];
+  scopedRowCount: number;
+  activeFilterLabels: readonly string[];
   selectedIds: ReadonlySet<string>;
   onSelectedIdsChange: (next: Set<string>) => void;
   onSearchSelected: (rows: AggregatedEntityRow[]) => void;
 }) {
   const [searchQuery, setSearchQuery] = useState("");
   const [tableTool, setTableTool] = useState<FilterColumnPanelTool | null>(null);
+  const { tableColumnIds, filterColumnPanelColumnProps } = useDataGridColumnPanel(
+    ENTITIES_AGGREGATED_DATA_GRID_COLUMNS,
+  );
 
   const filteredRows = useMemo(
     () => rows.filter((row) => aggregatedMatchesSearch(row, searchQuery)),
     [rows, searchQuery],
   );
   const tableGrid = useEntitiesAggregatedTableGrid(filteredRows);
+  const { exportAll, snackbarProps } = useDataGridJsonExport(filteredRows, "entities-aggregated");
 
   const selectedRows = useMemo(
     () => rows.filter((row) => selectedIds.has(row.id)),
@@ -929,13 +993,15 @@ function EntitiesAggregatedPanel({
   );
 
   return (
+    <>
     <DataGridSection
       header={
         <>
           <h2 className="text-base-semibold text-text-primary">Entities</h2>
           <div className="mt-2 flex flex-wrap items-center gap-3">
             <p className="shrink-0 text-base-small text-text-secondary">
-              {filteredRows.length} of {rows.length} Results
+              {filteredRows.length} of {scopedRowCount} Results
+              {activeFilterLabels.map((label) => ` · ${label}`).join("")}
               {searchQuery.trim() ? ` · “${searchQuery.trim()}”` : ""}
             </p>
             <div className="w-[300px] shrink-0">
@@ -971,7 +1037,7 @@ function EntitiesAggregatedPanel({
                 Search {selectedRows.length} selected
               </Button>
             ) : null}
-            <DataGridExportButton />
+            <DataGridExportButton onClick={exportAll} />
           </div>
         </>
       }
@@ -980,6 +1046,7 @@ function EntitiesAggregatedPanel({
           active={tableTool}
           onFilterClick={() => setTableTool(tableTool === "filter" ? null : "filter")}
           onColumnsClick={() => setTableTool(tableTool === "columns" ? null : "columns")}
+          {...filterColumnPanelColumnProps}
         />
       }
       table={
@@ -988,10 +1055,13 @@ function EntitiesAggregatedPanel({
           getSortProps={tableGrid.getSortProps}
           selected={selectedIds}
           onSelectedChange={handleSelectedChange}
+          tableColumnIds={tableColumnIds}
         />
       }
       footer={<DataGridPaginationFooter grid={tableGrid} />}
     />
+    <Snackbar {...snackbarProps} />
+    </>
   );
 }
 
@@ -1003,6 +1073,9 @@ export function EntitiesOverviewContent() {
   const [activeDetailTab, setActiveDetailTab] = useState<EntitiesDetailTab>("entities");
   const [aggregatedSelectedIds, setAggregatedSelectedIds] = useState<Set<string>>(() => new Set());
   const [categorySelectedKeys, setCategorySelectedKeys] = useState<Set<string>>(() => new Set());
+  const [entityTypeFilter, setEntityTypeFilter] = useState<EntityTypeChartLabel | null>(null);
+  const [entityRiskFilter, setEntityRiskFilter] = useState<EntityRiskChartLabel | null>(null);
+  const [entityVolumeFilter, setEntityVolumeFilter] = useState<string | null>(null);
 
   const launchEntitiesFsqlSearch = useCallback(
     (query: string, onLaunched?: () => void) => {
@@ -1056,6 +1129,35 @@ export function EntitiesOverviewContent() {
     [tableRows, timeframe],
   );
 
+  const widgetFilteredRows = useMemo(
+    () =>
+      applyEntityWidgetFilters(timeframeScopedRows, {
+        entityTypeFilter,
+        entityRiskFilter,
+        entityVolumeFilter,
+      }),
+    [timeframeScopedRows, entityTypeFilter, entityRiskFilter, entityVolumeFilter],
+  );
+
+  const entityCategoryCards = useMemo(
+    () => buildEntityCategoryCards(widgetFilteredRows),
+    [widgetFilteredRows],
+  );
+
+  const hasWidgetFilters =
+    entityTypeFilter != null || entityRiskFilter != null || entityVolumeFilter != null;
+
+  const activeWidgetFilterLabels = useMemo(
+    () => [entityTypeFilter, entityRiskFilter, entityVolumeFilter].filter((label): label is string => label != null),
+    [entityTypeFilter, entityRiskFilter, entityVolumeFilter],
+  );
+
+  const clearWidgetFilters = useCallback(() => {
+    setEntityTypeFilter(null);
+    setEntityRiskFilter(null);
+    setEntityVolumeFilter(null);
+  }, []);
+
   const entityTypeRows = useMemo(
     () =>
       countByLabel(timeframeScopedRows, ENTITY_TYPE_ORDER, (row) => entityTypeChartLabel(row.type)).map(
@@ -1098,6 +1200,20 @@ export function EntitiesOverviewContent() {
 
   const dailyChart = useMemo(() => buildDailyEntityChart(timeframe), [timeframe]);
 
+  const handleEntityTypeClick = (label: string) => {
+    if (!isEntityTypeChartLabel(label)) return;
+    setEntityTypeFilter((current) => (current === label ? null : label));
+  };
+
+  const handleEntityRiskClick = (label: string) => {
+    if (!isEntityRiskChartLabel(label)) return;
+    setEntityRiskFilter((current) => (current === label ? null : label));
+  };
+
+  const handleEntityVolumeClick = (label: string) => {
+    setEntityVolumeFilter((current) => (current === label ? null : label));
+  };
+
   return (
     <div className="flex shrink-0 flex-col gap-4 p-4 sm:p-5">
       <div className={DATA_GRID_ABOVE_SECTION_CLASS}>
@@ -1126,6 +1242,9 @@ export function EntitiesOverviewContent() {
         <InsightCard title="Entity Types" fillHeight>
           <HorizontalBarPanel
             rows={entityTypeRows}
+            selectedLabel={entityTypeFilter}
+            onBarClick={handleEntityTypeClick}
+            filterAriaLabel={(label) => `Filter entities by type ${label}`}
             xMax={entityTypeBarScale.xMax}
             xTicks={entityTypeBarScale.xTicks}
           />
@@ -1133,6 +1252,9 @@ export function EntitiesOverviewContent() {
         <InsightCard title="Entity Risk" fillHeight>
           <HorizontalBarPanel
             rows={entityRiskRows}
+            selectedLabel={entityRiskFilter}
+            onBarClick={handleEntityRiskClick}
+            filterAriaLabel={(label) => `Filter entities by ${label} risk`}
             xMax={entityRiskBarScale.xMax}
             xTicks={entityRiskBarScale.xTicks}
           />
@@ -1140,6 +1262,9 @@ export function EntitiesOverviewContent() {
         <InsightCard title="Top Entities By Event Volume" fillHeight>
           <HorizontalBarPanel
             rows={topEntitiesByVolumeRows}
+            selectedLabel={entityVolumeFilter}
+            onBarClick={handleEntityVolumeClick}
+            filterAriaLabel={(label) => `Filter entities by ${label}`}
             xMax={topEntitiesBarScale.xMax}
             xTicks={topEntitiesBarScale.xTicks}
           />
@@ -1148,6 +1273,24 @@ export function EntitiesOverviewContent() {
       </div>
 
       <EntitiesDetailTabs active={activeDetailTab} onChange={setActiveDetailTab} />
+
+      {hasWidgetFilters ? (
+        <div className="flex flex-wrap items-center gap-3">
+          <p className="text-base-small text-text-secondary">
+            {widgetFilteredRows.length} of {timeframeScopedRows.length} entities
+            {activeWidgetFilterLabels.map((label) => ` · ${label}`).join("")}
+          </p>
+          <Button
+            type="button"
+            variant="ghost"
+            className="h-8 shrink-0 gap-1.5 px-2 text-base-small text-text-tertiary hover:text-text-primary [&_svg]:!h-2 [&_svg]:!w-3"
+            onClick={clearWidgetFilters}
+          >
+            <Icon name="action-filter-list" size={14} aria-hidden />
+            Clear all filters
+          </Button>
+        </div>
+      ) : null}
 
       {activeDetailTab === "entities" ? (
         <>
@@ -1176,7 +1319,7 @@ export function EntitiesOverviewContent() {
             </div>
           ) : null}
           <div className="grid min-h-0 grid-cols-1 gap-4 lg:grid-cols-3">
-            {ENTITY_CATEGORY_CARDS.map((card) => (
+            {entityCategoryCards.map((card) => (
               <EntityCategoryCard
                 key={card.title}
                 data={card}
@@ -1188,7 +1331,9 @@ export function EntitiesOverviewContent() {
         </>
       ) : (
         <EntitiesAggregatedPanel
-          rows={timeframeScopedRows}
+          rows={widgetFilteredRows}
+          scopedRowCount={timeframeScopedRows.length}
+          activeFilterLabels={activeWidgetFilterLabels}
           selectedIds={aggregatedSelectedIds}
           onSelectedIdsChange={setAggregatedSelectedIds}
           onSearchSelected={handleSearchAggregatedSelection}

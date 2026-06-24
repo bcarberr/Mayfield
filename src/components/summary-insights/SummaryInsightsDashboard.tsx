@@ -1,4 +1,4 @@
-import { useCallback, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useState } from "react";
 import {
   DATA_GRID_ABOVE_SECTION_CLASS,
   DATA_GRID_HEADER_ROW_CLASS,
@@ -14,6 +14,16 @@ import { Search } from "lucide-react";
 import { Checkbox, Icon, withCategoricalColors } from "../../design-system";
 import { DonutChartPanel } from "../ui/DonutChartPanel";
 import { FilterColumnPanel, type FilterColumnPanelTool } from "../ui/FilterColumnPanel";
+import {
+  applyDataGridFacetFilters,
+  buildDataGridFacets,
+  hasDataGridFacetSelections,
+  type DataGridFacetSelections,
+} from "../ui/dataGridFilterTypes";
+import {
+  FINDINGS_DATA_GRID_COLUMNS,
+  useDataGridColumnLayout,
+} from "../ui/dataGridColumnTypes";
 import { SeverityTableIcon } from "../ui/SeverityTableIcon";
 import { Button } from "@/components/shadcn/button";
 import { ColumnHeaderMenu } from "../ui/ColumnHeaderMenu";
@@ -22,7 +32,15 @@ import { useSortedDataGridPagination } from "../ui/useSortedDataGridPagination";
 import { DataGridSection } from "../ui/DataGridSection";
 import { DataGridPaginationFooter } from "../ui/DataGridTableLayout";
 import { Input } from "../ui/Input";
-import { DataGridExportButton } from "../ui/DataGridExportButton";
+import { DataGridExportHeaderAction } from "../ui/DataGridExportHeaderAction";
+import { DataGridExportSelectionBanner } from "../ui/DataGridExportSelectionBanner";
+import { buildExportFilename, downloadJsonExport } from "../ui/exportRowsToJson";
+import { Snackbar } from "../ui/Snackbar";
+import {
+  getDataGridExportSelectionSnapshot,
+  resolveExportRows,
+  useDataGridExportSelection,
+} from "../ui/useDataGridExportSelection";
 import { TruncatedText } from "../ui/TruncatedText";
 import { demoTableConnector } from "../connectors/demoTableConnectors";
 import { ConnectorTableCell } from "../ui/ConnectorTableCell";
@@ -93,7 +111,6 @@ type FindingCategory =
   | "Compliance"
   | "Detections"
   | "Incidents"
-  | "Security"
   | "Data Security";
 
 function isFindingCategory(label: string): label is FindingCategory {
@@ -102,12 +119,9 @@ function isFindingCategory(label: string): label is FindingCategory {
     label === "Compliance" ||
     label === "Detections" ||
     label === "Incidents" ||
-    label === "Security" ||
     label === "Data Security"
   );
 }
-
-type FindingEventType = "HTTP Activity" | "Vulnerability";
 
 type FindingStatus = "New" | "In Progress" | "Resolved" | "Suppressed";
 
@@ -123,22 +137,11 @@ type FindingRow = {
   description: string;
   time: string;
   activity: string;
-  status: string;
-  findingStatus: FindingStatus;
-  eventType: FindingEventType;
+  status: FindingStatus;
   connector: string;
 };
 
-const EVENT_TYPE_ICON: Record<FindingEventType, { name: "network-activity" | "ocsf-findings"; className: string }> = {
-  "HTTP Activity": {
-    name: "network-activity",
-    className: "text-datavis-data-peanut-orange",
-  },
-  Vulnerability: {
-    name: "ocsf-findings",
-    className: "text-datavis-data-smalt-green-40",
-  },
-};
+const FINDING_EVENT_CLASS_ICON_CLASS = "text-datavis-data-smalt-green-40";
 
 const SEVERITY_ICON: Record<
   FindingRow["severity"],
@@ -163,7 +166,6 @@ function findingMatchesSearch(row: FindingRow, query: string): boolean {
     row.time,
     row.activity,
     row.status,
-    row.eventType,
     row.connector,
   ]
     .join(" ")
@@ -212,9 +214,7 @@ const FINDINGS_SECONDARY_SPIKE_TEMPLATES: FindingRow[] = [
       "Multiple high-severity detections clustered around 21:30 UTC across identity, network, and endpoint telemetry, matching a coordinated intrusion correlation rule.",
     time: "2024-10-27 21:30:08",
     activity: "Post",
-    status: "Failure",
-    findingStatus: "New",
-    eventType: "HTTP Activity",
+    status: "New",
     connector: demoTableConnector(0),
   },
   {
@@ -226,23 +226,19 @@ const FINDINGS_SECONDARY_SPIKE_TEMPLATES: FindingRow[] = [
       "Shadow copy deletion, suspicious service creation, and outbound beaconing occurred within the same ten-minute window, consistent with pre-encryption staging.",
     time: "2024-10-27 21:30:18",
     activity: "Delete",
-    status: "Failure",
-    findingStatus: "New",
-    eventType: "Vulnerability",
+    status: "New",
     connector: demoTableConnector(1),
   },
   {
     id: "s3",
     severity: "High",
-    category: "Security",
+    category: "Data Security",
     title: "Privilege escalation chain matched correlation rule after business hours",
     description:
       "A standard user account escalated to admin-equivalent roles through three discrete steps within minutes, with no linked change ticket.",
     time: "2024-10-27 21:30:28",
     activity: "Update",
-    status: "Unknown",
-    findingStatus: "New",
-    eventType: "HTTP Activity",
+    status: "New",
     connector: demoTableConnector(2),
   },
 ];
@@ -252,7 +248,6 @@ const FINDING_CATEGORY_ORDER: FindingCategory[] = [
   "Compliance",
   "Detections",
   "Incidents",
-  "Security",
   "Data Security",
 ];
 
@@ -276,32 +271,22 @@ const FINDING_SEVERITY_ORDER: Record<keyof typeof SEV_BAR, number> = {
   Informational: 4,
 };
 
-type FindingSortColumn = "severity" | "title" | "time" | "activity" | "status" | "eventType" | "connector";
+type FindingSortColumn = "severity" | "title" | "time" | "activity" | "status" | "category" | "connector";
 
-/** px widths: select, severity, title, time, activity, status, event type, actions, connector */
+/** px widths per column id */
 const FINDING_EVENTS_SELECT_COL_WIDTH = 40;
-const FINDING_EVENTS_COL_DEFAULTS: readonly number[] = [
-  FINDING_EVENTS_SELECT_COL_WIDTH,
-  108,
-  260,
-  168,
-  88,
-  112,
-  120,
-  56,
-  120,
-];
-const FINDING_EVENTS_COL_MINS: readonly number[] = [
-  FINDING_EVENTS_SELECT_COL_WIDTH,
-  72,
-  100,
-  120,
-  56,
-  72,
-  80,
-  48,
-  80,
-];
+const FINDING_COLUMN_WIDTHS: Record<string, { default: number; min: number }> = {
+  select: { default: FINDING_EVENTS_SELECT_COL_WIDTH, min: FINDING_EVENTS_SELECT_COL_WIDTH },
+  severity: { default: 108, min: 72 },
+  title: { default: 260, min: 100 },
+  time: { default: 168, min: 120 },
+  activity: { default: 88, min: 56 },
+  status: { default: 112, min: 72 },
+  category: { default: 120, min: 80 },
+  actions: { default: 56, min: 48 },
+  connector: { default: 120, min: 80 },
+};
+const FINDING_OPTIONAL_COL_WIDTH = { default: 120, min: 80 };
 
 const ROW_ACTION_ITEMS = ["Action one", "Action two", "Action three"] as const;
 
@@ -346,8 +331,6 @@ function FindingDetailDialog({
 }) {
   if (!row) return null;
 
-  const eventType = EVENT_TYPE_ICON[row.eventType];
-
   return (
     <Dialog open={open} onOpenChange={(isOpen) => { if (!isOpen) onClose(); }}>
       <DialogContent
@@ -375,12 +358,12 @@ function FindingDetailDialog({
             <span className="text-sm font-semibold text-text-primary">{row.severity}</span>
             <span className="text-sm text-text-tertiary">·</span>
             <Icon
-              name={eventType.name}
+              name="ocsf-findings"
               size={16}
-              className={cx("size-4 shrink-0 [&_svg]:!size-4", eventType.className)}
+              className={cx("size-4 shrink-0 [&_svg]:!size-4", FINDING_EVENT_CLASS_ICON_CLASS)}
               aria-hidden
             />
-            <span className="text-sm text-text-secondary">{row.eventType}</span>
+            <span className="text-sm text-text-secondary">{row.category}</span>
           </div>
           <p className="mt-4 text-sm leading-relaxed text-text-secondary">{row.description}</p>
           <dl className="mt-6 space-y-3 border-t border-border-rule pt-4 text-sm">
@@ -395,6 +378,10 @@ function FindingDetailDialog({
             <div className="flex gap-3">
               <dt className="w-28 shrink-0 text-text-tertiary">Status</dt>
               <dd className="text-text-secondary">{row.status}</dd>
+            </div>
+            <div className="flex gap-3">
+              <dt className="w-28 shrink-0 text-text-tertiary">Class</dt>
+              <dd className="text-text-secondary">{row.category}</dd>
             </div>
             <div className="flex gap-3">
               <dt className="w-28 shrink-0 text-text-tertiary">Connector</dt>
@@ -423,7 +410,7 @@ export function useFindingEventsTableGrid(rows: readonly Parameters<typeof Findi
       time: (a, b) => compareStrings(a.time, b.time),
       activity: (a, b) => compareStrings(a.activity, b.activity),
       status: (a, b) => compareStrings(a.status, b.status),
-      eventType: (a, b) => compareStrings(a.eventType, b.eventType),
+      category: (a, b) => compareStrings(a.category, b.category),
       connector: (a, b) => compareStrings(a.connector, b.connector),
     }),
     [],
@@ -435,12 +422,35 @@ function FindingEventsTable({
   displayRows,
   getSortProps,
   onOpenFinding,
+  tableColumnIds,
+  selectedIds,
+  allResultsSelected,
+  onToggleRow,
+  onTogglePage,
 }: {
   displayRows: FindingRow[];
   getSortProps: ReturnType<typeof useFindingEventsTableGrid>["getSortProps"];
   onOpenFinding: (id: string) => void;
+  tableColumnIds: readonly string[];
+  selectedIds: Set<string>;
+  allResultsSelected: boolean;
+  onToggleRow: (id: string, checked: boolean) => void;
+  onTogglePage: (pageIds: readonly string[], checked: boolean) => void;
 }) {
-  const [selected, setSelected] = useState<Set<string>>(() => new Set());
+
+  const colDefaults = useMemo(
+    () =>
+      tableColumnIds.map(
+        (id) => (FINDING_COLUMN_WIDTHS[id] ?? FINDING_OPTIONAL_COL_WIDTH).default,
+      ),
+    [tableColumnIds],
+  );
+  const colMins = useMemo(
+    () =>
+      tableColumnIds.map((id) => (FINDING_COLUMN_WIDTHS[id] ?? FINDING_OPTIONAL_COL_WIDTH).min),
+    [tableColumnIds],
+  );
+
   const {
     containerRef,
     colStyle,
@@ -452,49 +462,39 @@ function FindingEventsTable({
     minTableWidth,
   } = useResizableColumns({
     selectColWidth: FINDING_EVENTS_SELECT_COL_WIDTH,
-    colDefaults: FINDING_EVENTS_COL_DEFAULTS,
-    colMins: FINDING_EVENTS_COL_MINS,
+    colDefaults,
+    colMins,
   });
 
   const allIds = useMemo(() => displayRows.map((r) => r.id), [displayRows]);
   const total = allIds.length;
-  const selectedOnPage = useMemo(() => allIds.filter((id) => selected.has(id)).length, [allIds, selected]);
-  const allSelected = total > 0 && selectedOnPage === total;
-  const someSelected = selectedOnPage > 0 && !allSelected;
+  const selectedOnPage = useMemo(() => allIds.filter((id) => selectedIds.has(id)).length, [allIds, selectedIds]);
+  const allSelected = total > 0 && (allResultsSelected || selectedOnPage === total);
+  const someSelected = !allResultsSelected && selectedOnPage > 0 && selectedOnPage < total;
 
   const toggleAll = (checked: boolean) => {
-    setSelected(checked ? new Set(allIds) : new Set());
+    onTogglePage(allIds, checked);
   };
 
   const toggleRow = (id: string, checked: boolean) => {
-    setSelected((prev) => {
-      const next = new Set(prev);
-      if (checked) next.add(id);
-      else next.delete(id);
-      return next;
-    });
+    onToggleRow(id, checked);
   };
 
+  const headerCellClass = (colIndex: number, columnId: string) =>
+    cx(
+      "relative py-0 align-middle text-xs font-bold uppercase tracking-wide text-text-primary",
+      columnId === "select" ? "border-r border-datavis-gridlines px-0" : "border-r border-datavis-gridlines px-2",
+      colIndex === tableColumnIds.length - 1 && "border-r-0",
+    );
 
+  const bodyCellClass = (columnId: string) =>
+    cx("py-0 align-middle", columnId === "select" ? "px-0" : "px-2");
 
-  return (
-    <div ref={containerRef} className={cx(DATA_GRID_TABLE_SCROLL_CLASS, isResizing && "select-none")}>
-      <table
-        className={DATA_GRID_TABLE_CLASS}
-        style={{
-          width: tableFillsContainer ? "100%" : baseTotal,
-          minWidth: Math.max(minTableWidth, baseTotal),
-        }}
-      >
-      <caption className="sr-only">Finding events</caption>
-      <colgroup>
-        {displayWidths.map((w, i) => (
-          <col key={i} style={{ width: w }} />
-        ))}
-      </colgroup>
-      <thead className={DATA_GRID_THEAD_CLASS}>
-        <tr className={DATA_GRID_HEADER_ROW_CLASS}>
-          <th scope="col" style={colStyle(0)} className="relative border-r border-datavis-gridlines px-0 py-0 align-middle">
+  const renderHeaderCell = (columnId: string, colIndex: number) => {
+    switch (columnId) {
+      case "select":
+        return (
+          <th key={columnId} scope="col" style={colStyle(colIndex)} className={headerCellClass(colIndex, columnId)}>
             <div className="flex items-center justify-center">
               <Checkbox
                 checked={allSelected}
@@ -503,144 +503,203 @@ function FindingEventsTable({
                 aria-label="Select all rows"
               />
             </div>
-            {resizeHandle(0)}
+            {resizeHandle(colIndex)}
           </th>
-          <th
-            scope="col"
-            style={colStyle(1)}
-            className="relative border-r border-datavis-gridlines px-2 py-0 align-middle text-xs font-bold uppercase tracking-wide text-text-primary"
-          >
-            <ColumnHeaderMenu
-              label="Severity"
-              menuLabel="Severity column options"
-              {...getSortProps("severity")}
-            />
-            {resizeHandle(1)}
+        );
+      case "severity":
+        return (
+          <th key={columnId} scope="col" style={colStyle(colIndex)} className={headerCellClass(colIndex, columnId)}>
+            <ColumnHeaderMenu label="Severity" menuLabel="Severity column options" {...getSortProps("severity")} />
+            {resizeHandle(colIndex)}
           </th>
-          <th
-            scope="col"
-            style={colStyle(2)}
-            className="relative border-r border-datavis-gridlines px-2 py-0 align-middle text-xs font-bold uppercase tracking-wide text-text-primary"
-          >
+        );
+      case "title":
+        return (
+          <th key={columnId} scope="col" style={colStyle(colIndex)} className={headerCellClass(colIndex, columnId)}>
             <ColumnHeaderMenu label="Title" menuLabel="Title column options" {...getSortProps("title")} />
-            {resizeHandle(2)}
+            {resizeHandle(colIndex)}
           </th>
-          <th
-            scope="col"
-            style={colStyle(3)}
-            className="relative border-r border-datavis-gridlines px-2 py-0 align-middle text-xs font-bold uppercase tracking-wide text-text-primary"
-          >
+        );
+      case "time":
+        return (
+          <th key={columnId} scope="col" style={colStyle(colIndex)} className={headerCellClass(colIndex, columnId)}>
             <ColumnHeaderMenu label="Time" menuLabel="Time column options" {...getSortProps("time")} />
-            {resizeHandle(3)}
+            {resizeHandle(colIndex)}
           </th>
-          <th
-            scope="col"
-            style={colStyle(4)}
-            className="relative border-r border-datavis-gridlines px-2 py-0 align-middle text-xs font-bold uppercase tracking-wide text-text-primary"
-          >
+        );
+      case "activity":
+        return (
+          <th key={columnId} scope="col" style={colStyle(colIndex)} className={headerCellClass(colIndex, columnId)}>
             <ColumnHeaderMenu label="Activity" menuLabel="Activity column options" {...getSortProps("activity")} />
-            {resizeHandle(4)}
+            {resizeHandle(colIndex)}
           </th>
-          <th
-            scope="col"
-            style={colStyle(5)}
-            className="relative border-r border-datavis-gridlines px-2 py-0 align-middle text-xs font-bold uppercase tracking-wide text-text-primary"
-          >
+        );
+      case "status":
+        return (
+          <th key={columnId} scope="col" style={colStyle(colIndex)} className={headerCellClass(colIndex, columnId)}>
             <ColumnHeaderMenu label="Status" menuLabel="Status column options" {...getSortProps("status")} />
-            {resizeHandle(5)}
+            {resizeHandle(colIndex)}
           </th>
-          <th
-            scope="col"
-            style={colStyle(6)}
-            className="relative border-r border-datavis-gridlines px-2 py-0 align-middle text-xs font-bold uppercase tracking-wide text-text-primary"
-          >
-            <ColumnHeaderMenu
-              label="Event type"
-              menuLabel="Event type column options"
-              {...getSortProps("eventType")}
-            />
-            {resizeHandle(6)}
+        );
+      case "category":
+        return (
+          <th key={columnId} scope="col" style={colStyle(colIndex)} className={headerCellClass(colIndex, columnId)}>
+            <ColumnHeaderMenu label="Class" menuLabel="Class column options" {...getSortProps("category")} />
+            {resizeHandle(colIndex)}
           </th>
-          <th
-            scope="col"
-            style={colStyle(7)}
-            className="relative border-r border-datavis-gridlines px-2 py-0 align-middle text-xs font-bold uppercase tracking-wide text-text-primary"
-          >
+        );
+      case "actions":
+        return (
+          <th key={columnId} scope="col" style={colStyle(colIndex)} className={headerCellClass(colIndex, columnId)}>
             <span className="block translate-y-px truncate">Actions</span>
-            {resizeHandle(7)}
+            {resizeHandle(colIndex)}
           </th>
-          <th
-            scope="col"
-            style={colStyle(8)}
-            className="relative px-2 py-0 align-middle text-xs font-bold uppercase tracking-wide text-text-primary"
-          >
-            <ColumnHeaderMenu label="Connectors" menuLabel="Connectors column options" {...getSortProps("connector")} />
-            {resizeHandle(8)}
+        );
+      case "connector":
+        return (
+          <th key={columnId} scope="col" style={colStyle(colIndex)} className={headerCellClass(colIndex, columnId)}>
+            <ColumnHeaderMenu
+              label="Connectors"
+              menuLabel="Connectors column options"
+              {...getSortProps("connector")}
+            />
+            {resizeHandle(colIndex)}
           </th>
-        </tr>
-      </thead>
-      <tbody>
-        {displayRows.map((row) => {
-          const et = EVENT_TYPE_ICON[row.eventType];
-          return (
+        );
+      default:
+        return (
+          <th key={columnId} scope="col" style={colStyle(colIndex)} className={headerCellClass(colIndex, columnId)}>
+            <span className="block translate-y-px truncate">
+              {FINDINGS_DATA_GRID_COLUMNS.find((col) => col.id === columnId)?.label ?? columnId}
+            </span>
+            {resizeHandle(colIndex)}
+          </th>
+        );
+    }
+  };
+
+  const renderBodyCell = (columnId: string, row: FindingRow, colIndex: number) => {
+    switch (columnId) {
+      case "select":
+        return (
+          <td key={columnId} style={colStyle(colIndex)} className={bodyCellClass(columnId)}>
+            <div className="flex items-center justify-center">
+              <Checkbox
+                checked={selectedIds.has(row.id) || allResultsSelected}
+                onCheckedChange={(c) => toggleRow(row.id, c)}
+                aria-label={`Select finding ${row.id}`}
+              />
+            </div>
+          </td>
+        );
+      case "severity":
+        return (
+          <td key={columnId} style={colStyle(colIndex)} className={bodyCellClass(columnId)}>
+            <span className="inline-flex items-center gap-2">
+              <SeverityTableIcon name={SEVERITY_ICON[row.severity]} color={SEV_BAR[row.severity]} />
+              <span className="text-sm text-text-secondary">{row.severity}</span>
+            </span>
+          </td>
+        );
+      case "title":
+        return (
+          <td key={columnId} style={colStyle(colIndex)} className={cx(bodyCellClass(columnId), "min-w-0")}>
+            <TruncatedText
+              as="button"
+              className="w-full text-left text-sm font-semibold text-interactive-active hover:underline focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-interactive-active"
+              onClick={() => onOpenFinding(row.id)}
+            >
+              {row.title}
+            </TruncatedText>
+          </td>
+        );
+      case "time":
+        return (
+          <td key={columnId} style={colStyle(colIndex)} className={cx(bodyCellClass(columnId), "min-w-0 tabular-nums")}>
+            <TruncatedText className="text-sm text-text-secondary">{row.time}</TruncatedText>
+          </td>
+        );
+      case "activity":
+        return (
+          <td key={columnId} style={colStyle(colIndex)} className={cx(bodyCellClass(columnId), "min-w-0")}>
+            <TruncatedText className="text-sm text-text-secondary">{row.activity}</TruncatedText>
+          </td>
+        );
+      case "status":
+        return (
+          <td key={columnId} style={colStyle(colIndex)} className={cx(bodyCellClass(columnId), "min-w-0")}>
+            <TruncatedText className="text-sm text-text-secondary">{row.status}</TruncatedText>
+          </td>
+        );
+      case "category":
+        return (
+          <td key={columnId} style={colStyle(colIndex)} className={cx(bodyCellClass(columnId), "min-w-0")}>
+            <span className="inline-flex min-w-0 items-center gap-2">
+              <Icon
+                name="ocsf-findings"
+                size={16}
+                className={cx("size-4 shrink-0 [&_svg]:!size-4", FINDING_EVENT_CLASS_ICON_CLASS)}
+                aria-hidden
+              />
+              <TruncatedText className="text-sm text-text-secondary" wrapperClassName="min-w-0 flex-1">
+                {row.category}
+              </TruncatedText>
+            </span>
+          </td>
+        );
+      case "actions":
+        return (
+          <td key={columnId} style={colStyle(colIndex)} className={bodyCellClass(columnId)}>
+            <RowActionsMenu rowId={row.id} />
+          </td>
+        );
+      case "connector":
+        return (
+          <td key={columnId} style={colStyle(colIndex)} className={cx(bodyCellClass(columnId), "min-w-0")}>
+            <ConnectorTableCell name={row.connector} />
+          </td>
+        );
+      default:
+        return (
+          <td key={columnId} style={colStyle(colIndex)} className={cx(bodyCellClass(columnId), "min-w-0")}>
+            <TruncatedText className="text-sm text-text-secondary">—</TruncatedText>
+          </td>
+        );
+    }
+  };
+
+  return (
+    <div
+      key={tableColumnIds.join("|")}
+      ref={containerRef}
+      className={cx(DATA_GRID_TABLE_SCROLL_CLASS, isResizing && "select-none")}
+    >
+      <table
+        className={DATA_GRID_TABLE_CLASS}
+        style={{
+          width: tableFillsContainer ? "100%" : baseTotal,
+          minWidth: Math.max(minTableWidth, baseTotal),
+        }}
+      >
+        <caption className="sr-only">Finding events</caption>
+        <colgroup>
+          {displayWidths.map((w, i) => (
+            <col key={i} style={{ width: w }} />
+          ))}
+        </colgroup>
+        <thead className={DATA_GRID_THEAD_CLASS}>
+          <tr className={DATA_GRID_HEADER_ROW_CLASS}>
+            {tableColumnIds.map((columnId, colIndex) => renderHeaderCell(columnId, colIndex))}
+          </tr>
+        </thead>
+        <tbody>
+          {displayRows.map((row) => (
             <tr key={row.id} className="border-b border-datavis-gridlines hover:bg-overlay-subtle">
-              <td style={colStyle(0)} className="px-0 py-0 align-middle">
-                <div className="flex items-center justify-center">
-                  <Checkbox
-                    checked={selected.has(row.id)}
-                    onCheckedChange={(c) => toggleRow(row.id, c)}
-                    aria-label={`Select finding ${row.id}`}
-                  />
-                </div>
-              </td>
-              <td style={colStyle(1)} className="px-2 py-0 align-middle">
-                <span className="inline-flex items-center gap-2">
-                  <SeverityTableIcon name={SEVERITY_ICON[row.severity]} color={SEV_BAR[row.severity]} />
-                  <span className="text-sm text-text-secondary">{row.severity}</span>
-                </span>
-              </td>
-              <td style={colStyle(2)} className="min-w-0 px-2 py-0 align-middle">
-                <TruncatedText
-                  as="button"
-                  className="w-full text-left text-sm font-semibold text-interactive-active hover:underline focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-interactive-active"
-                  onClick={() => onOpenFinding(row.id)}
-                >
-                  {row.title}
-                </TruncatedText>
-              </td>
-              <td style={colStyle(3)} className="min-w-0 px-2 py-0 align-middle tabular-nums">
-                <TruncatedText className="text-sm text-text-secondary">{row.time}</TruncatedText>
-              </td>
-              <td style={colStyle(4)} className="min-w-0 px-2 py-0 align-middle">
-                <TruncatedText className="text-sm text-text-secondary">{row.activity}</TruncatedText>
-              </td>
-              <td style={colStyle(5)} className="min-w-0 px-2 py-0 align-middle">
-                <TruncatedText className="text-sm text-text-secondary">{row.status}</TruncatedText>
-              </td>
-              <td style={colStyle(6)} className="min-w-0 px-2 py-0 align-middle">
-                <span className="inline-flex min-w-0 items-center gap-2">
-                  <Icon
-                    name={et.name}
-                    size={16}
-                    className={cx("size-4 shrink-0 [&_svg]:!size-4", et.className)}
-                    aria-hidden
-                  />
-                  <TruncatedText className="text-sm text-text-secondary" wrapperClassName="min-w-0 flex-1">
-                    {row.eventType}
-                  </TruncatedText>
-                </span>
-              </td>
-              <td style={colStyle(7)} className="px-2 py-0 align-middle">
-                <RowActionsMenu rowId={row.id} />
-              </td>
-              <td style={colStyle(8)} className="min-w-0 px-2 py-0 align-middle">
-                <ConnectorTableCell name={row.connector} />
-              </td>
+              {tableColumnIds.map((columnId, colIndex) => renderBodyCell(columnId, row, colIndex))}
             </tr>
-          );
-        })}
-      </tbody>
-    </table>
+          ))}
+        </tbody>
+      </table>
     </div>
   );
 }
@@ -670,7 +729,21 @@ export function SummaryInsightsDashboard() {
   const [statusFilter, setStatusFilter] = useState<FindingStatus | null>(null);
   const [searchQuery, setSearchQuery] = useState("");
   const [tableTool, setTableTool] = useState<FilterColumnPanelTool | null>(null);
+  const [facetSelections, setFacetSelections] = useState<DataGridFacetSelections>({});
   const [drawerFindingId, setDrawerFindingId] = useState<string | null>(null);
+  const findingColumnLayout = useDataGridColumnLayout(FINDINGS_DATA_GRID_COLUMNS);
+
+  const findingFacetDefs = useMemo(
+    () =>
+      [
+        { id: "category", label: "Event Type", getValue: (row: FindingRow) => row.category },
+        { id: "severity", label: "Severity", getValue: (row: FindingRow) => row.severity },
+        { id: "status", label: "Status", getValue: (row: FindingRow) => row.status },
+        { id: "connector", label: "Connectors", getValue: (row: FindingRow) => row.connector },
+        { id: "activity", label: "Activity", getValue: (row: FindingRow) => row.activity },
+      ] as const,
+    [],
+  );
   const findingRowTemplates: FindingRow[] = useMemo(
     () => [
       {
@@ -682,9 +755,7 @@ export function SummaryInsightsDashboard() {
           "Repeated POST requests to an internal catalog service exceeded baseline volume during peak traffic, indicating potential data exfiltration or misconfigured automation.",
         time: "2024-07-31 14:22:08",
         activity: "Post",
-        status: "Failure",
-        findingStatus: "New",
-        eventType: "HTTP Activity",
+        status: "New",
         connector: demoTableConnector(0),
       },
       {
@@ -696,9 +767,7 @@ export function SummaryInsightsDashboard() {
           "Fifteen failed authentication attempts originated from an atypical geography, followed by a successful login from the same source within ten minutes.",
         time: "2024-07-31 13:05:41",
         activity: "Put",
-        status: "Unknown",
-        findingStatus: "New",
-        eventType: "HTTP Activity",
+        status: "New",
         connector: demoTableConnector(1),
       },
       {
@@ -710,9 +779,7 @@ export function SummaryInsightsDashboard() {
           "A workload in the production namespace launched with privileged security context, violating the cluster hardening policy for non-system namespaces.",
         time: "2024-07-31 11:40:12",
         activity: "Delete",
-        status: "Other",
-        findingStatus: "In Progress",
-        eventType: "Vulnerability",
+        status: "In Progress",
         connector: demoTableConnector(2),
       },
       {
@@ -725,8 +792,6 @@ export function SummaryInsightsDashboard() {
         time: "2024-07-31 09:12:00",
         activity: "Connect",
         status: "New",
-        findingStatus: "New",
-        eventType: "HTTP Activity",
         connector: demoTableConnector(3),
       },
       {
@@ -739,22 +804,18 @@ export function SummaryInsightsDashboard() {
         time: "2024-07-30 22:18:55",
         activity: "Create",
         status: "In Progress",
-        findingStatus: "In Progress",
-        eventType: "Vulnerability",
         connector: demoTableConnector(4),
       },
       {
         id: "6",
         severity: "Informational",
-        category: "Security",
+        category: "Data Security",
         title: "Connector health check succeeded across all regions",
         description:
           "All configured connectors reported healthy heartbeat and ingestion latency within SLA across US, EU, and APAC regions.",
         time: "2024-07-30 18:00:03",
         activity: "Update",
         status: "Suppressed",
-        findingStatus: "Suppressed",
-        eventType: "Vulnerability",
         connector: demoTableConnector(5),
       },
       {
@@ -766,9 +827,7 @@ export function SummaryInsightsDashboard() {
           "High-entropy DNS queries to a newly registered domain suggest possible DNS tunneling from a compromised host in the analytics subnet.",
         time: "2024-07-30 16:44:19",
         activity: "Post",
-        status: "Failure",
-        findingStatus: "New",
-        eventType: "HTTP Activity",
+        status: "New",
         connector: demoTableConnector(6),
       },
       {
@@ -780,9 +839,7 @@ export function SummaryInsightsDashboard() {
           "A service principal credential was rotated outside the approved change window without a linked change ticket in the ITSM system.",
         time: "2024-07-30 12:01:47",
         activity: "Put",
-        status: "Unknown",
-        findingStatus: "In Progress",
-        eventType: "Vulnerability",
+        status: "In Progress",
         connector: demoTableConnector(7),
       },
       {
@@ -795,8 +852,6 @@ export function SummaryInsightsDashboard() {
         time: "2024-07-30 09:33:22",
         activity: "Post",
         status: "New",
-        findingStatus: "New",
-        eventType: "HTTP Activity",
         connector: demoTableConnector(8),
       },
       {
@@ -809,8 +864,6 @@ export function SummaryInsightsDashboard() {
         time: "2024-07-29 21:15:08",
         activity: "Connect",
         status: "In Progress",
-        findingStatus: "In Progress",
-        eventType: "Vulnerability",
         connector: demoTableConnector(9),
       },
       {
@@ -822,9 +875,7 @@ export function SummaryInsightsDashboard() {
           "Rapid mass file renames and entropy spikes on a file server share match ransomware behavior patterns and require immediate containment.",
         time: "2024-07-29 17:48:51",
         activity: "Delete",
-        status: "Failure",
-        findingStatus: "New",
-        eventType: "Vulnerability",
+        status: "New",
         connector: demoTableConnector(10),
       },
       {
@@ -837,8 +888,6 @@ export function SummaryInsightsDashboard() {
         time: "2024-07-29 14:00:00",
         activity: "Create",
         status: "Suppressed",
-        findingStatus: "Suppressed",
-        eventType: "Vulnerability",
         connector: demoTableConnector(11),
       },
       {
@@ -850,9 +899,7 @@ export function SummaryInsightsDashboard() {
           "The same user account authenticated from North America and Europe within a thirty-minute window, exceeding plausible travel velocity.",
         time: "2024-07-29 08:27:36",
         activity: "Post",
-        status: "Unknown",
-        findingStatus: "New",
-        eventType: "HTTP Activity",
+        status: "New",
         connector: demoTableConnector(12),
       },
       {
@@ -864,9 +911,7 @@ export function SummaryInsightsDashboard() {
           "An object storage bucket policy was modified to grant public read access to all objects, diverging from the organization baseline.",
         time: "2024-07-28 23:59:14",
         activity: "Update",
-        status: "Other",
-        findingStatus: "Resolved",
-        eventType: "HTTP Activity",
+        status: "Resolved",
         connector: demoTableConnector(13),
       },
     ],
@@ -919,7 +964,7 @@ export function SummaryInsightsDashboard() {
   const findingStatusSegments = useMemo(() => {
     const counts = new Map<FindingStatus, number>();
     for (const row of timeframeScopedRows) {
-      counts.set(row.findingStatus, (counts.get(row.findingStatus) ?? 0) + 1);
+      counts.set(row.status, (counts.get(row.status) ?? 0) + 1);
     }
     return withCategoricalColors(
       FINDING_STATUS_ORDER.map((label) => ({
@@ -929,21 +974,109 @@ export function SummaryInsightsDashboard() {
     );
   }, [timeframeScopedRows]);
 
-    const filteredTableRows = useMemo(
-    () =>
-      timeframeScopedRows.filter((row) => {
-        if (categoryFilter && row.category !== categoryFilter) return false;
-        if (severityFilter && row.severity !== severityFilter) return false;
-        if (statusFilter && row.findingStatus !== statusFilter) return false;
-        if (!findingMatchesSearch(row, searchQuery)) return false;
-        return true;
-      }),
-    [timeframeScopedRows, categoryFilter, severityFilter, statusFilter, searchQuery],
+  const findingFacets = useMemo(
+    () => buildDataGridFacets(timeframeScopedRows, findingFacetDefs),
+    [timeframeScopedRows, findingFacetDefs],
   );
+
+  const filteredTableRows = useMemo(() => {
+    const chartFiltered = timeframeScopedRows.filter((row) => {
+      if (categoryFilter && row.category !== categoryFilter) return false;
+      if (severityFilter && row.severity !== severityFilter) return false;
+      if (statusFilter && row.status !== statusFilter) return false;
+      return true;
+    });
+
+    return applyDataGridFacetFilters(chartFiltered, facetSelections, (row, facetId) => {
+      const definition = findingFacetDefs.find((entry) => entry.id === facetId);
+      return definition ? definition.getValue(row) : "";
+    }).filter((row) => findingMatchesSearch(row, searchQuery));
+  }, [
+    timeframeScopedRows,
+    categoryFilter,
+    severityFilter,
+    statusFilter,
+    facetSelections,
+    findingFacetDefs,
+    searchQuery,
+  ]);
   const tableGrid = useFindingEventsTableGrid(filteredTableRows);
+  const findingExportSelection = useDataGridExportSelection();
+  const [findingExportSnackbarOpen, setFindingExportSnackbarOpen] = useState(false);
+  const [findingExportSnackbarMessage, setFindingExportSnackbarMessage] = useState("");
+
+  const findingPageRowIds = useMemo(
+    () => tableGrid.displayRows.map((row) => row.id),
+    [tableGrid.displayRows],
+  );
+  const findingExportSnapshot = useMemo(
+    () =>
+      getDataGridExportSelectionSnapshot(
+        findingExportSelection.selectedIds,
+        findingExportSelection.allResultsSelected,
+        findingPageRowIds,
+        filteredTableRows.length,
+        tableGrid.pageCount,
+      ),
+    [
+      findingExportSelection.selectedIds,
+      findingExportSelection.allResultsSelected,
+      findingPageRowIds,
+      filteredTableRows.length,
+      tableGrid.pageCount,
+    ],
+  );
+
+  const findingExportSelectionBanner =
+    findingExportSnapshot.showAllResultsBanner ? (
+      <DataGridExportSelectionBanner
+        variant="all"
+        pageCount={findingPageRowIds.length}
+        totalCount={filteredTableRows.length}
+        onSelectAllResults={findingExportSelection.selectAllResults}
+        onClearSelection={findingExportSelection.clearSelection}
+      />
+    ) : findingExportSnapshot.showPageBanner ? (
+      <DataGridExportSelectionBanner
+        variant="page"
+        pageCount={findingPageRowIds.length}
+        totalCount={filteredTableRows.length}
+        onSelectAllResults={findingExportSelection.selectAllResults}
+        onClearSelection={findingExportSelection.clearSelection}
+      />
+    ) : null;
+
+  const runFindingExport = useCallback(() => {
+    const rows = resolveExportRows(
+      filteredTableRows,
+      findingExportSelection.selectedIds,
+      findingExportSelection.allResultsSelected,
+    );
+    downloadJsonExport(rows, buildExportFilename("finding-events"));
+    setFindingExportSnackbarMessage(`Exported ${rows.length.toLocaleString()} results as JSON`);
+    setFindingExportSnackbarOpen(true);
+  }, [
+    filteredTableRows,
+    findingExportSelection.selectedIds,
+    findingExportSelection.allResultsSelected,
+  ]);
+
+  useEffect(() => {
+    findingExportSelection.clearSelection();
+  }, [
+    categoryFilter,
+    severityFilter,
+    statusFilter,
+    facetSelections,
+    searchQuery,
+    findingExportSelection.clearSelection,
+  ]);
 
   const hasActiveFilters =
-    categoryFilter != null || severityFilter != null || statusFilter != null;
+    categoryFilter != null ||
+    severityFilter != null ||
+    statusFilter != null ||
+    hasDataGridFacetSelections(facetSelections);
 
   const drawerRow = useMemo(
     () => (drawerFindingId ? tableRows.find((row) => row.id === drawerFindingId) : undefined),
@@ -1147,7 +1280,9 @@ export function SummaryInsightsDashboard() {
                       <h2 className="text-base-semibold text-text-primary">Finding Events</h2>
                       <div className="mt-2 flex flex-wrap items-center gap-3">
                         <p className="shrink-0 text-base-small text-text-secondary">
-                          {filteredTableRows.length} of {timeframeScopedRows.length} Results
+                          {tableGrid.pageCount > 1
+                            ? `${findingPageRowIds.length} of ${filteredTableRows.length.toLocaleString()} Results`
+                            : `${filteredTableRows.length} of ${timeframeScopedRows.length} Results`}
                           {categoryFilter ? ` · ${categoryFilter}` : ""}
                           {severityFilter ? ` · ${severityFilter}` : ""}
                           {statusFilter ? ` · ${statusFilter}` : ""}
@@ -1173,6 +1308,7 @@ export function SummaryInsightsDashboard() {
                               setCategoryFilter(null);
                               setSeverityFilter(null);
                               setStatusFilter(null);
+                              setFacetSelections({});
                               setSearchQuery("");
                             }}
                           >
@@ -1180,15 +1316,28 @@ export function SummaryInsightsDashboard() {
                             Clear all filters
                           </Button>
                         ) : null}
-                        <DataGridExportButton />
+                        <DataGridExportHeaderAction
+                          snapshot={findingExportSnapshot}
+                          onExportAll={runFindingExport}
+                          onExportSelected={runFindingExport}
+                        />
                       </div>
                     </>
                   }
+                  selectionBanner={findingExportSelectionBanner}
                   filterPanel={
                     <FilterColumnPanel
                       active={tableTool}
                       onFilterClick={() => setTableTool(tableTool === "filter" ? null : "filter")}
                       onColumnsClick={() => setTableTool(tableTool === "columns" ? null : "columns")}
+                      facets={findingFacets}
+                      selections={facetSelections}
+                      onSelectionsChange={setFacetSelections}
+                      columns={FINDINGS_DATA_GRID_COLUMNS}
+                      columnLayout={findingColumnLayout.layout}
+                      onColumnLayoutChange={findingColumnLayout.setLayout}
+                      columnLayoutIsDefault={findingColumnLayout.isDefault}
+                      onColumnLayoutReset={findingColumnLayout.resetToDefault}
                     />
                   }
                   table={
@@ -1196,6 +1345,11 @@ export function SummaryInsightsDashboard() {
                       displayRows={tableGrid.displayRows}
                       getSortProps={tableGrid.getSortProps}
                       onOpenFinding={setDrawerFindingId}
+                      tableColumnIds={findingColumnLayout.tableColumnIds}
+                      selectedIds={findingExportSelection.selectedIds}
+                      allResultsSelected={findingExportSelection.allResultsSelected}
+                      onToggleRow={findingExportSelection.toggleRow}
+                      onTogglePage={findingExportSelection.togglePage}
                     />
                   }
                   footer={<DataGridPaginationFooter grid={tableGrid} />}
@@ -1211,6 +1365,11 @@ export function SummaryInsightsDashboard() {
         row={drawerRow}
         open={drawerFindingId != null && activeView === "findings"}
         onClose={() => setDrawerFindingId(null)}
+      />
+      <Snackbar
+        open={findingExportSnackbarOpen}
+        message={findingExportSnackbarMessage}
+        onClose={() => setFindingExportSnackbarOpen(false)}
       />
     </div>
     </TooltipProvider>

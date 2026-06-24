@@ -4,7 +4,6 @@ import type { FederatedDetectionHubLocationState } from "../../app/routes";
 import {
   DATA_GRID_ABOVE_SECTION_CLASS,
   DATA_GRID_BODY_CELL_CENTER_CLASS,
-  DATA_GRID_BODY_CELL_CLASS,
   DATA_GRID_BODY_ROW_CLASS,
   DATA_GRID_EXPANDED_CELL_CLASS,
   DATA_GRID_EXPANDED_ROW_CLASS,
@@ -32,6 +31,8 @@ import {
 import { FilterColumnPanel, type FilterColumnPanelTool } from "../ui/FilterColumnPanel";
 import { Input } from "../ui/Input";
 import { DataGridExportButton } from "../ui/DataGridExportButton";
+import { Snackbar } from "../ui/Snackbar";
+import { useDataGridJsonExport } from "../ui/useDataGridJsonExport";
 import { DataGridPagination } from "../ui/DataGridPagination";
 import { SeverityTableIcon } from "../ui/SeverityTableIcon";
 import {
@@ -40,9 +41,14 @@ import {
   type ContentAreaSlideOverState,
 } from "../ui/SlideOver";
 import { TruncatedText } from "../ui/TruncatedText";
-import { Snackbar } from "../ui/Snackbar";
 import { DonutChartPanel } from "../ui/DonutChartPanel";
-import { useResizableColumns } from "../ui/useResizableColumns";
+import { FEDERATED_DETECTIONS_DATA_GRID_COLUMNS } from "../ui/dataGridColumnCatalog";
+import { useDataGridColumnPanel } from "../ui/dataGridColumnTypes";
+import {
+  dataGridBodyCellClass,
+  dataGridHeaderCellClass,
+  useDynamicResizableColumns,
+} from "../ui/dataGridDynamicTableHelpers";
 import { useDataGridPagination } from "../ui/useDataGridPagination";
 import { InsightCard } from "../summary-insights/datavisCard";
 import { getCategoricalPaletteColor } from "../../design-system";
@@ -153,8 +159,6 @@ function detectionMatchesSearch(row: DetectionRow, query: string, enabled: boole
 
   return haystack.includes(q);
 }
-
-const DETECTION_COLUMN_COUNT = 9;
 
 const SEV_COLORS: Record<DetectionSeverity, string> = {
   Critical: "#ff604a",
@@ -553,7 +557,6 @@ function DetectionActions({
 }
 
 
-/** px widths: select, expand, detections, state, severity, last run, recurrence, findings, actions */
 const DETECTION_SEVERITY_ORDER: Record<DetectionSeverity, number> = {
   Critical: 0,
   High: 1,
@@ -562,31 +565,6 @@ const DETECTION_SEVERITY_ORDER: Record<DetectionSeverity, number> = {
 };
 
 type DetectionSortColumn = "name" | "state" | "severity" | "lastRun" | "recurrence" | "findings";
-
-const DETECTION_SELECT_COL_WIDTH = 40;
-const DETECTION_EXPAND_COL_WIDTH = 40;
-const DETECTION_COL_DEFAULTS: readonly number[] = [
-  DETECTION_SELECT_COL_WIDTH,
-  DETECTION_EXPAND_COL_WIDTH,
-  250,
-  80,
-  115,
-  115,
-  135,
-  115,
-  135,
-];
-const DETECTION_COL_MINS: readonly number[] = [
-  DETECTION_SELECT_COL_WIDTH,
-  DETECTION_EXPAND_COL_WIDTH,
-  120,
-  56,
-  72,
-  100,
-  80,
-  80,
-  100,
-];
 
 function DetectionsTable({
   rows,
@@ -644,6 +622,10 @@ function DetectionsTable({
   scrollToRowId?: string | null;
 }) {
   const [selected, setSelected] = useState<Set<string>>(() => new Set());
+  const { tableColumnIds, filterColumnPanelColumnProps } = useDataGridColumnPanel(
+    FEDERATED_DETECTIONS_DATA_GRID_COLUMNS,
+  );
+  const { exportAll, snackbarProps } = useDataGridJsonExport(rows, "federated-detections");
   const {
     containerRef,
     colStyle,
@@ -653,12 +635,7 @@ function DetectionsTable({
     resizeHandle,
     displayWidths,
     minTableWidth,
-  } = useResizableColumns({
-    selectColWidth: DETECTION_SELECT_COL_WIDTH,
-    colDefaults: DETECTION_COL_DEFAULTS,
-    colMins: DETECTION_COL_MINS,
-    minTableWidth: 960,
-  });
+  } = useDynamicResizableColumns(tableColumnIds);
 
   const allIds = useMemo(() => rows.map((r) => r.id), [rows]);
   const total = allIds.length;
@@ -679,9 +656,10 @@ function DetectionsTable({
     });
   };
 
-  const thClass =
-    "relative border-r border-datavis-gridlines px-2 py-0 align-middle text-xs font-bold uppercase tracking-wide text-text-primary";
-  const tdClass = cx(DATA_GRID_BODY_CELL_CLASS, "text-sm text-text-secondary");
+  const thClass = (colIndex: number, columnId: string) =>
+    dataGridHeaderCellClass(colIndex, tableColumnIds.length, columnId);
+  const tdClass = (columnId: string) =>
+    cx(dataGridBodyCellClass(columnId), "text-sm text-text-secondary");
   const hasActiveFilters =
     detectionNameFilter != null ||
     severityFilter != null ||
@@ -725,7 +703,274 @@ function DetectionsTable({
 
   const { toolbarRef, sectionStyle } = useDataGridStickyToolbar();
 
+  const renderHeaderCell = (columnId: string, colIndex: number) => {
+    switch (columnId) {
+      case "select":
+        return (
+          <th key={columnId} scope="col" style={colStyle(colIndex)} className={thClass(colIndex, columnId)}>
+            <div className="flex items-center justify-center">
+              <Checkbox
+                checked={allSelected}
+                indeterminate={someSelected}
+                onCheckedChange={toggleAll}
+                aria-label="Select all rows"
+              />
+            </div>
+            {resizeHandle(colIndex)}
+          </th>
+        );
+      case "expand":
+        return (
+          <th key={columnId} scope="col" style={colStyle(colIndex)} className={thClass(colIndex, columnId)}>
+            <div className="flex justify-center">
+              <button
+                type="button"
+                className="inline-flex items-center p-0 text-text-tertiary hover:text-text-primary"
+                aria-expanded={allExpanded}
+                aria-label={
+                  allExpanded ? "Collapse all detection descriptions" : "Expand all detection descriptions"
+                }
+                onClick={onToggleExpandAll}
+              >
+                <Icon
+                  name="navi-arrow-drop-down"
+                  size={32}
+                  className={cx("block shrink-0 transition-transform", allExpanded ? "rotate-0" : "-rotate-90")}
+                  aria-hidden
+                />
+                <Icon name="navi-chevron-right" size={20} className="-ml-4 block shrink-0" aria-hidden />
+              </button>
+            </div>
+            {resizeHandle(colIndex)}
+          </th>
+        );
+      case "name":
+        return (
+          <th key={columnId} scope="col" style={colStyle(colIndex)} className={thClass(colIndex, columnId)}>
+            <ColumnHeaderMenu
+              label="Detections"
+              menuLabel="Detections column options"
+              {...getSortProps("name")}
+            />
+            {resizeHandle(colIndex)}
+          </th>
+        );
+      case "state":
+        return (
+          <th key={columnId} scope="col" style={colStyle(colIndex)} className={thClass(colIndex, columnId)}>
+            <ColumnHeaderMenu label="State" menuLabel="State column options" {...getSortProps("state")} />
+            {resizeHandle(colIndex)}
+          </th>
+        );
+      case "severity":
+        return (
+          <th key={columnId} scope="col" style={colStyle(colIndex)} className={thClass(colIndex, columnId)}>
+            <ColumnHeaderMenu
+              label="Severity"
+              menuLabel="Severity column options"
+              {...getSortProps("severity")}
+            />
+            {resizeHandle(colIndex)}
+          </th>
+        );
+      case "lastRun":
+        return (
+          <th key={columnId} scope="col" style={colStyle(colIndex)} className={thClass(colIndex, columnId)}>
+            <ColumnHeaderMenu label="Last Run" menuLabel="Last Run column options" {...getSortProps("lastRun")} />
+            {resizeHandle(colIndex)}
+          </th>
+        );
+      case "recurrence":
+        return (
+          <th key={columnId} scope="col" style={colStyle(colIndex)} className={thClass(colIndex, columnId)}>
+            <ColumnHeaderMenu
+              label="Recurrence"
+              menuLabel="Recurrence column options"
+              {...getSortProps("recurrence")}
+            />
+            {resizeHandle(colIndex)}
+          </th>
+        );
+      case "findings":
+        return (
+          <th key={columnId} scope="col" style={colStyle(colIndex)} className={thClass(colIndex, columnId)}>
+            <ColumnHeaderMenu
+              label="Detection Findings"
+              menuLabel="Detection Findings column options"
+              {...getSortProps("findings")}
+            />
+            {resizeHandle(colIndex)}
+          </th>
+        );
+      case "actions":
+        return (
+          <th key={columnId} scope="col" style={colStyle(colIndex)} className={thClass(colIndex, columnId)}>
+            <span className="block translate-y-px truncate">Actions</span>
+            {resizeHandle(colIndex)}
+          </th>
+        );
+      default:
+        return (
+          <th key={columnId} scope="col" style={colStyle(colIndex)} className={thClass(colIndex, columnId)}>
+            <span className="block translate-y-px truncate">
+              {FEDERATED_DETECTIONS_DATA_GRID_COLUMNS.find((col) => col.id === columnId)?.label ?? columnId}
+            </span>
+            {resizeHandle(colIndex)}
+          </th>
+        );
+    }
+  };
+
+  const renderBodyCell = (
+    columnId: string,
+    row: DetectionRow,
+    colIndex: number,
+    opts: {
+      expanded: boolean;
+      enabled: boolean;
+      isLibraryManaged: boolean;
+      inactiveCellClass: string;
+    },
+  ) => {
+    const { expanded, isLibraryManaged, inactiveCellClass } = opts;
+    switch (columnId) {
+      case "select":
+        return (
+          <td key={columnId} style={colStyle(colIndex)} className={cx(tdClass(columnId), inactiveCellClass)}>
+            <div className={DATA_GRID_BODY_CELL_CENTER_CLASS}>
+              <Checkbox
+                checked={selected.has(row.id)}
+                onCheckedChange={(checked) => toggleRow(row.id, checked)}
+                aria-label={`Select ${row.name}`}
+              />
+            </div>
+          </td>
+        );
+      case "expand":
+        return (
+          <td key={columnId} style={colStyle(colIndex)} className={cx(tdClass(columnId), inactiveCellClass)}>
+            <div className={DATA_GRID_BODY_CELL_CENTER_CLASS}>
+              <button
+                type="button"
+                className={DATA_GRID_ROW_EXPAND_BTN_CLASS}
+                aria-expanded={expanded}
+                aria-label={expanded ? `Collapse description for ${row.name}` : `Expand description for ${row.name}`}
+                onClick={() => onToggleExpand(row.id)}
+              >
+                <Icon
+                  name="navi-arrow-drop-down"
+                  size={DATA_GRID_ROW_EXPAND_ICON_SIZE}
+                  className={cx("block transition-transform", expanded ? "rotate-0" : "-rotate-90")}
+                  aria-hidden
+                />
+              </button>
+            </div>
+          </td>
+        );
+      case "name":
+        return (
+          <td key={columnId} style={colStyle(colIndex)} className={cx(tdClass(columnId), "min-w-0", inactiveCellClass)}>
+            <div className="flex min-w-0 items-center gap-1.5 overflow-hidden">
+              {queuedById[row.id] ? (
+                <QueuedForReviewIndicator onClear={() => onClearFromReview(row.id)} />
+              ) : null}
+              {isLibraryManaged ? (
+                <>
+                  <Icon
+                    name="nav-detections"
+                    size={16}
+                    className="shrink-0 text-text-tertiary"
+                    aria-hidden
+                  />
+                  <TruncatedText
+                    as="button"
+                    className="min-w-0 flex-1 text-left font-semibold text-interactive-active hover:underline focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-interactive-active"
+                    onClick={() => onViewLibraryDetection(row.id)}
+                  >
+                    {row.name}
+                  </TruncatedText>
+                </>
+              ) : (
+                <TruncatedText
+                  as="button"
+                  className="min-w-0 flex-1 text-left font-semibold text-interactive-active hover:underline focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-interactive-active"
+                  onClick={() => onEditDetection(row.id)}
+                >
+                  {row.name}
+                </TruncatedText>
+              )}
+            </div>
+          </td>
+        );
+      case "state":
+        return (
+          <td key={columnId} style={colStyle(colIndex)} className={cx(tdClass(columnId), inactiveCellClass)}>
+            <Switch
+              checked={getDetectionEnabled(row.name, row.enabled, enabledByName)}
+              onCheckedChange={(checked) => onEnabledChange(row.name, checked)}
+              aria-label={`Toggle ${row.name}`}
+            />
+          </td>
+        );
+      case "severity":
+        return (
+          <td key={columnId} style={colStyle(colIndex)} className={cx(tdClass(columnId), inactiveCellClass)}>
+            <span className="inline-flex items-center gap-2">
+              <SeverityTableIcon name={SEV_ICONS[row.severity]} color={SEV_COLORS[row.severity]} />
+              <span>{row.severity}</span>
+            </span>
+          </td>
+        );
+      case "lastRun":
+        return (
+          <td key={columnId} style={colStyle(colIndex)} className={cx(tdClass(columnId), "tabular-nums", inactiveCellClass)}>
+            {row.lastRun}
+          </td>
+        );
+      case "recurrence":
+        return (
+          <td key={columnId} style={colStyle(colIndex)} className={cx(tdClass(columnId), inactiveCellClass)}>
+            {row.recurrence}
+          </td>
+        );
+      case "findings":
+        return (
+          <td key={columnId} style={colStyle(colIndex)} className={tdClass(columnId)}>
+            <FindingsSearchCell
+              findings={row.findings}
+              detectionId={row.id}
+              detectionName={row.name}
+            />
+          </td>
+        );
+      case "actions":
+        return (
+          <td key={columnId} style={colStyle(colIndex)} className={tdClass(columnId)}>
+            <div className="flex items-center justify-start gap-0.5 overflow-hidden">
+              <DetectionActions
+                name={row.name}
+                onEdit={() => onEditDetection(row.id)}
+                onRunNow={() => onRunNow(row.name)}
+                onCopy={() => onCopyDetection(row.id)}
+                onDelete={() => onDeleteDetection(row.id)}
+                onQueueForReview={() => onQueueForReview(row.id)}
+                isQueuedForReview={Boolean(queuedById[row.id])}
+                isLibraryManaged={isLibraryManaged}
+              />
+            </div>
+          </td>
+        );
+      default:
+        return (
+          <td key={columnId} style={colStyle(colIndex)} className={cx(tdClass(columnId), "min-w-0", inactiveCellClass)}>
+            —
+          </td>
+        );
+    }
+  };
+
   return (
+    <>
     <section
       className={DATA_GRID_SECTION_CLASS}
       style={sectionStyle}
@@ -772,7 +1017,7 @@ function DetectionsTable({
               Clear all filters
             </Button>
           ) : null}
-          <DataGridExportButton />
+          <DataGridExportButton onClick={exportAll} />
         </div>
       </div>
         <DatavisGridlineRule inset={false} />
@@ -782,8 +1027,10 @@ function DetectionsTable({
           active={tableTool}
           onFilterClick={() => onTableToolChange(tableTool === "filter" ? null : "filter")}
           onColumnsClick={() => onTableToolChange(tableTool === "columns" ? null : "columns")}
+          {...filterColumnPanelColumnProps}
         />
         <div
+          key={tableColumnIds.join("|")}
           ref={containerRef}
           className={cx(DATA_GRID_TABLE_SCROLL_CLASS, isResizing && "select-none")}
         >
@@ -802,83 +1049,7 @@ function DetectionsTable({
             </colgroup>
             <thead className={DATA_GRID_THEAD_CLASS}>
               <tr className={DATA_GRID_HEADER_ROW_CLASS}>
-                <th scope="col" style={colStyle(0)} className="relative border-r border-datavis-gridlines px-0 py-0 align-middle">
-                  <div className="flex items-center justify-center">
-                    <Checkbox
-                      checked={allSelected}
-                      indeterminate={someSelected}
-                      onCheckedChange={toggleAll}
-                      aria-label="Select all rows"
-                    />
-                  </div>
-                  {resizeHandle(0)}
-                </th>
-                <th scope="col" style={colStyle(1)} className={cx(thClass, "px-0")}>
-                  <div className="flex justify-center">
-                    <button
-                      type="button"
-                      className="inline-flex items-center p-0 text-text-tertiary hover:text-text-primary"
-                      aria-expanded={allExpanded}
-                      aria-label={
-                        allExpanded ? "Collapse all detection descriptions" : "Expand all detection descriptions"
-                      }
-                      onClick={onToggleExpandAll}
-                    >
-                      <Icon
-                        name="navi-arrow-drop-down"
-                        size={32}
-                        className={cx("block shrink-0 transition-transform", allExpanded ? "rotate-0" : "-rotate-90")}
-                        aria-hidden
-                      />
-                      <Icon name="navi-chevron-right" size={20} className="-ml-4 block shrink-0" aria-hidden />
-                    </button>
-                  </div>
-                  {resizeHandle(1)}
-                </th>
-                <th scope="col" style={colStyle(2)} className={thClass}>
-                  <ColumnHeaderMenu
-                    label="Detections"
-                    menuLabel="Detections column options"
-                    {...getSortProps("name")}
-                  />
-                  {resizeHandle(2)}
-                </th>
-                <th scope="col" style={colStyle(3)} className={thClass}>
-                  <ColumnHeaderMenu label="State" menuLabel="State column options" {...getSortProps("state")} />
-                  {resizeHandle(3)}
-                </th>
-                <th scope="col" style={colStyle(4)} className={thClass}>
-                  <ColumnHeaderMenu
-                    label="Severity"
-                    menuLabel="Severity column options"
-                    {...getSortProps("severity")}
-                  />
-                  {resizeHandle(4)}
-                </th>
-                <th scope="col" style={colStyle(5)} className={thClass}>
-                  <ColumnHeaderMenu label="Last Run" menuLabel="Last Run column options" {...getSortProps("lastRun")} />
-                  {resizeHandle(5)}
-                </th>
-                <th scope="col" style={colStyle(6)} className={thClass}>
-                  <ColumnHeaderMenu
-                    label="Recurrence"
-                    menuLabel="Recurrence column options"
-                    {...getSortProps("recurrence")}
-                  />
-                  {resizeHandle(6)}
-                </th>
-                <th scope="col" style={colStyle(7)} className={thClass}>
-                  <ColumnHeaderMenu
-                    label="Detection Findings"
-                    menuLabel="Detection Findings column options"
-                    {...getSortProps("findings")}
-                  />
-                  {resizeHandle(7)}
-                </th>
-                <th scope="col" style={colStyle(8)} className="relative px-2 py-0 align-middle text-xs font-bold uppercase tracking-wide text-text-primary">
-                  <span className="block translate-y-px truncate">Actions</span>
-                  {resizeHandle(8)}
-                </th>
+                {tableColumnIds.map((columnId, colIndex) => renderHeaderCell(columnId, colIndex))}
               </tr>
             </thead>
             <tbody>
@@ -890,111 +1061,20 @@ function DetectionsTable({
                 return (
                   <Fragment key={row.id}>
                     <tr className={DATA_GRID_BODY_ROW_CLASS}>
-                      <td style={colStyle(0)} className={cx("px-0 py-0 align-middle", inactiveCellClass)}>
-                        <div className={DATA_GRID_BODY_CELL_CENTER_CLASS}>
-                          <Checkbox
-                            checked={selected.has(row.id)}
-                            onCheckedChange={(checked) => toggleRow(row.id, checked)}
-                            aria-label={`Select ${row.name}`}
-                          />
-                        </div>
-                      </td>
-                      <td style={colStyle(1)} className={cx("px-0 py-0 align-middle", inactiveCellClass)}>
-                        <div className={DATA_GRID_BODY_CELL_CENTER_CLASS}>
-                          <button
-                            type="button"
-                            className={DATA_GRID_ROW_EXPAND_BTN_CLASS}
-                            aria-expanded={expanded}
-                            aria-label={expanded ? `Collapse description for ${row.name}` : `Expand description for ${row.name}`}
-                            onClick={() => onToggleExpand(row.id)}
-                          >
-                            <Icon
-                              name="navi-arrow-drop-down"
-                              size={DATA_GRID_ROW_EXPAND_ICON_SIZE}
-                              className={cx("block transition-transform", expanded ? "rotate-0" : "-rotate-90")}
-                              aria-hidden
-                            />
-                          </button>
-                        </div>
-                      </td>
-                      <td style={colStyle(2)} className={cx(tdClass, "min-w-0", inactiveCellClass)}>
-                        <div className="flex min-w-0 items-center gap-1.5 overflow-hidden">
-                          {queuedById[row.id] ? (
-                            <QueuedForReviewIndicator onClear={() => onClearFromReview(row.id)} />
-                          ) : null}
-                          {isLibraryManaged ? (
-                            <>
-                              <Icon
-                                name="nav-detections"
-                                size={16}
-                                className="shrink-0 text-text-tertiary"
-                                aria-hidden
-                              />
-                              <TruncatedText
-                                as="button"
-                                className="min-w-0 flex-1 text-left font-semibold text-interactive-active hover:underline focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-interactive-active"
-                                onClick={() => onViewLibraryDetection(row.id)}
-                              >
-                                {row.name}
-                              </TruncatedText>
-                            </>
-                          ) : (
-                            <TruncatedText
-                              as="button"
-                              className="min-w-0 flex-1 text-left font-semibold text-interactive-active hover:underline focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-interactive-active"
-                              onClick={() => onEditDetection(row.id)}
-                            >
-                              {row.name}
-                            </TruncatedText>
-                          )}
-                        </div>
-                      </td>
-                      <td style={colStyle(3)} className={cx(tdClass, inactiveCellClass)}>
-                        <Switch
-                          checked={getDetectionEnabled(row.name, row.enabled, enabledByName)}
-                          onCheckedChange={(checked) => onEnabledChange(row.name, checked)}
-                          aria-label={`Toggle ${row.name}`}
-                        />
-                      </td>
-                      <td style={colStyle(4)} className={cx(tdClass, inactiveCellClass)}>
-                        <span className="inline-flex items-center gap-2">
-                          <SeverityTableIcon name={SEV_ICONS[row.severity]} color={SEV_COLORS[row.severity]} />
-                          <span>{row.severity}</span>
-                        </span>
-                      </td>
-                      <td style={colStyle(5)} className={cx(tdClass, "tabular-nums", inactiveCellClass)}>
-                        {row.lastRun}
-                      </td>
-                      <td style={colStyle(6)} className={cx(tdClass, inactiveCellClass)}>
-                        {row.recurrence}
-                      </td>
-                      <td style={colStyle(7)} className={tdClass}>
-                        <FindingsSearchCell
-                          findings={row.findings}
-                          detectionId={row.id}
-                          detectionName={row.name}
-                        />
-                      </td>
-                      <td style={colStyle(8)} className={tdClass}>
-                        <div className="flex items-center justify-start gap-0.5 overflow-hidden">
-                        <DetectionActions
-                          name={row.name}
-                          onEdit={() => onEditDetection(row.id)}
-                          onRunNow={() => onRunNow(row.name)}
-                          onCopy={() => onCopyDetection(row.id)}
-                          onDelete={() => onDeleteDetection(row.id)}
-                          onQueueForReview={() => onQueueForReview(row.id)}
-                          isQueuedForReview={Boolean(queuedById[row.id])}
-                          isLibraryManaged={isLibraryManaged}
-                        />
-                        </div>
-                      </td>
+                      {tableColumnIds.map((columnId, colIndex) =>
+                        renderBodyCell(columnId, row, colIndex, {
+                          expanded,
+                          enabled,
+                          isLibraryManaged,
+                          inactiveCellClass,
+                        }),
+                      )}
                     </tr>
                     {expanded ? (
                       <tr
                         className={cx(DATA_GRID_EXPANDED_ROW_CLASS, !enabled && "opacity-70")}
                       >
-                        <td colSpan={DETECTION_COLUMN_COUNT} className={DATA_GRID_EXPANDED_CELL_CLASS}>
+                        <td colSpan={tableColumnIds.length} className={DATA_GRID_EXPANDED_CELL_CLASS}>
                           <DetectionExpandedDetails
                             description={row.description}
                             detectionId={row.id}
@@ -1025,6 +1105,8 @@ function DetectionsTable({
         />
       ) : null}
     </section>
+    <Snackbar {...snackbarProps} />
+    </>
   );
 }
 

@@ -8,12 +8,25 @@ import {
   DATA_GRID_TABLE_SCROLL_CLASS,
   DATA_GRID_THEAD_CLASS,
 } from "../ui/dataGridTableStyles";
-import { Icon } from "../../design-system";
+import { Checkbox, Icon } from "../../design-system";
 import { useTimeframe, type TimeframeRange } from "../../context/TimeframeContext";
 import { useSearch } from "../../context/SearchContext";
 import { FilterColumnPanel } from "../ui/FilterColumnPanel";
+import {
+  applyDataGridFacetFilters,
+  buildDataGridFacets,
+  type DataGridFacetSelections,
+} from "../ui/dataGridFilterTypes";
 import { SeverityTableIcon } from "../ui/SeverityTableIcon";
-import { DataGridExportButton } from "../ui/DataGridExportButton";
+import { DataGridExportHeaderAction } from "../ui/DataGridExportHeaderAction";
+import { DataGridExportSelectionBanner } from "../ui/DataGridExportSelectionBanner";
+import { buildExportFilename, downloadJsonExport } from "../ui/exportRowsToJson";
+import { Snackbar } from "../ui/Snackbar";
+import {
+  getDataGridExportSelectionSnapshot,
+  resolveExportRows,
+  useDataGridExportSelection,
+} from "../ui/useDataGridExportSelection";
 import { ColumnHeaderMenu } from "../ui/ColumnHeaderMenu";
 import { compareStrings } from "../ui/useColumnSort";
 import { useSortedDataGridPagination } from "../ui/useSortedDataGridPagination";
@@ -23,7 +36,13 @@ import { DATA_GRID_RESULTS_SEARCH_PLACEHOLDER } from "../ui/dataGridTableStyles"
 import { DataGridPaginationFooter } from "../ui/DataGridTableLayout";
 import { TruncatedText } from "../ui/TruncatedText";
 import { ConnectorTableCell } from "../ui/ConnectorTableCell";
-import { useResizableColumns } from "../ui/useResizableColumns";
+import { FSQL_SEARCH_DATA_GRID_COLUMNS } from "../ui/dataGridColumnCatalog";
+import { useDataGridColumnPanel } from "../ui/dataGridColumnTypes";
+import {
+  dataGridBodyCellClass,
+  dataGridHeaderCellClass,
+  useDynamicResizableColumns,
+} from "../ui/dataGridDynamicTableHelpers";
 import { cx, InsightCard } from "../summary-insights/datavisCard";
 import { TimeSeriesBarChart } from "../summary-insights/timeSeriesBarChart";
 import {
@@ -37,7 +56,6 @@ import { ChartZoomHint } from "../summary-insights/federatedAnalyticsZoom";
 import { FsqlSearchProgressStats } from "./FsqlSearchProgressStats";
 import { useFsqlSearchProgress } from "./useFsqlSearchProgress";
 import { useConnectorSelectionCounts } from "../connectors/connectorEnabledState";
-import { Checkbox } from "@/components/shadcn/checkbox";
 
 const SEV_CRITICAL = "#ff604a";
 
@@ -55,11 +73,17 @@ const EVENT_TYPE_ICON: Record<
   },
 };
 
-const SELECT_COL_WIDTH = 40;
-const COL_DEFAULTS: readonly number[] = [SELECT_COL_WIDTH, 108, 280, 168, 88, 112, 132, 140];
-const COL_MINS: readonly number[] = [SELECT_COL_WIDTH, 72, 120, 120, 56, 72, 96, 96];
-
 type SortColumn = "severity" | "title" | "time" | "activity" | "status" | "eventType" | "connector";
+
+const SORTABLE_COLUMN_LABELS: Record<SortColumn, string> = {
+  severity: "Severity",
+  title: "Title",
+  time: "Time",
+  activity: "Activity",
+  status: "Status",
+  eventType: "Event type",
+  connector: "Connector",
+};
 
 export function useFsqlSearchTableGrid(
   rows: FsqlSearchResultRow[],
@@ -83,11 +107,20 @@ export function useFsqlSearchTableGrid(
 function FsqlSearchResultsTable({
   displayRows,
   getSortProps,
+  tableColumnIds,
+  selectedIds,
+  allResultsSelected,
+  onToggleRow,
+  onTogglePage,
 }: {
   displayRows: FsqlSearchResultRow[];
   getSortProps: ReturnType<typeof useFsqlSearchTableGrid>["getSortProps"];
+  tableColumnIds: readonly string[];
+  selectedIds: Set<string>;
+  allResultsSelected: boolean;
+  onToggleRow: (id: string, checked: boolean) => void;
+  onTogglePage: (pageIds: readonly string[], checked: boolean) => void;
 }) {
-  const [selected, setSelected] = useState<Set<string>>(() => new Set());
   const {
     containerRef,
     colStyle,
@@ -97,33 +130,159 @@ function FsqlSearchResultsTable({
     resizeHandle,
     displayWidths,
     minTableWidth,
-  } = useResizableColumns({
-    selectColWidth: SELECT_COL_WIDTH,
-    colDefaults: COL_DEFAULTS,
-    colMins: COL_MINS,
-  });
+  } = useDynamicResizableColumns(tableColumnIds);
 
   const allIds = useMemo(() => displayRows.map((row) => row.id), [displayRows]);
   const total = allIds.length;
-  const selectedOnPage = useMemo(() => allIds.filter((id) => selected.has(id)).length, [allIds, selected]);
-  const allSelected = total > 0 && selectedOnPage === total;
-  const someSelected = selectedOnPage > 0 && !allSelected;
+  const selectedOnPage = useMemo(() => allIds.filter((id) => selectedIds.has(id)).length, [allIds, selectedIds]);
+  const allSelected = total > 0 && (allResultsSelected || selectedOnPage === total);
+  const someSelected = !allResultsSelected && selectedOnPage > 0 && selectedOnPage < total;
 
   const toggleAll = (checked: boolean) => {
-    setSelected(checked ? new Set(allIds) : new Set());
+    onTogglePage(allIds, checked);
   };
 
   const toggleRow = (id: string, checked: boolean) => {
-    setSelected((prev) => {
-      const next = new Set(prev);
-      if (checked) next.add(id);
-      else next.delete(id);
-      return next;
-    });
+    onToggleRow(id, checked);
+  };
+
+  const renderHeaderCell = (columnId: string, colIndex: number) => {
+    const headerClass = dataGridHeaderCellClass(colIndex, tableColumnIds.length, columnId);
+
+    switch (columnId) {
+      case "select":
+        return (
+          <th key={columnId} scope="col" style={colStyle(colIndex)} className={headerClass}>
+            <div className="flex items-center justify-center">
+              <Checkbox
+                checked={allSelected}
+                indeterminate={someSelected}
+                onCheckedChange={toggleAll}
+                aria-label="Select all rows"
+              />
+            </div>
+            {resizeHandle(colIndex)}
+          </th>
+        );
+      case "severity":
+      case "title":
+      case "time":
+      case "activity":
+      case "status":
+      case "eventType":
+      case "connector": {
+        const label = SORTABLE_COLUMN_LABELS[columnId];
+        return (
+          <th key={columnId} scope="col" style={colStyle(colIndex)} className={headerClass}>
+            <ColumnHeaderMenu
+              label={label}
+              menuLabel={`${label} column options`}
+              {...getSortProps(columnId)}
+            />
+            {resizeHandle(colIndex)}
+          </th>
+        );
+      }
+      default:
+        return (
+          <th key={columnId} scope="col" style={colStyle(colIndex)} className={headerClass}>
+            <span className="block translate-y-px truncate">
+              {FSQL_SEARCH_DATA_GRID_COLUMNS.find((col) => col.id === columnId)?.label ?? columnId}
+            </span>
+            {resizeHandle(colIndex)}
+          </th>
+        );
+    }
+  };
+
+  const renderBodyCell = (columnId: string, row: FsqlSearchResultRow, colIndex: number) => {
+    const cellClass = dataGridBodyCellClass(columnId);
+
+    switch (columnId) {
+      case "select":
+        return (
+          <td key={columnId} style={colStyle(colIndex)} className={cellClass}>
+            <div className="flex items-center justify-center">
+              <Checkbox
+                checked={selectedIds.has(row.id) || allResultsSelected}
+                onCheckedChange={(checked) => toggleRow(row.id, checked)}
+                aria-label={`Select result ${row.id}`}
+              />
+            </div>
+          </td>
+        );
+      case "severity":
+        return (
+          <td key={columnId} style={colStyle(colIndex)} className={cellClass}>
+            <span className="inline-flex items-center gap-2">
+              <SeverityTableIcon name="severity-critical" color={SEV_CRITICAL} />
+              <span className="text-sm text-text-secondary">{row.severity}</span>
+            </span>
+          </td>
+        );
+      case "title":
+        return (
+          <td key={columnId} style={colStyle(colIndex)} className={cx(cellClass, "min-w-0")}>
+            <TruncatedText className="text-sm font-semibold text-interactive-active">{row.title}</TruncatedText>
+          </td>
+        );
+      case "time":
+        return (
+          <td key={columnId} style={colStyle(colIndex)} className={cx(cellClass, "min-w-0 tabular-nums")}>
+            <TruncatedText className="text-sm text-text-secondary">{row.time}</TruncatedText>
+          </td>
+        );
+      case "activity":
+        return (
+          <td key={columnId} style={colStyle(colIndex)} className={cx(cellClass, "min-w-0")}>
+            <TruncatedText className="text-sm text-text-secondary">{row.activity}</TruncatedText>
+          </td>
+        );
+      case "status":
+        return (
+          <td key={columnId} style={colStyle(colIndex)} className={cx(cellClass, "min-w-0")}>
+            <TruncatedText className="text-sm text-text-secondary">{row.status}</TruncatedText>
+          </td>
+        );
+      case "eventType": {
+        const eventType = EVENT_TYPE_ICON[row.eventType];
+        return (
+          <td key={columnId} style={colStyle(colIndex)} className={cx(cellClass, "min-w-0")}>
+            <span className="inline-flex min-w-0 items-center gap-2">
+              <Icon
+                name={eventType.name}
+                size={16}
+                className={cx("size-4 shrink-0 [&_svg]:!size-4", eventType.className)}
+                aria-hidden
+              />
+              <TruncatedText className="text-sm text-text-secondary" wrapperClassName="min-w-0 flex-1">
+                {row.eventType}
+              </TruncatedText>
+            </span>
+          </td>
+        );
+      }
+      case "connector":
+        return (
+          <td key={columnId} style={colStyle(colIndex)} className={cx(cellClass, "min-w-0")}>
+            <ConnectorTableCell name={row.connector} />
+          </td>
+        );
+      default:
+        return (
+          <td key={columnId} style={colStyle(colIndex)} className={cx(cellClass, "min-w-0")}>
+            <TruncatedText className="text-sm text-text-secondary">—</TruncatedText>
+          </td>
+        );
+    }
   };
 
   return (
-    <div ref={containerRef} className={cx(DATA_GRID_TABLE_SCROLL_CLASS, isResizing && "select-none")}>
+    <div
+      key={tableColumnIds.join("|")}
+      ref={containerRef}
+      className={cx(DATA_GRID_TABLE_SCROLL_CLASS, isResizing && "select-none")}
+    >
       <table
         className={DATA_GRID_TABLE_CLASS}
         style={{
@@ -139,101 +298,15 @@ function FsqlSearchResultsTable({
         </colgroup>
         <thead className={DATA_GRID_THEAD_CLASS}>
           <tr className={DATA_GRID_HEADER_ROW_CLASS}>
-            <th
-              scope="col"
-              style={colStyle(0)}
-              className="relative h-10 border-r border-datavis-gridlines px-0 py-0 align-middle"
-            >
-              <div className="flex items-center justify-center">
-                <Checkbox
-                  checked={someSelected ? "indeterminate" : allSelected}
-                  onCheckedChange={(value) => toggleAll(value === true)}
-                  aria-label="Select all rows"
-                />
-              </div>
-              {resizeHandle(0)}
-            </th>
-            {(
-              [
-                ["Severity", "severity"],
-                ["Title", "title"],
-                ["Time", "time"],
-                ["Activity", "activity"],
-                ["Status", "status"],
-                ["Event type", "eventType"],
-                ["Connector", "connector"],
-              ] as const
-            ).map(([label, columnId], index) => (
-              <th
-                key={columnId}
-                scope="col"
-                style={colStyle(index + 1)}
-                className={cx(
-                  "relative h-10 px-2 py-0 align-middle text-xs font-bold uppercase tracking-wide text-text-primary",
-                  index < 6 && "border-r border-datavis-gridlines",
-                )}
-              >
-                <ColumnHeaderMenu
-                  label={label}
-                  menuLabel={`${label} column options`}
-                  {...getSortProps(columnId)}
-                />
-                {resizeHandle(index + 1)}
-              </th>
-            ))}
+            {tableColumnIds.map((columnId, colIndex) => renderHeaderCell(columnId, colIndex))}
           </tr>
         </thead>
         <tbody>
-          {displayRows.map((row) => {
-            const eventType = EVENT_TYPE_ICON[row.eventType];
-            return (
-              <tr key={row.id} className="h-10 border-b border-datavis-gridlines hover:bg-overlay-subtle">
-                <td style={colStyle(0)} className="h-10 px-0 py-0 align-middle">
-                  <div className="flex items-center justify-center">
-                    <Checkbox
-                      checked={selected.has(row.id)}
-                      onCheckedChange={(checked) => toggleRow(row.id, checked === true)}
-                      aria-label={`Select result ${row.id}`}
-                    />
-                  </div>
-                </td>
-                <td style={colStyle(1)} className="h-10 px-2 py-0 align-middle">
-                  <span className="inline-flex items-center gap-2">
-                    <SeverityTableIcon name="severity-critical" color={SEV_CRITICAL} />
-                    <span className="text-sm text-text-secondary">{row.severity}</span>
-                  </span>
-                </td>
-                <td style={colStyle(2)} className="h-10 min-w-0 px-2 py-0 align-middle">
-                  <TruncatedText className="text-sm font-semibold text-interactive-active">{row.title}</TruncatedText>
-                </td>
-                <td style={colStyle(3)} className="h-10 min-w-0 px-2 py-0 align-middle tabular-nums">
-                  <TruncatedText className="text-sm text-text-secondary">{row.time}</TruncatedText>
-                </td>
-                <td style={colStyle(4)} className="h-10 min-w-0 px-2 py-0 align-middle">
-                  <TruncatedText className="text-sm text-text-secondary">{row.activity}</TruncatedText>
-                </td>
-                <td style={colStyle(5)} className="h-10 min-w-0 px-2 py-0 align-middle">
-                  <TruncatedText className="text-sm text-text-secondary">{row.status}</TruncatedText>
-                </td>
-                <td style={colStyle(6)} className="h-10 min-w-0 px-2 py-0 align-middle">
-                  <span className="inline-flex min-w-0 items-center gap-2">
-                    <Icon
-                      name={eventType.name}
-                      size={16}
-                      className={cx("size-4 shrink-0 [&_svg]:!size-4", eventType.className)}
-                      aria-hidden
-                    />
-                    <TruncatedText className="text-sm text-text-secondary" wrapperClassName="min-w-0 flex-1">
-                      {row.eventType}
-                    </TruncatedText>
-                  </span>
-                </td>
-                <td style={colStyle(7)} className="h-10 min-w-0 px-2 py-0 align-middle">
-                  <ConnectorTableCell name={row.connector} />
-                </td>
-              </tr>
-            );
-          })}
+          {displayRows.map((row) => (
+            <tr key={row.id} className="border-b border-datavis-gridlines hover:bg-overlay-subtle">
+              {tableColumnIds.map((columnId, colIndex) => renderBodyCell(columnId, row, colIndex))}
+            </tr>
+          ))}
         </tbody>
       </table>
     </div>
@@ -323,10 +396,28 @@ export function FsqlSearchResultsView({
     return () => window.clearTimeout(timer);
   }, [timeframe.from.getTime(), timeframe.to.getTime()]);
 
-  const filteredRows = useMemo(
-    () => streamingRows.filter((row) => fsqlResultMatchesSearch(row, resultsFilterQuery)),
-    [streamingRows, resultsFilterQuery],
+  const [facetSelections, setFacetSelections] = useState<DataGridFacetSelections>({});
+
+  const facetDefs = useMemo(
+    () =>
+      [
+        { id: "eventType", label: "Event Type", getValue: (row: FsqlSearchResultRow) => row.eventType },
+        { id: "status", label: "Status", getValue: (row: FsqlSearchResultRow) => row.status },
+        { id: "connector", label: "Connectors", getValue: (row: FsqlSearchResultRow) => row.connector },
+        { id: "activity", label: "Activity", getValue: (row: FsqlSearchResultRow) => row.activity },
+      ] as const,
+    [],
   );
+
+  const facets = useMemo(() => buildDataGridFacets(streamingRows, facetDefs), [streamingRows, facetDefs]);
+
+  const filteredRows = useMemo(() => {
+    const facetFiltered = applyDataGridFacetFilters(streamingRows, facetSelections, (row, facetId) => {
+      const definition = facetDefs.find((entry) => entry.id === facetId);
+      return definition ? definition.getValue(row) : "";
+    });
+    return facetFiltered.filter((row) => fsqlResultMatchesSearch(row, resultsFilterQuery));
+  }, [streamingRows, facetSelections, facetDefs, resultsFilterQuery]);
 
   const showTableLoading = timeframeRefreshing;
   const showChartLoading = Boolean(fsqlSearching || searchProgress.isProgressActive);
@@ -335,6 +426,68 @@ export function FsqlSearchResultsView({
     page: resultsPage,
     onPageChange: setResultsPage,
   });
+  const { tableColumnIds, filterColumnPanelColumnProps } = useDataGridColumnPanel(
+    FSQL_SEARCH_DATA_GRID_COLUMNS,
+  );
+  const exportSelection = useDataGridExportSelection();
+  const [exportSnackbarOpen, setExportSnackbarOpen] = useState(false);
+  const [exportSnackbarMessage, setExportSnackbarMessage] = useState("");
+
+  const pageRowIds = useMemo(
+    () => tableGrid.displayRows.map((row) => row.id),
+    [tableGrid.displayRows],
+  );
+  const exportSnapshot = useMemo(
+    () =>
+      getDataGridExportSelectionSnapshot(
+        exportSelection.selectedIds,
+        exportSelection.allResultsSelected,
+        pageRowIds,
+        filteredRows.length,
+        tableGrid.pageCount,
+      ),
+    [
+      exportSelection.selectedIds,
+      exportSelection.allResultsSelected,
+      pageRowIds,
+      filteredRows.length,
+      tableGrid.pageCount,
+    ],
+  );
+
+  const exportSelectionBanner =
+    exportSnapshot.showAllResultsBanner ? (
+      <DataGridExportSelectionBanner
+        variant="all"
+        pageCount={pageRowIds.length}
+        totalCount={filteredRows.length}
+        onSelectAllResults={exportSelection.selectAllResults}
+        onClearSelection={exportSelection.clearSelection}
+      />
+    ) : exportSnapshot.showPageBanner ? (
+      <DataGridExportSelectionBanner
+        variant="page"
+        pageCount={pageRowIds.length}
+        totalCount={filteredRows.length}
+        onSelectAllResults={exportSelection.selectAllResults}
+        onClearSelection={exportSelection.clearSelection}
+      />
+    ) : null;
+
+  const runExport = useCallback(() => {
+    const rows = resolveExportRows(
+      filteredRows,
+      exportSelection.selectedIds,
+      exportSelection.allResultsSelected,
+    );
+    downloadJsonExport(rows, buildExportFilename("fsql-search-results"));
+    setExportSnackbarMessage(`Exported ${rows.length.toLocaleString()} results as JSON`);
+    setExportSnackbarOpen(true);
+  }, [filteredRows, exportSelection.selectedIds, exportSelection.allResultsSelected]);
+
+  useEffect(() => {
+    exportSelection.clearSelection();
+  }, [resultsFilterQuery, facetSelections, exportSelection.clearSelection]);
 
   return (
     <div className={cx(DATA_GRID_PAGE_SCROLL_OUTER_CLASS, "bg-surface-page")}>
@@ -376,7 +529,9 @@ export function FsqlSearchResultsView({
                 <p className="shrink-0 text-base-small text-text-secondary">
                   {searchProgress.isProgressActive
                     ? `${searchProgress.displayedTotalResults.toLocaleString()} of ${resultRows.length.toLocaleString()} Results`
-                    : `${filteredRows.length} Results`}
+                    : tableGrid.pageCount > 1
+                      ? `${pageRowIds.length} of ${filteredRows.length.toLocaleString()} Results`
+                      : `${filteredRows.length} of ${resultRows.length.toLocaleString()} Results`}
                   {resultsFilterQuery.trim() ? ` · “${resultsFilterQuery.trim()}”` : ""}
                 </p>
                 <div className="w-[300px] shrink-0">
@@ -390,15 +545,24 @@ export function FsqlSearchResultsView({
                     aria-label="Filter search results"
                   />
                 </div>
-                <DataGridExportButton />
+                <DataGridExportHeaderAction
+                  snapshot={exportSnapshot}
+                  onExportAll={runExport}
+                  onExportSelected={runExport}
+                />
               </div>
             </>
           }
+          selectionBanner={exportSelectionBanner}
           filterPanel={
             <FilterColumnPanel
               active={resultsTableTool}
               onFilterClick={() => setResultsTableTool(resultsTableTool === "filter" ? null : "filter")}
               onColumnsClick={() => setResultsTableTool(resultsTableTool === "columns" ? null : "columns")}
+              facets={facets}
+              selections={facetSelections}
+              onSelectionsChange={setFacetSelections}
+              {...filterColumnPanelColumnProps}
             />
           }
           table={
@@ -409,7 +573,15 @@ export function FsqlSearchResultsView({
                 Waiting for connector results…
               </div>
             ) : (
-              <FsqlSearchResultsTable displayRows={tableGrid.displayRows} getSortProps={tableGrid.getSortProps} />
+              <FsqlSearchResultsTable
+                displayRows={tableGrid.displayRows}
+                getSortProps={tableGrid.getSortProps}
+                tableColumnIds={tableColumnIds}
+                selectedIds={exportSelection.selectedIds}
+                allResultsSelected={exportSelection.allResultsSelected}
+                onToggleRow={exportSelection.toggleRow}
+                onTogglePage={exportSelection.togglePage}
+              />
             )
           }
           footer={
@@ -417,6 +589,11 @@ export function FsqlSearchResultsView({
               <DataGridPaginationFooter grid={tableGrid} />
             )
           }
+        />
+        <Snackbar
+          open={exportSnackbarOpen}
+          message={exportSnackbarMessage}
+          onClose={() => setExportSnackbarOpen(false)}
         />
       </div>
       </div>

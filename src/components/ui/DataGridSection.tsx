@@ -13,12 +13,15 @@ const cx = (...classes: (string | false | undefined)[]) => classes.filter(Boolea
 /** Section card with sticky title toolbar + filter rail + thead on page scroll. */
 export function DataGridSection({
   header,
+  selectionBanner,
   filterPanel,
   table,
   footer,
   className,
 }: {
   header: ReactNode;
+  /** Full-width banner below the header toolbar (e.g. bulk selection state). */
+  selectionBanner?: ReactNode;
   filterPanel: ReactNode;
   table: ReactNode;
   footer?: ReactNode;
@@ -30,6 +33,7 @@ export function DataGridSection({
     <section className={cx(DATA_GRID_SECTION_CLASS, className)} style={sectionStyle}>
       <div ref={toolbarRef} className={DATA_GRID_TOOLBAR_STICKY_CLASS}>
         <div className={DATA_GRID_SECTION_HEADER_CLASS}>{header}</div>
+        {selectionBanner}
         <DatavisGridlineRule inset={false} />
       </div>
       <DataGridTableLayout filterPanel={filterPanel} table={table} footer={footer} />
