@@ -1,6 +1,6 @@
 import { useCallback, useMemo, useState } from "react";
 
-export type LockedColumnPlacement = "start" | "end" | "before-connector";
+export type LockedColumnPlacement = "start" | "end";
 
 export type DataGridColumnDef = {
   id: string;
@@ -26,7 +26,7 @@ export const DEFAULT_FEDERATED_RESULTS_COLUMNS: DataGridColumnDef[] = [
   { id: "time", label: "Time", defaultVisible: true },
   { id: "activity", label: "Activity", defaultVisible: true },
   { id: "status", label: "Status", defaultVisible: true },
-  { id: "eventType", label: "Event Type", defaultVisible: true },
+  { id: "eventType", label: "Event Class", defaultVisible: true },
   { id: "connector", label: "Connector", defaultVisible: true },
   { id: "accountId", label: "Account ID" },
   { id: "commandLine", label: "Command Line" },
@@ -62,8 +62,8 @@ export const FINDINGS_DATA_GRID_COLUMNS: DataGridColumnDef[] = [
   { id: "time", label: "Time", defaultVisible: true },
   { id: "activity", label: "Activity", defaultVisible: true },
   { id: "status", label: "Status", defaultVisible: true },
-  { id: "category", label: "Class", defaultVisible: true },
-  { id: "actions", label: "Actions", locked: true, lockedPlacement: "before-connector" },
+  { id: "category", label: "Event Class", defaultVisible: true },
+  { id: "actions", label: "Actions", locked: true, lockedPlacement: "end" },
   { id: "connector", label: "Connector", defaultVisible: true },
   { id: "accountId", label: "Account ID" },
   { id: "commandLine", label: "Command Line" },
@@ -144,11 +144,20 @@ export function setPickerColumnVisible(
   visible: boolean,
 ): DataGridColumnLayout {
   const nextVisibleIds = new Set(layout.visibleIds);
+  const wasVisible = nextVisibleIds.has(columnId);
+
   if (visible) nextVisibleIds.add(columnId);
   else nextVisibleIds.delete(columnId);
 
+  let visibleOrder = layout.order.filter((id) => nextVisibleIds.has(id));
+  const hiddenOrder = layout.order.filter((id) => !nextVisibleIds.has(id));
+
+  if (visible && !wasVisible) {
+    visibleOrder = [...visibleOrder.filter((id) => id !== columnId), columnId];
+  }
+
   return {
-    ...layout,
+    order: [...visibleOrder, ...hiddenOrder],
     visibleIds: nextVisibleIds,
   };
 }
@@ -161,13 +170,13 @@ export function isColumnLayoutDefault(
 }
 
 function getLockedPlacement(column: DataGridColumnDef): LockedColumnPlacement {
+  if (column.id === "actions") return "end";
   if (column.lockedPlacement) return column.lockedPlacement;
-  if (column.id === "actions") return "before-connector";
   if (column.id === "select" || column.id === "expand") return "start";
   return "end";
 }
 
-/** Locked columns + visible picker order. */
+/** Locked columns + visible picker order. Actions always renders last. */
 export function resolveTableColumnIds(
   columns: readonly DataGridColumnDef[],
   layout: DataGridColumnLayout,
@@ -177,23 +186,13 @@ export function resolveTableColumnIds(
     .filter((column) => getLockedPlacement(column) === "start")
     .map((column) => column.id);
   const endLocked = lockedColumns
-    .filter((column) => getLockedPlacement(column) === "end")
+    .filter((column) => getLockedPlacement(column) === "end" && column.id !== "actions")
     .map((column) => column.id);
-  const beforeConnectorLocked = lockedColumns
-    .filter((column) => getLockedPlacement(column) === "before-connector")
-    .map((column) => column.id);
+  const hasActions = lockedColumns.some((column) => column.id === "actions");
   const pickerVisible = layout.order.filter((id) => layout.visibleIds.has(id));
-  const connectorIds = new Set(["connector", "connectors"]);
 
-  const result = [...startLocked];
-  for (const id of pickerVisible) {
-    if (connectorIds.has(id)) result.push(...beforeConnectorLocked);
-    result.push(id);
-  }
-  if (!pickerVisible.some((id) => connectorIds.has(id))) {
-    result.push(...beforeConnectorLocked);
-  }
-  result.push(...endLocked);
+  const result = [...startLocked, ...pickerVisible, ...endLocked];
+  if (hasActions) result.push("actions");
   return result;
 }
 

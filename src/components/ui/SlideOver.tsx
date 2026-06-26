@@ -1,6 +1,7 @@
 import { type ReactNode, useEffect } from "react";
 import { createPortal } from "react-dom";
 import { Icon } from "../../design-system";
+import { useCopilot, useCopilotLayoutInset } from "../../context/CopilotContext";
 import { Button } from "@/components/shadcn/button";
 
 export type SlideOverProps = {
@@ -61,14 +62,14 @@ function SlideOverPanelFrame({
   );
 }
 
-/** Panel width for connector setup / add flows — full content column (viewport minus `w-10` nav rail). */
-export const CONNECTOR_PAGE_SLIDE_OVER_PANEL_CLASS = "w-[calc(100vw-2.5rem)] max-w-none shrink-0";
+/** Panel width for connector setup / add flows — full content column (container minus `w-10` nav rail). */
+export const CONNECTOR_PAGE_SLIDE_OVER_PANEL_CLASS = "w-[calc(100%-2.5rem)] max-w-none shrink-0";
 
-/** Full viewport width — panel and scrim cover nav rail and entire screen. */
-export const FULL_VIEWPORT_SLIDE_OVER_PANEL_CLASS = "w-screen max-w-none shrink-0";
+/** Full container width — panel and scrim cover nav rail and entire available area. */
+export const FULL_VIEWPORT_SLIDE_OVER_PANEL_CLASS = "w-full max-w-none shrink-0";
 
-/** Three-quarter viewport width — full-viewport scrim with panel aligned right (~75%). */
-export const THREE_QUARTER_VIEWPORT_SLIDE_OVER_PANEL_CLASS = "w-[75vw] max-w-none shrink-0";
+/** Three-quarter container width — full scrim with panel aligned right (~75%). */
+export const THREE_QUARTER_VIEWPORT_SLIDE_OVER_PANEL_CLASS = "w-[75%] max-w-none shrink-0";
 
 /** max-w-2xl form column (42rem) + 24px horizontal padding on each side (48px total). */
 export const FORM_CONTENT_SLIDE_OVER_PANEL_CLASS = "w-[calc(42rem+48px)] max-w-none shrink-0";
@@ -102,6 +103,9 @@ export function PageSlideOver({
   ariaLabel = "Panel",
   panelClassName = CONNECTOR_PAGE_SLIDE_OVER_PANEL_CLASS,
 }: Omit<SlideOverProps, "dimNav">) {
+  const copilotInset = useCopilotLayoutInset();
+  const { isResizingCopilot } = useCopilot();
+
   useEffect(() => {
     if (!open) return;
     const onKey = (event: KeyboardEvent) => {
@@ -114,7 +118,13 @@ export function PageSlideOver({
   if (!open) return null;
 
   return createPortal(
-    <div className="fixed inset-0 z-50 flex overflow-hidden">
+    <div
+      className={cx(
+        "fixed inset-y-0 left-0 z-50 flex overflow-hidden",
+        !isResizingCopilot && "transition-[right] duration-[280ms] ease-[cubic-bezier(0.32,0.72,0,1)]",
+      )}
+      style={{ right: copilotInset }}
+    >
       <button
         type="button"
         className="absolute inset-0 animate-overlay-scrim-in bg-overlay-scrim"

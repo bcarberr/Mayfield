@@ -282,6 +282,10 @@ body {
     padding-block: 0;
     vertical-align: middle;
   }
+
+  table.data-grid-table tbody > tr.data-grid-detail-highlight-row > td:first-child {
+    box-shadow: inset 3px 0 0 var(--color-interactive-active);
+  }
 }
 
 [data-theme="light"] [data-slot="input"],

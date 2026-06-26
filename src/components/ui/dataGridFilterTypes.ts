@@ -18,6 +18,8 @@ export type DataGridFacetDefinition<T> = {
   id: string;
   label: string;
   getValue: (row: T) => string;
+  /** When set, facet values/counts/filtering use all returned labels (e.g. entity attributes). */
+  getValues?: (row: T) => readonly string[];
   order?: readonly string[];
 };
 
@@ -100,7 +102,7 @@ export const DEFAULT_DATA_GRID_FILTER_FACETS: DataGridFilterFacet[] = [
   },
   {
     id: "eventType",
-    label: "Event Type",
+    label: "Event Class",
     values: [
       { label: "Application Security Posture Finding", count: 2 },
       { label: "Authentication", count: 38 },
@@ -212,14 +214,34 @@ export function countFacetValues<T>(
   const counts = new Map<string, number>();
   for (const row of rows) {
     const label = getValue(row);
+    if (!label || label === "—") continue;
     counts.set(label, (counts.get(label) ?? 0) + 1);
   }
 
   if (order) {
-    return order.map((label) => ({
-      label,
-      count: counts.get(label) ?? 0,
-    }));
+    return order
+      .map((label) => ({
+        label,
+        count: counts.get(label) ?? 0,
+      }))
+      .filter((entry) => entry.count > 0);
+  }
+
+  return [...counts.entries()]
+    .sort((a, b) => b[1] - a[1] || a[0].localeCompare(b[0]))
+    .map(([label, count]) => ({ label, count }));
+}
+
+export function countMultiValueFacetValues<T>(
+  rows: readonly T[],
+  getValues: (row: T) => readonly string[],
+): DataGridFilterFacetValue[] {
+  const counts = new Map<string, number>();
+  for (const row of rows) {
+    for (const label of getValues(row)) {
+      if (!label || label === "—") continue;
+      counts.set(label, (counts.get(label) ?? 0) + 1);
+    }
   }
 
   return [...counts.entries()]
@@ -231,23 +253,38 @@ export function buildDataGridFacets<T>(
   rows: readonly T[],
   definitions: readonly DataGridFacetDefinition<T>[],
 ): DataGridFilterFacet[] {
-  return definitions.map((definition) => ({
-    id: definition.id,
-    label: definition.label,
-    values: countFacetValues(rows, definition.getValue, definition.order),
-  }));
+  return definitions
+    .map((definition) => ({
+      id: definition.id,
+      label: definition.label,
+      values: definition.getValues
+        ? countMultiValueFacetValues(rows, definition.getValues)
+        : countFacetValues(rows, definition.getValue, definition.order),
+    }))
+    .filter((facet) => facet.values.length > 0);
 }
 
 export function applyDataGridFacetFilters<T>(
   rows: readonly T[],
   selections: DataGridFacetSelections,
-  getValue: (row: T, facetId: string) => string,
+  definitions: readonly DataGridFacetDefinition<T>[],
 ): T[] {
   const activeFacets = Object.entries(selections).filter(([, selected]) => selected.size > 0);
   if (activeFacets.length === 0) return [...rows];
 
+  const definitionById = new Map(definitions.map((definition) => [definition.id, definition]));
+
   return rows.filter((row) =>
-    activeFacets.every(([facetId, selected]) => selected.has(getValue(row, facetId))),
+    activeFacets.every(([facetId, selected]) => {
+      const definition = definitionById.get(facetId);
+      if (!definition) return true;
+
+      if (definition.getValues) {
+        return definition.getValues(row).some((value) => selected.has(value));
+      }
+
+      return selected.has(definition.getValue(row));
+    }),
   );
 }
 
@@ -271,11 +308,7 @@ export function useDataGridFacetFilter<T>(
   );
 
   const filteredRows = useMemo(
-    () =>
-      applyDataGridFacetFilters(rows, selections, (row, facetId) => {
-        const definition = definitions.find((entry) => entry.id === facetId);
-        return definition ? definition.getValue(row) : "";
-      }),
+    () => applyDataGridFacetFilters(rows, selections, definitions),
     [rows, selections, definitions],
   );
 
@@ -288,5 +321,10 @@ export function useDataGridFacetFilter<T>(
     filteredRows,
     hasFacetFilters,
     clearSelections: () => setSelections({}),
+    filterPanelProps: {
+      facets,
+      selections,
+      onSelectionsChange: setSelections,
+    },
   };
 }

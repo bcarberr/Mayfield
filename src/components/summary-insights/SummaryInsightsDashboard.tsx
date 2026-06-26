@@ -14,6 +14,7 @@ import { Search } from "lucide-react";
 import { Checkbox, Icon, withCategoricalColors } from "../../design-system";
 import { DonutChartPanel } from "../ui/DonutChartPanel";
 import { FilterColumnPanel, type FilterColumnPanelTool } from "../ui/FilterColumnPanel";
+import { eventGridFacetDefinitions } from "../ui/dataGridFacetDefinitions";
 import {
   applyDataGridFacetFilters,
   buildDataGridFacets,
@@ -41,6 +42,7 @@ import {
   resolveExportRows,
   useDataGridExportSelection,
 } from "../ui/useDataGridExportSelection";
+import { renderDataGridEntityOrEmptyBodyCell } from "../ui/dataGridEntityAttributeCells";
 import { TruncatedText } from "../ui/TruncatedText";
 import { demoTableConnector } from "../connectors/demoTableConnectors";
 import { ConnectorTableCell } from "../ui/ConnectorTableCell";
@@ -54,14 +56,11 @@ import {
   DropdownMenuTrigger,
 } from "@/components/shadcn/dropdown-menu";
 import { TooltipProvider } from "@/components/shadcn/tooltip";
-import {
-  Dialog,
-  DialogContent,
-  DialogFooter,
-  DialogHeader,
-  DialogTitle,
-} from "@/components/shadcn/dialog";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/shadcn/tabs";
+import { DataGridTitleLink } from "../ui/DataGridTitleLink";
+import { dataGridDetailRowProps } from "../ui/dataGridDetailRowHighlight";
+import { ResultsDetailSlideOver, useResultsDetailSlideOver } from "../ui/useResultsDetailSlideOver";
+import { useResultsDetailPaginationSync } from "../ui/useResultsDetailPaginationSync";
 import { useTimeframe, type TimeframeRange } from "../../context/TimeframeContext";
 import { EntitiesOverviewContent } from "./EntitiesOverviewContent";
 import { NetworkActivityContent } from "./NetworkActivityContent";
@@ -320,88 +319,6 @@ function RowActionsMenu({ rowId }: { rowId: string }) {
   );
 }
 
-function FindingDetailDialog({
-  row,
-  open,
-  onClose,
-}: {
-  row: FindingRow | undefined;
-  open: boolean;
-  onClose: () => void;
-}) {
-  if (!row) return null;
-
-  return (
-    <Dialog open={open} onOpenChange={(isOpen) => { if (!isOpen) onClose(); }}>
-      <DialogContent
-        showCloseButton={false}
-        className="flex max-h-[min(85vh,720px)] w-full max-w-lg flex-col gap-0 overflow-hidden border border-border-rule bg-surface-modal p-0 text-text-primary ring-0 shadow-xl"
-      >
-        <DialogHeader className="flex-row items-start justify-between gap-3 border-b border-border-rule px-5 py-4">
-          <div className="min-w-0 text-left">
-            <p className="text-xs font-bold uppercase tracking-wide text-text-tertiary">Finding</p>
-            <DialogTitle className="mt-1 text-left text-page-title font-bold text-text-primary">{row.title}</DialogTitle>
-          </div>
-          <Button
-            type="button"
-            variant="ghost"
-            className="h-auto shrink-0 p-1 text-text-tertiary hover:text-text-primary"
-            aria-label="Close finding details"
-            onClick={onClose}
-          >
-            <Icon name="close" size={20} />
-          </Button>
-        </DialogHeader>
-        <div className="min-h-0 flex-1 overflow-y-auto px-5 py-4">
-          <div className="flex flex-wrap items-center gap-2">
-            <SeverityTableIcon name={SEVERITY_ICON[row.severity]} color={SEV_BAR[row.severity]} />
-            <span className="text-sm font-semibold text-text-primary">{row.severity}</span>
-            <span className="text-sm text-text-tertiary">·</span>
-            <Icon
-              name="ocsf-findings"
-              size={16}
-              className={cx("size-4 shrink-0 [&_svg]:!size-4", FINDING_EVENT_CLASS_ICON_CLASS)}
-              aria-hidden
-            />
-            <span className="text-sm text-text-secondary">{row.category}</span>
-          </div>
-          <p className="mt-4 text-sm leading-relaxed text-text-secondary">{row.description}</p>
-          <dl className="mt-6 space-y-3 border-t border-border-rule pt-4 text-sm">
-            <div className="flex gap-3">
-              <dt className="w-28 shrink-0 text-text-tertiary">Time</dt>
-              <dd className="text-text-secondary">{row.time}</dd>
-            </div>
-            <div className="flex gap-3">
-              <dt className="w-28 shrink-0 text-text-tertiary">Activity</dt>
-              <dd className="text-text-secondary">{row.activity}</dd>
-            </div>
-            <div className="flex gap-3">
-              <dt className="w-28 shrink-0 text-text-tertiary">Status</dt>
-              <dd className="text-text-secondary">{row.status}</dd>
-            </div>
-            <div className="flex gap-3">
-              <dt className="w-28 shrink-0 text-text-tertiary">Class</dt>
-              <dd className="text-text-secondary">{row.category}</dd>
-            </div>
-            <div className="flex gap-3">
-              <dt className="w-28 shrink-0 text-text-tertiary">Connector</dt>
-              <dd className="text-text-secondary">{row.connector}</dd>
-            </div>
-          </dl>
-        </div>
-        <DialogFooter className="mx-0 mb-0 shrink-0 gap-2 rounded-none border-t border-border-rule bg-transparent px-5 py-4 sm:flex-row sm:justify-end">
-          <Button type="button" variant="secondary-outline" onClick={onClose}>
-            Close
-          </Button>
-          <Button type="button" variant="default">
-            View event
-          </Button>
-        </DialogFooter>
-      </DialogContent>
-    </Dialog>
-  );
-}
-
 export function useFindingEventsTableGrid(rows: readonly Parameters<typeof FindingEventsTable>[0]["displayRows"][number][]) {
   const sortComparators = useMemo(
     (): Record<FindingSortColumn, (a: FindingRow, b: FindingRow) => number> => ({
@@ -421,21 +338,23 @@ export function useFindingEventsTableGrid(rows: readonly Parameters<typeof Findi
 function FindingEventsTable({
   displayRows,
   getSortProps,
-  onOpenFinding,
+  onOpenDetail,
   tableColumnIds,
   selectedIds,
   allResultsSelected,
   onToggleRow,
   onTogglePage,
+  highlightedRowId,
 }: {
   displayRows: FindingRow[];
   getSortProps: ReturnType<typeof useFindingEventsTableGrid>["getSortProps"];
-  onOpenFinding: (id: string) => void;
+  onOpenDetail: (id: string) => void;
   tableColumnIds: readonly string[];
   selectedIds: Set<string>;
   allResultsSelected: boolean;
   onToggleRow: (id: string, checked: boolean) => void;
   onTogglePage: (pageIds: readonly string[], checked: boolean) => void;
+  highlightedRowId?: string | null;
 }) {
 
   const colDefaults = useMemo(
@@ -454,12 +373,10 @@ function FindingEventsTable({
   const {
     containerRef,
     colStyle,
-    baseTotal,
-    tableFillsContainer,
+    tableSizeStyle,
     isResizing,
     resizeHandle,
     displayWidths,
-    minTableWidth,
   } = useResizableColumns({
     selectColWidth: FINDING_EVENTS_SELECT_COL_WIDTH,
     colDefaults,
@@ -544,7 +461,7 @@ function FindingEventsTable({
       case "category":
         return (
           <th key={columnId} scope="col" style={colStyle(colIndex)} className={headerCellClass(colIndex, columnId)}>
-            <ColumnHeaderMenu label="Class" menuLabel="Class column options" {...getSortProps("category")} />
+            <ColumnHeaderMenu label="Event Class" menuLabel="Event Class column options" {...getSortProps("category")} />
             {resizeHandle(colIndex)}
           </th>
         );
@@ -604,13 +521,7 @@ function FindingEventsTable({
       case "title":
         return (
           <td key={columnId} style={colStyle(colIndex)} className={cx(bodyCellClass(columnId), "min-w-0")}>
-            <TruncatedText
-              as="button"
-              className="w-full text-left text-sm font-semibold text-interactive-active hover:underline focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-interactive-active"
-              onClick={() => onOpenFinding(row.id)}
-            >
-              {row.title}
-            </TruncatedText>
+            <DataGridTitleLink onClick={() => onOpenDetail(row.id)}>{row.title}</DataGridTitleLink>
           </td>
         );
       case "time":
@@ -660,11 +571,13 @@ function FindingEventsTable({
           </td>
         );
       default:
-        return (
-          <td key={columnId} style={colStyle(colIndex)} className={cx(bodyCellClass(columnId), "min-w-0")}>
-            <TruncatedText className="text-sm text-text-secondary">—</TruncatedText>
-          </td>
-        );
+        return renderDataGridEntityOrEmptyBodyCell({
+          columnId,
+          rowId: row.id,
+          colIndex,
+          colStyle,
+          className: bodyCellClass(columnId),
+        });
     }
   };
 
@@ -676,10 +589,7 @@ function FindingEventsTable({
     >
       <table
         className={DATA_GRID_TABLE_CLASS}
-        style={{
-          width: tableFillsContainer ? "100%" : baseTotal,
-          minWidth: Math.max(minTableWidth, baseTotal),
-        }}
+        style={tableSizeStyle}
       >
         <caption className="sr-only">Finding events</caption>
         <colgroup>
@@ -694,7 +604,7 @@ function FindingEventsTable({
         </thead>
         <tbody>
           {displayRows.map((row) => (
-            <tr key={row.id} className="border-b border-datavis-gridlines hover:bg-overlay-subtle">
+            <tr key={row.id} {...dataGridDetailRowProps(highlightedRowId, row.id)}>
               {tableColumnIds.map((columnId, colIndex) => renderBodyCell(columnId, row, colIndex))}
             </tr>
           ))}
@@ -730,18 +640,17 @@ export function SummaryInsightsDashboard() {
   const [searchQuery, setSearchQuery] = useState("");
   const [tableTool, setTableTool] = useState<FilterColumnPanelTool | null>(null);
   const [facetSelections, setFacetSelections] = useState<DataGridFacetSelections>({});
-  const [drawerFindingId, setDrawerFindingId] = useState<string | null>(null);
   const findingColumnLayout = useDataGridColumnLayout(FINDINGS_DATA_GRID_COLUMNS);
 
   const findingFacetDefs = useMemo(
     () =>
-      [
-        { id: "category", label: "Event Type", getValue: (row: FindingRow) => row.category },
-        { id: "severity", label: "Severity", getValue: (row: FindingRow) => row.severity },
-        { id: "status", label: "Status", getValue: (row: FindingRow) => row.status },
-        { id: "connector", label: "Connectors", getValue: (row: FindingRow) => row.connector },
-        { id: "activity", label: "Activity", getValue: (row: FindingRow) => row.activity },
-      ] as const,
+      eventGridFacetDefinitions<FindingRow>({
+        category: (row) => row.category,
+        severity: (row) => row.severity,
+        status: (row) => row.status,
+        connector: (row) => row.connector,
+        activity: (row) => row.activity,
+      }),
     [],
   );
   const findingRowTemplates: FindingRow[] = useMemo(
@@ -987,10 +896,9 @@ export function SummaryInsightsDashboard() {
       return true;
     });
 
-    return applyDataGridFacetFilters(chartFiltered, facetSelections, (row, facetId) => {
-      const definition = findingFacetDefs.find((entry) => entry.id === facetId);
-      return definition ? definition.getValue(row) : "";
-    }).filter((row) => findingMatchesSearch(row, searchQuery));
+    return applyDataGridFacetFilters(chartFiltered, facetSelections, findingFacetDefs).filter((row) =>
+      findingMatchesSearch(row, searchQuery),
+    );
   }, [
     timeframeScopedRows,
     categoryFilter,
@@ -1001,6 +909,15 @@ export function SummaryInsightsDashboard() {
     searchQuery,
   ]);
   const tableGrid = useFindingEventsTableGrid(filteredTableRows);
+  const resultsDetail = useResultsDetailSlideOver(filteredTableRows);
+  useResultsDetailPaginationSync({
+    activeId: resultsDetail.activeId,
+    isOpen: resultsDetail.isOpen,
+    rows: filteredTableRows,
+    page: tableGrid.page,
+    setPage: tableGrid.setPage,
+    pageSize: tableGrid.pageSize,
+  });
   const findingExportSelection = useDataGridExportSelection();
   const [findingExportSnackbarOpen, setFindingExportSnackbarOpen] = useState(false);
   const [findingExportSnackbarMessage, setFindingExportSnackbarMessage] = useState("");
@@ -1077,11 +994,6 @@ export function SummaryInsightsDashboard() {
     severityFilter != null ||
     statusFilter != null ||
     hasDataGridFacetSelections(facetSelections);
-
-  const drawerRow = useMemo(
-    () => (drawerFindingId ? tableRows.find((row) => row.id === drawerFindingId) : undefined),
-    [drawerFindingId, tableRows],
-  );
 
   const handleCategoryBarClick = (label: string) => {
     if (!isFindingCategory(label)) return;
@@ -1344,7 +1256,8 @@ export function SummaryInsightsDashboard() {
                     <FindingEventsTable
                       displayRows={tableGrid.displayRows}
                       getSortProps={tableGrid.getSortProps}
-                      onOpenFinding={setDrawerFindingId}
+                      onOpenDetail={resultsDetail.open}
+                      highlightedRowId={resultsDetail.isOpen ? resultsDetail.activeId : null}
                       tableColumnIds={findingColumnLayout.tableColumnIds}
                       selectedIds={findingExportSelection.selectedIds}
                       allResultsSelected={findingExportSelection.allResultsSelected}
@@ -1361,11 +1274,7 @@ export function SummaryInsightsDashboard() {
         </div>
       </Tabs>
 
-      <FindingDetailDialog
-        row={drawerRow}
-        open={drawerFindingId != null && activeView === "findings"}
-        onClose={() => setDrawerFindingId(null)}
-      />
+      <ResultsDetailSlideOver {...resultsDetail} />
       <Snackbar
         open={findingExportSnackbarOpen}
         message={findingExportSnackbarMessage}

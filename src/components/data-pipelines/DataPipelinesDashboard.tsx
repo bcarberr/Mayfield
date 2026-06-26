@@ -16,8 +16,17 @@ import { useDataGridStickyToolbar } from "../ui/useDataGridStickyToolbar";
 import { Checkbox, Icon, Switch } from "../../design-system";
 import { Button } from "@/components/shadcn/button";
 import { ColumnHeaderMenu } from "../ui/ColumnHeaderMenu";
+import { renderDataGridEntityOrEmptyBodyCell } from "../ui/dataGridEntityAttributeCells";
 import { compareBooleans, compareNumbers, compareStrings, useColumnSort } from "../ui/useColumnSort";
 import { FilterColumnPanel, type FilterColumnPanelTool } from "../ui/FilterColumnPanel";
+import { eventGridFacetDefinitions } from "../ui/dataGridFacetDefinitions";
+import {
+  applyDataGridFacetFilters,
+  buildDataGridFacets,
+  hasDataGridFacetSelections,
+  type DataGridFacetSelections,
+  type DataGridFilterFacet,
+} from "../ui/dataGridFilterTypes";
 import { DataGridExportButton } from "../ui/DataGridExportButton";
 import { Snackbar } from "../ui/Snackbar";
 import { useDataGridJsonExport } from "../ui/useDataGridJsonExport";
@@ -166,6 +175,9 @@ function PipelinesTable({
   onSearchQueryChange,
   onClearFilters,
   hasActiveFilters,
+  facets,
+  facetSelections,
+  onFacetSelectionsChange,
   eventLogEnabledByPipeline,
   onEventLogToggle,
   activeById,
@@ -182,6 +194,9 @@ function PipelinesTable({
   onSearchQueryChange: (query: string) => void;
   onClearFilters: () => void;
   hasActiveFilters: boolean;
+  facets: DataGridFilterFacet[];
+  facetSelections: DataGridFacetSelections;
+  onFacetSelectionsChange: (selections: DataGridFacetSelections) => void;
   eventLogEnabledByPipeline: Record<string, Record<string, boolean>>;
   onEventLogToggle: (pipelineId: string, logId: string, enabled: boolean) => void;
   activeById: Record<string, boolean>;
@@ -194,12 +209,10 @@ function PipelinesTable({
   const {
     containerRef,
     colStyle,
-    baseTotal,
-    tableFillsContainer,
+    tableSizeStyle,
     isResizing,
     resizeHandle,
     displayWidths,
-    minTableWidth,
   } = useDynamicResizableColumns(tableColumnIds);
 
   const thClass = (colIndex: number, columnId: string) =>
@@ -360,11 +373,13 @@ function PipelinesTable({
           </td>
         );
       default:
-        return (
-          <td key={columnId} style={colStyle(colIndex)} className={cx(tdClass(columnId), "min-w-0")}>
-            —
-          </td>
-        );
+        return renderDataGridEntityOrEmptyBodyCell({
+          columnId,
+          rowId: row.id,
+          colIndex,
+          colStyle,
+          className: tdClass(columnId),
+        });
     }
   };
 
@@ -413,6 +428,9 @@ function PipelinesTable({
           active={tableTool}
           onFilterClick={() => onTableToolChange(tableTool === "filter" ? null : "filter")}
           onColumnsClick={() => onTableToolChange(tableTool === "columns" ? null : "columns")}
+          facets={facets}
+          selections={facetSelections}
+          onSelectionsChange={onFacetSelectionsChange}
           {...filterColumnPanelColumnProps}
         />
         <div
@@ -422,10 +440,7 @@ function PipelinesTable({
         >
           <table
             className={DATA_GRID_TABLE_CLASS}
-            style={{
-              width: tableFillsContainer ? "100%" : baseTotal,
-              minWidth: Math.max(minTableWidth, baseTotal),
-            }}
+            style={tableSizeStyle}
           >
             <caption className="sr-only">Security data pipelines</caption>
             <colgroup>
@@ -478,9 +493,29 @@ export function DataPipelinesDashboard({ searchQuery, onSearchQueryChange }: Dat
   const [tableTool, setTableTool] = useState<FilterColumnPanelTool | null>(null);
   const [expandedIds, setExpandedIds] = useState<Set<string>>(() => new Set());
   const [statFilter, setStatFilter] = useState<PipelineStatFilter | null>(null);
+  const [facetSelections, setFacetSelections] = useState<DataGridFacetSelections>({});
 
   const [eventLogEnabledByPipeline, setEventLogEnabledByPipeline] = useState(buildInitialEventLogState);
   const [activeById, setActiveById] = useState<Record<string, boolean>>(buildInitialActiveById);
+
+  const facetDefs = useMemo(
+    () =>
+      eventGridFacetDefinitions<DataPipelineRow>(
+        {
+          source: (row) => row.source,
+          destination: (row) => row.destination,
+          state: (row) => (pipelineIsActive(row, activeById) ? "Active" : "Paused"),
+          records: (row) => row.records,
+        },
+        { includeEntityAttributes: true },
+      ),
+    [activeById],
+  );
+
+  const facets = useMemo(
+    () => buildDataGridFacets(DATA_PIPELINE_ROWS, facetDefs),
+    [facetDefs],
+  );
 
   const summaryStats = useMemo(() => {
     const active = DATA_PIPELINE_ROWS.filter((row) => pipelineIsActive(row, activeById)).length;
@@ -500,7 +535,8 @@ export function DataPipelinesDashboard({ searchQuery, onSearchQueryChange }: Dat
   }, [activeById]);
 
   const filteredRows = useMemo(() => {
-    return DATA_PIPELINE_ROWS.filter((row) => {
+    const facetFiltered = applyDataGridFacetFilters(DATA_PIPELINE_ROWS, facetSelections, facetDefs);
+    return facetFiltered.filter((row) => {
       const active = pipelineIsActive(row, activeById);
       if (statFilter === "active" && !active) return false;
       if (statFilter === "paused" && active) return false;
@@ -509,11 +545,11 @@ export function DataPipelinesDashboard({ searchQuery, onSearchQueryChange }: Dat
       }
       return pipelineMatchesSearch(row, searchQuery);
     });
-  }, [searchQuery, statFilter, summaryStats.highestRecordsNumeric, activeById]);
+  }, [facetSelections, facetDefs, searchQuery, statFilter, summaryStats.highestRecordsNumeric, activeById]);
 
   const statFilterLabel = statFilter ? PIPELINE_STAT_FILTER_LABELS[statFilter] : null;
 
-  const hasActiveFilters = statFilter != null;
+  const hasActiveFilters = statFilter != null || hasDataGridFacetSelections(facetSelections);
 
   const handleStatFilterClick = (filter: PipelineStatFilter) => {
     setStatFilter((current) => (current === filter ? null : filter));
@@ -547,6 +583,7 @@ export function DataPipelinesDashboard({ searchQuery, onSearchQueryChange }: Dat
   const clearFilters = () => {
     onSearchQueryChange("");
     setStatFilter(null);
+    setFacetSelections({});
   };
 
   const toggleEventLog = (pipelineId: string, logId: string, enabled: boolean) => {
@@ -602,6 +639,9 @@ export function DataPipelinesDashboard({ searchQuery, onSearchQueryChange }: Dat
         onSearchQueryChange={onSearchQueryChange}
         onClearFilters={clearFilters}
         hasActiveFilters={hasActiveFilters}
+        facets={facets}
+        facetSelections={facetSelections}
+        onFacetSelectionsChange={setFacetSelections}
         eventLogEnabledByPipeline={eventLogEnabledByPipeline}
         onEventLogToggle={toggleEventLog}
         activeById={activeById}

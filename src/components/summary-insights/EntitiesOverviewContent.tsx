@@ -18,6 +18,13 @@ import { type TimeframeRange } from "../../context/TimeframeContext";
 import { Button } from "@/components/shadcn/button";
 import { ColumnHeaderMenu } from "../ui/ColumnHeaderMenu";
 import { FilterColumnPanel, type FilterColumnPanelTool } from "../ui/FilterColumnPanel";
+import { eventGridFacetDefinitions } from "../ui/dataGridFacetDefinitions";
+import {
+  applyDataGridFacetFilters,
+  buildDataGridFacets,
+  hasDataGridFacetSelections,
+  type DataGridFacetSelections,
+} from "../ui/dataGridFilterTypes";
 import { Input } from "../ui/Input";
 import { DataGridExportButton } from "../ui/DataGridExportButton";
 import { Snackbar } from "../ui/Snackbar";
@@ -34,6 +41,7 @@ import {
   dataGridHeaderCellClass,
   useDynamicResizableColumns,
 } from "../ui/dataGridDynamicTableHelpers";
+import { renderDataGridEntityOrEmptyBodyCell } from "../ui/dataGridEntityAttributeCells";
 import { TruncatedText } from "../ui/TruncatedText";
 import { demoTableConnector } from "../connectors/demoTableConnectors";
 import { ConnectorTableCell } from "../ui/ConnectorTableCell";
@@ -693,12 +701,10 @@ function EntitiesAggregatedTable({
   const {
     containerRef,
     colStyle,
-    baseTotal,
-    tableFillsContainer,
+    tableSizeStyle,
     isResizing,
     resizeHandle,
     displayWidths,
-    minTableWidth,
   } = useDynamicResizableColumns(tableColumnIds);
 
   const allIds = useMemo(() => displayRows.map((r) => r.id), [displayRows]);
@@ -876,11 +882,13 @@ function EntitiesAggregatedTable({
           </td>
         );
       default:
-        return (
-          <td key={columnId} style={colStyle(colIndex)} className={cx(cellClass, "min-w-0")}>
-            <TruncatedText className="text-sm text-text-secondary">—</TruncatedText>
-          </td>
-        );
+        return renderDataGridEntityOrEmptyBodyCell({
+          columnId,
+          rowId: row.id,
+          colIndex,
+          colStyle,
+          className: cellClass,
+        });
     }
   };
 
@@ -892,10 +900,7 @@ function EntitiesAggregatedTable({
     >
       <table
         className={DATA_GRID_TABLE_CLASS}
-        style={{
-          width: tableFillsContainer ? "100%" : baseTotal,
-          minWidth: Math.max(minTableWidth, baseTotal),
-        }}
+        style={tableSizeStyle}
       >
         <caption className="sr-only">Aggregated entities</caption>
         <colgroup>
@@ -969,14 +974,28 @@ function EntitiesAggregatedPanel({
 }) {
   const [searchQuery, setSearchQuery] = useState("");
   const [tableTool, setTableTool] = useState<FilterColumnPanelTool | null>(null);
+  const [facetSelections, setFacetSelections] = useState<DataGridFacetSelections>({});
   const { tableColumnIds, filterColumnPanelColumnProps } = useDataGridColumnPanel(
     ENTITIES_AGGREGATED_DATA_GRID_COLUMNS,
   );
 
-  const filteredRows = useMemo(
-    () => rows.filter((row) => aggregatedMatchesSearch(row, searchQuery)),
-    [rows, searchQuery],
+  const facetDefs = useMemo(
+    () =>
+      eventGridFacetDefinitions<AggregatedEntityRow>({
+        risk: (row) => row.risk,
+        type: (row) => row.type,
+        categories: (row) => row.categories,
+        connector: (row) => row.connector,
+      }),
+    [],
   );
+
+  const facets = useMemo(() => buildDataGridFacets(rows, facetDefs), [rows, facetDefs]);
+
+  const filteredRows = useMemo(() => {
+    const facetFiltered = applyDataGridFacetFilters(rows, facetSelections, facetDefs);
+    return facetFiltered.filter((row) => aggregatedMatchesSearch(row, searchQuery));
+  }, [rows, facetSelections, facetDefs, searchQuery]);
   const tableGrid = useEntitiesAggregatedTableGrid(filteredRows);
   const { exportAll, snackbarProps } = useDataGridJsonExport(filteredRows, "entities-aggregated");
 
@@ -984,6 +1003,8 @@ function EntitiesAggregatedPanel({
     () => rows.filter((row) => selectedIds.has(row.id)),
     [rows, selectedIds],
   );
+
+  const hasActiveFilters = hasDataGridFacetSelections(facetSelections);
 
   const handleSelectedChange = useCallback(
     (next: Set<string>) => {
@@ -1015,12 +1036,12 @@ function EntitiesAggregatedPanel({
                 aria-label="Search aggregated entities"
               />
             </div>
-            {searchQuery.trim() ? (
+            {hasActiveFilters ? (
               <Button
                 type="button"
                 variant="ghost"
                 className="h-8 shrink-0 gap-1.5 px-2 text-base-small text-text-tertiary hover:text-text-primary [&_svg]:!h-2 [&_svg]:!w-3"
-                onClick={() => setSearchQuery("")}
+                onClick={() => { setFacetSelections({}); setSearchQuery(""); }}
               >
                 <Icon name="action-filter-list" size={14} aria-hidden />
                 Clear all filters
@@ -1046,6 +1067,9 @@ function EntitiesAggregatedPanel({
           active={tableTool}
           onFilterClick={() => setTableTool(tableTool === "filter" ? null : "filter")}
           onColumnsClick={() => setTableTool(tableTool === "columns" ? null : "columns")}
+          facets={facets}
+          selections={facetSelections}
+          onSelectionsChange={setFacetSelections}
           {...filterColumnPanelColumnProps}
         />
       }
