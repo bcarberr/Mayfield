@@ -12,6 +12,7 @@ import { Checkbox, Icon } from "../../design-system";
 import { useTimeframe, type TimeframeRange } from "../../context/TimeframeContext";
 import { useSearch } from "../../context/SearchContext";
 import { FilterColumnPanel } from "../ui/FilterColumnPanel";
+import { eventGridFacetDefinitions } from "../ui/dataGridFacetDefinitions";
 import {
   applyDataGridFacetFilters,
   buildDataGridFacets,
@@ -34,7 +35,12 @@ import { DataGridSection } from "../ui/DataGridSection";
 import { Input } from "../ui/Input";
 import { DATA_GRID_RESULTS_SEARCH_PLACEHOLDER } from "../ui/dataGridTableStyles";
 import { DataGridPaginationFooter } from "../ui/DataGridTableLayout";
+import { renderDataGridEntityOrEmptyBodyCell } from "../ui/dataGridEntityAttributeCells";
 import { TruncatedText } from "../ui/TruncatedText";
+import { DataGridTitleLink } from "../ui/DataGridTitleLink";
+import { dataGridDetailRowProps } from "../ui/dataGridDetailRowHighlight";
+import { ResultsDetailSlideOver, useResultsDetailSlideOver } from "../ui/useResultsDetailSlideOver";
+import { useResultsDetailPaginationSync } from "../ui/useResultsDetailPaginationSync";
 import { ConnectorTableCell } from "../ui/ConnectorTableCell";
 import { FSQL_SEARCH_DATA_GRID_COLUMNS } from "../ui/dataGridColumnCatalog";
 import { useDataGridColumnPanel } from "../ui/dataGridColumnTypes";
@@ -81,7 +87,7 @@ const SORTABLE_COLUMN_LABELS: Record<SortColumn, string> = {
   time: "Time",
   activity: "Activity",
   status: "Status",
-  eventType: "Event type",
+  eventType: "Event Class",
   connector: "Connector",
 };
 
@@ -112,6 +118,8 @@ function FsqlSearchResultsTable({
   allResultsSelected,
   onToggleRow,
   onTogglePage,
+  onOpenDetail,
+  highlightedRowId,
 }: {
   displayRows: FsqlSearchResultRow[];
   getSortProps: ReturnType<typeof useFsqlSearchTableGrid>["getSortProps"];
@@ -120,16 +128,16 @@ function FsqlSearchResultsTable({
   allResultsSelected: boolean;
   onToggleRow: (id: string, checked: boolean) => void;
   onTogglePage: (pageIds: readonly string[], checked: boolean) => void;
+  onOpenDetail: (id: string) => void;
+  highlightedRowId?: string | null;
 }) {
   const {
     containerRef,
     colStyle,
-    baseTotal,
-    tableFillsContainer,
+    tableSizeStyle,
     isResizing,
     resizeHandle,
     displayWidths,
-    minTableWidth,
   } = useDynamicResizableColumns(tableColumnIds);
 
   const allIds = useMemo(() => displayRows.map((row) => row.id), [displayRows]);
@@ -223,7 +231,7 @@ function FsqlSearchResultsTable({
       case "title":
         return (
           <td key={columnId} style={colStyle(colIndex)} className={cx(cellClass, "min-w-0")}>
-            <TruncatedText className="text-sm font-semibold text-interactive-active">{row.title}</TruncatedText>
+            <DataGridTitleLink onClick={() => onOpenDetail(row.id)}>{row.title}</DataGridTitleLink>
           </td>
         );
       case "time":
@@ -269,11 +277,13 @@ function FsqlSearchResultsTable({
           </td>
         );
       default:
-        return (
-          <td key={columnId} style={colStyle(colIndex)} className={cx(cellClass, "min-w-0")}>
-            <TruncatedText className="text-sm text-text-secondary">—</TruncatedText>
-          </td>
-        );
+        return renderDataGridEntityOrEmptyBodyCell({
+          columnId,
+          rowId: row.id,
+          colIndex,
+          colStyle,
+          className: cellClass,
+        });
     }
   };
 
@@ -285,10 +295,7 @@ function FsqlSearchResultsTable({
     >
       <table
         className={DATA_GRID_TABLE_CLASS}
-        style={{
-          width: tableFillsContainer ? "100%" : baseTotal,
-          minWidth: Math.max(minTableWidth, baseTotal),
-        }}
+        style={tableSizeStyle}
       >
         <caption className="sr-only">FSQL search results</caption>
         <colgroup>
@@ -303,7 +310,7 @@ function FsqlSearchResultsTable({
         </thead>
         <tbody>
           {displayRows.map((row) => (
-            <tr key={row.id} className="border-b border-datavis-gridlines hover:bg-overlay-subtle">
+            <tr key={row.id} {...dataGridDetailRowProps(highlightedRowId, row.id)}>
               {tableColumnIds.map((columnId, colIndex) => renderBodyCell(columnId, row, colIndex))}
             </tr>
           ))}
@@ -400,22 +407,20 @@ export function FsqlSearchResultsView({
 
   const facetDefs = useMemo(
     () =>
-      [
-        { id: "eventType", label: "Event Type", getValue: (row: FsqlSearchResultRow) => row.eventType },
-        { id: "status", label: "Status", getValue: (row: FsqlSearchResultRow) => row.status },
-        { id: "connector", label: "Connectors", getValue: (row: FsqlSearchResultRow) => row.connector },
-        { id: "activity", label: "Activity", getValue: (row: FsqlSearchResultRow) => row.activity },
-      ] as const,
+      eventGridFacetDefinitions<FsqlSearchResultRow>({
+        severity: (row) => row.severity,
+        eventType: (row) => row.eventType,
+        status: (row) => row.status,
+        connector: (row) => row.connector,
+        activity: (row) => row.activity,
+      }),
     [],
   );
 
   const facets = useMemo(() => buildDataGridFacets(streamingRows, facetDefs), [streamingRows, facetDefs]);
 
   const filteredRows = useMemo(() => {
-    const facetFiltered = applyDataGridFacetFilters(streamingRows, facetSelections, (row, facetId) => {
-      const definition = facetDefs.find((entry) => entry.id === facetId);
-      return definition ? definition.getValue(row) : "";
-    });
+    const facetFiltered = applyDataGridFacetFilters(streamingRows, facetSelections, facetDefs);
     return facetFiltered.filter((row) => fsqlResultMatchesSearch(row, resultsFilterQuery));
   }, [streamingRows, facetSelections, facetDefs, resultsFilterQuery]);
 
@@ -425,6 +430,15 @@ export function FsqlSearchResultsView({
   const tableGrid = useFsqlSearchTableGrid(filteredRows, {
     page: resultsPage,
     onPageChange: setResultsPage,
+  });
+  const resultsDetail = useResultsDetailSlideOver(filteredRows);
+  useResultsDetailPaginationSync({
+    activeId: resultsDetail.activeId,
+    isOpen: resultsDetail.isOpen,
+    rows: filteredRows,
+    page: tableGrid.page,
+    setPage: tableGrid.setPage,
+    pageSize: tableGrid.pageSize,
   });
   const { tableColumnIds, filterColumnPanelColumnProps } = useDataGridColumnPanel(
     FSQL_SEARCH_DATA_GRID_COLUMNS,
@@ -581,6 +595,8 @@ export function FsqlSearchResultsView({
                 allResultsSelected={exportSelection.allResultsSelected}
                 onToggleRow={exportSelection.toggleRow}
                 onTogglePage={exportSelection.togglePage}
+                onOpenDetail={resultsDetail.open}
+                highlightedRowId={resultsDetail.isOpen ? resultsDetail.activeId : null}
               />
             )
           }
@@ -595,6 +611,7 @@ export function FsqlSearchResultsView({
           message={exportSnackbarMessage}
           onClose={() => setExportSnackbarOpen(false)}
         />
+        <ResultsDetailSlideOver {...resultsDetail} />
       </div>
       </div>
     </div>

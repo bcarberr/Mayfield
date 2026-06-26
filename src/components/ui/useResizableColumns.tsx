@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useRef, useState, type CSSProperties, type PointerEvent } from "react";
+import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState, type CSSProperties, type PointerEvent } from "react";
 
 const cx = (...c: (string | false | undefined)[]) => c.filter(Boolean).join(" ");
 
@@ -19,43 +19,80 @@ export function useResizableColumns({
   const [hasManualWidths, setHasManualWidths] = useState(false);
   const [containerWidth, setContainerWidth] = useState(0);
   const [isResizing, setIsResizing] = useState(false);
-  const containerRef = useRef<HTMLDivElement>(null);
+  const containerElRef = useRef<HTMLDivElement | null>(null);
+  const resizeObserverRef = useRef<ResizeObserver | null>(null);
   const dragRef = useRef<{ columnIndex: number; startX: number; startWidths: number[] } | null>(null);
+  const colDefaultsKey = colDefaults.join(",");
 
-  useEffect(() => {
-    const el = containerRef.current;
+  const measureContainer = useCallback(() => {
+    const el = containerElRef.current;
     if (!el) return;
-    const update = () => setContainerWidth(el.clientWidth);
-    update();
-    const ro = new ResizeObserver(update);
-    ro.observe(el);
-    return () => ro.disconnect();
+    const next = el.clientWidth || el.parentElement?.clientWidth || 0;
+    if (next > 0) setContainerWidth(next);
   }, []);
 
-  const baseTotal = useMemo(
-    () => selectColWidth + colWidths.slice(1).reduce((a, b) => a + b, 0),
-    [colWidths, selectColWidth],
+  const containerRef = useCallback(
+    (node: HTMLDivElement | null) => {
+      resizeObserverRef.current?.disconnect();
+      resizeObserverRef.current = null;
+      containerElRef.current = node;
+      if (!node) return;
+
+      measureContainer();
+      const ro = new ResizeObserver(measureContainer);
+      ro.observe(node);
+      resizeObserverRef.current = ro;
+    },
+    [measureContainer],
   );
 
-  const displayWidths = useMemo(() => {
-    const resizableWidths = colWidths.slice(1);
-    const resizableBaseTotal = resizableWidths.reduce((a, b) => a + b, 0);
+  useEffect(() => {
+    setColWidths([...colDefaults]);
+    setHasManualWidths(false);
+  }, [colDefaultsKey, colDefaults]);
 
-    if (hasManualWidths || containerWidth <= 0 || containerWidth <= baseTotal) {
-      return [selectColWidth, ...resizableWidths];
+  useLayoutEffect(() => {
+    measureContainer();
+  }, [colDefaultsKey, measureContainer]);
+
+  const effectiveContainerWidth = useMemo(() => {
+    if (containerWidth > 0) return containerWidth;
+    const el = containerElRef.current;
+    return el?.clientWidth || el?.parentElement?.clientWidth || 0;
+  }, [containerWidth]);
+
+  const displayWidths = useMemo(() => {
+    if (hasManualWidths) {
+      return [...colWidths];
     }
 
-    const scale = (containerWidth - selectColWidth) / resizableBaseTotal;
-    return [selectColWidth, ...resizableWidths.map((w) => w * scale)];
-  }, [colWidths, containerWidth, baseTotal, hasManualWidths, selectColWidth]);
+    if (effectiveContainerWidth <= 0) {
+      return [...colWidths];
+    }
 
-  const tableFillsContainer = !hasManualWidths && containerWidth > 0 && containerWidth >= baseTotal;
+    const flexDefaults = colWidths.slice(1);
+    const flexWeightTotal = flexDefaults.reduce((a, b) => a + b, 0) || 1;
+    const available = Math.max(0, effectiveContainerWidth - selectColWidth);
 
-  const colStyle = (i: number): CSSProperties => ({
-    width: displayWidths[i],
-    minWidth: displayWidths[i],
-    ...(i === 0 ? { maxWidth: selectColWidth } : {}),
-  });
+    return [
+      selectColWidth,
+      ...flexDefaults.map((w) => (w / flexWeightTotal) * available),
+    ];
+  }, [colWidths, effectiveContainerWidth, hasManualWidths, selectColWidth]);
+
+  const baseTotal = useMemo(
+    () => displayWidths.reduce((a, b) => a + b, 0),
+    [displayWidths],
+  );
+
+  const tableFillsContainer = !hasManualWidths;
+
+  const colStyle = (i: number): CSSProperties => {
+    if (i === 0) {
+      return { width: selectColWidth, minWidth: selectColWidth, maxWidth: selectColWidth };
+    }
+    return { width: displayWidths[i], minWidth: displayWidths[i] };
+  };
 
   const onResizePointerDown = (columnIndex: number) => (e: PointerEvent<HTMLButtonElement>) => {
     e.preventDefault();
@@ -139,11 +176,20 @@ export function useResizableColumns({
     </button>
   );
 
+  const tableSizeStyle = useMemo(
+    (): CSSProperties => ({
+      width: hasManualWidths ? baseTotal : "100%",
+      minWidth: hasManualWidths ? Math.max(minTableWidth, baseTotal) : minTableWidth,
+    }),
+    [hasManualWidths, baseTotal, minTableWidth],
+  );
+
   return {
     containerRef,
     colStyle,
     baseTotal,
     tableFillsContainer,
+    tableSizeStyle,
     isResizing,
     resizeHandle,
     displayWidths,

@@ -4,6 +4,13 @@ import { Checkbox, Icon, type SeverityShapeIconName } from "../../design-system"
 import { Button } from "@/components/shadcn/button";
 import { ColumnHeaderMenu } from "../ui/ColumnHeaderMenu";
 import { FilterColumnPanel, type FilterColumnPanelTool } from "../ui/FilterColumnPanel";
+import { eventGridFacetDefinitions } from "../ui/dataGridFacetDefinitions";
+import {
+  applyDataGridFacetFilters,
+  buildDataGridFacets,
+  hasDataGridFacetSelections,
+  type DataGridFacetSelections,
+} from "../ui/dataGridFilterTypes";
 import { Input } from "../ui/Input";
 import { DataGridExportButton } from "../ui/DataGridExportButton";
 import { Snackbar } from "../ui/Snackbar";
@@ -20,7 +27,12 @@ import {
   dataGridHeaderCellClass,
   useDynamicResizableColumns,
 } from "../ui/dataGridDynamicTableHelpers";
+import { renderDataGridEntityOrEmptyBodyCell } from "../ui/dataGridEntityAttributeCells";
 import { TruncatedText } from "../ui/TruncatedText";
+import { DataGridTitleLink } from "../ui/DataGridTitleLink";
+import { dataGridDetailRowProps } from "../ui/dataGridDetailRowHighlight";
+import { ResultsDetailSlideOver, useResultsDetailSlideOver } from "../ui/useResultsDetailSlideOver";
+import { useResultsDetailPaginationSync } from "../ui/useResultsDetailPaginationSync";
 import { demoTableConnector } from "../connectors/demoTableConnectors";
 import { ConnectorTableCell } from "../ui/ConnectorTableCell";
 import { cx, InsightCard } from "./datavisCard";
@@ -335,7 +347,7 @@ const SYSTEM_SORTABLE_COLUMN_LABELS: Record<SystemSortColumn, string> = {
   title: "Title",
   time: "Time",
   activity: "Activity",
-  eventClass: "Class",
+  eventClass: "Event Class",
   host: "Host",
   process: "Process",
   connector: "Connectors",
@@ -362,21 +374,23 @@ function SystemActivityTable({
   displayRows,
   getSortProps,
   tableColumnIds,
+  onOpenDetail,
+  highlightedRowId,
 }: {
   displayRows: SystemActivityRow[];
   getSortProps: ReturnType<typeof useSystemActivityTableGrid>["getSortProps"];
   tableColumnIds: readonly string[];
+  onOpenDetail: (id: string) => void;
+  highlightedRowId?: string | null;
 }) {
   const [selected, setSelected] = useState<Set<string>>(() => new Set());
   const {
     containerRef,
     colStyle,
-    baseTotal,
-    tableFillsContainer,
+    tableSizeStyle,
     isResizing,
     resizeHandle,
     displayWidths,
-    minTableWidth,
   } = useDynamicResizableColumns(tableColumnIds);
 
   const allIds = useMemo(() => displayRows.map((r) => r.id), [displayRows]);
@@ -472,12 +486,7 @@ function SystemActivityTable({
       case "title":
         return (
           <td key={columnId} style={colStyle(colIndex)} className={cx(cellClass, "min-w-0")}>
-            <TruncatedText
-              as="button"
-              className="w-full text-left text-sm font-semibold text-interactive-active hover:underline focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-interactive-active"
-            >
-              {row.title}
-            </TruncatedText>
+            <DataGridTitleLink onClick={() => onOpenDetail(row.id)}>{row.title}</DataGridTitleLink>
           </td>
         );
       case "time":
@@ -527,11 +536,13 @@ function SystemActivityTable({
           </td>
         );
       default:
-        return (
-          <td key={columnId} style={colStyle(colIndex)} className={cx(cellClass, "min-w-0")}>
-            <TruncatedText className="text-sm text-text-secondary">—</TruncatedText>
-          </td>
-        );
+        return renderDataGridEntityOrEmptyBodyCell({
+          columnId,
+          rowId: row.id,
+          colIndex,
+          colStyle,
+          className: cellClass,
+        });
     }
   };
 
@@ -543,10 +554,7 @@ function SystemActivityTable({
     >
       <table
         className={DATA_GRID_TABLE_CLASS}
-        style={{
-          width: tableFillsContainer ? "100%" : baseTotal,
-          minWidth: Math.max(minTableWidth, baseTotal),
-        }}
+        style={tableSizeStyle}
       >
         <caption className="sr-only">System activity events</caption>
         <colgroup>
@@ -561,7 +569,7 @@ function SystemActivityTable({
         </thead>
         <tbody>
           {displayRows.map((row) => (
-            <tr key={row.id} className="border-b border-datavis-gridlines hover:bg-overlay-subtle">
+            <tr key={row.id} {...dataGridDetailRowProps(highlightedRowId, row.id)}>
               {tableColumnIds.map((columnId, colIndex) => renderBodyCell(columnId, row, colIndex))}
             </tr>
           ))}
@@ -580,6 +588,20 @@ export function SystemActivityContent() {
   const [hostFilter, setHostFilter] = useState<string | null>(null);
   const [searchQuery, setSearchQuery] = useState("");
   const [tableTool, setTableTool] = useState<FilterColumnPanelTool | null>(null);
+  const [facetSelections, setFacetSelections] = useState<DataGridFacetSelections>({});
+
+  const facetDefs = useMemo(
+    () =>
+      eventGridFacetDefinitions<SystemActivityRow>({
+        severity: (row) => row.severity,
+        activity: (row) => row.activity,
+        eventClass: (row) => row.eventClass,
+        host: (row) => row.host,
+        process: (row) => row.process,
+        connector: (row) => row.connector,
+      }),
+    [],
+  );
 
   const tableRows = useMemo(
     () =>
@@ -599,6 +621,11 @@ export function SystemActivityContent() {
   const timeframeScopedRows = useMemo(
     () => tableRows.filter((row) => rowTimeInTimeframe(row.time, timeframe)),
     [tableRows, timeframe],
+  );
+
+  const facets = useMemo(
+    () => buildDataGridFacets(timeframeScopedRows, facetDefs),
+    [timeframeScopedRows, facetDefs],
   );
 
   const activityClassRows = useMemo(
@@ -635,25 +662,38 @@ export function SystemActivityContent() {
     [hostChartRows],
   );
 
-    const filteredRows = useMemo(
-    () =>
-      timeframeScopedRows.filter((row) => {
-        if (activityClassFilter && row.activityClass !== activityClassFilter) return false;
-        if (severityFilter && row.severity !== severityFilter) return false;
-        if (hostFilter && row.host !== hostFilter) return false;
-        if (!systemMatchesSearch(row, searchQuery)) return false;
-        return true;
-      }),
-    [timeframeScopedRows, activityClassFilter, severityFilter, hostFilter, searchQuery],
-  );
+  const filteredRows = useMemo(() => {
+    const chartFiltered = timeframeScopedRows.filter((row) => {
+      if (activityClassFilter && row.activityClass !== activityClassFilter) return false;
+      if (severityFilter && row.severity !== severityFilter) return false;
+      if (hostFilter && row.host !== hostFilter) return false;
+      return true;
+    });
+
+    return applyDataGridFacetFilters(chartFiltered, facetSelections, facetDefs).filter((row) =>
+      systemMatchesSearch(row, searchQuery),
+    );
+  }, [timeframeScopedRows, activityClassFilter, severityFilter, hostFilter, facetSelections, facetDefs, searchQuery]);
   const tableGrid = useSystemActivityTableGrid(filteredRows);
+  const resultsDetail = useResultsDetailSlideOver(filteredRows);
+  useResultsDetailPaginationSync({
+    activeId: resultsDetail.activeId,
+    isOpen: resultsDetail.isOpen,
+    rows: filteredRows,
+    page: tableGrid.page,
+    setPage: tableGrid.setPage,
+    pageSize: tableGrid.pageSize,
+  });
   const { exportAll, snackbarProps } = useDataGridJsonExport(filteredRows, "system-activity");
   const { tableColumnIds, filterColumnPanelColumnProps } = useDataGridColumnPanel(
     SYSTEM_ACTIVITY_DATA_GRID_COLUMNS,
   );
 
   const hasActiveFilters =
-    activityClassFilter != null || severityFilter != null || hostFilter != null;
+    activityClassFilter != null ||
+    severityFilter != null ||
+    hostFilter != null ||
+    hasDataGridFacetSelections(facetSelections);
 
   const handleActivityClassClick = (label: string) => {
     if (!isActivityClass(label)) return;
@@ -793,6 +833,7 @@ export function SystemActivityContent() {
                     setActivityClassFilter(null);
                     setSeverityFilter(null);
                     setHostFilter(null);
+                    setFacetSelections({});
                     setSearchQuery("");
                   }}
                 >
@@ -809,6 +850,9 @@ export function SystemActivityContent() {
             active={tableTool}
             onFilterClick={() => setTableTool(tableTool === "filter" ? null : "filter")}
             onColumnsClick={() => setTableTool(tableTool === "columns" ? null : "columns")}
+            facets={facets}
+            selections={facetSelections}
+            onSelectionsChange={setFacetSelections}
             {...filterColumnPanelColumnProps}
           />
         }
@@ -817,11 +861,14 @@ export function SystemActivityContent() {
             displayRows={tableGrid.displayRows}
             getSortProps={tableGrid.getSortProps}
             tableColumnIds={tableColumnIds}
+            onOpenDetail={resultsDetail.open}
+            highlightedRowId={resultsDetail.isOpen ? resultsDetail.activeId : null}
           />
         }
         footer={<DataGridPaginationFooter grid={tableGrid} />}
       />
       <Snackbar {...snackbarProps} />
+      <ResultsDetailSlideOver {...resultsDetail} />
     </div>
   );
 }

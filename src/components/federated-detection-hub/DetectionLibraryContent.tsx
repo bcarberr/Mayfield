@@ -26,12 +26,15 @@ import {
   useColumnSort,
 } from "../ui/useColumnSort";
 import { FilterColumnPanel, type FilterColumnPanelTool } from "../ui/FilterColumnPanel";
+import { eventGridFacetDefinitions, formatDetectionFindings } from "../ui/dataGridFacetDefinitions";
+import { useDataGridFacetFilter } from "../ui/dataGridFilterTypes";
 import { Input } from "../ui/Input";
 import { DataGridExportButton } from "../ui/DataGridExportButton";
 import { Snackbar } from "../ui/Snackbar";
 import { useDataGridJsonExport } from "../ui/useDataGridJsonExport";
 import { DataGridPagination } from "../ui/DataGridPagination";
 import { SeverityTableIcon } from "../ui/SeverityTableIcon";
+import { renderDataGridEntityOrEmptyBodyCell } from "../ui/dataGridEntityAttributeCells";
 import { TruncatedText } from "../ui/TruncatedText";
 import { DETECTION_LIBRARY_DATA_GRID_COLUMNS } from "../ui/dataGridColumnCatalog";
 import { useDataGridColumnPanel } from "../ui/dataGridColumnTypes";
@@ -443,19 +446,40 @@ function LibraryDetectionsTable({
   const { tableColumnIds, filterColumnPanelColumnProps } = useDataGridColumnPanel(
     DETECTION_LIBRARY_DATA_GRID_COLUMNS,
   );
-  const { exportAll, snackbarProps } = useDataGridJsonExport(rows, "detection-library");
+  const facetDefs = useMemo(
+    () =>
+      eventGridFacetDefinitions<LibraryDetectionRow>(
+        {
+          severity: (row) => row.severity,
+          category: (row) => row.category,
+          state: (row) =>
+            getDetectionEnabled(row.name, row.enabled, enabledByName) ? "Enabled" : "Disabled",
+          recurrence: (row) => row.recurrence,
+          findings: (row) => formatDetectionFindings(row.findings),
+        },
+        { includeEntityAttributes: true },
+      ),
+    [enabledByName],
+  );
+  const {
+    facets,
+    selections: facetSelections,
+    setSelections: setFacetSelections,
+    filteredRows,
+    hasFacetFilters,
+    clearSelections: clearFacetSelections,
+  } = useDataGridFacetFilter(rows, facetDefs);
+  const { exportAll, snackbarProps } = useDataGridJsonExport(filteredRows, "detection-library");
   const {
     containerRef,
     colStyle,
-    baseTotal,
-    tableFillsContainer,
+    tableSizeStyle,
     isResizing,
     resizeHandle,
     displayWidths,
-    minTableWidth,
   } = useDynamicResizableColumns(tableColumnIds);
 
-  const allIds = useMemo(() => rows.map((r) => r.id), [rows]);
+  const allIds = useMemo(() => filteredRows.map((r) => r.id), [filteredRows]);
   const total = allIds.length;
   const selectedOnPage = useMemo(() => allIds.filter((id) => selected.has(id)).length, [allIds, selected]);
   const allSelected = total > 0 && selectedOnPage === total;
@@ -478,8 +502,8 @@ function LibraryDetectionsTable({
     dataGridHeaderCellClass(colIndex, tableColumnIds.length, columnId);
   const tdClass = (columnId: string) =>
     cx(dataGridBodyCellClass(columnId), "text-sm text-text-secondary");
-  const hasActiveFilters = statFilterLabel != null;
-  const allExpanded = rows.length > 0 && rows.every((row) => expandedIds.has(row.id));
+  const hasActiveFilters = statFilterLabel != null || hasFacetFilters;
+  const allExpanded = filteredRows.length > 0 && filteredRows.every((row) => expandedIds.has(row.id));
   const sortComparators = useMemo(
     (): Record<LibrarySortColumn, (a: LibraryDetectionRow, b: LibraryDetectionRow) => number> => ({
       name: (a, b) => compareStrings(a.name, b.name),
@@ -498,7 +522,7 @@ function LibraryDetectionsTable({
     [enabledByName],
   );
   const { sortedRows, getSortProps } = useColumnSort(sortComparators);
-  const sorted = sortedRows(rows);
+  const sorted = sortedRows(filteredRows);
   const {
     page,
     setPage,
@@ -766,11 +790,13 @@ function LibraryDetectionsTable({
           </td>
         );
       default:
-        return (
-          <td key={columnId} style={colStyle(colIndex)} className={cx(tdClass(columnId), "min-w-0", inactiveCellClass)}>
-            —
-          </td>
-        );
+        return renderDataGridEntityOrEmptyBodyCell({
+          columnId,
+          rowId: row.id,
+          colIndex,
+          colStyle,
+          className: cx(tdClass(columnId), inactiveCellClass),
+        });
     }
   };
 
@@ -785,7 +811,7 @@ function LibraryDetectionsTable({
         <h2 className="text-base-semibold text-text-primary">Detection Library</h2>
         <div className="mt-2 flex flex-wrap items-center gap-3">
           <p className="shrink-0 text-base-small text-text-secondary">
-            {rows.length} of {totalCount} Results
+            {filteredRows.length} of {totalCount} Results
             {statFilterLabel ? ` · ${statFilterLabel}` : ""}
             {searchQuery.trim() ? ` · “${searchQuery.trim()}”` : ""}
           </p>
@@ -807,7 +833,10 @@ function LibraryDetectionsTable({
               type="button"
               variant="ghost"
               className="h-8 shrink-0 gap-1.5 px-2 text-base-small text-text-tertiary hover:text-text-primary [&_svg]:!h-2 [&_svg]:!w-3"
-              onClick={onClearFilters}
+              onClick={() => {
+                onClearFilters();
+                clearFacetSelections();
+              }}
             >
               <Icon name="action-filter-list" size={14} aria-hidden />
               Clear all filters
@@ -823,6 +852,9 @@ function LibraryDetectionsTable({
           active={tableTool}
           onFilterClick={() => onTableToolChange(tableTool === "filter" ? null : "filter")}
           onColumnsClick={() => onTableToolChange(tableTool === "columns" ? null : "columns")}
+          facets={facets}
+          selections={facetSelections}
+          onSelectionsChange={setFacetSelections}
           {...filterColumnPanelColumnProps}
         />
         <div
@@ -832,10 +864,7 @@ function LibraryDetectionsTable({
         >
           <table
             className={DATA_GRID_TABLE_CLASS}
-            style={{
-              width: tableFillsContainer ? "100%" : baseTotal,
-              minWidth: Math.max(minTableWidth, baseTotal),
-            }}
+            style={tableSizeStyle}
           >
             <caption className="sr-only">Detection library</caption>
             <colgroup>

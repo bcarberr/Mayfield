@@ -11,6 +11,7 @@ import {
   resolveCopilotPrompt,
 } from "../lib/fsqlCopilotResponder";
 import { Button } from "@/components/shadcn/button";
+import { DEFAULT_COPILOT_PANEL_WIDTH, useCopilot } from "../context/CopilotContext";
 import { SearchAgentsPanel } from "./search/SearchAgentsPanel";
 import aiAgentsNavSvg from "../assets/nav-v4/ai-agents.svg?raw";
 import copilotSparklesUrl from "../assets/icons/copilot-sparkles.svg?url";
@@ -20,7 +21,7 @@ const cx = (...c: (string | false | undefined)[]) => c.filter(Boolean).join(" ")
 const COPILOT_ACTION_BTN_CLASS =
   "size-7 p-0 text-text-tertiary hover:bg-overlay-subtle hover:text-text-primary active:bg-interactive-secondary-pressed active:text-text-primary disabled:pointer-events-none disabled:!opacity-40";
 
-const COPILOT_PANEL_WIDTH = 360;
+const COPILOT_PANEL_WIDTH = DEFAULT_COPILOT_PANEL_WIDTH;
 const COPILOT_PANEL_MIN_WIDTH = 280;
 const COPILOT_PANEL_MAX_WIDTH = 640;
 
@@ -459,15 +460,21 @@ export function SearchCopilotSidePanel({
   submitRequest?: CopilotSubmitRequest | null;
   onSendToFsqlSearch?: (query: string) => void;
 }) {
-  const [panelWidth, setPanelWidth] = useState(COPILOT_PANEL_WIDTH);
+  const { panelWidth: contextPanelWidth, setPanelWidth: setCopilotPanelWidth, setIsResizingCopilot } = useCopilot();
+  const [panelWidth, setPanelWidth] = useState(() => contextPanelWidth);
   const [isResizing, setIsResizing] = useState(false);
   const resizeDragRef = useRef<{ startX: number; startWidth: number } | null>(null);
+
+  useEffect(() => {
+    setCopilotPanelWidth(panelWidth);
+  }, [panelWidth, setCopilotPanelWidth]);
 
   const handleResizePointerDown = (event: React.PointerEvent<HTMLButtonElement>) => {
     event.preventDefault();
     event.currentTarget.setPointerCapture(event.pointerId);
     resizeDragRef.current = { startX: event.clientX, startWidth: panelWidth };
     setIsResizing(true);
+    setIsResizingCopilot(true);
   };
 
   const handleResizePointerMove = (event: React.PointerEvent<HTMLButtonElement>) => {
@@ -482,6 +489,7 @@ export function SearchCopilotSidePanel({
     }
     resizeDragRef.current = null;
     setIsResizing(false);
+    setIsResizingCopilot(false);
   };
 
   return (
@@ -515,6 +523,7 @@ export function SearchCopilotSidePanel({
           onLostPointerCapture={() => {
             resizeDragRef.current = null;
             setIsResizing(false);
+            setIsResizingCopilot(false);
           }}
         >
           <span

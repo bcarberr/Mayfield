@@ -22,15 +22,28 @@ function filterActionLinkClass(active: boolean) {
   );
 }
 
-function ColumnDragHandle({ isDragging, label }: { isDragging: boolean; label: string }) {
+function ColumnDragHandle({
+  isDragging,
+  label,
+  onDragStart,
+  onDragEnd,
+}: {
+  isDragging: boolean;
+  label: string;
+  onDragStart: (event: DragEvent<HTMLSpanElement>) => void;
+  onDragEnd: () => void;
+}) {
   return (
     <span
+      draggable
       className={cx(
         "flex shrink-0 cursor-grab items-center py-1 active:cursor-grabbing",
         isDragging && "cursor-grabbing",
       )}
       title={`Drag to reorder ${label}`}
-      aria-hidden
+      aria-label={`Drag to reorder ${label}`}
+      onDragStart={onDragStart}
+      onDragEnd={onDragEnd}
     >
       <Icon
         name="action-drag-indicator"
@@ -47,7 +60,7 @@ function ColumnDragHandle({ isDragging, label }: { isDragging: boolean; label: s
 function ColumnPickerRow({
   label,
   visible,
-  draggable,
+  reorderable,
   isDragging,
   isDragOver,
   onToggle,
@@ -58,11 +71,11 @@ function ColumnPickerRow({
 }: {
   label: string;
   visible: boolean;
-  draggable: boolean;
+  reorderable: boolean;
   isDragging: boolean;
   isDragOver: boolean;
   onToggle: (checked: boolean) => void;
-  onDragStart: (event: DragEvent<HTMLDivElement>) => void;
+  onDragStart: (event: DragEvent<HTMLSpanElement>) => void;
   onDragOver: (event: DragEvent<HTMLDivElement>) => void;
   onDrop: (event: DragEvent<HTMLDivElement>) => void;
   onDragEnd: () => void;
@@ -74,22 +87,24 @@ function ColumnPickerRow({
         isDragOver && "bg-overlay-subtle",
         isDragging && "opacity-60",
       )}
-      draggable={draggable}
-      onDragStart={onDragStart}
       onDragOver={onDragOver}
       onDrop={onDrop}
-      onDragEnd={onDragEnd}
     >
-      {draggable ? (
-        <ColumnDragHandle isDragging={isDragging} label={label} />
-      ) : (
-        <span className="w-[11px] shrink-0" aria-hidden />
-      )}
       <Checkbox
         checked={visible}
         aria-label={label}
         onCheckedChange={onToggle}
       />
+      {reorderable ? (
+        <ColumnDragHandle
+          isDragging={isDragging}
+          label={label}
+          onDragStart={onDragStart}
+          onDragEnd={onDragEnd}
+        />
+      ) : (
+        <span className="w-[11px] shrink-0" aria-hidden />
+      )}
       <span className="min-w-0 flex-1 truncate text-sm font-semibold text-text-primary">{label}</span>
     </div>
   );
@@ -184,12 +199,11 @@ export function DataGridColumnSlideOut({
               key={row.id}
               label={row.label}
               visible={row.visible}
-              draggable={row.visible}
+              reorderable={row.visible}
               isDragging={draggedId === row.id}
               isDragOver={dragOverId === row.id && draggedId !== row.id}
               onToggle={(checked) => onLayoutChange(setPickerColumnVisible(layout, row.id, checked))}
               onDragStart={(event) => {
-                if (!row.visible) return;
                 setDraggedId(row.id);
                 event.dataTransfer.effectAllowed = "move";
                 event.dataTransfer.setData("text/plain", row.id);

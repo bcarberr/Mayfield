@@ -24,6 +24,46 @@ function escapeFsqlString(value: string): string {
   return value.replace(/'/g, "''");
 }
 
+/** Build an FSQL query to search for a results-detail attribute value. */
+export function buildAttributeValueFsqlQuery(
+  fieldId: string,
+  attributeLabel: string,
+  value: string,
+): string {
+  const trimmed = value.trim();
+  if (!trimmed || trimmed === "—") return "";
+
+  const escaped = escapeFsqlString(trimmed);
+  const id = fieldId.toLowerCase();
+  const label = attributeLabel.toLowerCase();
+
+  let filter: string;
+  if (id.includes("ip") || label.includes("ip address")) {
+    filter = `%ip = '${escaped}'`;
+  } else if (
+    id.includes("hostname") ||
+    id === "domain" ||
+    id.includes("dstname") ||
+    id.includes("srcname") ||
+    id.includes("devicename") ||
+    label.includes("hostname")
+  ) {
+    filter = `%hostname = '${escaped}'`;
+  } else if (id.includes("url") || label === "url") {
+    filter = `%url CONTAINS '${escaped}'`;
+  } else if (id.includes("user") || id.includes("email") || label.includes("user")) {
+    filter = `%username = '${escaped}'`;
+  } else if (id.includes("cve") || label.includes("cve")) {
+    filter = `%cve = '${escaped}'`;
+  } else if (id.includes("mac") || label.includes("mac")) {
+    filter = `%mac = '${escaped}'`;
+  } else {
+    filter = `(%hostname CONTAINS '${escaped}' OR %username CONTAINS '${escaped}' OR %ip CONTAINS '${escaped}')`;
+  }
+
+  return `QUERY\nSHOW **\nWITH ${filter}\nLIMIT 100`;
+}
+
 function formatInList(values: readonly string[]): string {
   return values.map((value) => `'${escapeFsqlString(value)}'`).join(", ");
 }

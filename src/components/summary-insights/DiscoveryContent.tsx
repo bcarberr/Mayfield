@@ -6,6 +6,13 @@ import { Button } from "@/components/shadcn/button";
 import { ColumnHeaderMenu } from "../ui/ColumnHeaderMenu";
 import { DonutChartPanel } from "../ui/DonutChartPanel";
 import { FilterColumnPanel, type FilterColumnPanelTool } from "../ui/FilterColumnPanel";
+import { eventGridFacetDefinitions } from "../ui/dataGridFacetDefinitions";
+import {
+  applyDataGridFacetFilters,
+  buildDataGridFacets,
+  hasDataGridFacetSelections,
+  type DataGridFacetSelections,
+} from "../ui/dataGridFilterTypes";
 import { DISCOVERY_DATA_GRID_COLUMNS } from "../ui/dataGridColumnCatalog";
 import { useDataGridColumnPanel } from "../ui/dataGridColumnTypes";
 import {
@@ -22,7 +29,12 @@ import { compareStrings } from "../ui/useColumnSort";
 import { useSortedDataGridPagination } from "../ui/useSortedDataGridPagination";
 import { DataGridSection } from "../ui/DataGridSection";
 import { DataGridPaginationFooter } from "../ui/DataGridTableLayout";
+import { renderDataGridEntityOrEmptyBodyCell } from "../ui/dataGridEntityAttributeCells";
 import { TruncatedText } from "../ui/TruncatedText";
+import { DataGridTitleLink } from "../ui/DataGridTitleLink";
+import { dataGridDetailRowProps } from "../ui/dataGridDetailRowHighlight";
+import { ResultsDetailSlideOver, useResultsDetailSlideOver } from "../ui/useResultsDetailSlideOver";
+import { useResultsDetailPaginationSync } from "../ui/useResultsDetailPaginationSync";
 import { demoTableConnector } from "../connectors/demoTableConnectors";
 import { ConnectorTableCell } from "../ui/ConnectorTableCell";
 import {
@@ -336,7 +348,7 @@ const SORTABLE_COLUMN_LABELS: Record<DiscoverySortColumn, string> = {
   title: "Title",
   time: "Time",
   patchStatus: "Patch Compliance",
-  eventClass: "Class",
+  eventClass: "Event Class",
   asset: "Asset",
   owner: "Owner",
   connector: "Connectors",
@@ -363,21 +375,23 @@ function DiscoveryEventsTable({
   displayRows,
   getSortProps,
   tableColumnIds,
+  onOpenDetail,
+  highlightedRowId,
 }: {
   displayRows: DiscoveryRow[];
   getSortProps: ReturnType<typeof useDiscoveryEventsTableGrid>["getSortProps"];
   tableColumnIds: readonly string[];
+  onOpenDetail: (id: string) => void;
+  highlightedRowId?: string | null;
 }) {
   const [selected, setSelected] = useState<Set<string>>(() => new Set());
   const {
     containerRef,
     colStyle,
-    baseTotal,
-    tableFillsContainer,
+    tableSizeStyle,
     isResizing,
     resizeHandle,
     displayWidths,
-    minTableWidth,
   } = useDynamicResizableColumns(tableColumnIds);
 
   const allIds = useMemo(() => displayRows.map((r) => r.id), [displayRows]);
@@ -467,12 +481,7 @@ function DiscoveryEventsTable({
       case "title":
         return (
           <td key={columnId} style={colStyle(colIndex)} className={cx(cellClass, "min-w-0")}>
-            <TruncatedText
-              as="button"
-              className="w-full text-left text-sm font-semibold text-interactive-active hover:underline focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-interactive-active"
-            >
-              {row.title}
-            </TruncatedText>
+            <DataGridTitleLink onClick={() => onOpenDetail(row.id)}>{row.title}</DataGridTitleLink>
           </td>
         );
       case "time":
@@ -522,11 +531,13 @@ function DiscoveryEventsTable({
           </td>
         );
       default:
-        return (
-          <td key={columnId} style={colStyle(colIndex)} className={cx(cellClass, "min-w-0")}>
-            <TruncatedText className="text-sm text-text-secondary">—</TruncatedText>
-          </td>
-        );
+        return renderDataGridEntityOrEmptyBodyCell({
+          columnId,
+          rowId: row.id,
+          colIndex,
+          colStyle,
+          className: cellClass,
+        });
     }
   };
 
@@ -538,10 +549,7 @@ function DiscoveryEventsTable({
     >
       <table
         className={DATA_GRID_TABLE_CLASS}
-        style={{
-          width: tableFillsContainer ? "100%" : baseTotal,
-          minWidth: Math.max(minTableWidth, baseTotal),
-        }}
+        style={tableSizeStyle}
       >
         <caption className="sr-only">Discovery events</caption>
         <colgroup>
@@ -556,7 +564,7 @@ function DiscoveryEventsTable({
         </thead>
         <tbody>
           {displayRows.map((row) => (
-            <tr key={row.id} className="border-b border-datavis-gridlines hover:bg-overlay-subtle">
+            <tr key={row.id} {...dataGridDetailRowProps(highlightedRowId, row.id)}>
               {tableColumnIds.map((columnId, colIndex) => renderBodyCell(columnId, row, colIndex))}
             </tr>
           ))}
@@ -575,7 +583,21 @@ export function DiscoveryContent() {
   const [patchFilter, setPatchFilter] = useState<PatchStatus | null>(null);
   const [searchQuery, setSearchQuery] = useState("");
   const [tableTool, setTableTool] = useState<FilterColumnPanelTool | null>(null);
+  const [facetSelections, setFacetSelections] = useState<DataGridFacetSelections>({});
   const { tableColumnIds, filterColumnPanelColumnProps } = useDataGridColumnPanel(DISCOVERY_DATA_GRID_COLUMNS);
+
+  const facetDefs = useMemo(
+    () =>
+      eventGridFacetDefinitions<DiscoveryRow>({
+        severity: (row) => row.severity,
+        eventClass: (row) => row.eventClass,
+        patchStatus: (row) => row.patchStatus,
+        connector: (row) => row.connector,
+        asset: (row) => row.asset,
+        owner: (row) => row.owner,
+      }),
+    [],
+  );
 
   const tableRows = useMemo(
     () =>
@@ -590,6 +612,11 @@ export function DiscoveryContent() {
   const timeframeScopedRows = useMemo(
     () => tableRows.filter((row) => rowTimeInTimeframe(row.time, timeframe)),
     [tableRows, timeframe],
+  );
+
+  const facets = useMemo(
+    () => buildDataGridFacets(timeframeScopedRows, facetDefs),
+    [timeframeScopedRows, facetDefs],
   );
 
   const platformRows = useMemo(
@@ -633,24 +660,35 @@ export function DiscoveryContent() {
     [patchSegments],
   );
 
-    const filteredRows = useMemo(
-    () =>
-      timeframeScopedRows.filter((row) => {
-        if (platformFilter && row.platform !== platformFilter) return false;
-        if (severityFilter && row.severity !== severityFilter) return false;
-        if (patchFilter && row.patchStatus !== patchFilter) return false;
-        if (!discoveryMatchesSearch(row, searchQuery)) return false;
-        return true;
-      }),
-    [timeframeScopedRows, platformFilter, severityFilter, patchFilter, searchQuery],
-  );
+  const filteredRows = useMemo(() => {
+    const chartFiltered = timeframeScopedRows.filter((row) => {
+      if (platformFilter && row.platform !== platformFilter) return false;
+      if (severityFilter && row.severity !== severityFilter) return false;
+      if (patchFilter && row.patchStatus !== patchFilter) return false;
+      return true;
+    });
+
+    return applyDataGridFacetFilters(chartFiltered, facetSelections, facetDefs).filter((row) =>
+      discoveryMatchesSearch(row, searchQuery),
+    );
+  }, [timeframeScopedRows, platformFilter, severityFilter, patchFilter, facetSelections, facetDefs, searchQuery]);
   const tableGrid = useDiscoveryEventsTableGrid(filteredRows);
+  const resultsDetail = useResultsDetailSlideOver(filteredRows);
+  useResultsDetailPaginationSync({
+    activeId: resultsDetail.activeId,
+    isOpen: resultsDetail.isOpen,
+    rows: filteredRows,
+    page: tableGrid.page,
+    setPage: tableGrid.setPage,
+    pageSize: tableGrid.pageSize,
+  });
   const { exportAll, snackbarProps } = useDataGridJsonExport(filteredRows, "discovery-events");
 
   const hasActiveFilters =
     platformFilter != null ||
     severityFilter != null ||
-    patchFilter != null;
+    patchFilter != null ||
+    hasDataGridFacetSelections(facetSelections);
 
   const dailyChart = useMemo(() => buildDailyDiscoveryChart(timeframe), [timeframe]);
 
@@ -759,6 +797,7 @@ export function DiscoveryContent() {
                     setPlatformFilter(null);
                     setSeverityFilter(null);
                     setPatchFilter(null);
+                    setFacetSelections({});
                     setSearchQuery("");
                   }}
                 >
@@ -775,6 +814,9 @@ export function DiscoveryContent() {
             active={tableTool}
             onFilterClick={() => setTableTool(tableTool === "filter" ? null : "filter")}
             onColumnsClick={() => setTableTool(tableTool === "columns" ? null : "columns")}
+            facets={facets}
+            selections={facetSelections}
+            onSelectionsChange={setFacetSelections}
             {...filterColumnPanelColumnProps}
           />
         }
@@ -783,11 +825,14 @@ export function DiscoveryContent() {
             displayRows={tableGrid.displayRows}
             getSortProps={tableGrid.getSortProps}
             tableColumnIds={tableColumnIds}
+            onOpenDetail={resultsDetail.open}
+            highlightedRowId={resultsDetail.isOpen ? resultsDetail.activeId : null}
           />
         }
         footer={<DataGridPaginationFooter grid={tableGrid} />}
       />
       <Snackbar {...snackbarProps} />
+      <ResultsDetailSlideOver {...resultsDetail} />
     </div>
   );
 }

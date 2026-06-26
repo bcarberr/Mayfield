@@ -21,6 +21,14 @@ import { Button } from "@/components/shadcn/button";
 import { ColumnHeaderMenu } from "../ui/ColumnHeaderMenu";
 import { compareStrings, useColumnSort } from "../ui/useColumnSort";
 import { FilterColumnPanel, type FilterColumnPanelTool } from "../ui/FilterColumnPanel";
+import { eventGridFacetDefinitions } from "../ui/dataGridFacetDefinitions";
+import {
+  applyDataGridFacetFilters,
+  buildDataGridFacets,
+  hasDataGridFacetSelections,
+  type DataGridFacetSelections,
+  type DataGridFilterFacet,
+} from "../ui/dataGridFilterTypes";
 import { Input } from "../ui/Input";
 import { DataGridExportButton } from "../ui/DataGridExportButton";
 import { Snackbar } from "../ui/Snackbar";
@@ -28,6 +36,7 @@ import { useDataGridJsonExport } from "../ui/useDataGridJsonExport";
 import { DataGridPagination } from "../ui/DataGridPagination";
 import { DonutChartPanel } from "../ui/DonutChartPanel";
 import { SeverityTableIcon } from "../ui/SeverityTableIcon";
+import { renderDataGridEntityOrEmptyBodyCell } from "../ui/dataGridEntityAttributeCells";
 import { TruncatedText } from "../ui/TruncatedText";
 import { DETECTION_HISTORY_DATA_GRID_COLUMNS } from "../ui/dataGridColumnCatalog";
 import { useDataGridColumnPanel } from "../ui/dataGridColumnTypes";
@@ -495,6 +504,9 @@ function RunHistoryTable({
   onToggleExpandAll,
   tableTool,
   onTableToolChange,
+  facets,
+  facetSelections,
+  onFacetSelectionsChange,
 }: {
   rows: RunHistoryRow[];
   expandedIds: Set<string>;
@@ -502,6 +514,9 @@ function RunHistoryTable({
   onToggleExpandAll: () => void;
   tableTool: FilterColumnPanelTool | null;
   onTableToolChange: (tool: FilterColumnPanelTool | null) => void;
+  facets: DataGridFilterFacet[];
+  facetSelections: DataGridFacetSelections;
+  onFacetSelectionsChange: (selections: DataGridFacetSelections) => void;
 }) {
   const [selected, setSelected] = useState<Set<string>>(() => new Set());
   const { tableColumnIds, filterColumnPanelColumnProps } = useDataGridColumnPanel(
@@ -510,12 +525,10 @@ function RunHistoryTable({
   const {
     containerRef,
     colStyle,
-    baseTotal,
-    tableFillsContainer,
+    tableSizeStyle,
     isResizing,
     resizeHandle,
     displayWidths,
-    minTableWidth,
   } = useDynamicResizableColumns(tableColumnIds);
 
   const allIds = useMemo(() => rows.map((row) => row.id), [rows]);
@@ -720,11 +733,13 @@ function RunHistoryTable({
           </td>
         );
       default:
-        return (
-          <td key={columnId} style={colStyle(colIndex)} className={cx(tdClass(columnId), "min-w-0")}>
-            —
-          </td>
-        );
+        return renderDataGridEntityOrEmptyBodyCell({
+          columnId,
+          rowId: row.id,
+          colIndex,
+          colStyle,
+          className: tdClass(columnId),
+        });
     }
   };
 
@@ -735,6 +750,9 @@ function RunHistoryTable({
           active={tableTool}
           onFilterClick={() => onTableToolChange(tableTool === "filter" ? null : "filter")}
           onColumnsClick={() => onTableToolChange(tableTool === "columns" ? null : "columns")}
+          facets={facets}
+          selections={facetSelections}
+          onSelectionsChange={onFacetSelectionsChange}
           {...filterColumnPanelColumnProps}
         />
         <div
@@ -744,10 +762,7 @@ function RunHistoryTable({
         >
           <table
             className={DATA_GRID_TABLE_CLASS}
-            style={{
-              width: tableFillsContainer ? "100%" : baseTotal,
-              minWidth: Math.max(minTableWidth, baseTotal),
-            }}
+            style={tableSizeStyle}
           >
             <caption className="sr-only">Detection run history</caption>
             <colgroup>
@@ -801,45 +816,72 @@ function RunHistoryTable({
 export function DetectionHistoryContent() {
   const [tableTool, setTableTool] = useState<FilterColumnPanelTool | null>("filter");
   const [searchQuery, setSearchQuery] = useState("");
+  const [facetSelections, setFacetSelections] = useState<DataGridFacetSelections>({});
   const [expandedIds, setExpandedIds] = useState<Set<string>>(() => new Set());
   const [runHistoryFilter, setRunHistoryFilter] = useState<RunHistoryFilter | null>(null);
   const [detectionNameFilter, setDetectionNameFilter] = useState<string | null>(null);
   const [severityFilter, setSeverityFilter] = useState<DetectionSeverity | null>(null);
 
-  const filteredRows = useMemo(
+  const facetDefs = useMemo(
+    () =>
+      eventGridFacetDefinitions<RunHistoryRow>({
+        severity: (row) => row.severity,
+        detectionName: (row) => row.detectionName,
+        status: (row) => row.status,
+        triggeredBy: (row) => row.triggeredBy,
+        findingsGenerated: (row) =>
+          row.findingsGenerated == null ? "—" : String(row.findingsGenerated),
+      }),
+    [],
+  );
+
+  const chartFilteredRows = useMemo(
     () =>
       RUN_HISTORY_ROWS.filter((row) => {
         if (runHistoryFilter && row.status !== RUN_HISTORY_FILTER_LABELS[runHistoryFilter]) return false;
         if (detectionNameFilter && row.detectionName !== detectionNameFilter) return false;
         if (severityFilter && row.severity !== severityFilter) return false;
-        if (!runHistoryMatchesSearch(row, searchQuery)) return false;
         return true;
       }),
-    [runHistoryFilter, detectionNameFilter, severityFilter, searchQuery],
+    [runHistoryFilter, detectionNameFilter, severityFilter],
   );
+
+  const facets = useMemo(
+    () => buildDataGridFacets(chartFilteredRows, facetDefs),
+    [chartFilteredRows, facetDefs],
+  );
+
+  const filteredRows = useMemo(() => {
+    const facetFiltered = applyDataGridFacetFilters(chartFilteredRows, facetSelections, facetDefs);
+    return facetFiltered.filter((row) => runHistoryMatchesSearch(row, searchQuery));
+  }, [chartFilteredRows, facetSelections, facetDefs, searchQuery]);
   const { exportAll, snackbarProps } = useDataGridJsonExport(filteredRows, "detection-run-history");
 
   const hasActiveFilters =
     runHistoryFilter != null ||
     detectionNameFilter != null ||
-    severityFilter != null;
+    severityFilter != null ||
+    hasDataGridFacetSelections(facetSelections);
 
   const handleRunHistoryFilterClick = (filter: RunHistoryFilter) => {
     setRunHistoryFilter((current) => (current === filter ? null : filter));
     setDetectionNameFilter(null);
     setSeverityFilter(null);
+    setFacetSelections({});
   };
 
   const handleDetectionClick = (label: string) => {
     setDetectionNameFilter((current) => (current === label ? null : label));
     setRunHistoryFilter(null);
     setSeverityFilter(null);
+    setFacetSelections({});
   };
 
   const handleSeverityClick = (severity: DetectionSeverity) => {
     setSeverityFilter((current) => (current === severity ? null : severity));
     setRunHistoryFilter(null);
     setDetectionNameFilter(null);
+    setFacetSelections({});
   };
 
   const toggleExpand = (id: string) => {
@@ -920,6 +962,7 @@ export function DetectionHistoryContent() {
                   setRunHistoryFilter(null);
                   setDetectionNameFilter(null);
                   setSeverityFilter(null);
+                  setFacetSelections({});
                   setSearchQuery("");
                 }}
               >
@@ -939,6 +982,9 @@ export function DetectionHistoryContent() {
           onToggleExpandAll={toggleExpandAll}
           tableTool={tableTool}
           onTableToolChange={setTableTool}
+          facets={facets}
+          facetSelections={facetSelections}
+          onFacetSelectionsChange={setFacetSelections}
         />
       </section>
       <Snackbar {...snackbarProps} />
