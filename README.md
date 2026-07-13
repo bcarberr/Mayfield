@@ -1,0 +1,1 @@
+Architected end-to-end UX for an OCSF-aligned federated security analytics SaaS platform, enabling analysts to query and correlate distributed data across diverse security tools without centralizing or duplicating data.<img width="468" height="50" alt="image" src="https://github.com/user-attachments/assets/f155d81d-a544-4f06-838d-48ac93f6ee9c" />
