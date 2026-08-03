@@ -1,8 +1,9 @@
-import { useMemo, useState } from "react";
+import { useCallback, useMemo, useState } from "react";
 import { DATA_GRID_ABOVE_SECTION_CLASS, DATA_GRID_HEADER_ROW_CLASS, DATA_GRID_RESULTS_SEARCH_PLACEHOLDER, DATA_GRID_TABLE_CLASS, DATA_GRID_TABLE_SCROLL_CLASS, DATA_GRID_THEAD_CLASS } from "../ui/dataGridTableStyles";
-import { Checkbox, Icon, type SeverityShapeIconName } from "../../design-system";
+import { Checkbox, Icon, type SeverityShapeIconName, withCategoricalColors } from "../../design-system";
 import { Button } from "@/components/shadcn/button";
 import { ColumnHeaderMenu } from "../ui/ColumnHeaderMenu";
+import { DonutChartPanel } from "../ui/DonutChartPanel";
 import { FilterColumnPanel, type FilterColumnPanelTool } from "../ui/FilterColumnPanel";
 import { eventGridFacetDefinitions } from "../ui/dataGridFacetDefinitions";
 import {
@@ -13,6 +14,7 @@ import {
 } from "../ui/dataGridFilterTypes";
 import { Input } from "../ui/Input";
 import { DataGridExportButton } from "../ui/DataGridExportButton";
+import { DataGridSearchSelectedActions } from "../ui/DataGridSearchSelectedActions";
 import { Snackbar } from "../ui/Snackbar";
 import { useDataGridJsonExport } from "../ui/useDataGridJsonExport";
 import { SeverityTableIcon } from "../ui/SeverityTableIcon";
@@ -35,30 +37,35 @@ import { ResultsDetailSlideOver, useResultsDetailSlideOver } from "../ui/useResu
 import { useResultsDetailPaginationSync } from "../ui/useResultsDetailPaginationSync";
 import { demoTableConnector } from "../connectors/demoTableConnectors";
 import { ConnectorTableCell } from "../ui/ConnectorTableCell";
-import { cx, InsightCard } from "./datavisCard";
+import { useCopilot } from "../../context/CopilotContext";
+import { buildTitlesFsqlQuery } from "../../lib/buildEntitiesFsqlQuery";
+import { cx, InsightCard, InsightCardHeaderActions } from "./datavisCard";
+import {
+  ExpandableColumnWidgetLayout,
+  ExpandableColumnWidgetShell,
+  useExpandableColumnWidgets,
+} from "./useExpandableColumnWidgets";
 import {
   buildHourlyEventRows,
   ChartZoomHint,
   countByLabel,
   formatAnalyticsRowTime,
   horizontalBarScale,
+  parseAnalyticsRowTime,
   rowTimeInTimeframe,
   topCountsByLabel,
   useFederatedAnalyticsTimeframeZoom,
 } from "./federatedAnalyticsZoom";
+import { chartFiltersActive, formatChartFilterLabels, toggleChartFilter } from "./chartFilterSet";
 import { CHART_CATEGORY_FILL, HorizontalBarPanel } from "./horizontalBarPanel";
 import { TimeSeriesAreaChart } from "./timeSeriesAreaChart";
-import {
-  buildHourlyAxisTicks,
-  buildHourlyBuckets,
-  formatBucketTimeLabel,
-  shouldIncludeDateInBucketLabels,
-  hourlySeverityValues,
-  resolveAnalyticsSpikeIndices,
-  SPIKE_CLOCK_HOUR,
-} from "./timeframeChartUtils";
+import { SEVERITY_TIMELINE_VIZ_OPTIONS, type SeverityTimelineViz } from "./severityTimelineViz";
+import { buildSeverityTimelineChart } from "./severityTimelineSeries";
+import { CATEGORICAL_WIDGET_VIZ_OPTIONS, type CategoricalWidgetViz } from "./categoricalWidgetViz";
 
 type IdentitySeverity = "Critical" | "High" | "Medium" | "Low" | "Informational";
+
+const IDENTITY_COLUMN_WIDGET_ORDER = ["classes", "severity", "users"] as const;
 
 const SEV_BAR: Record<IdentitySeverity, string> = {
   Critical: "#ff604a",
@@ -75,6 +82,14 @@ const SEV_ICONS: Record<IdentitySeverity, SeverityShapeIconName> = {
   Low: "severity-low",
   Informational: "severity-info",
 };
+
+const SEVERITY_TIMELINE_STYLES = {
+  Informational: { color: SEV_BAR.Informational, icon: SEV_ICONS.Informational },
+  Low: { color: SEV_BAR.Low, icon: SEV_ICONS.Low },
+  Medium: { color: SEV_BAR.Medium, icon: SEV_ICONS.Medium },
+  High: { color: SEV_BAR.High, icon: SEV_ICONS.High },
+  Critical: { color: SEV_BAR.Critical, icon: SEV_ICONS.Critical },
+} as const;
 
 const SEVERITY_ORDER: Record<IdentitySeverity, number> = {
   Critical: 0,
@@ -354,14 +369,17 @@ function IdentityAccessTable({
   tableColumnIds,
   onOpenDetail,
   highlightedRowId,
+  selected,
+  onSelectedChange,
 }: {
   displayRows: IdentityAccessRow[];
   getSortProps: ReturnType<typeof useIdentityAccessTableGrid>["getSortProps"];
   tableColumnIds: readonly string[];
   onOpenDetail: (id: string) => void;
   highlightedRowId?: string | null;
+  selected: ReadonlySet<string>;
+  onSelectedChange: (next: Set<string>) => void;
 }) {
-  const [selected, setSelected] = useState<Set<string>>(() => new Set());
   const {
     containerRef,
     colStyle,
@@ -378,16 +396,14 @@ function IdentityAccessTable({
   const someSelected = selectedOnPage > 0 && !allSelected;
 
   const toggleAll = (checked: boolean) => {
-    setSelected(checked ? new Set(allIds) : new Set());
+    onSelectedChange(checked ? new Set([...selected, ...allIds]) : new Set());
   };
 
   const toggleRow = (id: string, checked: boolean) => {
-    setSelected((prev) => {
-      const next = new Set(prev);
-      if (checked) next.add(id);
-      else next.delete(id);
-      return next;
-    });
+    const next = new Set(selected);
+    if (checked) next.add(id);
+    else next.delete(id);
+    onSelectedChange(next);
   };
 
   const renderHeaderCell = (columnId: string, colIndex: number) => {
@@ -563,14 +579,21 @@ function IdentityAccessTable({
 
 /** Figma concept — Identity & Access body for Federated Analytics. */
 export function IdentityAccessContent() {
+  const { setPendingFsqlSearch } = useCopilot();
   const { timeframe, initialTimeframe, isChartZoomed, handleTimelineBrush, handleChartZoomReset } =
-    useFederatedAnalyticsTimeframeZoom("hourly");
+    useFederatedAnalyticsTimeframeZoom("adaptive");
   const [eventClassFilter, setEventClassFilter] = useState<IdentityEventClass | null>(null);
-  const [severityFilter, setSeverityFilter] = useState<IdentitySeverity | null>(null);
+  const [severityFilters, setSeverityFilters] = useState<ReadonlySet<string>>(() => new Set());
   const [userFilter, setUserFilter] = useState<string | null>(null);
+  const [timelineViz, setTimelineViz] = useState<SeverityTimelineViz>("area");
+  const [classesViz, setClassesViz] = useState<CategoricalWidgetViz>("bar");
+  const [severityViz, setSeverityViz] = useState<CategoricalWidgetViz>("bar");
+  const [usersViz, setUsersViz] = useState<CategoricalWidgetViz>("bar");
   const [searchQuery, setSearchQuery] = useState("");
   const [tableTool, setTableTool] = useState<FilterColumnPanelTool | null>(null);
   const [facetSelections, setFacetSelections] = useState<DataGridFacetSelections>({});
+  const [selectedIds, setSelectedIds] = useState<Set<string>>(() => new Set());
+  const columnExpand = useExpandableColumnWidgets(IDENTITY_COLUMN_WIDGET_ORDER);
 
   const facetDefs = useMemo(
     () =>
@@ -605,14 +628,32 @@ export function IdentityAccessContent() {
     [tableRows, timeframe],
   );
 
+  const chartScopedRows = useMemo(() => {
+    return timeframeScopedRows.filter((row) => {
+      if (eventClassFilter && row.eventClass !== eventClassFilter) return false;
+      if (severityFilters.size > 0 && !severityFilters.has(row.severity)) return false;
+      if (userFilter && row.user !== userFilter) return false;
+      return true;
+    });
+  }, [timeframeScopedRows, eventClassFilter, severityFilters, userFilter]);
+
+  /** Top severity timeline follows non-severity widget filters; legend still toggles series. */
+  const timelineScopedRows = useMemo(() => {
+    return timeframeScopedRows.filter((row) => {
+      if (eventClassFilter && row.eventClass !== eventClassFilter) return false;
+      if (userFilter && row.user !== userFilter) return false;
+      return true;
+    });
+  }, [timeframeScopedRows, eventClassFilter, userFilter]);
+
   const facets = useMemo(
     () => buildDataGridFacets(timeframeScopedRows, facetDefs),
     [timeframeScopedRows, facetDefs],
   );
 
   const iamManagementClassRows = useMemo(
-    () => countByLabel(timeframeScopedRows, IAM_MANAGEMENT_CLASS_ORDER, (row) => row.eventClass),
-    [timeframeScopedRows],
+    () => countByLabel(chartScopedRows, IAM_MANAGEMENT_CLASS_ORDER, (row) => row.eventClass),
+    [chartScopedRows],
   );
 
   const iamManagementClassBarScale = useMemo(
@@ -620,13 +661,18 @@ export function IdentityAccessContent() {
     [iamManagementClassRows],
   );
 
+  const iamManagementClassSegments = useMemo(
+    () => withCategoricalColors(iamManagementClassRows),
+    [iamManagementClassRows],
+  );
+
   const severityChartRows = useMemo(
     () =>
-      countByLabel(timeframeScopedRows, SEVERITY_CHART_ORDER, (row) => row.severity).map((row) => ({
+      countByLabel(chartScopedRows, SEVERITY_CHART_ORDER, (row) => row.severity).map((row) => ({
         ...row,
         color: SEV_BAR[row.label as IdentitySeverity],
       })),
-    [timeframeScopedRows],
+    [chartScopedRows],
   );
 
   const severityBarScale = useMemo(
@@ -635,8 +681,8 @@ export function IdentityAccessContent() {
   );
 
   const topUsersChartRows = useMemo(
-    () => topCountsByLabel(timeframeScopedRows, (row) => row.user, 4, CHART_CATEGORY_FILL),
-    [timeframeScopedRows],
+    () => topCountsByLabel(chartScopedRows, (row) => row.user, 4, CHART_CATEGORY_FILL),
+    [chartScopedRows],
   );
 
   const topUsersBarScale = useMemo(
@@ -644,18 +690,16 @@ export function IdentityAccessContent() {
     [topUsersChartRows],
   );
 
-  const filteredRows = useMemo(() => {
-    const chartFiltered = timeframeScopedRows.filter((row) => {
-      if (eventClassFilter && row.eventClass !== eventClassFilter) return false;
-      if (severityFilter && row.severity !== severityFilter) return false;
-      if (userFilter && row.user !== userFilter) return false;
-      return true;
-    });
+  const topUsersSegments = useMemo(
+    () => withCategoricalColors(topUsersChartRows.map(({ label, value }) => ({ label, value }))),
+    [topUsersChartRows],
+  );
 
-    return applyDataGridFacetFilters(chartFiltered, facetSelections, facetDefs).filter((row) =>
+  const filteredRows = useMemo(() => {
+    return applyDataGridFacetFilters(chartScopedRows, facetSelections, facetDefs).filter((row) =>
       identityMatchesSearch(row, searchQuery),
     );
-  }, [timeframeScopedRows, eventClassFilter, severityFilter, userFilter, facetSelections, facetDefs, searchQuery]);
+  }, [chartScopedRows, facetSelections, facetDefs, searchQuery]);
   const tableGrid = useIdentityAccessTableGrid(filteredRows);
   const resultsDetail = useResultsDetailSlideOver(filteredRows);
   useResultsDetailPaginationSync({
@@ -671,9 +715,17 @@ export function IdentityAccessContent() {
     IDENTITY_ACCESS_DATA_GRID_COLUMNS,
   );
 
+  const handleSearchSelected = useCallback(() => {
+    const selectedRows = filteredRows.filter((row) => selectedIds.has(row.id));
+    const query = buildTitlesFsqlQuery(selectedRows.map((row) => row.title));
+    if (!query.trim()) return;
+    setPendingFsqlSearch({ query, autoExecute: true });
+    setSelectedIds(new Set());
+  }, [filteredRows, selectedIds, setPendingFsqlSearch]);
+
   const hasActiveFilters =
     eventClassFilter != null ||
-    severityFilter != null ||
+    chartFiltersActive(severityFilters) ||
     userFilter != null ||
     hasDataGridFacetSelections(facetSelections);
 
@@ -684,103 +736,166 @@ export function IdentityAccessContent() {
 
   const handleSeverityClick = (label: string) => {
     if (!isIdentitySeverity(label)) return;
-    setSeverityFilter((current) => (current === label ? null : label));
+    setSeverityFilters((current) => toggleChartFilter(current, label));
   };
 
   const handleUserClick = (label: string) => {
     setUserFilter((current) => (current === label ? null : label));
   };
 
-  const eventsPerHourChart = useMemo(() => {
-    const buckets = buildHourlyBuckets(timeframe);
-    const { spikeIndex, secondarySpikeIndex } = resolveAnalyticsSpikeIndices(buckets, timeframe.to);
-    const includeDate = shouldIncludeDateInBucketLabels(timeframe);
-    const xLabels = buckets.map((bucket) => formatBucketTimeLabel(bucket.start, includeDate));
-    const { indices: xTickIndices, labels: xTickLabels } = buildHourlyAxisTicks(buckets, timeframe);
-
-    const series = [
-      {
-        id: "Medium",
-        label: "Medium",
-        color: SEV_BAR.Medium,
-        icon: SEV_ICONS.Medium,
-        values: hourlySeverityValues(12, buckets, spikeIndex, secondarySpikeIndex),
-      },
-      {
-        id: "High",
-        label: "High",
-        color: SEV_BAR.High,
-        icon: SEV_ICONS.High,
-        values: hourlySeverityValues(8, buckets, spikeIndex, secondarySpikeIndex),
-      },
-      {
-        id: "Critical",
-        label: "Critical",
-        color: SEV_BAR.Critical,
-        icon: SEV_ICONS.Critical,
-        values: hourlySeverityValues(3, buckets, spikeIndex, secondarySpikeIndex),
-      },
-    ] as const;
-
-    const spikeHighlight =
-      spikeIndex != null
-        ? { index: spikeIndex, label: `spike ~${SPIKE_CLOCK_HOUR}:00` }
-        : undefined;
-
-    return { series, xLabels, xTickIndices, xTickLabels, spikeHighlight, buckets };
-  }, [timeframe]);
+  const eventsPerHourChart = useMemo(
+    () =>
+      buildSeverityTimelineChart(
+        timeframe,
+        timelineScopedRows,
+        SEVERITY_TIMELINE_STYLES,
+        (row) => row.severity,
+        (row) => parseAnalyticsRowTime(row.time),
+      ),
+    [timeframe, timelineScopedRows],
+  );
 
   return (
     <div className="flex shrink-0 flex-col gap-4 p-4 sm:p-5">
       <div className={DATA_GRID_ABOVE_SECTION_CLASS}>
-      <InsightCard title="Identity & Access Events Per Hour By Severity">
-        <ChartZoomHint unit="Hours" isChartZoomed={isChartZoomed} onReset={handleChartZoomReset} />
+      <InsightCard
+        title={`Identity & Access Events ${eventsPerHourChart.titleCadence} By Severity`}
+        headerActions={
+          <InsightCardHeaderActions
+            visualization={{
+              value: timelineViz,
+              options: SEVERITY_TIMELINE_VIZ_OPTIONS,
+              onChange: (id) => setTimelineViz(id as SeverityTimelineViz),
+            }}
+          />
+        }
+      >
+        <ChartZoomHint unit={eventsPerHourChart.zoomUnit} isChartZoomed={isChartZoomed} onReset={handleChartZoomReset} />
         <TimeSeriesAreaChart
+          mode={timelineViz}
           series={eventsPerHourChart.series}
           xLabels={eventsPerHourChart.xLabels}
           xTickIndices={eventsPerHourChart.xTickIndices}
           xTickLabels={eventsPerHourChart.xTickLabels}
           bucketStarts={eventsPerHourChart.buckets.map((bucket) => bucket.start)}
           spikeHighlight={eventsPerHourChart.spikeHighlight}
+          yMax={eventsPerHourChart.yMax}
+          yTicks={eventsPerHourChart.yTicks}
           ariaLabel="Identity and access events per hour by severity"
-          selectedSeriesId={severityFilter}
+          selectedSeriesIds={[...severityFilters]}
           onSeriesClick={handleSeverityClick}
-          onBrushCommit={(selection) => handleTimelineBrush(selection, eventsPerHourChart.buckets)}
+          onBrushCommit={(selection) =>
+            handleTimelineBrush(selection, eventsPerHourChart.buckets, eventsPerHourChart.durationMs)
+          }
         />
       </InsightCard>
 
-      <div className="grid min-h-0 shrink-0 grid-cols-1 items-stretch gap-4 lg:grid-cols-3">
-        <InsightCard title="Identity & Access Management Classes" fillHeight>
-          <HorizontalBarPanel
-            rows={iamManagementClassRows}
-            selectedLabel={eventClassFilter}
-            onBarClick={handleEventClassClick}
-            filterAriaLabel={(label) => `Filter identity events by ${label}`}
-            xMax={iamManagementClassBarScale.xMax}
-            xTicks={iamManagementClassBarScale.xTicks}
-          />
-        </InsightCard>
-        <InsightCard title="Severity ID" fillHeight>
-          <HorizontalBarPanel
-            rows={severityChartRows}
-            selectedLabel={severityFilter}
-            onBarClick={handleSeverityClick}
-            filterAriaLabel={(label) => `Filter identity events by ${label} severity`}
-            xMax={severityBarScale.xMax}
-            xTicks={severityBarScale.xTicks}
-          />
-        </InsightCard>
-        <InsightCard title="Top Users By Failed Logins" fillHeight>
-          <HorizontalBarPanel
-            rows={topUsersChartRows}
-            selectedLabel={userFilter}
-            onBarClick={handleUserClick}
-            filterAriaLabel={(label) => `Filter identity events by user ${label}`}
-            xMax={topUsersBarScale.xMax}
-            xTicks={topUsersBarScale.xTicks}
-          />
-        </InsightCard>
-      </div>
+      <ExpandableColumnWidgetLayout
+        expandedIds={columnExpand.expandedIds}
+        collapsedIds={columnExpand.collapsedIds}
+        renderWidget={(id, expanded) => {
+          const chart =
+            id === "classes" ? (
+              classesViz === "donut" ? (
+                <DonutChartPanel
+                  segments={iamManagementClassSegments}
+                  total={chartScopedRows.length}
+                  centerLabel="events"
+                  selectedLabel={eventClassFilter}
+                  onSegmentClick={handleEventClassClick}
+                  ariaLabel="Identity and access management classes"
+                />
+              ) : (
+                <HorizontalBarPanel
+                  rows={iamManagementClassRows}
+                  selectedLabel={eventClassFilter}
+                  onBarClick={handleEventClassClick}
+                  filterAriaLabel={(label) => `Filter identity events by ${label}`}
+                  xMax={iamManagementClassBarScale.xMax}
+                  xTicks={iamManagementClassBarScale.xTicks}
+                />
+              )
+            ) : id === "severity" ? (
+              severityViz === "donut" ? (
+                <DonutChartPanel
+                  segments={severityChartRows}
+                  total={chartScopedRows.length}
+                  centerLabel="events"
+                  selectedLabels={[...severityFilters]}
+                  onSegmentClick={handleSeverityClick}
+                  ariaLabel="Identity events by severity"
+                />
+              ) : (
+                <HorizontalBarPanel
+                  rows={severityChartRows}
+                  selectedLabels={[...severityFilters]}
+                  onBarClick={handleSeverityClick}
+                  filterAriaLabel={(label) => `Filter identity events by ${label} severity`}
+                  xMax={severityBarScale.xMax}
+                  xTicks={severityBarScale.xTicks}
+                />
+              )
+            ) : usersViz === "donut" ? (
+              <DonutChartPanel
+                segments={topUsersSegments}
+                total={topUsersSegments.reduce((sum, segment) => sum + segment.value, 0)}
+                centerLabel="events"
+                selectedLabel={userFilter}
+                onSegmentClick={handleUserClick}
+                ariaLabel="Top users by failed logins"
+              />
+            ) : (
+              <HorizontalBarPanel
+                rows={topUsersChartRows}
+                selectedLabel={userFilter}
+                onBarClick={handleUserClick}
+                filterAriaLabel={(label) => `Filter identity events by user ${label}`}
+                xMax={topUsersBarScale.xMax}
+                xTicks={topUsersBarScale.xTicks}
+              />
+            );
+          const title =
+            id === "classes"
+              ? "Identity & Access Management Classes"
+              : id === "severity"
+                ? "Severity ID"
+                : "Top Users By Failed Logins";
+          const visualization =
+            id === "classes"
+              ? {
+                  value: classesViz,
+                  options: CATEGORICAL_WIDGET_VIZ_OPTIONS,
+                  onChange: (next: string) => setClassesViz(next as CategoricalWidgetViz),
+                }
+              : id === "severity"
+                ? {
+                    value: severityViz,
+                    options: CATEGORICAL_WIDGET_VIZ_OPTIONS,
+                    onChange: (next: string) => setSeverityViz(next as CategoricalWidgetViz),
+                  }
+                : {
+                    value: usersViz,
+                    options: CATEGORICAL_WIDGET_VIZ_OPTIONS,
+                    onChange: (next: string) => setUsersViz(next as CategoricalWidgetViz),
+                  };
+          return (
+            <ExpandableColumnWidgetShell id={id} expanded={expanded} api={columnExpand}>
+              <InsightCard
+                title={title}
+                fillHeight
+                headerActions={
+                  <InsightCardHeaderActions
+                    expand={{ expanded, onToggle: () => columnExpand.toggle(id) }}
+                    visualization={visualization}
+                  />
+                }
+              >
+                {chart}
+              </InsightCard>
+            </ExpandableColumnWidgetShell>
+          );
+        }}
+      />
       </div>
 
       <DataGridSection
@@ -788,42 +903,51 @@ export function IdentityAccessContent() {
           <>
             <h2 className="text-base-semibold text-text-primary">Identity & Access Events</h2>
             <div className="mt-2 flex flex-wrap items-center gap-3">
-              <p className="shrink-0 text-base-small text-text-secondary">
-                {filteredRows.length} of {timeframeScopedRows.length} Results
-                {eventClassFilter ? ` · ${eventClassFilter}` : ""}
-                {severityFilter ? ` · ${severityFilter}` : ""}
-                {userFilter ? ` · ${userFilter}` : ""}
-                {searchQuery.trim() ? ` · “${searchQuery.trim()}”` : ""}
-              </p>
-              <div className="w-[300px] shrink-0">
-                <Input
-                  variant="search"
-                  placeholder={DATA_GRID_RESULTS_SEARCH_PLACEHOLDER}
-                  value={searchQuery}
-                  onChange={(event) => setSearchQuery(event.target.value)}
-                  onClear={() => setSearchQuery("")}
-                  className="!bg-datavis-card-bg"
-                  aria-label="Search identity and access events"
-                />
+              <div className="flex min-w-0 flex-1 flex-wrap items-center gap-3">
+                <p className="shrink-0 text-base-small text-text-secondary">
+                  {filteredRows.length} of {timeframeScopedRows.length} Results
+                  {eventClassFilter ? ` · ${eventClassFilter}` : ""}
+                  {severityFilters.size > 0 ? ` · ${formatChartFilterLabels(severityFilters)}` : ""}
+                  {userFilter ? ` · ${userFilter}` : ""}
+                  {searchQuery.trim() ? ` · “${searchQuery.trim()}”` : ""}
+                </p>
+                <div className="w-[300px] shrink-0">
+                  <Input
+                    variant="search"
+                    placeholder={DATA_GRID_RESULTS_SEARCH_PLACEHOLDER}
+                    value={searchQuery}
+                    onChange={(event) => setSearchQuery(event.target.value)}
+                    onClear={() => setSearchQuery("")}
+                    className="!bg-datavis-card-bg"
+                    aria-label="Search identity and access events"
+                  />
+                </div>
+                {hasActiveFilters ? (
+                  <Button
+                    type="button"
+                    variant="ghost"
+                    className="h-8 shrink-0 gap-1.5 px-2 text-base-small text-text-tertiary hover:text-text-primary [&_svg]:!h-2 [&_svg]:!w-3"
+                    onClick={() => {
+                      setEventClassFilter(null);
+                      setSeverityFilters(new Set());
+                      setUserFilter(null);
+                      setFacetSelections({});
+                      setSearchQuery("");
+                    }}
+                  >
+                    <Icon name="action-filter-list" size={14} aria-hidden />
+                    Clear all filters
+                  </Button>
+                ) : null}
+                <DataGridExportButton onClick={exportAll} />
               </div>
-              {hasActiveFilters ? (
-                <Button
-                  type="button"
-                  variant="ghost"
-                  className="h-8 shrink-0 gap-1.5 px-2 text-base-small text-text-tertiary hover:text-text-primary [&_svg]:!h-2 [&_svg]:!w-3"
-                  onClick={() => {
-                    setEventClassFilter(null);
-                    setSeverityFilter(null);
-                    setUserFilter(null);
-                    setFacetSelections({});
-                    setSearchQuery("");
-                  }}
-                >
-                  <Icon name="action-filter-list" size={14} aria-hidden />
-                  Clear all filters
-                </Button>
+              {selectedIds.size > 0 ? (
+                <DataGridSearchSelectedActions
+                  className="!ml-0"
+                  onSearch={handleSearchSelected}
+                  onClear={() => setSelectedIds(new Set())}
+                />
               ) : null}
-              <DataGridExportButton onClick={exportAll} />
             </div>
           </>
         }
@@ -845,6 +969,8 @@ export function IdentityAccessContent() {
             tableColumnIds={tableColumnIds}
             onOpenDetail={resultsDetail.open}
             highlightedRowId={resultsDetail.isOpen ? resultsDetail.activeId : null}
+            selected={selectedIds}
+            onSelectedChange={setSelectedIds}
           />
         }
         footer={<DataGridPaginationFooter grid={tableGrid} />}

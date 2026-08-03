@@ -1,4 +1,4 @@
-import { useMemo, useState } from "react";
+import { useCallback, useMemo, useState } from "react";
 import { DATA_GRID_ABOVE_SECTION_CLASS, DATA_GRID_HEADER_ROW_CLASS, DATA_GRID_RESULTS_SEARCH_PLACEHOLDER, DATA_GRID_TABLE_CLASS, DATA_GRID_TABLE_SCROLL_CLASS, DATA_GRID_THEAD_CLASS } from "../ui/dataGridTableStyles";
 import { Checkbox, Icon, type SeverityShapeIconName, withCategoricalColors } from "../../design-system";
 import { Button } from "@/components/shadcn/button";
@@ -14,6 +14,7 @@ import {
 } from "../ui/dataGridFilterTypes";
 import { Input } from "../ui/Input";
 import { DataGridExportButton } from "../ui/DataGridExportButton";
+import { DataGridSearchSelectedActions } from "../ui/DataGridSearchSelectedActions";
 import { Snackbar } from "../ui/Snackbar";
 import { useDataGridJsonExport } from "../ui/useDataGridJsonExport";
 import { SeverityTableIcon } from "../ui/SeverityTableIcon";
@@ -36,28 +37,36 @@ import { ResultsDetailSlideOver, useResultsDetailSlideOver } from "../ui/useResu
 import { useResultsDetailPaginationSync } from "../ui/useResultsDetailPaginationSync";
 import { demoTableConnector } from "../connectors/demoTableConnectors";
 import { ConnectorTableCell } from "../ui/ConnectorTableCell";
-import { cx, InsightCard } from "./datavisCard";
+import { useCopilot } from "../../context/CopilotContext";
+import { buildTitlesFsqlQuery } from "../../lib/buildEntitiesFsqlQuery";
+import { cx, InsightCard, InsightCardHeaderActions } from "./datavisCard";
+import {
+  ExpandableColumnWidgetLayout,
+  ExpandableColumnWidgetShell,
+  useExpandableColumnWidgets,
+} from "./useExpandableColumnWidgets";
 import {
   buildHourlyEventRows,
   ChartZoomHint,
   countByLabel,
   formatAnalyticsRowTime,
   horizontalBarScale,
+  parseAnalyticsRowTime,
   rowTimeInTimeframe,
   useFederatedAnalyticsTimeframeZoom,
 } from "./federatedAnalyticsZoom";
+import { chartFiltersActive, formatChartFilterLabels, toggleChartFilter } from "./chartFilterSet";
 import { HorizontalBarPanel } from "./horizontalBarPanel";
 import { TimeSeriesAreaChart } from "./timeSeriesAreaChart";
+import { SEVERITY_TIMELINE_VIZ_OPTIONS, type SeverityTimelineViz } from "./severityTimelineViz";
 import {
-  buildHourlyAxisTicks,
-  buildHourlyBuckets,
-  formatBucketTimeLabel,
-  shouldIncludeDateInBucketLabels,
-  hourlySeverityValues,
-  resolveAnalyticsSpikeIndices,
-} from "./timeframeChartUtils";
+  buildSeverityTimelineChart,
+  normalizeSeverityFilterIds,
+} from "./severityTimelineSeries";
+import { CATEGORICAL_WIDGET_VIZ_OPTIONS, type CategoricalWidgetViz } from "./categoricalWidgetViz";
 
 const REMEDIATION_SPIKE_HOUR = 10;
+const REMEDIATION_COLUMN_WIDGET_ORDER = ["classes", "severity", "status"] as const;
 type RemediationSeverity = "Critical" | "High" | "Medium" | "Low" | "Informational";
 
 const SEV_BAR: Record<RemediationSeverity, string> = {
@@ -75,6 +84,14 @@ const SEV_ICONS: Record<RemediationSeverity, SeverityShapeIconName> = {
   Low: "severity-low",
   Informational: "severity-info",
 };
+
+const SEVERITY_TIMELINE_STYLES = {
+  Informational: { color: SEV_BAR.Informational, icon: SEV_ICONS.Informational },
+  Low: { color: SEV_BAR.Low, icon: SEV_ICONS.Low },
+  Medium: { color: SEV_BAR.Medium, icon: SEV_ICONS.Medium },
+  High: { color: SEV_BAR.High, icon: SEV_ICONS.High },
+  Critical: { color: SEV_BAR.Critical, icon: SEV_ICONS.Critical },
+} as const;
 
 const SEVERITY_ORDER: Record<RemediationSeverity, number> = {
   Critical: 0,
@@ -366,14 +383,17 @@ function RemediationEventsTable({
   tableColumnIds,
   onOpenDetail,
   highlightedRowId,
+  selected,
+  onSelectedChange,
 }: {
   displayRows: RemediationRow[];
   getSortProps: ReturnType<typeof useRemediationEventsTableGrid>["getSortProps"];
   tableColumnIds: readonly string[];
   onOpenDetail: (id: string) => void;
   highlightedRowId?: string | null;
+  selected: ReadonlySet<string>;
+  onSelectedChange: (next: Set<string>) => void;
 }) {
-  const [selected, setSelected] = useState<Set<string>>(() => new Set());
   const {
     containerRef,
     colStyle,
@@ -390,16 +410,14 @@ function RemediationEventsTable({
   const someSelected = selectedOnPage > 0 && !allSelected;
 
   const toggleAll = (checked: boolean) => {
-    setSelected(checked ? new Set(allIds) : new Set());
+    onSelectedChange(checked ? new Set([...selected, ...allIds]) : new Set());
   };
 
   const toggleRow = (id: string, checked: boolean) => {
-    setSelected((prev) => {
-      const next = new Set(prev);
-      if (checked) next.add(id);
-      else next.delete(id);
-      return next;
-    });
+    const next = new Set(selected);
+    if (checked) next.add(id);
+    else next.delete(id);
+    onSelectedChange(next);
   };
 
   const renderHeaderCell = (columnId: string, colIndex: number) => {
@@ -571,14 +589,21 @@ function RemediationEventsTable({
 
 /** Figma concept — Remediation body for Federated Analytics. */
 export function RemediationContent() {
+  const { setPendingFsqlSearch } = useCopilot();
   const { timeframe, initialTimeframe, isChartZoomed, handleTimelineBrush, handleChartZoomReset } =
-    useFederatedAnalyticsTimeframeZoom("hourly");
+    useFederatedAnalyticsTimeframeZoom("adaptive");
   const [activityClassFilter, setActivityClassFilter] = useState<ActivityClass | null>(null);
-  const [severityFilter, setSeverityFilter] = useState<string | null>(null);
+  const [severityFilters, setSeverityFilters] = useState<ReadonlySet<string>>(() => new Set());
   const [statusFilter, setStatusFilter] = useState<RemediationStatus | null>(null);
+  const [timelineViz, setTimelineViz] = useState<SeverityTimelineViz>("area");
+  const [classesViz, setClassesViz] = useState<CategoricalWidgetViz>("bar");
+  const [severityViz, setSeverityViz] = useState<CategoricalWidgetViz>("bar");
+  const [statusViz, setStatusViz] = useState<CategoricalWidgetViz>("donut");
   const [searchQuery, setSearchQuery] = useState("");
   const [tableTool, setTableTool] = useState<FilterColumnPanelTool | null>(null);
   const [facetSelections, setFacetSelections] = useState<DataGridFacetSelections>({});
+  const [selectedIds, setSelectedIds] = useState<Set<string>>(() => new Set());
+  const columnExpand = useExpandableColumnWidgets(REMEDIATION_COLUMN_WIDGET_ORDER);
 
   const facetDefs = useMemo(
     () =>
@@ -616,14 +641,33 @@ export function RemediationContent() {
     [tableRows, timeframe],
   );
 
+  const chartScopedRows = useMemo(() => {
+    return timeframeScopedRows.filter((row) => {
+      if (activityClassFilter && row.activityClass !== activityClassFilter) return false;
+      if (severityFilters.size > 0) {
+        if (![...severityFilters].some((f) => severityMatchesFilter(row.severity, f))) return false;
+      }
+      if (statusFilter && row.status !== statusFilter) return false;
+      return true;
+    });
+  }, [timeframeScopedRows, activityClassFilter, severityFilters, statusFilter]);
+
+  const timelineScopedRows = useMemo(() => {
+    return timeframeScopedRows.filter((row) => {
+      if (activityClassFilter && row.activityClass !== activityClassFilter) return false;
+      if (statusFilter && row.status !== statusFilter) return false;
+      return true;
+    });
+  }, [timeframeScopedRows, activityClassFilter, statusFilter]);
+
   const facets = useMemo(
     () => buildDataGridFacets(timeframeScopedRows, facetDefs),
     [timeframeScopedRows, facetDefs],
   );
 
   const activityClassRows = useMemo(
-    () => countByLabel(timeframeScopedRows, ACTIVITY_CLASS_ORDER, (row) => row.activityClass),
-    [timeframeScopedRows],
+    () => countByLabel(chartScopedRows, ACTIVITY_CLASS_ORDER, (row) => row.activityClass),
+    [chartScopedRows],
   );
 
   const activityClassBarScale = useMemo(
@@ -631,15 +675,20 @@ export function RemediationContent() {
     [activityClassRows],
   );
 
+  const activityClassSegments = useMemo(
+    () => withCategoricalColors(activityClassRows),
+    [activityClassRows],
+  );
+
   const severityChartRows = useMemo(
     () =>
-      countByLabel(timeframeScopedRows, SEVERITY_CHART_ORDER, (row) =>
+      countByLabel(chartScopedRows, SEVERITY_CHART_ORDER, (row) =>
         row.severity === "Informational" ? "Info" : row.severity,
       ).map((row) => ({
         ...row,
         color: row.label === "Info" ? SEV_BAR.Informational : SEV_BAR[row.label as RemediationSeverity],
       })),
-    [timeframeScopedRows],
+    [chartScopedRows],
   );
 
   const severityBarScale = useMemo(
@@ -649,22 +698,25 @@ export function RemediationContent() {
 
   const statusSegments = useMemo(
     () =>
-      withCategoricalColors(countByLabel(timeframeScopedRows, STATUS_ORDER, (row) => row.status)),
-    [timeframeScopedRows],
+      withCategoricalColors(countByLabel(chartScopedRows, STATUS_ORDER, (row) => row.status)),
+    [chartScopedRows],
+  );
+
+  const statusBarRows = useMemo(
+    () => statusSegments.map(({ label, value, color }) => ({ label, value, color })),
+    [statusSegments],
+  );
+
+  const statusBarScale = useMemo(
+    () => horizontalBarScale(statusBarRows.map((row) => row.value)),
+    [statusBarRows],
   );
 
   const filteredRows = useMemo(() => {
-    const chartFiltered = timeframeScopedRows.filter((row) => {
-      if (activityClassFilter && row.activityClass !== activityClassFilter) return false;
-      if (severityFilter && !severityMatchesFilter(row.severity, severityFilter)) return false;
-      if (statusFilter && row.status !== statusFilter) return false;
-      return true;
-    });
-
-    return applyDataGridFacetFilters(chartFiltered, facetSelections, facetDefs).filter((row) =>
+    return applyDataGridFacetFilters(chartScopedRows, facetSelections, facetDefs).filter((row) =>
       remediationMatchesSearch(row, searchQuery),
     );
-  }, [timeframeScopedRows, activityClassFilter, severityFilter, statusFilter, facetSelections, facetDefs, searchQuery]);
+  }, [chartScopedRows, facetSelections, facetDefs, searchQuery]);
   const tableGrid = useRemediationEventsTableGrid(filteredRows);
   const resultsDetail = useResultsDetailSlideOver(filteredRows);
   useResultsDetailPaginationSync({
@@ -680,9 +732,17 @@ export function RemediationContent() {
     REMEDIATION_DATA_GRID_COLUMNS,
   );
 
+  const handleSearchSelected = useCallback(() => {
+    const selectedRows = filteredRows.filter((row) => selectedIds.has(row.id));
+    const query = buildTitlesFsqlQuery(selectedRows.map((row) => row.title));
+    if (!query.trim()) return;
+    setPendingFsqlSearch({ query, autoExecute: true });
+    setSelectedIds(new Set());
+  }, [filteredRows, selectedIds, setPendingFsqlSearch]);
+
   const hasActiveFilters =
     activityClassFilter != null ||
-    severityFilter != null ||
+    chartFiltersActive(severityFilters) ||
     statusFilter != null ||
     hasDataGridFacetSelections(facetSelections);
 
@@ -693,12 +753,12 @@ export function RemediationContent() {
 
   const handleSeverityClick = (label: string) => {
     if (label !== "Info" && !isRemediationSeverity(label)) return;
-    setSeverityFilter((current) => (current === label ? null : label));
+    setSeverityFilters((current) => toggleChartFilter(current, label));
   };
 
   const handleChartSeverityClick = (seriesId: string) => {
     if (!isRemediationSeverity(seriesId)) return;
-    setSeverityFilter((current) => (current === seriesId ? null : seriesId));
+    setSeverityFilters((current) => toggleChartFilter(current, seriesId));
   };
 
   const handleStatusClick = (label: string) => {
@@ -706,100 +766,160 @@ export function RemediationContent() {
     setStatusFilter((current) => (current === label ? null : label));
   };
 
-  const eventsPerHourChart = useMemo(() => {
-    const buckets = buildHourlyBuckets(timeframe);
-    const { spikeIndex, secondarySpikeIndex } = resolveAnalyticsSpikeIndices(
-      buckets,
-      timeframe.to,
-      REMEDIATION_SPIKE_HOUR,
-    );
-    const includeDate = shouldIncludeDateInBucketLabels(timeframe);
-    const xLabels = buckets.map((bucket) => formatBucketTimeLabel(bucket.start, includeDate));
-    const { indices: xTickIndices, labels: xTickLabels } = buildHourlyAxisTicks(buckets, timeframe);
-
-    const series = [
-      {
-        id: "Medium",
-        label: "Medium",
-        color: SEV_BAR.Medium,
-        icon: SEV_ICONS.Medium,
-        values: hourlySeverityValues(14, buckets, spikeIndex, secondarySpikeIndex),
-      },
-      {
-        id: "High",
-        label: "High",
-        color: SEV_BAR.High,
-        icon: SEV_ICONS.High,
-        values: hourlySeverityValues(10, buckets, spikeIndex, secondarySpikeIndex),
-      },
-      {
-        id: "Critical",
-        label: "Critical",
-        color: SEV_BAR.Critical,
-        icon: SEV_ICONS.Critical,
-        values: hourlySeverityValues(4, buckets, spikeIndex, secondarySpikeIndex),
-      },
-    ] as const;
-
-    const spikeHighlight =
-      spikeIndex != null
-        ? { index: spikeIndex, label: "spike ~10:30" }
-        : undefined;
-
-    return { series, xLabels, xTickIndices, xTickLabels, spikeHighlight, buckets };
-  }, [timeframe]);
+  const eventsPerHourChart = useMemo(
+    () =>
+      buildSeverityTimelineChart(
+        timeframe,
+        timelineScopedRows,
+        SEVERITY_TIMELINE_STYLES,
+        (row) => row.severity,
+        (row) => parseAnalyticsRowTime(row.time),
+        { primarySpikeHour: REMEDIATION_SPIKE_HOUR, spikeLabel: "spike ~10:30" },
+      ),
+    [timeframe, timelineScopedRows],
+  );
 
   return (
     <div className="flex shrink-0 flex-col gap-4 p-4 sm:p-5">
       <div className={DATA_GRID_ABOVE_SECTION_CLASS}>
-      <InsightCard title="Remediation Events Per Hour By Severity">
-        <ChartZoomHint unit="Hours" isChartZoomed={isChartZoomed} onReset={handleChartZoomReset} />
+      <InsightCard
+        title={`Remediation Events ${eventsPerHourChart.titleCadence} By Severity`}
+        headerActions={
+          <InsightCardHeaderActions
+            visualization={{
+              value: timelineViz,
+              options: SEVERITY_TIMELINE_VIZ_OPTIONS,
+              onChange: (id) => setTimelineViz(id as SeverityTimelineViz),
+            }}
+          />
+        }
+      >
+        <ChartZoomHint unit={eventsPerHourChart.zoomUnit} isChartZoomed={isChartZoomed} onReset={handleChartZoomReset} />
         <TimeSeriesAreaChart
+          mode={timelineViz}
           series={eventsPerHourChart.series}
           xLabels={eventsPerHourChart.xLabels}
           xTickIndices={eventsPerHourChart.xTickIndices}
           xTickLabels={eventsPerHourChart.xTickLabels}
           bucketStarts={eventsPerHourChart.buckets.map((bucket) => bucket.start)}
           spikeHighlight={eventsPerHourChart.spikeHighlight}
+          yMax={eventsPerHourChart.yMax}
+          yTicks={eventsPerHourChart.yTicks}
           ariaLabel="Remediation events per hour by severity"
-          selectedSeriesId={severityFilter && isRemediationSeverity(severityFilter) ? severityFilter : null}
+          selectedSeriesIds={normalizeSeverityFilterIds(severityFilters).filter(isRemediationSeverity)}
           onSeriesClick={handleChartSeverityClick}
-          onBrushCommit={(selection) => handleTimelineBrush(selection, eventsPerHourChart.buckets)}
+          onBrushCommit={(selection) =>
+            handleTimelineBrush(selection, eventsPerHourChart.buckets, eventsPerHourChart.durationMs)
+          }
         />
       </InsightCard>
 
-      <div className="grid min-h-0 shrink-0 grid-cols-1 items-stretch gap-4 lg:grid-cols-3">
-        <InsightCard title="Remediation Activity Classes" fillHeight>
-          <HorizontalBarPanel
-            rows={activityClassRows}
-            selectedLabel={activityClassFilter}
-            onBarClick={handleActivityClassClick}
-            filterAriaLabel={(label) => `Filter remediation events by ${label}`}
-            xMax={activityClassBarScale.xMax}
-            xTicks={activityClassBarScale.xTicks}
-          />
-        </InsightCard>
-        <InsightCard title="Severity ID" fillHeight>
-          <HorizontalBarPanel
-            rows={severityChartRows}
-            selectedLabel={severityFilter}
-            onBarClick={handleSeverityClick}
-            filterAriaLabel={(label) => `Filter remediation events by ${label} severity`}
-            xMax={severityBarScale.xMax}
-            xTicks={severityBarScale.xTicks}
-          />
-        </InsightCard>
-        <InsightCard title="Remediation Status" fillHeight>
-          <DonutChartPanel
-            segments={statusSegments}
-            total={timeframeScopedRows.length}
-            centerLabel="actions"
-            selectedLabel={statusFilter}
-            onSegmentClick={handleStatusClick}
-            ariaLabel="Remediation status breakdown"
-          />
-        </InsightCard>
-      </div>
+      <ExpandableColumnWidgetLayout
+        expandedIds={columnExpand.expandedIds}
+        collapsedIds={columnExpand.collapsedIds}
+        renderWidget={(id, expanded) => {
+          const chart =
+            id === "classes" ? (
+              classesViz === "donut" ? (
+                <DonutChartPanel
+                  segments={activityClassSegments}
+                  total={chartScopedRows.length}
+                  centerLabel="actions"
+                  selectedLabel={activityClassFilter}
+                  onSegmentClick={handleActivityClassClick}
+                  ariaLabel="Remediation activity classes"
+                />
+              ) : (
+                <HorizontalBarPanel
+                  rows={activityClassRows}
+                  selectedLabel={activityClassFilter}
+                  onBarClick={handleActivityClassClick}
+                  filterAriaLabel={(label) => `Filter remediation events by ${label}`}
+                  xMax={activityClassBarScale.xMax}
+                  xTicks={activityClassBarScale.xTicks}
+                />
+              )
+            ) : id === "severity" ? (
+              severityViz === "donut" ? (
+                <DonutChartPanel
+                  segments={severityChartRows}
+                  total={chartScopedRows.length}
+                  centerLabel="actions"
+                  selectedLabels={[...severityFilters]}
+                  onSegmentClick={handleSeverityClick}
+                  ariaLabel="Remediation events by severity"
+                />
+              ) : (
+                <HorizontalBarPanel
+                  rows={severityChartRows}
+                  selectedLabels={[...severityFilters]}
+                  onBarClick={handleSeverityClick}
+                  filterAriaLabel={(label) => `Filter remediation events by ${label} severity`}
+                  xMax={severityBarScale.xMax}
+                  xTicks={severityBarScale.xTicks}
+                />
+              )
+            ) : statusViz === "bar" ? (
+              <HorizontalBarPanel
+                rows={statusBarRows}
+                selectedLabel={statusFilter}
+                onBarClick={handleStatusClick}
+                filterAriaLabel={(label) => `Filter remediation events by ${label} status`}
+                xMax={statusBarScale.xMax}
+                xTicks={statusBarScale.xTicks}
+              />
+            ) : (
+              <DonutChartPanel
+                segments={statusSegments}
+                total={chartScopedRows.length}
+                centerLabel="actions"
+                selectedLabel={statusFilter}
+                onSegmentClick={handleStatusClick}
+                ariaLabel="Remediation status breakdown"
+              />
+            );
+          const title =
+            id === "classes"
+              ? "Remediation Activity Classes"
+              : id === "severity"
+                ? "Severity ID"
+                : "Remediation Status";
+          const visualization =
+            id === "classes"
+              ? {
+                  value: classesViz,
+                  options: CATEGORICAL_WIDGET_VIZ_OPTIONS,
+                  onChange: (next: string) => setClassesViz(next as CategoricalWidgetViz),
+                }
+              : id === "severity"
+                ? {
+                    value: severityViz,
+                    options: CATEGORICAL_WIDGET_VIZ_OPTIONS,
+                    onChange: (next: string) => setSeverityViz(next as CategoricalWidgetViz),
+                  }
+                : {
+                    value: statusViz,
+                    options: CATEGORICAL_WIDGET_VIZ_OPTIONS,
+                    onChange: (next: string) => setStatusViz(next as CategoricalWidgetViz),
+                  };
+          return (
+            <ExpandableColumnWidgetShell id={id} expanded={expanded} api={columnExpand}>
+              <InsightCard
+                title={title}
+                fillHeight
+                headerActions={
+                  <InsightCardHeaderActions
+                    expand={{ expanded, onToggle: () => columnExpand.toggle(id) }}
+                    visualization={visualization}
+                  />
+                }
+              >
+                {chart}
+              </InsightCard>
+            </ExpandableColumnWidgetShell>
+          );
+        }}
+      />
       </div>
 
       <DataGridSection
@@ -807,42 +927,51 @@ export function RemediationContent() {
           <>
             <h2 className="text-base-semibold text-text-primary">Remediation Activity Events</h2>
             <div className="mt-2 flex flex-wrap items-center gap-3">
-              <p className="shrink-0 text-base-small text-text-secondary">
-                {filteredRows.length} of {timeframeScopedRows.length} Results
-                {activityClassFilter ? ` · ${activityClassFilter}` : ""}
-                {severityFilter ? ` · ${severityFilter}` : ""}
-                {statusFilter ? ` · ${statusFilter}` : ""}
-                {searchQuery.trim() ? ` · “${searchQuery.trim()}”` : ""}
-              </p>
-              <div className="w-[300px] shrink-0">
-                <Input
-                  variant="search"
-                  placeholder={DATA_GRID_RESULTS_SEARCH_PLACEHOLDER}
-                  value={searchQuery}
-                  onChange={(event) => setSearchQuery(event.target.value)}
-                  onClear={() => setSearchQuery("")}
-                  className="!bg-datavis-card-bg"
-                  aria-label="Search remediation activity events"
-                />
+              <div className="flex min-w-0 flex-1 flex-wrap items-center gap-3">
+                <p className="shrink-0 text-base-small text-text-secondary">
+                  {filteredRows.length} of {timeframeScopedRows.length} Results
+                  {activityClassFilter ? ` · ${activityClassFilter}` : ""}
+                  {severityFilters.size > 0 ? ` · ${formatChartFilterLabels(severityFilters)}` : ""}
+                  {statusFilter ? ` · ${statusFilter}` : ""}
+                  {searchQuery.trim() ? ` · “${searchQuery.trim()}”` : ""}
+                </p>
+                <div className="w-[300px] shrink-0">
+                  <Input
+                    variant="search"
+                    placeholder={DATA_GRID_RESULTS_SEARCH_PLACEHOLDER}
+                    value={searchQuery}
+                    onChange={(event) => setSearchQuery(event.target.value)}
+                    onClear={() => setSearchQuery("")}
+                    className="!bg-datavis-card-bg"
+                    aria-label="Search remediation activity events"
+                  />
+                </div>
+                {hasActiveFilters ? (
+                  <Button
+                    type="button"
+                    variant="ghost"
+                    className="h-8 shrink-0 gap-1.5 px-2 text-base-small text-text-tertiary hover:text-text-primary [&_svg]:!h-2 [&_svg]:!w-3"
+                    onClick={() => {
+                      setActivityClassFilter(null);
+                      setSeverityFilters(new Set());
+                      setStatusFilter(null);
+                      setFacetSelections({});
+                      setSearchQuery("");
+                    }}
+                  >
+                    <Icon name="action-filter-list" size={14} aria-hidden />
+                    Clear all filters
+                  </Button>
+                ) : null}
+                <DataGridExportButton onClick={exportAll} />
               </div>
-              {hasActiveFilters ? (
-                <Button
-                  type="button"
-                  variant="ghost"
-                  className="h-8 shrink-0 gap-1.5 px-2 text-base-small text-text-tertiary hover:text-text-primary [&_svg]:!h-2 [&_svg]:!w-3"
-                  onClick={() => {
-                    setActivityClassFilter(null);
-                    setSeverityFilter(null);
-                    setStatusFilter(null);
-                    setFacetSelections({});
-                    setSearchQuery("");
-                  }}
-                >
-                  <Icon name="action-filter-list" size={14} aria-hidden />
-                  Clear all filters
-                </Button>
+              {selectedIds.size > 0 ? (
+                <DataGridSearchSelectedActions
+                  className="!ml-0"
+                  onSearch={handleSearchSelected}
+                  onClear={() => setSelectedIds(new Set())}
+                />
               ) : null}
-              <DataGridExportButton onClick={exportAll} />
             </div>
           </>
         }
@@ -864,6 +993,8 @@ export function RemediationContent() {
             tableColumnIds={tableColumnIds}
             onOpenDetail={resultsDetail.open}
             highlightedRowId={resultsDetail.isOpen ? resultsDetail.activeId : null}
+            selected={selectedIds}
+            onSelectedChange={setSelectedIds}
           />
         }
         footer={<DataGridPaginationFooter grid={tableGrid} />}

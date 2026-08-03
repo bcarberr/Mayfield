@@ -27,7 +27,29 @@ function donutSegmentPath(
   startAngle: number,
   endAngle: number,
 ) {
-  const largeArc = endAngle - startAngle > 180 ? 1 : 0;
+  const sweep = endAngle - startAngle;
+  if (sweep <= 0) return "";
+
+  // SVG arcs cannot draw a full 360° from a point back to itself — split into two halves.
+  if (sweep >= 359.999) {
+    const midAngle = startAngle + 180;
+    const outerStart = polarToCartesian(centerX, centerY, outerR, startAngle);
+    const outerMid = polarToCartesian(centerX, centerY, outerR, midAngle);
+    const innerStart = polarToCartesian(centerX, centerY, innerR, startAngle);
+    const innerMid = polarToCartesian(centerX, centerY, innerR, midAngle);
+
+    return [
+      `M ${outerStart.x} ${outerStart.y}`,
+      `A ${outerR} ${outerR} 0 1 1 ${outerMid.x} ${outerMid.y}`,
+      `A ${outerR} ${outerR} 0 1 1 ${outerStart.x} ${outerStart.y}`,
+      `L ${innerStart.x} ${innerStart.y}`,
+      `A ${innerR} ${innerR} 0 1 0 ${innerMid.x} ${innerMid.y}`,
+      `A ${innerR} ${innerR} 0 1 0 ${innerStart.x} ${innerStart.y}`,
+      "Z",
+    ].join(" ");
+  }
+
+  const largeArc = sweep > 180 ? 1 : 0;
   const outerStart = polarToCartesian(centerX, centerY, outerR, startAngle);
   const outerEnd = polarToCartesian(centerX, centerY, outerR, endAngle);
   const innerStart = polarToCartesian(centerX, centerY, innerR, endAngle);
@@ -47,6 +69,8 @@ export type DonutChartPanelProps = {
   total: number;
   centerLabel: string;
   selectedLabel?: string | null;
+  /** Multi-select highlight; when provided, takes precedence over `selectedLabel`. */
+  selectedLabels?: readonly string[] | null;
   onSegmentClick?: (label: string) => void;
   ariaLabel: string;
   size?: "default" | "compact";
@@ -58,6 +82,7 @@ export function DonutChartPanel({
   total,
   centerLabel,
   selectedLabel = null,
+  selectedLabels,
   onSegmentClick,
   ariaLabel,
   size = "default",
@@ -70,16 +95,25 @@ export function DonutChartPanel({
   const [hoveredLabel, setHoveredLabel] = useState<string | null>(null);
   const [tooltipPos, setTooltipPos] = useState<{ x: number; y: number } | null>(null);
 
+  const selectedSet =
+    selectedLabels != null
+      ? new Set(selectedLabels)
+      : selectedLabel != null
+        ? new Set([selectedLabel])
+        : null;
+
+  const isSelected = (label: string) => selectedSet != null && selectedSet.has(label);
+
   const isChartSegmentDimmed = (label: string) => {
     if (hoveredLabel != null) return hoveredLabel !== label;
-    if (selectedLabel != null) return selectedLabel !== label;
+    if (selectedSet != null && selectedSet.size > 0) return !selectedSet.has(label);
     return false;
   };
 
   const linkClass = (label: string) =>
     cx(
       "flex w-full items-start gap-2.5 rounded-[4px] text-left text-sm font-semibold transition-colors hover:text-interactive-active hover:underline",
-      selectedLabel === label ? "text-interactive-active underline" : "text-text-primary",
+      isSelected(label) ? "text-interactive-active underline" : "text-text-primary",
     );
 
   const updateTooltipPos = (event: React.MouseEvent) => {
@@ -96,28 +130,36 @@ export function DonutChartPanel({
     setTooltipPos(null);
   };
 
-  const sortedSegments = useMemo(() => [...segments].sort((a, b) => b.value - a.value), [segments]);
+  const sortedSegments = useMemo(
+    () => [...segments].filter((segment) => segment.value > 0).sort((a, b) => b.value - a.value),
+    [segments],
+  );
 
   const arcs = useMemo(() => {
     const cxPos = outerPx / 2;
     const cyPos = outerPx / 2;
     const outerR = outerPx / 2;
     const innerR = innerPx / 2;
+    // Always fill 360° from visible segments (top-N totals can be < center `total`).
+    const segmentTotal = sortedSegments.reduce((sum, segment) => sum + segment.value, 0);
     let angle = 0;
 
-    return sortedSegments.map((segment) => {
-      const sweep = total > 0 ? (segment.value / total) * 360 : 0;
+    return sortedSegments.map((segment, index) => {
+      const isLast = index === sortedSegments.length - 1;
       const startAngle = angle;
-      const endAngle = angle + sweep;
+      // Snap the final segment to 360 so float error never leaves a visible gap.
+      const endAngle =
+        isLast && segmentTotal > 0
+          ? 360
+          : angle + (segmentTotal > 0 ? (segment.value / segmentTotal) * 360 : 0);
       angle = endAngle;
 
       return {
         ...segment,
-        percent: total > 0 ? Math.round((segment.value / total) * 100) : 0,
         path: donutSegmentPath(cxPos, cyPos, innerR, outerR, startAngle, endAngle),
       };
     });
-  }, [sortedSegments, total, outerPx, innerPx]);
+  }, [sortedSegments, outerPx, innerPx]);
 
   const hovered = arcs.find((segment) => segment.label === hoveredLabel);
   const interactive = Boolean(onSegmentClick);
@@ -138,7 +180,7 @@ export function DonutChartPanel({
               transform: "translateY(calc(-100% - 8px))",
             }}
           >
-            {hovered.percent}% {hovered.label}
+            {hovered.value.toLocaleString()} {hovered.label}
           </div>
         ) : null}
         <svg
@@ -150,7 +192,7 @@ export function DonutChartPanel({
           onMouseLeave={clearHover}
         >
           {arcs.map((segment) => {
-            const selected = selectedLabel === segment.label;
+            const selected = isSelected(segment.label);
 
             return (
               <path
@@ -201,7 +243,7 @@ export function DonutChartPanel({
               <button
                 type="button"
                 className={linkClass(segment.label)}
-                aria-pressed={selectedLabel === segment.label}
+                aria-pressed={isSelected(segment.label)}
                 onClick={() => onSegmentClick!(segment.label)}
               >
                 <span

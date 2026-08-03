@@ -5,12 +5,19 @@ import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/shadcn/too
 import {
   buildDailyBuckets,
   buildHourlyBuckets,
+  dailyAmplitudeFactor,
+  demoNoise,
   eventTimeForAnalyticsBucket,
   hourlyEventMultiplier,
+  hourlyJitterFactor,
+  isDemoIncidentDay,
+  niceIntegerYTicks,
   resolveAnalyticsSpikeIndices,
   SECONDARY_SPIKE_CLUSTER_MINUTES,
   timeframeFromBucketSelection,
   timeframeFromDailyBucketSelection,
+  weekdayVolumeFactor,
+  weekendActivityFactor,
   type HourBucket,
 } from "./timeframeChartUtils";
 import type { TimeSeriesBrushSelection } from "./timeSeriesBarChart";
@@ -30,6 +37,97 @@ export function rowTimeInTimeframe(time: string, range: TimeframeRange): boolean
   const eventTime = parseAnalyticsRowTime(time);
   if (!eventTime) return true;
   return eventTime.getTime() >= range.from.getTime() && eventTime.getTime() <= range.to.getTime();
+}
+
+/** Hourly bucket index for an event time, or -1 when outside the series. */
+export function hourlyBucketIndexForTime(
+  eventTime: Date,
+  buckets: readonly HourBucket[],
+  durationMs = 3_600_000,
+): number {
+  const ms = eventTime.getTime();
+  for (let i = 0; i < buckets.length; i++) {
+    const start = buckets[i]!.start.getTime();
+    const end = start + durationMs;
+    if (ms >= start && ms < end) return i;
+  }
+  if (buckets.length > 0) {
+    const lastStart = buckets[buckets.length - 1]!.start.getTime();
+    if (ms >= lastStart && ms <= lastStart + durationMs) return buckets.length - 1;
+  }
+  return -1;
+}
+
+/** Count rows into one severity series aligned to timeline buckets. */
+export function hourlySeverityValuesFromRows<T>(
+  rows: readonly T[],
+  buckets: readonly HourBucket[],
+  severityId: string,
+  getSeverity: (row: T) => string,
+  getTime: (row: T) => Date | null,
+  durationMs = 3_600_000,
+): number[] {
+  const values = buckets.map(() => 0);
+  for (const row of rows) {
+    if (getSeverity(row) !== severityId) continue;
+    const eventTime = getTime(row);
+    if (!eventTime) continue;
+    const index = hourlyBucketIndexForTime(eventTime, buckets, durationMs);
+    if (index >= 0) values[index] += 1;
+  }
+  return values;
+}
+
+/** Count rows into daily buckets (start-of-day timestamps). */
+export function dailyValuesFromRows<T>(
+  rows: readonly T[],
+  buckets: readonly HourBucket[],
+  getTime: (row: T) => Date | null,
+): number[] {
+  const values = buckets.map(() => 0);
+  const indexByDay = new Map(buckets.map((bucket, index) => [bucket.start.getTime(), index]));
+  for (const row of rows) {
+    const eventTime = getTime(row);
+    if (!eventTime) continue;
+    const day = new Date(eventTime);
+    day.setHours(0, 0, 0, 0);
+    const index = indexByDay.get(day.getTime());
+    if (index != null) values[index] += 1;
+  }
+  return values;
+}
+
+export function niceChartYScale(values: readonly number[]): { yMax: number; yTicks: number[] } {
+  return niceIntegerYTicks(Math.max(...values, 1));
+}
+
+/** Prefer Low/Info volume so severity charts match typical security telemetry. */
+const DEMO_SEVERITY_WEIGHT: Record<string, number> = {
+  Critical: 5,
+  High: 12,
+  Medium: 20,
+  Low: 28,
+  Informational: 35,
+};
+
+function templateSeverityWeight(template: unknown): number {
+  if (template && typeof template === "object" && "severity" in template) {
+    const severity = String((template as { severity: string }).severity);
+    return DEMO_SEVERITY_WEIGHT[severity] ?? 10;
+  }
+  return 10;
+}
+
+/** Deterministic weighted pick so demos stay stable across reloads. */
+function pickWeightedTemplate<T>(templates: readonly T[], salt: number): T {
+  const weights = templates.map(templateSeverityWeight);
+  const total = weights.reduce((sum, weight) => sum + weight, 0);
+  let cursor = ((salt * 17 + 23) % total + total) % total;
+  for (let i = 0; i < templates.length; i++) {
+    cursor -= weights[i]!;
+    if (cursor < 0) return templates[i]!;
+  }
+  return templates[templates.length - 1]!;
 }
 
 export type BuildHourlyEventRowsOptions<T> = {
@@ -54,22 +152,32 @@ export function buildHourlyEventRows<T>(
   const fromMs = range.from.getTime();
   const toMs = range.to.getTime();
   const rows: T[] = [];
-  let templateIndex = 0;
+  let pickSalt = 0;
 
   buckets.forEach((bucket, bucketIndex) => {
     const isSpike = spikeIndex === bucketIndex;
     const isSecondarySpike = secondarySpikeIndex === bucketIndex;
-    const multiplier = hourlyEventMultiplier(bucket.start.getHours(), isSpike, isSecondarySpike);
-    const count = Math.max(1, Math.round(multiplier * 1.2 + ((bucketIndex * 2) % 2)));
+    const clockHour = bucket.start.getHours();
+    const multiplier = hourlyEventMultiplier(clockHour, isSpike, isSecondarySpike);
+    const weekend = weekendActivityFactor(bucket.start);
+    const weekday = weekdayVolumeFactor(bucket.start);
+    const dayAmp = dailyAmplitudeFactor(bucket.start);
+    const jitter = hourlyJitterFactor(bucket.start, clockHour, bucketIndex);
+    const incidentBoost = isDemoIncidentDay(bucket.start) && clockHour >= 9 && clockHour <= 17 ? 1.55 : 1;
+    // Day-to-day + hour jitter so longer ranges don't look copy-pasted.
+    const count = Math.max(
+      isSpike || isSecondarySpike ? 12 : 0,
+      Math.round(multiplier * 13 * weekend * weekday * dayAmp * jitter * incidentBoost),
+    );
     const secondaryTemplates = options?.secondarySpikeTemplates;
 
     for (let i = 0; i < count; i++) {
       let template: T;
       if (isSecondarySpike && secondaryTemplates?.length && i < secondaryTemplates.length) {
-        template = secondaryTemplates[i];
+        template = secondaryTemplates[i]!;
       } else {
-        template = templates[templateIndex % templates.length];
-        templateIndex += 1;
+        template = pickWeightedTemplate(templates, pickSalt);
+        pickSalt += 1;
       }
 
       const eventTime = eventTimeForAnalyticsBucket(
@@ -100,21 +208,30 @@ export function buildDailyEventRows<T>(
   const endDayMs = new Date(range.to);
   endDayMs.setHours(0, 0, 0, 0);
   const rows: T[] = [];
-  let templateIndex = 0;
+  let pickSalt = 0;
 
-  buckets.forEach((bucket) => {
+  buckets.forEach((bucket, bucketIndex) => {
     const isSpike = bucket.start.getTime() === endDayMs.getTime();
-    const dow = bucket.start.getDay();
-    const weekdayMultiplier = dow === 0 || dow === 6 ? 0.7 : 1 + (dow === 4 ? 0.2 : 0);
-    const count = Math.max(1, Math.round((isSpike ? 4 : 2) * weekdayMultiplier));
+    const weekend = weekendActivityFactor(bucket.start);
+    const weekday = weekdayVolumeFactor(bucket.start);
+    const dayAmp = dailyAmplitudeFactor(bucket.start);
+    const incident = isDemoIncidentDay(bucket.start);
+    const wave = 0.9 + Math.sin((bucketIndex / Math.max(buckets.length - 1, 1)) * Math.PI * 2.2) * 0.18;
+    const base = isSpike ? 42 : incident ? 28 : 12;
+    const count = Math.max(
+      1,
+      Math.round(base * weekend * weekday * dayAmp * wave * (0.85 + demoNoise(bucketIndex, 13) * 0.4)),
+    );
     const bucketStart = Math.max(bucket.start.getTime(), fromMs);
     const bucketEnd = Math.min(bucket.start.getTime() + 86_400_000, toMs);
     const bucketSpan = Math.max(bucketEnd - bucketStart, 60_000);
 
     for (let i = 0; i < count; i++) {
-      const template = templates[templateIndex % templates.length];
-      templateIndex += 1;
-      const eventMs = bucketStart + (bucketSpan * (i + 0.5)) / count;
+      const template = pickWeightedTemplate(templates, pickSalt);
+      pickSalt += 1;
+      // Spread events through the day with business-hours bias via index mix.
+      const hourBias = 0.2 + demoNoise(bucketIndex, i, 5) * 0.55;
+      const eventMs = bucketStart + bucketSpan * hourBias;
       rows.push(applyRow(template, String(rows.length + 1), new Date(Math.min(eventMs, toMs))));
     }
   });
@@ -161,7 +278,7 @@ export function topCountsByLabel<T>(
     .map(([label, value]) => ({ label, value, color }));
 }
 
-export function useFederatedAnalyticsTimeframeZoom(mode: "hourly" | "daily" = "hourly") {
+export function useFederatedAnalyticsTimeframeZoom(mode: "hourly" | "daily" | "adaptive" = "adaptive") {
   const {
     range: timeframe,
     analyticsBaselineRange: initialTimeframe,
@@ -171,11 +288,17 @@ export function useFederatedAnalyticsTimeframeZoom(mode: "hourly" | "daily" = "h
   } = useTimeframe();
 
   const handleTimelineBrush = useCallback(
-    (selection: TimeSeriesBrushSelection, buckets: readonly HourBucket[]) => {
+    (selection: TimeSeriesBrushSelection, buckets: readonly HourBucket[], durationMs = 3_600_000) => {
       const nextRange =
         mode === "daily"
           ? timeframeFromDailyBucketSelection(timeframe, buckets, selection.startIndex, selection.endIndex)
-          : timeframeFromBucketSelection(timeframe, buckets, selection.startIndex, selection.endIndex);
+          : timeframeFromBucketSelection(
+              timeframe,
+              buckets,
+              selection.startIndex,
+              selection.endIndex,
+              mode === "hourly" ? 3_600_000 : durationMs,
+            );
       if (!nextRange) return;
       applyAnalyticsChartZoom(nextRange);
     },

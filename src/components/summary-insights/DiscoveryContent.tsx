@@ -1,4 +1,4 @@
-import { useMemo, useState } from "react";
+import { useCallback, useMemo, useState } from "react";
 import { DATA_GRID_ABOVE_SECTION_CLASS, DATA_GRID_HEADER_ROW_CLASS, DATA_GRID_RESULTS_SEARCH_PLACEHOLDER, DATA_GRID_TABLE_CLASS, DATA_GRID_TABLE_SCROLL_CLASS, DATA_GRID_THEAD_CLASS } from "../ui/dataGridTableStyles";
 import { Checkbox, Icon, type SeverityShapeIconName, withCategoricalColors } from "../../design-system";
 import type { TimeframeRange } from "../../context/TimeframeContext";
@@ -22,6 +22,7 @@ import {
 } from "../ui/dataGridDynamicTableHelpers";
 import { Input } from "../ui/Input";
 import { DataGridExportButton } from "../ui/DataGridExportButton";
+import { DataGridSearchSelectedActions } from "../ui/DataGridSearchSelectedActions";
 import { Snackbar } from "../ui/Snackbar";
 import { useDataGridJsonExport } from "../ui/useDataGridJsonExport";
 import { SeverityTableIcon } from "../ui/SeverityTableIcon";
@@ -37,21 +38,35 @@ import { ResultsDetailSlideOver, useResultsDetailSlideOver } from "../ui/useResu
 import { useResultsDetailPaginationSync } from "../ui/useResultsDetailPaginationSync";
 import { demoTableConnector } from "../connectors/demoTableConnectors";
 import { ConnectorTableCell } from "../ui/ConnectorTableCell";
+import { useCopilot } from "../../context/CopilotContext";
+import { buildTitlesFsqlQuery } from "../../lib/buildEntitiesFsqlQuery";
 import {
   buildDailyEventRows,
   ChartZoomHint,
   countByLabel,
+  dailyValuesFromRows,
   formatAnalyticsRowTime,
   horizontalBarScale,
+  niceChartYScale,
+  parseAnalyticsRowTime,
   rowTimeInTimeframe,
   useFederatedAnalyticsTimeframeZoom,
 } from "./federatedAnalyticsZoom";
+import { chartFiltersActive, formatChartFilterLabels, toggleChartFilter } from "./chartFilterSet";
 import { CHART_CATEGORY_FILL, HorizontalBarPanel, TIME_SERIES_BAR_FILL } from "./horizontalBarPanel";
-import { cx, InsightCard } from "./datavisCard";
+import { cx, InsightCard, InsightCardHeaderActions } from "./datavisCard";
+import {
+  ExpandableColumnWidgetLayout,
+  ExpandableColumnWidgetShell,
+  useExpandableColumnWidgets,
+} from "./useExpandableColumnWidgets";
 import { TimeSeriesBarChart } from "./timeSeriesBarChart";
+import { CATEGORICAL_WIDGET_VIZ_OPTIONS, type CategoricalWidgetViz } from "./categoricalWidgetViz";
 import { buildDailyBuckets, type HourBucket } from "./timeframeChartUtils";
 
 type DiscoverySeverity = "Critical" | "High" | "Medium" | "Low" | "Informational";
+
+const DISCOVERY_COLUMN_WIDGET_ORDER = ["platform", "severity", "patch"] as const;
 
 const SEV_BAR: Record<DiscoverySeverity, string> = {
   Critical: "#ff604a",
@@ -113,14 +128,15 @@ type DailyDiscoveryChart = {
   buckets: HourBucket[];
 };
 
-function buildDailyDiscoveryChart(range: TimeframeRange): DailyDiscoveryChart {
+function buildDailyDiscoveryChart(range: TimeframeRange): Omit<DailyDiscoveryChart, "values" | "yMax" | "yTicks" | "spikeLabel"> & {
+  spikeDayOfWeek: string;
+} {
   const buckets = buildDailyBuckets(range);
   const useDate = buckets.length > 7;
   const endDayMs = new Date(range.to);
   endDayMs.setHours(0, 0, 0, 0);
 
   const xLabels: string[] = [];
-  const values: number[] = [];
   let spikeIndex: number | null = null;
 
   buckets.forEach((bucket, i) => {
@@ -133,22 +149,11 @@ function buildDailyDiscoveryChart(range: TimeframeRange): DailyDiscoveryChart {
 
     const isSpike = day.getTime() === endDayMs.getTime();
     if (isSpike) spikeIndex = i;
-    const base = 12;
-    const dow = day.getDay();
-    const weekdayMultiplier = dow === 0 || dow === 6 ? 0.7 : 1.0 + (dow === 4 ? 0.2 : 0);
-    const value = isSpike ? 38 : Math.max(8, Math.round(base * weekdayMultiplier * (0.9 + (i % 3) * 0.1)));
-    values.push(value);
   });
 
-  const peak = Math.max(...values, 10);
-  const yMax = Math.ceil(peak / 10) * 10;
-  const step = yMax / 4;
-  const yTicks = [0, step, step * 2, step * 3, yMax];
-
   const spikeDayOfWeek = spikeIndex != null ? WEEKDAY_SHORT[endDayMs.getDay()] : "Thu";
-  const spikeLabel = `${spikeDayOfWeek} spike: ${values[spikeIndex ?? 0] ?? 38} new cloud resources in us-east-2, no IaC tag`;
 
-  return { xLabels, values, spikeIndex, spikeLabel, yMax, yTicks, buckets };
+  return { xLabels, spikeIndex, spikeDayOfWeek, buckets };
 }
 
 const PLATFORM_ORDER = ["Windows", "macOS", "Linux", "Cloud / SaaS", "Unknown"] as const;
@@ -377,14 +382,17 @@ function DiscoveryEventsTable({
   tableColumnIds,
   onOpenDetail,
   highlightedRowId,
+  selected,
+  onSelectedChange,
 }: {
   displayRows: DiscoveryRow[];
   getSortProps: ReturnType<typeof useDiscoveryEventsTableGrid>["getSortProps"];
   tableColumnIds: readonly string[];
   onOpenDetail: (id: string) => void;
   highlightedRowId?: string | null;
+  selected: ReadonlySet<string>;
+  onSelectedChange: (next: Set<string>) => void;
 }) {
-  const [selected, setSelected] = useState<Set<string>>(() => new Set());
   const {
     containerRef,
     colStyle,
@@ -401,16 +409,14 @@ function DiscoveryEventsTable({
   const someSelected = selectedOnPage > 0 && !allSelected;
 
   const toggleAll = (checked: boolean) => {
-    setSelected(checked ? new Set(allIds) : new Set());
+    onSelectedChange(checked ? new Set([...selected, ...allIds]) : new Set());
   };
 
   const toggleRow = (id: string, checked: boolean) => {
-    setSelected((prev) => {
-      const next = new Set(prev);
-      if (checked) next.add(id);
-      else next.delete(id);
-      return next;
-    });
+    const next = new Set(selected);
+    if (checked) next.add(id);
+    else next.delete(id);
+    onSelectedChange(next);
   };
 
   const renderHeaderCell = (columnId: string, colIndex: number) => {
@@ -576,14 +582,20 @@ function DiscoveryEventsTable({
 
 /** Figma concept — Discovery body for Federated Analytics. */
 export function DiscoveryContent() {
+  const { setPendingFsqlSearch } = useCopilot();
   const { timeframe, initialTimeframe, isChartZoomed, handleTimelineBrush, handleChartZoomReset } =
     useFederatedAnalyticsTimeframeZoom("daily");
   const [platformFilter, setPlatformFilter] = useState<DevicePlatform | null>(null);
-  const [severityFilter, setSeverityFilter] = useState<DiscoverySeverity | null>(null);
+  const [severityFilters, setSeverityFilters] = useState<ReadonlySet<string>>(() => new Set());
   const [patchFilter, setPatchFilter] = useState<PatchStatus | null>(null);
+  const [platformViz, setPlatformViz] = useState<CategoricalWidgetViz>("bar");
+  const [severityViz, setSeverityViz] = useState<CategoricalWidgetViz>("bar");
+  const [patchViz, setPatchViz] = useState<CategoricalWidgetViz>("donut");
   const [searchQuery, setSearchQuery] = useState("");
   const [tableTool, setTableTool] = useState<FilterColumnPanelTool | null>(null);
   const [facetSelections, setFacetSelections] = useState<DataGridFacetSelections>({});
+  const [selectedIds, setSelectedIds] = useState<Set<string>>(() => new Set());
+  const columnExpand = useExpandableColumnWidgets(DISCOVERY_COLUMN_WIDGET_ORDER);
   const { tableColumnIds, filterColumnPanelColumnProps } = useDataGridColumnPanel(DISCOVERY_DATA_GRID_COLUMNS);
 
   const facetDefs = useMemo(
@@ -614,6 +626,15 @@ export function DiscoveryContent() {
     [tableRows, timeframe],
   );
 
+  const chartScopedRows = useMemo(() => {
+    return timeframeScopedRows.filter((row) => {
+      if (platformFilter && row.platform !== platformFilter) return false;
+      if (severityFilters.size > 0 && !severityFilters.has(row.severity)) return false;
+      if (patchFilter && row.patchStatus !== patchFilter) return false;
+      return true;
+    });
+  }, [timeframeScopedRows, platformFilter, severityFilters, patchFilter]);
+
   const facets = useMemo(
     () => buildDataGridFacets(timeframeScopedRows, facetDefs),
     [timeframeScopedRows, facetDefs],
@@ -621,11 +642,11 @@ export function DiscoveryContent() {
 
   const platformRows = useMemo(
     () =>
-      countByLabel(timeframeScopedRows, PLATFORM_ORDER, (row) => row.platform).map((row) => ({
+      countByLabel(chartScopedRows, PLATFORM_ORDER, (row) => row.platform).map((row) => ({
         ...row,
         color: CHART_CATEGORY_FILL,
       })),
-    [timeframeScopedRows],
+    [chartScopedRows],
   );
 
   const platformBarScale = useMemo(
@@ -633,13 +654,18 @@ export function DiscoveryContent() {
     [platformRows],
   );
 
+  const platformSegments = useMemo(
+    () => withCategoricalColors(platformRows.map(({ label, value }) => ({ label, value }))),
+    [platformRows],
+  );
+
   const severityChartRows = useMemo(
     () =>
-      countByLabel(timeframeScopedRows, SEVERITY_CHART_ORDER, (row) => row.severity).map((row) => ({
+      countByLabel(chartScopedRows, SEVERITY_CHART_ORDER, (row) => row.severity).map((row) => ({
         ...row,
         color: SEV_BAR[row.label as DiscoverySeverity],
       })),
-    [timeframeScopedRows],
+    [chartScopedRows],
   );
 
   const severityBarScale = useMemo(
@@ -650,9 +676,19 @@ export function DiscoveryContent() {
   const patchSegments = useMemo(
     () =>
       withCategoricalColors(
-        countByLabel(timeframeScopedRows, PATCH_STATUS_ORDER, (row) => row.patchStatus),
+        countByLabel(chartScopedRows, PATCH_STATUS_ORDER, (row) => row.patchStatus),
       ),
-    [timeframeScopedRows],
+    [chartScopedRows],
+  );
+
+  const patchBarRows = useMemo(
+    () => patchSegments.map(({ label, value, color }) => ({ label, value, color })),
+    [patchSegments],
+  );
+
+  const patchBarScale = useMemo(
+    () => horizontalBarScale(patchBarRows.map((row) => row.value)),
+    [patchBarRows],
   );
 
   const patchDeviceTotal = useMemo(
@@ -661,17 +697,10 @@ export function DiscoveryContent() {
   );
 
   const filteredRows = useMemo(() => {
-    const chartFiltered = timeframeScopedRows.filter((row) => {
-      if (platformFilter && row.platform !== platformFilter) return false;
-      if (severityFilter && row.severity !== severityFilter) return false;
-      if (patchFilter && row.patchStatus !== patchFilter) return false;
-      return true;
-    });
-
-    return applyDataGridFacetFilters(chartFiltered, facetSelections, facetDefs).filter((row) =>
+    return applyDataGridFacetFilters(chartScopedRows, facetSelections, facetDefs).filter((row) =>
       discoveryMatchesSearch(row, searchQuery),
     );
-  }, [timeframeScopedRows, platformFilter, severityFilter, patchFilter, facetSelections, facetDefs, searchQuery]);
+  }, [chartScopedRows, facetSelections, facetDefs, searchQuery]);
   const tableGrid = useDiscoveryEventsTableGrid(filteredRows);
   const resultsDetail = useResultsDetailSlideOver(filteredRows);
   useResultsDetailPaginationSync({
@@ -684,13 +713,38 @@ export function DiscoveryContent() {
   });
   const { exportAll, snackbarProps } = useDataGridJsonExport(filteredRows, "discovery-events");
 
+  const handleSearchSelected = useCallback(() => {
+    const selectedRows = filteredRows.filter((row) => selectedIds.has(row.id));
+    const query = buildTitlesFsqlQuery(selectedRows.map((row) => row.title));
+    if (!query.trim()) return;
+    setPendingFsqlSearch({ query, autoExecute: true });
+    setSelectedIds(new Set());
+  }, [filteredRows, selectedIds, setPendingFsqlSearch]);
+
   const hasActiveFilters =
     platformFilter != null ||
-    severityFilter != null ||
+    chartFiltersActive(severityFilters) ||
     patchFilter != null ||
     hasDataGridFacetSelections(facetSelections);
 
-  const dailyChart = useMemo(() => buildDailyDiscoveryChart(timeframe), [timeframe]);
+  const dailyChart = useMemo(() => {
+    const base = buildDailyDiscoveryChart(timeframe);
+    const values = dailyValuesFromRows(chartScopedRows, base.buckets, (row) =>
+      parseAnalyticsRowTime(row.time),
+    );
+    const { yMax, yTicks } = niceChartYScale(values);
+    const spikeCount = base.spikeIndex != null ? values[base.spikeIndex] ?? 0 : 0;
+    const spikeLabel = `${base.spikeDayOfWeek} spike: ${spikeCount} new cloud resources in us-east-2, no IaC tag`;
+    return {
+      xLabels: base.xLabels,
+      values,
+      spikeIndex: base.spikeIndex,
+      spikeLabel,
+      yMax,
+      yTicks,
+      buckets: base.buckets,
+    };
+  }, [timeframe, chartScopedRows]);
 
   const handlePlatformClick = (label: string) => {
     if (!isDevicePlatform(label)) return;
@@ -699,7 +753,7 @@ export function DiscoveryContent() {
 
   const handleSeverityClick = (label: string) => {
     if (!isDiscoverySeverity(label)) return;
-    setSeverityFilter((current) => (current === label ? null : label));
+    setSeverityFilters((current) => toggleChartFilter(current, label));
   };
 
   const handlePatchClick = (label: string) => {
@@ -731,38 +785,112 @@ export function DiscoveryContent() {
         </p>
       </InsightCard>
 
-      <div className="grid min-h-0 shrink-0 grid-cols-1 items-stretch gap-4 lg:grid-cols-3">
-        <InsightCard title="Devices By Platform" fillHeight>
-          <HorizontalBarPanel
-            rows={platformRows}
-            selectedLabel={platformFilter}
-            onBarClick={handlePlatformClick}
-            filterAriaLabel={(label) => `Filter discovery events by platform ${label}`}
-            xMax={platformBarScale.xMax}
-            xTicks={platformBarScale.xTicks}
-          />
-        </InsightCard>
-        <InsightCard title="Severity ID" fillHeight>
-          <HorizontalBarPanel
-            rows={severityChartRows}
-            selectedLabel={severityFilter}
-            onBarClick={handleSeverityClick}
-            filterAriaLabel={(label) => `Filter discovery events by ${label} severity`}
-            xMax={severityBarScale.xMax}
-            xTicks={severityBarScale.xTicks}
-          />
-        </InsightCard>
-        <InsightCard title="Patch Compliance" fillHeight>
-          <DonutChartPanel
-            segments={patchSegments}
-            total={patchDeviceTotal}
-            centerLabel="devices"
-            selectedLabel={patchFilter}
-            onSegmentClick={handlePatchClick}
-            ariaLabel="Patch compliance by status"
-          />
-        </InsightCard>
-      </div>
+      <ExpandableColumnWidgetLayout
+        expandedIds={columnExpand.expandedIds}
+        collapsedIds={columnExpand.collapsedIds}
+        renderWidget={(id, expanded) => {
+          const chart =
+            id === "platform" ? (
+              platformViz === "donut" ? (
+                <DonutChartPanel
+                  segments={platformSegments}
+                  total={chartScopedRows.length}
+                  centerLabel="devices"
+                  selectedLabel={platformFilter}
+                  onSegmentClick={handlePlatformClick}
+                  ariaLabel="Devices by platform"
+                />
+              ) : (
+                <HorizontalBarPanel
+                  rows={platformRows}
+                  selectedLabel={platformFilter}
+                  onBarClick={handlePlatformClick}
+                  filterAriaLabel={(label) => `Filter discovery events by platform ${label}`}
+                  xMax={platformBarScale.xMax}
+                  xTicks={platformBarScale.xTicks}
+                />
+              )
+            ) : id === "severity" ? (
+              severityViz === "donut" ? (
+                <DonutChartPanel
+                  segments={severityChartRows}
+                  total={chartScopedRows.length}
+                  centerLabel="devices"
+                  selectedLabels={[...severityFilters]}
+                  onSegmentClick={handleSeverityClick}
+                  ariaLabel="Discovery events by severity"
+                />
+              ) : (
+                <HorizontalBarPanel
+                  rows={severityChartRows}
+                  selectedLabels={[...severityFilters]}
+                  onBarClick={handleSeverityClick}
+                  filterAriaLabel={(label) => `Filter discovery events by ${label} severity`}
+                  xMax={severityBarScale.xMax}
+                  xTicks={severityBarScale.xTicks}
+                />
+              )
+            ) : patchViz === "bar" ? (
+              <HorizontalBarPanel
+                rows={patchBarRows}
+                selectedLabel={patchFilter}
+                onBarClick={handlePatchClick}
+                filterAriaLabel={(label) => `Filter discovery events by patch status ${label}`}
+                xMax={patchBarScale.xMax}
+                xTicks={patchBarScale.xTicks}
+              />
+            ) : (
+              <DonutChartPanel
+                segments={patchSegments}
+                total={patchDeviceTotal}
+                centerLabel="devices"
+                selectedLabel={patchFilter}
+                onSegmentClick={handlePatchClick}
+                ariaLabel="Patch compliance by status"
+              />
+            );
+          const title =
+            id === "platform"
+              ? "Devices By Platform"
+              : id === "severity"
+                ? "Severity ID"
+                : "Patch Compliance";
+          const visualization =
+            id === "platform"
+              ? {
+                  value: platformViz,
+                  options: CATEGORICAL_WIDGET_VIZ_OPTIONS,
+                  onChange: (next: string) => setPlatformViz(next as CategoricalWidgetViz),
+                }
+              : id === "severity"
+                ? {
+                    value: severityViz,
+                    options: CATEGORICAL_WIDGET_VIZ_OPTIONS,
+                    onChange: (next: string) => setSeverityViz(next as CategoricalWidgetViz),
+                  }
+                : {
+                    value: patchViz,
+                    options: CATEGORICAL_WIDGET_VIZ_OPTIONS,
+                    onChange: (next: string) => setPatchViz(next as CategoricalWidgetViz),
+                  };
+          return (
+            <ExpandableColumnWidgetShell id={id} expanded={expanded} api={columnExpand}>
+              <InsightCard
+                title={title}
+                fillHeight
+                headerActions={
+                  <InsightCardHeaderActions
+                    expand={{ expanded, onToggle: () => columnExpand.toggle(id) }}
+                    visualization={visualization}
+                  />
+                }
+              >
+                {chart}
+              </InsightCard>
+            </ExpandableColumnWidgetShell>
+          );
+        }}
+      />
       </div>
 
       <DataGridSection
@@ -770,42 +898,51 @@ export function DiscoveryContent() {
           <>
             <h2 className="text-base-semibold text-text-primary">Discovery Events</h2>
             <div className="mt-2 flex flex-wrap items-center gap-3">
-              <p className="shrink-0 text-base-small text-text-secondary">
-                {filteredRows.length} of {timeframeScopedRows.length} Results
-                {platformFilter ? ` · ${platformFilter}` : ""}
-                {severityFilter ? ` · ${severityFilter}` : ""}
-                {patchFilter ? ` · ${patchFilter}` : ""}
-                {searchQuery.trim() ? ` · “${searchQuery.trim()}”` : ""}
-              </p>
-              <div className="w-[300px] shrink-0">
-                <Input
-                  variant="search"
-                  placeholder={DATA_GRID_RESULTS_SEARCH_PLACEHOLDER}
-                  value={searchQuery}
-                  onChange={(event) => setSearchQuery(event.target.value)}
-                  onClear={() => setSearchQuery("")}
-                  className="!bg-datavis-card-bg"
-                  aria-label="Search discovery events"
-                />
+              <div className="flex min-w-0 flex-1 flex-wrap items-center gap-3">
+                <p className="shrink-0 text-base-small text-text-secondary">
+                  {filteredRows.length} of {timeframeScopedRows.length} Results
+                  {platformFilter ? ` · ${platformFilter}` : ""}
+                  {severityFilters.size > 0 ? ` · ${formatChartFilterLabels(severityFilters)}` : ""}
+                  {patchFilter ? ` · ${patchFilter}` : ""}
+                  {searchQuery.trim() ? ` · “${searchQuery.trim()}”` : ""}
+                </p>
+                <div className="w-[300px] shrink-0">
+                  <Input
+                    variant="search"
+                    placeholder={DATA_GRID_RESULTS_SEARCH_PLACEHOLDER}
+                    value={searchQuery}
+                    onChange={(event) => setSearchQuery(event.target.value)}
+                    onClear={() => setSearchQuery("")}
+                    className="!bg-datavis-card-bg"
+                    aria-label="Search discovery events"
+                  />
+                </div>
+                {hasActiveFilters ? (
+                  <Button
+                    type="button"
+                    variant="ghost"
+                    className="h-8 shrink-0 gap-1.5 px-2 text-base-small text-text-tertiary hover:text-text-primary [&_svg]:!h-2 [&_svg]:!w-3"
+                    onClick={() => {
+                      setPlatformFilter(null);
+                      setSeverityFilters(new Set());
+                      setPatchFilter(null);
+                      setFacetSelections({});
+                      setSearchQuery("");
+                    }}
+                  >
+                    <Icon name="action-filter-list" size={14} aria-hidden />
+                    Clear all filters
+                  </Button>
+                ) : null}
+                <DataGridExportButton onClick={exportAll} />
               </div>
-              {hasActiveFilters ? (
-                <Button
-                  type="button"
-                  variant="ghost"
-                  className="h-8 shrink-0 gap-1.5 px-2 text-base-small text-text-tertiary hover:text-text-primary [&_svg]:!h-2 [&_svg]:!w-3"
-                  onClick={() => {
-                    setPlatformFilter(null);
-                    setSeverityFilter(null);
-                    setPatchFilter(null);
-                    setFacetSelections({});
-                    setSearchQuery("");
-                  }}
-                >
-                  <Icon name="action-filter-list" size={14} aria-hidden />
-                  Clear all filters
-                </Button>
+              {selectedIds.size > 0 ? (
+                <DataGridSearchSelectedActions
+                  className="!ml-0"
+                  onSearch={handleSearchSelected}
+                  onClear={() => setSelectedIds(new Set())}
+                />
               ) : null}
-              <DataGridExportButton onClick={exportAll} />
             </div>
           </>
         }
@@ -827,6 +964,8 @@ export function DiscoveryContent() {
             tableColumnIds={tableColumnIds}
             onOpenDetail={resultsDetail.open}
             highlightedRowId={resultsDetail.isOpen ? resultsDetail.activeId : null}
+            selected={selectedIds}
+            onSelectedChange={setSelectedIds}
           />
         }
         footer={<DataGridPaginationFooter grid={tableGrid} />}

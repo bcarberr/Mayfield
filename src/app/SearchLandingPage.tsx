@@ -44,9 +44,11 @@ const SEARCH_CRITERIA_MODE_OPTIONS: readonly {
   id: SearchCriteriaMode;
   label: string;
   tooltip?: string;
+  disabled?: boolean;
+  comingSoon?: boolean;
 }[] = [
   { id: "fsql", label: "FSQL", tooltip: "Federated Search Query Language" },
-  { id: "query-builder", label: "Query Builder" },
+  { id: "query-builder", label: "Query Builder", disabled: true, comingSoon: true },
 ];
 
 function SearchCriteriaModeRadios({
@@ -59,7 +61,10 @@ function SearchCriteriaModeRadios({
   return (
     <RadioGroup
       value={value}
-      onValueChange={(next) => onChange(next as SearchCriteriaMode)}
+      onValueChange={(next) => {
+        if (next === "query-builder") return;
+        onChange(next as SearchCriteriaMode);
+      }}
       aria-label="Search criteria mode"
       className="flex flex-wrap items-center gap-4"
     >
@@ -67,13 +72,20 @@ function SearchCriteriaModeRadios({
         const fieldId = `search-criteria-mode-${option.id}`;
         const optionControl = (
           <div className="flex items-center gap-2">
-            <RadioGroupItem value={option.id} id={fieldId} />
+            <RadioGroupItem value={option.id} id={fieldId} disabled={option.disabled} />
             <Label
               htmlFor={fieldId}
-              className="cursor-pointer text-sm font-semibold leading-5 tracking-[0.4px] text-text-primary"
+              className={
+                option.disabled
+                  ? "cursor-not-allowed text-sm font-semibold leading-5 tracking-[0.4px] text-text-disabled"
+                  : "cursor-pointer text-sm font-semibold leading-5 tracking-[0.4px] text-text-primary"
+              }
             >
               {option.label}
             </Label>
+            {option.comingSoon ? (
+              <span className="text-base-small text-text-tertiary">Coming soon</span>
+            ) : null}
           </div>
         );
 
@@ -375,6 +387,12 @@ export function SearchLandingPage() {
   // clearing it with setSkipTimeframeFsqlSyncOnce(false) doesn't trigger a second run.
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [criteriaMode, timeframe.from.getTime(), timeframe.to.getTime(), timeframe, setSkipTimeframeFsqlSyncOnce, setFsqlQuery, setLastExecutedFsqlQuery]);
+
+  useEffect(() => {
+    if (criteriaMode === "query-builder") {
+      setCriteriaMode("fsql");
+    }
+  }, [criteriaMode, setCriteriaMode]);
 
   // Clicking the Federated Search nav icon while already on this page pushes a new
   // history entry (same pathname, new key). Detect that and reset to the clean slate.

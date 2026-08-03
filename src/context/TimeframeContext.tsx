@@ -20,10 +20,10 @@ export const TIMEFRAME_PRESETS: readonly TimeframePreset[] = [
   { id: "7d", label: "Last 7 days", durationMs: 7 * MS_DAY },
   { id: "14d", label: "Last 14 days", durationMs: 14 * MS_DAY },
   { id: "30d", label: "Last 30 days", durationMs: 30 * MS_DAY },
-  { id: "60d", label: "Last 60 days", durationMs: 60 * MS_DAY },
+  { id: "90d", label: "Last 90 days", durationMs: 90 * MS_DAY },
 ] as const;
 
-export const DEFAULT_TIMEFRAME_PRESET = TIMEFRAME_PRESETS.find((preset) => preset.id === "14d")!;
+export const DEFAULT_TIMEFRAME_PRESET = TIMEFRAME_PRESETS.find((preset) => preset.id === "7d")!;
 
 export function createRelativeTimeframeRange(durationMs: number, end: Date = new Date()): TimeframeRange {
   const to = new Date(end);

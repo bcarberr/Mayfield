@@ -98,6 +98,15 @@ export function buildEntitiesFsqlQuery(clauses: readonly EntityFsqlClause[]): st
   return `QUERY\nSHOW **\nWITH ${where}\nLIMIT 100`;
 }
 
+/** Pivot selected event titles into Federated Search. */
+export function buildTitlesFsqlQuery(titles: readonly string[]): string {
+  const clauses = [...new Set(titles.map((title) => title.trim()).filter(Boolean))].map((value) => ({
+    observable: "%title",
+    value,
+  }));
+  return buildEntitiesFsqlQuery(clauses);
+}
+
 export function buildAggregatedEntitiesFsqlQuery(
   entities: readonly { entity: string; type: string }[],
 ): string {

@@ -4,6 +4,8 @@ const cx = (...c: (string | false | undefined)[]) => c.filter(Boolean).join(" ")
 
 export type ThemeToggleProps = {
   className?: string;
+  /** Optional visible label (e.g. expanded nav rail). */
+  label?: string;
 };
 
 function SunIcon({ className }: { className?: string }) {
@@ -41,7 +43,7 @@ function MoonIcon({ className }: { className?: string }) {
 }
 
 /** Icon-only light/dark theme switch — styled for the thin nav rail. */
-export function ThemeToggle({ className = "" }: ThemeToggleProps) {
+export function ThemeToggle({ className = "", label }: ThemeToggleProps) {
   const { theme, toggleTheme } = useTheme();
   const isLight = theme === "light";
 
@@ -61,7 +63,12 @@ export function ThemeToggle({ className = "" }: ThemeToggleProps) {
         className,
       )}
     >
-      {isLight ? <SunIcon className="size-[18px]" /> : <MoonIcon className="size-[18px]" />}
+      <span className={cx("flex shrink-0 items-center justify-center", label ? "size-8" : undefined)}>
+        {isLight ? <SunIcon className="size-[18px]" /> : <MoonIcon className="size-[18px]" />}
+      </span>
+      {label ? (
+        <span className="min-w-0 flex-1 truncate text-left text-sm font-semibold leading-5">{label}</span>
+      ) : null}
     </button>
   );
 }

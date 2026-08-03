@@ -1,6 +1,19 @@
-import type { ReactNode } from "react";
+import type { CSSProperties, ReactNode } from "react";
+import { Maximize2, Minimize2 } from "lucide-react";
 import { Icon } from "../../design-system";
 import { Button } from "@/components/shadcn/button";
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuRadioGroup,
+  DropdownMenuRadioItem,
+  DropdownMenuSeparator,
+  DropdownMenuSub,
+  DropdownMenuSubContent,
+  DropdownMenuSubTrigger,
+  DropdownMenuTrigger,
+} from "@/components/shadcn/dropdown-menu";
 import {
   Tooltip,
   TooltipContent,
@@ -14,6 +27,113 @@ export function DatavisGridlineRule({ inset = true }: { inset?: boolean }) {
   return <div className={cx("h-px shrink-0 bg-datavis-gridlines", inset && "mx-[20px]")} aria-hidden />;
 }
 
+const WIDGET_OPTION_ITEMS = ["Export widget", "Pin to dashboard"] as const;
+
+const MENU_ITEM_CLASS =
+  "cursor-pointer text-text-secondary focus:bg-overlay-subtle focus:text-text-primary";
+
+export type WidgetVisualizationOption = {
+  id: string;
+  label: string;
+};
+
+export type InsightCardVisualizationConfig = {
+  value: string;
+  options: readonly WidgetVisualizationOption[];
+  onChange: (id: string) => void;
+};
+
+export type InsightCardExpandConfig = {
+  expanded: boolean;
+  onToggle: () => void;
+};
+
+/** Overflow menu for insight/chart widget headers (ellipsis → export / pin / viz). */
+export function InsightCardHeaderActions({
+  visualization,
+  expand,
+}: {
+  visualization?: InsightCardVisualizationConfig;
+  /** Horizontal expand control — Lucide Maximize2 / Minimize2. */
+  expand?: InsightCardExpandConfig;
+} = {}) {
+  const showVisualization = Boolean(visualization && visualization.options.length >= 2);
+
+  return (
+    <div className="flex shrink-0 items-center gap-0.5">
+      {expand ? (
+        <Tooltip>
+          <TooltipTrigger asChild>
+            <Button
+              type="button"
+              variant="ghost"
+              className="shrink-0 p-1 text-text-tertiary hover:text-text-primary"
+              aria-label={expand.expanded ? "Collapse widget width" : "Expand widget width"}
+              aria-pressed={expand.expanded}
+              onClick={expand.onToggle}
+            >
+              {expand.expanded ? (
+                <Minimize2 size={16} strokeWidth={1.5} />
+              ) : (
+                <Maximize2 size={16} strokeWidth={1.5} />
+              )}
+            </Button>
+          </TooltipTrigger>
+          <TooltipContent>{expand.expanded ? "Collapse width" : "Expand width"}</TooltipContent>
+        </Tooltip>
+      ) : null}
+      <DropdownMenu>
+        <DropdownMenuTrigger asChild>
+          <Button
+            type="button"
+            variant="ghost"
+            className="shrink-0 p-1 text-text-tertiary hover:text-text-primary"
+            aria-label="Widget options"
+          >
+            <Icon name="navi-more-vert" />
+          </Button>
+        </DropdownMenuTrigger>
+        <DropdownMenuContent
+          align="end"
+          className="min-w-[11rem] rounded border border-border-container bg-surface-modal py-1 shadow-[0_4px_12px_rgba(0,0,0,0.35)]"
+        >
+          {WIDGET_OPTION_ITEMS.map((label) => (
+            <DropdownMenuItem key={label} className={MENU_ITEM_CLASS}>
+              {label}
+            </DropdownMenuItem>
+          ))}
+          {showVisualization && visualization ? (
+            <>
+              <DropdownMenuSeparator className="bg-border-container" />
+              <DropdownMenuSub>
+                <DropdownMenuSubTrigger className={MENU_ITEM_CLASS}>
+                  Change visualization
+                </DropdownMenuSubTrigger>
+                <DropdownMenuSubContent className="min-w-[10rem] rounded border border-border-container bg-surface-modal py-1 shadow-[0_4px_12px_rgba(0,0,0,0.35)]">
+                  <DropdownMenuRadioGroup
+                    value={visualization.value}
+                    onValueChange={visualization.onChange}
+                  >
+                    {visualization.options.map((option) => (
+                      <DropdownMenuRadioItem
+                        key={option.id}
+                        value={option.id}
+                        className={MENU_ITEM_CLASS}
+                      >
+                        {option.label}
+                      </DropdownMenuRadioItem>
+                    ))}
+                  </DropdownMenuRadioGroup>
+                </DropdownMenuSubContent>
+              </DropdownMenuSub>
+            </>
+          ) : null}
+        </DropdownMenuContent>
+      </DropdownMenu>
+    </div>
+  );
+}
+
 export function InsightCard({
   title,
   children,
@@ -21,6 +141,8 @@ export function InsightCard({
   fillHeight = false,
   compact = false,
   stretch = false,
+  className,
+  style,
 }: {
   title?: string;
   children: ReactNode;
@@ -31,6 +153,8 @@ export function InsightCard({
   compact?: boolean;
   /** Match sibling height in a stretched grid row without forcing full-page flex growth. */
   stretch?: boolean;
+  className?: string;
+  style?: CSSProperties;
 }) {
   return (
     <section
@@ -38,7 +162,9 @@ export function InsightCard({
         "flex min-w-0 flex-col overflow-hidden rounded-[4px] border border-border-container",
         "bg-datavis-card-bg shadow-datavis-card",
         fillHeight ? "min-h-0 flex-1 lg:h-full" : stretch ? "h-full" : "shrink-0",
+        className,
       )}
+      style={style}
     >
       {title || headerActions ? (
         <>
@@ -52,16 +178,7 @@ export function InsightCard({
             {title ? (
               <h2 className="min-w-0 truncate text-base-semibold text-text-primary">{title}</h2>
             ) : null}
-            {headerActions ?? (
-              <Tooltip>
-                <TooltipTrigger asChild>
-                  <Button variant="ghost" className="shrink-0 p-1 text-text-tertiary hover:text-text-primary" aria-label="Chart options">
-                    <Icon name="navi-more-vert" />
-                  </Button>
-                </TooltipTrigger>
-                <TooltipContent>Chart options</TooltipContent>
-              </Tooltip>
-            )}
+            {headerActions ?? <InsightCardHeaderActions />}
           </header>
           <DatavisGridlineRule />
         </>
