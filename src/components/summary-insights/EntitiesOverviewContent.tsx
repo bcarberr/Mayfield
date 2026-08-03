@@ -12,11 +12,11 @@ import {
   DATA_GRID_TABLE_SCROLL_CLASS,
   DATA_GRID_THEAD_CLASS,
 } from "../ui/dataGridTableStyles";
-import { Search } from "lucide-react";
-import { Checkbox, Icon, type SeverityShapeIconName } from "../../design-system";
+import { Checkbox, Icon, type SeverityShapeIconName, withCategoricalColors } from "../../design-system";
 import { type TimeframeRange } from "../../context/TimeframeContext";
 import { Button } from "@/components/shadcn/button";
 import { ColumnHeaderMenu } from "../ui/ColumnHeaderMenu";
+import { DonutChartPanel } from "../ui/DonutChartPanel";
 import { FilterColumnPanel, type FilterColumnPanelTool } from "../ui/FilterColumnPanel";
 import { eventGridFacetDefinitions } from "../ui/dataGridFacetDefinitions";
 import {
@@ -33,6 +33,7 @@ import { SeverityTableIcon } from "../ui/SeverityTableIcon";
 import { compareStrings } from "../ui/useColumnSort";
 import { useSortedDataGridPagination } from "../ui/useSortedDataGridPagination";
 import { DataGridSection } from "../ui/DataGridSection";
+import { DataGridSearchSelectedActions } from "../ui/DataGridSearchSelectedActions";
 import { DataGridPaginationFooter } from "../ui/DataGridTableLayout";
 import { ENTITIES_AGGREGATED_DATA_GRID_COLUMNS } from "../ui/dataGridColumnCatalog";
 import { useDataGridColumnPanel } from "../ui/dataGridColumnTypes";
@@ -46,31 +47,35 @@ import { TruncatedText } from "../ui/TruncatedText";
 import { demoTableConnector } from "../connectors/demoTableConnectors";
 import { ConnectorTableCell } from "../ui/ConnectorTableCell";
 import {
-  DropdownMenu,
-  DropdownMenuContent,
-  DropdownMenuItem,
-  DropdownMenuTrigger,
-} from "@/components/shadcn/dropdown-menu";
-import {
-  Tooltip,
-  TooltipContent,
-  TooltipTrigger,
-} from "@/components/shadcn/tooltip";
-import {
   buildDailyEventRows,
   ChartZoomHint,
   countByLabel,
+  dailyValuesFromRows,
   formatAnalyticsRowTime,
   horizontalBarScale,
+  niceChartYScale,
+  parseAnalyticsRowTime,
   rowTimeInTimeframe,
   useFederatedAnalyticsTimeframeZoom,
 } from "./federatedAnalyticsZoom";
 import { CHART_CATEGORY_FILL, HorizontalBarPanel, TIME_SERIES_BAR_FILL } from "./horizontalBarPanel";
-import { cx, InsightCard } from "./datavisCard";
+import { cx, InsightCard, InsightCardHeaderActions } from "./datavisCard";
+import {
+  ExpandableColumnWidgetLayout,
+  ExpandableColumnWidgetShell,
+  useExpandableColumnWidgets,
+} from "./useExpandableColumnWidgets";
 import { TimeSeriesBarChart } from "./timeSeriesBarChart";
+import { CATEGORICAL_WIDGET_VIZ_OPTIONS, type CategoricalWidgetViz } from "./categoricalWidgetViz";
 import { buildDailyBuckets, type HourBucket } from "./timeframeChartUtils";
 
 const ENTITY_BAR_TRACK = "rgba(158, 158, 158, 0.2)";
+
+const ENTITIES_COLUMN_WIDGET_ORDER = ["types", "risk", "volume"] as const;
+
+const ENTITY_CATEGORY_CARD_ORDER = ["ips", "usernames", "hostnames", "cves", "macs", "urls"] as const;
+
+type EntityCategoryCardId = (typeof ENTITY_CATEGORY_CARD_ORDER)[number];
 
 const WEEKDAY_SHORT = ["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"] as const;
 
@@ -84,14 +89,15 @@ type DailyEntityChart = {
   buckets: HourBucket[];
 };
 
-function buildDailyEntityChart(range: TimeframeRange): DailyEntityChart {
+function buildDailyEntityChart(range: TimeframeRange): Omit<DailyEntityChart, "values" | "yMax" | "yTicks" | "spikeLabel"> & {
+  spikeDayLabel: string;
+} {
   const buckets = buildDailyBuckets(range);
   const useDate = buckets.length > 7;
   const endDayMs = new Date(range.to);
   endDayMs.setHours(0, 0, 0, 0);
 
   const xLabels: string[] = [];
-  const values: number[] = [];
   let spikeIndex: number | null = null;
 
   buckets.forEach((bucket, i) => {
@@ -103,20 +109,11 @@ function buildDailyEntityChart(range: TimeframeRange): DailyEntityChart {
     }
     const isSpike = day.getTime() === endDayMs.getTime();
     if (isSpike) spikeIndex = i;
-    const dow = day.getDay();
-    const weekdayMultiplier = dow === 0 || dow === 6 ? 0.7 : 1.0 + (dow === 4 ? 0.2 : 0);
-    values.push(isSpike ? 61 : Math.max(8, Math.round(14 * weekdayMultiplier * (0.9 + (i % 3) * 0.1))));
   });
 
-  const peak = Math.max(...values, 10);
-  const yMax = Math.ceil(peak / 10) * 10;
-  const step = yMax / 4;
-  const yTicks = [0, step, step * 2, step * 3, yMax];
-
   const spikeDayLabel = spikeIndex != null ? (xLabels[spikeIndex] ?? "") : "";
-  const spikeLabel = `${spikeDayLabel} spike correlates with new cloud resources from Discovery`;
 
-  return { xLabels, values, spikeIndex, spikeLabel, yMax, yTicks, buckets };
+  return { xLabels, spikeIndex, spikeDayLabel, buckets };
 }
 
 const ENTITY_TYPE_ROWS = [
@@ -172,6 +169,7 @@ type EntityListItem = {
 };
 
 type EntityCategoryCardData = {
+  id: EntityCategoryCardId;
   title: string;
   total: string;
   uniqueSeenLabel: string;
@@ -183,45 +181,24 @@ function formatCount(value: number): string {
   return value.toLocaleString("en-US");
 }
 
-function EntityCardHeaderActions() {
-  return (
-    <div className="flex shrink-0 items-center gap-1">
-      <Tooltip>
-        <TooltipTrigger asChild>
-          <Button variant="ghost" size="icon-xs" className="p-0 text-text-tertiary hover:text-text-primary" aria-label="Pivot search">
-            <Search size={16} strokeWidth={1.5} />
-          </Button>
-        </TooltipTrigger>
-        <TooltipContent>Pivot search</TooltipContent>
-      </Tooltip>
-      <Tooltip>
-        <TooltipTrigger asChild>
-          <Button variant="ghost" size="icon-xs" className="p-0 text-text-tertiary hover:text-text-primary" aria-label="Expand widget">
-            <Icon name="nav-expand" size={16} />
-          </Button>
-        </TooltipTrigger>
-        <TooltipContent>Expand widget</TooltipContent>
-      </Tooltip>
-      <DropdownMenu>
-        <DropdownMenuTrigger asChild>
-          <Button variant="ghost" size="icon-xs" className="p-0 text-text-tertiary hover:text-text-primary" aria-label="Widget options">
-            <Icon name="navi-more-vert" size={16} />
-          </Button>
-        </DropdownMenuTrigger>
-        <DropdownMenuContent align="end" className="min-w-[9rem] border-border-container bg-surface-modal">
-          <DropdownMenuItem>Export widget</DropdownMenuItem>
-          <DropdownMenuItem>Pin to dashboard</DropdownMenuItem>
-        </DropdownMenuContent>
-      </DropdownMenu>
-    </div>
-  );
-}
-
-function EntityAmountBar({ value, maxValue }: { value: number; maxValue: number }) {
+function EntityAmountBar({
+  value,
+  maxValue,
+  expanded = false,
+}: {
+  value: number;
+  maxValue: number;
+  expanded?: boolean;
+}) {
   const pct = maxValue > 0 ? Math.max((value / maxValue) * 100, value > 0 ? 8 : 0) : 0;
 
   return (
-    <div className="relative h-1.5 min-w-[6.5rem] flex-1 max-w-[6.625rem]">
+    <div
+      className={cx(
+        "relative h-1.5 min-w-[6.5rem] flex-1",
+        expanded ? "max-w-none" : "max-w-[6.625rem]",
+      )}
+    >
       <div className="absolute inset-0 rounded-sm" style={{ backgroundColor: ENTITY_BAR_TRACK }} aria-hidden />
       <div
         className="absolute inset-y-0 left-0 rounded-sm"
@@ -240,15 +217,25 @@ function EntityCategoryCard({
   data,
   selectedKeys,
   onToggleItem,
+  expanded,
+  onToggleExpand,
 }: {
   data: EntityCategoryCardData;
   selectedKeys: ReadonlySet<string>;
   onToggleItem: (cardTitle: string, label: string, checked: boolean) => void;
+  expanded: boolean;
+  onToggleExpand: () => void;
 }) {
   const maxItemValue = data.items[0]?.value ?? 1;
 
   return (
-    <InsightCard title={data.title} headerActions={<EntityCardHeaderActions />}>
+    <InsightCard
+      title={data.title}
+      fillHeight
+      headerActions={
+        <InsightCardHeaderActions expand={{ expanded, onToggle: onToggleExpand }} />
+      }
+    >
       <div className="flex min-h-0 flex-1 flex-col">
         <div className="mx-1 flex h-[7.875rem] flex-col items-center justify-center gap-1 rounded bg-surface-modal sm:mx-0">
           <p className="text-[3rem] font-black leading-[2.75rem] text-text-primary">{data.total}</p>
@@ -267,11 +254,11 @@ function EntityCategoryCard({
               </span>
               <TruncatedText
                 className="text-base-semibold text-text-secondary"
-                wrapperClassName="min-w-0 flex-1"
+                wrapperClassName={cx("min-w-0", expanded ? "w-44 shrink-0 sm:w-56" : "flex-1")}
               >
                 {item.label}
               </TruncatedText>
-              <EntityAmountBar value={item.value} maxValue={maxItemValue} />
+              <EntityAmountBar value={item.value} maxValue={maxItemValue} expanded={expanded} />
               <span className="w-10 shrink-0 text-right text-base-small tabular-nums text-text-secondary">
                 {formatCount(item.value)}
               </span>
@@ -537,38 +524,49 @@ const AGGREGATED_ENTITY_ROWS: AggregatedEntityRow[] = [
   },
 ];
 
-const ENTITY_CATEGORY_CARD_SPECS = [
+const ENTITY_CATEGORY_CARD_SPECS: readonly {
+  id: EntityCategoryCardId;
+  title: string;
+  uniqueSeenLabel: string;
+  matchesRow: (row: AggregatedEntityRow) => boolean;
+}[] = [
   {
+    id: "ips",
     title: "Top IP Addresses",
     uniqueSeenLabel: "unique IPs seen",
-    matchesRow: (row: AggregatedEntityRow) => row.categories.includes("Network Activity"),
+    matchesRow: (row) => row.categories.includes("Network Activity"),
   },
   {
+    id: "usernames",
     title: "Top Usernames",
     uniqueSeenLabel: "unique usernames seen",
-    matchesRow: (row: AggregatedEntityRow) => row.type === "User",
+    matchesRow: (row) => row.type === "User",
   },
   {
+    id: "hostnames",
     title: "Top Hostnames",
     uniqueSeenLabel: "unique hostnames seen",
-    matchesRow: (row: AggregatedEntityRow) => row.type === "Device",
+    matchesRow: (row) => row.type === "Device",
   },
   {
+    id: "cves",
     title: "Top CVEs",
     uniqueSeenLabel: "unique CVEs seen",
-    matchesRow: (row: AggregatedEntityRow) => row.categories.includes("Findings"),
+    matchesRow: (row) => row.categories.includes("Findings"),
   },
   {
+    id: "macs",
     title: "MAC Addresses",
     uniqueSeenLabel: "unique MAC addresses seen",
-    matchesRow: (row: AggregatedEntityRow) => row.type === "Device",
+    matchesRow: (row) => row.type === "Device",
   },
   {
+    id: "urls",
     title: "Top URLs",
     uniqueSeenLabel: "unique URLs seen",
-    matchesRow: (row: AggregatedEntityRow) => row.type === "Cloud Resource",
+    matchesRow: (row) => row.type === "Cloud Resource",
   },
-] as const;
+];
 
 function formatTotalCompact(value: number): string {
   if (value >= 1000) {
@@ -591,6 +589,7 @@ function buildEntityCategoryCards(rows: readonly AggregatedEntityRow[]): EntityC
     const eventTotal = sorted.reduce((sum, [, value]) => sum + value, 0);
 
     return {
+      id: spec.id,
       title: spec.title,
       total: formatTotalCompact(eventTotal),
       uniqueSeenLabel: spec.uniqueSeenLabel,
@@ -1020,45 +1019,43 @@ function EntitiesAggregatedPanel({
         <>
           <h2 className="text-base-semibold text-text-primary">Entities</h2>
           <div className="mt-2 flex flex-wrap items-center gap-3">
-            <p className="shrink-0 text-base-small text-text-secondary">
-              {filteredRows.length} of {scopedRowCount} Results
-              {activeFilterLabels.map((label) => ` · ${label}`).join("")}
-              {searchQuery.trim() ? ` · “${searchQuery.trim()}”` : ""}
-            </p>
-            <div className="w-[300px] shrink-0">
-              <Input
-                variant="search"
-                placeholder={DATA_GRID_RESULTS_SEARCH_PLACEHOLDER}
-                value={searchQuery}
-                onChange={(event) => setSearchQuery(event.target.value)}
-                onClear={() => setSearchQuery("")}
-                className="!bg-datavis-card-bg"
-                aria-label="Search aggregated entities"
-              />
+            <div className="flex min-w-0 flex-1 flex-wrap items-center gap-3">
+              <p className="shrink-0 text-base-small text-text-secondary">
+                {filteredRows.length} of {scopedRowCount} Results
+                {activeFilterLabels.map((label) => ` · ${label}`).join("")}
+                {searchQuery.trim() ? ` · “${searchQuery.trim()}”` : ""}
+              </p>
+              <div className="w-[300px] shrink-0">
+                <Input
+                  variant="search"
+                  placeholder={DATA_GRID_RESULTS_SEARCH_PLACEHOLDER}
+                  value={searchQuery}
+                  onChange={(event) => setSearchQuery(event.target.value)}
+                  onClear={() => setSearchQuery("")}
+                  className="!bg-datavis-card-bg"
+                  aria-label="Search aggregated entities"
+                />
+              </div>
+              {hasActiveFilters ? (
+                <Button
+                  type="button"
+                  variant="ghost"
+                  className="h-8 shrink-0 gap-1.5 px-2 text-base-small text-text-tertiary hover:text-text-primary [&_svg]:!h-2 [&_svg]:!w-3"
+                  onClick={() => { setFacetSelections({}); setSearchQuery(""); }}
+                >
+                  <Icon name="action-filter-list" size={14} aria-hidden />
+                  Clear all filters
+                </Button>
+              ) : null}
+              <DataGridExportButton onClick={exportAll} />
             </div>
-            {hasActiveFilters ? (
-              <Button
-                type="button"
-                variant="ghost"
-                className="h-8 shrink-0 gap-1.5 px-2 text-base-small text-text-tertiary hover:text-text-primary [&_svg]:!h-2 [&_svg]:!w-3"
-                onClick={() => { setFacetSelections({}); setSearchQuery(""); }}
-              >
-                <Icon name="action-filter-list" size={14} aria-hidden />
-                Clear all filters
-              </Button>
-            ) : null}
             {selectedRows.length > 0 ? (
-              <Button
-                type="button"
-                variant="secondary-outline"
-                className="h-8 shrink-0 gap-1.5"
-                onClick={() => onSearchSelected(selectedRows)}
-              >
-                <Search size={14} strokeWidth={1.5} className="size-3.5 shrink-0 text-current" aria-hidden />
-                Search {selectedRows.length} selected
-              </Button>
+              <DataGridSearchSelectedActions
+                className="!ml-0"
+                onSearch={() => onSearchSelected(selectedRows)}
+                onClear={() => onSelectedIdsChange(new Set())}
+              />
             ) : null}
-            <DataGridExportButton onClick={exportAll} />
           </div>
         </>
       }
@@ -1100,6 +1097,11 @@ export function EntitiesOverviewContent() {
   const [entityTypeFilter, setEntityTypeFilter] = useState<EntityTypeChartLabel | null>(null);
   const [entityRiskFilter, setEntityRiskFilter] = useState<EntityRiskChartLabel | null>(null);
   const [entityVolumeFilter, setEntityVolumeFilter] = useState<string | null>(null);
+  const [typesViz, setTypesViz] = useState<CategoricalWidgetViz>("bar");
+  const [riskViz, setRiskViz] = useState<CategoricalWidgetViz>("bar");
+  const [volumeViz, setVolumeViz] = useState<CategoricalWidgetViz>("bar");
+  const columnExpand = useExpandableColumnWidgets(ENTITIES_COLUMN_WIDGET_ORDER);
+  const categoryExpand = useExpandableColumnWidgets(ENTITY_CATEGORY_CARD_ORDER);
 
   const launchEntitiesFsqlSearch = useCallback(
     (query: string, onLaunched?: () => void) => {
@@ -1153,7 +1155,7 @@ export function EntitiesOverviewContent() {
     [tableRows, timeframe],
   );
 
-  const widgetFilteredRows = useMemo(
+  const chartScopedRows = useMemo(
     () =>
       applyEntityWidgetFilters(timeframeScopedRows, {
         entityTypeFilter,
@@ -1164,8 +1166,8 @@ export function EntitiesOverviewContent() {
   );
 
   const entityCategoryCards = useMemo(
-    () => buildEntityCategoryCards(widgetFilteredRows),
-    [widgetFilteredRows],
+    () => buildEntityCategoryCards(chartScopedRows),
+    [chartScopedRows],
   );
 
   const hasWidgetFilters =
@@ -1184,13 +1186,13 @@ export function EntitiesOverviewContent() {
 
   const entityTypeRows = useMemo(
     () =>
-      countByLabel(timeframeScopedRows, ENTITY_TYPE_ORDER, (row) => entityTypeChartLabel(row.type)).map(
+      countByLabel(chartScopedRows, ENTITY_TYPE_ORDER, (row) => entityTypeChartLabel(row.type)).map(
         (row) => ({
           ...row,
           color: CHART_CATEGORY_FILL,
         }),
       ),
-    [timeframeScopedRows],
+    [chartScopedRows],
   );
 
   const entityTypeBarScale = useMemo(
@@ -1198,13 +1200,18 @@ export function EntitiesOverviewContent() {
     [entityTypeRows],
   );
 
+  const entityTypeSegments = useMemo(
+    () => withCategoricalColors(entityTypeRows.map(({ label, value }) => ({ label, value }))),
+    [entityTypeRows],
+  );
+
   const entityRiskRows = useMemo(
     () =>
-      countByLabel(timeframeScopedRows, ENTITY_RISK_CHART_ORDER, (row) => row.risk).map((row) => ({
+      countByLabel(chartScopedRows, ENTITY_RISK_CHART_ORDER, (row) => row.risk).map((row) => ({
         ...row,
         color: ENTITY_RISK_CHART_COLORS[row.label as (typeof ENTITY_RISK_CHART_ORDER)[number]],
       })),
-    [timeframeScopedRows],
+    [chartScopedRows],
   );
 
   const entityRiskBarScale = useMemo(
@@ -1213,8 +1220,8 @@ export function EntitiesOverviewContent() {
   );
 
   const topEntitiesByVolumeRows = useMemo(
-    () => topEntitiesByEventVolume(timeframeScopedRows, 4),
-    [timeframeScopedRows],
+    () => topEntitiesByEventVolume(chartScopedRows, 4),
+    [chartScopedRows],
   );
 
   const topEntitiesBarScale = useMemo(
@@ -1222,7 +1229,29 @@ export function EntitiesOverviewContent() {
     [topEntitiesByVolumeRows],
   );
 
-  const dailyChart = useMemo(() => buildDailyEntityChart(timeframe), [timeframe]);
+  const topEntitiesSegments = useMemo(
+    () =>
+      withCategoricalColors(topEntitiesByVolumeRows.map(({ label, value }) => ({ label, value }))),
+    [topEntitiesByVolumeRows],
+  );
+
+  const dailyChart = useMemo(() => {
+    const base = buildDailyEntityChart(timeframe);
+    const values = dailyValuesFromRows(chartScopedRows, base.buckets, (row) =>
+      parseAnalyticsRowTime(row.lastSeen),
+    );
+    const { yMax, yTicks } = niceChartYScale(values);
+    const spikeLabel = `${base.spikeDayLabel} spike correlates with new cloud resources from Discovery`;
+    return {
+      xLabels: base.xLabels,
+      values,
+      spikeIndex: base.spikeIndex,
+      spikeLabel,
+      yMax,
+      yTicks,
+      buckets: base.buckets,
+    };
+  }, [timeframe, chartScopedRows]);
 
   const handleEntityTypeClick = (label: string) => {
     if (!isEntityTypeChartLabel(label)) return;
@@ -1262,38 +1291,112 @@ export function EntitiesOverviewContent() {
         </p>
       </InsightCard>
 
-      <div className="grid min-h-0 shrink-0 grid-cols-1 items-stretch gap-4 lg:grid-cols-3">
-        <InsightCard title="Entity Types" fillHeight>
-          <HorizontalBarPanel
-            rows={entityTypeRows}
-            selectedLabel={entityTypeFilter}
-            onBarClick={handleEntityTypeClick}
-            filterAriaLabel={(label) => `Filter entities by type ${label}`}
-            xMax={entityTypeBarScale.xMax}
-            xTicks={entityTypeBarScale.xTicks}
-          />
-        </InsightCard>
-        <InsightCard title="Entity Risk" fillHeight>
-          <HorizontalBarPanel
-            rows={entityRiskRows}
-            selectedLabel={entityRiskFilter}
-            onBarClick={handleEntityRiskClick}
-            filterAriaLabel={(label) => `Filter entities by ${label} risk`}
-            xMax={entityRiskBarScale.xMax}
-            xTicks={entityRiskBarScale.xTicks}
-          />
-        </InsightCard>
-        <InsightCard title="Top Entities By Event Volume" fillHeight>
-          <HorizontalBarPanel
-            rows={topEntitiesByVolumeRows}
-            selectedLabel={entityVolumeFilter}
-            onBarClick={handleEntityVolumeClick}
-            filterAriaLabel={(label) => `Filter entities by ${label}`}
-            xMax={topEntitiesBarScale.xMax}
-            xTicks={topEntitiesBarScale.xTicks}
-          />
-        </InsightCard>
-      </div>
+      <ExpandableColumnWidgetLayout
+        expandedIds={columnExpand.expandedIds}
+        collapsedIds={columnExpand.collapsedIds}
+        renderWidget={(id, expanded) => {
+          const chart =
+            id === "types" ? (
+              typesViz === "donut" ? (
+                <DonutChartPanel
+                  segments={entityTypeSegments}
+                  total={chartScopedRows.length}
+                  centerLabel="entities"
+                  selectedLabel={entityTypeFilter}
+                  onSegmentClick={handleEntityTypeClick}
+                  ariaLabel="Entity types"
+                />
+              ) : (
+                <HorizontalBarPanel
+                  rows={entityTypeRows}
+                  selectedLabel={entityTypeFilter}
+                  onBarClick={handleEntityTypeClick}
+                  filterAriaLabel={(label) => `Filter entities by type ${label}`}
+                  xMax={entityTypeBarScale.xMax}
+                  xTicks={entityTypeBarScale.xTicks}
+                />
+              )
+            ) : id === "risk" ? (
+              riskViz === "donut" ? (
+                <DonutChartPanel
+                  segments={entityRiskRows}
+                  total={chartScopedRows.length}
+                  centerLabel="entities"
+                  selectedLabel={entityRiskFilter}
+                  onSegmentClick={handleEntityRiskClick}
+                  ariaLabel="Entity risk"
+                />
+              ) : (
+                <HorizontalBarPanel
+                  rows={entityRiskRows}
+                  selectedLabel={entityRiskFilter}
+                  onBarClick={handleEntityRiskClick}
+                  filterAriaLabel={(label) => `Filter entities by ${label} risk`}
+                  xMax={entityRiskBarScale.xMax}
+                  xTicks={entityRiskBarScale.xTicks}
+                />
+              )
+            ) : volumeViz === "donut" ? (
+              <DonutChartPanel
+                segments={topEntitiesSegments}
+                total={topEntitiesSegments.reduce((sum, segment) => sum + segment.value, 0)}
+                centerLabel="events"
+                selectedLabel={entityVolumeFilter}
+                onSegmentClick={handleEntityVolumeClick}
+                ariaLabel="Top entities by event volume"
+              />
+            ) : (
+              <HorizontalBarPanel
+                rows={topEntitiesByVolumeRows}
+                selectedLabel={entityVolumeFilter}
+                onBarClick={handleEntityVolumeClick}
+                filterAriaLabel={(label) => `Filter entities by ${label}`}
+                xMax={topEntitiesBarScale.xMax}
+                xTicks={topEntitiesBarScale.xTicks}
+              />
+            );
+          const title =
+            id === "types"
+              ? "Entity Types"
+              : id === "risk"
+                ? "Entity Risk"
+                : "Top Entities By Event Volume";
+          const visualization =
+            id === "types"
+              ? {
+                  value: typesViz,
+                  options: CATEGORICAL_WIDGET_VIZ_OPTIONS,
+                  onChange: (next: string) => setTypesViz(next as CategoricalWidgetViz),
+                }
+              : id === "risk"
+                ? {
+                    value: riskViz,
+                    options: CATEGORICAL_WIDGET_VIZ_OPTIONS,
+                    onChange: (next: string) => setRiskViz(next as CategoricalWidgetViz),
+                  }
+                : {
+                    value: volumeViz,
+                    options: CATEGORICAL_WIDGET_VIZ_OPTIONS,
+                    onChange: (next: string) => setVolumeViz(next as CategoricalWidgetViz),
+                  };
+          return (
+            <ExpandableColumnWidgetShell id={id} expanded={expanded} api={columnExpand}>
+              <InsightCard
+                title={title}
+                fillHeight
+                headerActions={
+                  <InsightCardHeaderActions
+                    expand={{ expanded, onToggle: () => columnExpand.toggle(id) }}
+                    visualization={visualization}
+                  />
+                }
+              >
+                {chart}
+              </InsightCard>
+            </ExpandableColumnWidgetShell>
+          );
+        }}
+      />
       </div>
 
       <EntitiesDetailTabs active={activeDetailTab} onChange={setActiveDetailTab} />
@@ -1301,7 +1404,7 @@ export function EntitiesOverviewContent() {
       {hasWidgetFilters ? (
         <div className="flex flex-wrap items-center gap-3">
           <p className="text-base-small text-text-secondary">
-            {widgetFilteredRows.length} of {timeframeScopedRows.length} entities
+            {chartScopedRows.length} of {timeframeScopedRows.length} entities
             {activeWidgetFilterLabels.map((label) => ` · ${label}`).join("")}
           </p>
           <Button
@@ -1319,43 +1422,36 @@ export function EntitiesOverviewContent() {
       {activeDetailTab === "entities" ? (
         <>
           {categorySelectedKeys.size > 0 ? (
-            <div className="flex flex-wrap items-center gap-3">
-              <p className="text-base-small text-text-secondary">
-                {categorySelectedKeys.size} entit{categorySelectedKeys.size === 1 ? "y" : "ies"} selected
-              </p>
-              <Button
-                type="button"
-                variant="secondary-outline"
-                className="h-8 shrink-0 gap-1.5"
-                onClick={handleSearchCategorySelection}
-              >
-                <Search size={14} strokeWidth={1.5} className="size-3.5 shrink-0 text-current" aria-hidden />
-                Search selected
-              </Button>
-              <Button
-                type="button"
-                variant="ghost"
-                className="h-8 shrink-0 px-2 text-base-small text-text-tertiary hover:text-text-primary"
-                onClick={() => setCategorySelectedKeys(new Set())}
-              >
-                Clear selection
-              </Button>
+            <div className="flex flex-wrap items-center justify-end gap-3">
+              <DataGridSearchSelectedActions
+                onSearch={handleSearchCategorySelection}
+                onClear={() => setCategorySelectedKeys(new Set())}
+              />
             </div>
           ) : null}
-          <div className="grid min-h-0 grid-cols-1 gap-4 lg:grid-cols-3">
-            {entityCategoryCards.map((card) => (
-              <EntityCategoryCard
-                key={card.title}
-                data={card}
-                selectedKeys={categorySelectedKeys}
-                onToggleItem={handleToggleCategoryItem}
-              />
-            ))}
-          </div>
+          <ExpandableColumnWidgetLayout
+            expandedIds={categoryExpand.expandedIds}
+            collapsedIds={categoryExpand.collapsedIds}
+            renderWidget={(id, expanded) => {
+              const card = entityCategoryCards.find((item) => item.id === id);
+              if (!card) return null;
+              return (
+                <ExpandableColumnWidgetShell id={id} expanded={expanded} api={categoryExpand}>
+                  <EntityCategoryCard
+                    data={card}
+                    selectedKeys={categorySelectedKeys}
+                    onToggleItem={handleToggleCategoryItem}
+                    expanded={expanded}
+                    onToggleExpand={() => categoryExpand.toggle(id)}
+                  />
+                </ExpandableColumnWidgetShell>
+              );
+            }}
+          />
         </>
       ) : (
         <EntitiesAggregatedPanel
-          rows={widgetFilteredRows}
+          rows={chartScopedRows}
           scopedRowCount={timeframeScopedRows.length}
           activeFilterLabels={activeWidgetFilterLabels}
           selectedIds={aggregatedSelectedIds}

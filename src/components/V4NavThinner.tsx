@@ -1,6 +1,7 @@
-import type { ImgHTMLAttributes, ReactNode } from "react";
+import { useState, type ImgHTMLAttributes, type ReactNode } from "react";
 import { Link } from "react-router-dom";
 import { SHOW_ADDONS_NAV, SHOW_AI_AGENTS_PAGE, SHOW_DESIGN_SYSTEM_NAV } from "../app/navRailConfig";
+import { Icon } from "../design-system";
 
 import logomarkA from "../assets/nav-v4/logomark-a.svg?url";
 import logomarkB from "../assets/nav-v4/logomark-b.svg?url";
@@ -20,6 +21,10 @@ import { ThemeToggle } from "./ThemeToggle";
 import { ROUTES } from "../app/routes";
 
 const cx = (...c: (string | false | undefined)[]) => c.filter(Boolean).join(" ");
+
+const NAV_RAIL_COLLAPSED_WIDTH = "w-10";
+const NAV_RAIL_EXPANDED_WIDTH = "w-[13.75rem]";
+const NAV_RAIL_STORAGE_KEY = "mayfield.nav-rail.expanded";
 
 /** Inline SVG from disk so `fill="currentColor"` picks up rail `text-*` from the parent `NavSlot`. */
 function NavSvgInline({ svg, className }: { svg: string; className?: string }) {
@@ -54,22 +59,30 @@ function NavImg({
 
 function NavSlot({
   title,
+  label,
   children,
   className,
   active,
   to,
+  expanded,
 }: {
   title: string;
+  /** Visible label when expanded; defaults to `title`. */
+  label?: string;
   children: ReactNode;
   className?: string;
   /** Shows the rounded rail highlight behind the icon (current section). */
   active?: boolean;
   /** When set, navigates via client-side routing instead of an inert control. */
   to?: string;
+  /** When true, show the section label beside the icon. */
+  expanded?: boolean;
 }) {
+  const displayLabel = label ?? title;
   const shared = cx(
-    "relative flex size-10 shrink-0 items-center justify-center bg-transparent p-0",
+    "relative flex h-10 shrink-0 items-center bg-transparent",
     "rounded-sm transition-[color,background-color] duration-150 ease-out",
+    expanded ? "w-full gap-2 px-2" : "size-10 justify-center p-0",
     !active && "text-nav-icon hover:bg-nav-overlay-subtle hover:text-nav-icon-hover",
     active && "text-nav-icon-active hover:text-nav-icon-active",
     "focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-nav-icon-active",
@@ -80,9 +93,27 @@ function NavSlot({
   const body = (
     <>
       {active ? (
-        <div className="absolute top-1 left-1 size-8 rounded-md bg-nav-highlight" aria-hidden />
+        <div
+          className={cx(
+            "absolute rounded-md bg-nav-highlight",
+            expanded ? "inset-x-1 inset-y-1" : "top-1 left-1 size-8",
+          )}
+          aria-hidden
+        />
       ) : null}
-      <span className="relative z-[1] flex size-full items-center justify-center text-current">{children}</span>
+      <span
+        className={cx(
+          "relative z-[1] flex shrink-0 items-center justify-center text-current",
+          expanded ? "size-10" : "size-full",
+        )}
+      >
+        {children}
+      </span>
+      {expanded ? (
+        <span className="relative z-[1] min-w-0 flex-1 truncate text-left text-sm font-semibold leading-5">
+          {displayLabel}
+        </span>
+      ) : null}
     </>
   );
 
@@ -105,6 +136,14 @@ function NavSlot({
       {body}
     </button>
   );
+}
+
+function readStoredExpanded(): boolean {
+  try {
+    return window.localStorage.getItem(NAV_RAIL_STORAGE_KEY) === "1";
+  } catch {
+    return false;
+  }
 }
 
 /** Icons on the thin vertical rail; drives which slot shows the active highlight. */
@@ -131,6 +170,7 @@ export type V4NavThinnerProps = {
 /**
  * Thin vertical nav rail — Figma `6582:59669` (`v4 Nav-thinner`).
  * Icon assets exported from the same frame; sizes match Figma slot geometry.
+ * Chevron at the bottom expands the rail so section names are visible.
  */
 export function V4NavThinner({
   variant = "federated-search",
@@ -140,10 +180,36 @@ export function V4NavThinner({
   const isFederated = variant === "federated-search";
   const resolvedActive: V4NavActiveSection | undefined =
     activeSection ?? (isFederated ? "search" : undefined);
+  const [expanded, setExpanded] = useState(readStoredExpanded);
+
+  const toggleExpanded = () => {
+    setExpanded((current) => {
+      const next = !current;
+      try {
+        window.localStorage.setItem(NAV_RAIL_STORAGE_KEY, next ? "1" : "0");
+      } catch {
+        /* ignore quota / private mode */
+      }
+      return next;
+    });
+  };
 
   return (
-    <aside className="flex h-full min-h-0 w-10 shrink-0 flex-col items-center border-r border-black/30 bg-nav-bg">
-      <div className="flex h-10 w-full shrink-0 items-center justify-center" aria-label="Product home">
+    <aside
+      className={cx(
+        "flex h-full min-h-0 shrink-0 flex-col overflow-hidden border-r border-black/30 bg-nav-bg",
+        "transition-[width] duration-200 ease-out",
+        expanded ? NAV_RAIL_EXPANDED_WIDTH : cx(NAV_RAIL_COLLAPSED_WIDTH, "items-center"),
+      )}
+      data-expanded={expanded ? "true" : "false"}
+    >
+      <div
+        className={cx(
+          "flex h-10 w-full shrink-0 items-center",
+          expanded ? "justify-start px-3" : "justify-center",
+        )}
+        aria-label="Product home"
+      >
         {isFederated ? (
           <div className="flex h-4 w-[22px] items-end justify-center gap-px">
             <NavImg src={logomarkFsA} alt="" className="h-4 w-2.5 object-contain object-left-bottom" />
@@ -157,69 +223,151 @@ export function V4NavThinner({
         )}
       </div>
 
-      <NavSlot title="Summary & insights" active={resolvedActive === "summary"} to={navTargets?.summary}>
-        <NavSvgInline svg={summaryInsightsSvg} className="size-10" />
-      </NavSlot>
-
-      <NavSlot title="Search" active={resolvedActive === "search"} to={navTargets?.search}>
-        <NavSvgInline svg={searchSvg} className="size-10" />
-      </NavSlot>
-
-      <NavSlot
-        title="Federated Detection Hub"
-        active={resolvedActive === "federatedDetectionHub"}
-        to={navTargets?.federatedDetectionHub}
-      >
-        <NavSvgInline svg={federatedDetectionHubSvg} className="h-[27px] w-7" />
-      </NavSlot>
-
-      <NavSlot title="Connectors" active={resolvedActive === "connectors"} to={navTargets?.connectors}>
-        <NavSvgInline svg={connectorsFigmaSvg} className="size-6" />
-      </NavSlot>
-
-      <NavSlot title="Data Pipeline" active={resolvedActive === "dataPipelines"} to={navTargets?.dataPipelines}>
-        <NavSvgInline svg={dataMobilitySvg} className="h-4 w-6" />
-      </NavSlot>
-
-      {SHOW_AI_AGENTS_PAGE ? (
-        <NavSlot title="AI Agents" active={resolvedActive === "aiAgents"} to={navTargets?.aiAgents}>
-          <NavSvgInline svg={aiAgentsSvg} className="h-6 w-[18px]" />
+      <div className={cx("flex w-full flex-col", expanded ? "px-1" : "items-center")}>
+        <NavSlot
+          title="Federated Analytics"
+          label="Analytics"
+          active={resolvedActive === "summary"}
+          to={navTargets?.summary}
+          expanded={expanded}
+        >
+          <NavSvgInline svg={summaryInsightsSvg} className="size-10" />
         </NavSlot>
-      ) : null}
 
-      {SHOW_ADDONS_NAV ? (
-        <NavSlot title="Addons" active={resolvedActive === "addons"} to={navTargets?.addons}>
-          <NavSvgInline svg={addonsSvg} className="h-[23px] w-[25px]" />
+        <NavSlot
+          title="Federated Search"
+          label="Search"
+          active={resolvedActive === "search"}
+          to={navTargets?.search}
+          expanded={expanded}
+        >
+          <NavSvgInline svg={searchSvg} className="size-10" />
         </NavSlot>
-      ) : null}
 
-      <NavSlot title="Admin Settings" active={resolvedActive === "adminSettings"} to={navTargets?.adminSettings}>
-        <NavSvgInline svg={adminSettingsSvg} className="size-[25px]" />
-      </NavSlot>
+        <NavSlot
+          title="Federated Detection Hub"
+          label="Detection Hub"
+          active={resolvedActive === "federatedDetectionHub"}
+          to={navTargets?.federatedDetectionHub}
+          expanded={expanded}
+        >
+          <NavSvgInline svg={federatedDetectionHubSvg} className="h-[27px] w-7" />
+        </NavSlot>
 
-      <NavSlot title="Settings" active={resolvedActive === "settings"} to={navTargets?.settings}>
-        <NavSvgInline svg={settingsSvg} className="size-6" />
-      </NavSlot>
+        <NavSlot
+          title="Connectors"
+          active={resolvedActive === "connectors"}
+          to={navTargets?.connectors}
+          expanded={expanded}
+        >
+          <NavSvgInline svg={connectorsFigmaSvg} className="size-6" />
+        </NavSlot>
+
+        <NavSlot
+          title="Data Pipeline"
+          active={resolvedActive === "dataPipelines"}
+          to={navTargets?.dataPipelines}
+          expanded={expanded}
+        >
+          <NavSvgInline svg={dataMobilitySvg} className="h-4 w-6" />
+        </NavSlot>
+
+        {SHOW_AI_AGENTS_PAGE ? (
+          <NavSlot
+            title="AI Agents"
+            active={resolvedActive === "aiAgents"}
+            to={navTargets?.aiAgents}
+            expanded={expanded}
+          >
+            <NavSvgInline svg={aiAgentsSvg} className="h-6 w-[18px]" />
+          </NavSlot>
+        ) : null}
+
+        {SHOW_ADDONS_NAV ? (
+          <NavSlot title="Addons" active={resolvedActive === "addons"} to={navTargets?.addons} expanded={expanded}>
+            <NavSvgInline svg={addonsSvg} className="h-[23px] w-[25px]" />
+          </NavSlot>
+        ) : null}
+
+        <NavSlot
+          title="Admin Settings"
+          active={resolvedActive === "adminSettings"}
+          to={navTargets?.adminSettings}
+          expanded={expanded}
+        >
+          <NavSvgInline svg={adminSettingsSvg} className="size-[25px]" />
+        </NavSlot>
+
+        <NavSlot
+          title="Settings"
+          active={resolvedActive === "settings"}
+          to={navTargets?.settings}
+          expanded={expanded}
+        >
+          <NavSvgInline svg={settingsSvg} className="size-6" />
+        </NavSlot>
+
+        <button
+          type="button"
+          title={expanded ? "Collapse navigation" : "Expand navigation"}
+          aria-label={expanded ? "Collapse navigation" : "Expand navigation"}
+          aria-expanded={expanded}
+          onClick={toggleExpanded}
+          className={cx(
+            "relative flex h-10 shrink-0 items-center rounded-sm bg-transparent",
+            "text-nav-icon transition-[color,background-color] duration-150 ease-out",
+            "hover:bg-nav-overlay-subtle hover:text-nav-icon-hover",
+            "focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-nav-icon-active",
+            expanded ? "w-full gap-2 px-2" : "size-10 justify-center p-0",
+          )}
+        >
+          <span className={cx("flex shrink-0 items-center justify-center", expanded ? "size-10" : "size-full")}>
+            <Icon
+              name={expanded ? "navi-chevron-left" : "navi-chevron-right"}
+              size={18}
+              className="block"
+              aria-hidden
+            />
+          </span>
+          {expanded ? (
+            <span className="min-w-0 flex-1 truncate text-left text-sm font-semibold leading-5">Collapse</span>
+          ) : null}
+        </button>
+      </div>
 
       <div className="min-h-0 flex-1" aria-hidden />
 
-      <Link
-        to={ROUTES.designSystem}
-        aria-label="Design system"
-        className={cx(
-          "relative flex size-10 shrink-0 items-center justify-center rounded-sm transition-colors duration-150 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-nav-icon-active",
-          SHOW_DESIGN_SYSTEM_NAV
-            ? "hover:bg-nav-overlay-subtle"
-            : "opacity-0 hover:bg-transparent focus-visible:opacity-100",
-        )}
-      >
-        <div className="size-[18px] rounded-full bg-white/5 ring-1 ring-inset ring-white/10" aria-hidden />
-      </Link>
+      <div className={cx("flex w-full flex-col", expanded ? "px-1" : "items-center")}>
+        <Link
+          to={ROUTES.designSystem}
+          aria-label="Design system"
+          title="Design system"
+          className={cx(
+            "relative flex h-10 shrink-0 items-center rounded-sm transition-colors duration-150",
+            "focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-nav-icon-active",
+            expanded ? "w-full gap-2 px-2" : "size-10 justify-center",
+            SHOW_DESIGN_SYSTEM_NAV
+              ? "text-nav-icon hover:bg-nav-overlay-subtle hover:text-nav-icon-hover"
+              : "opacity-0 hover:bg-transparent focus-visible:opacity-100",
+          )}
+        >
+          <span className={cx("flex shrink-0 items-center justify-center", expanded ? "size-8" : "size-full")}>
+            <div className="size-[18px] rounded-full bg-white/5 ring-1 ring-inset ring-white/10" aria-hidden />
+          </span>
+          {expanded && SHOW_DESIGN_SYSTEM_NAV ? (
+            <span className="min-w-0 flex-1 truncate text-left text-sm font-semibold leading-5">Design system</span>
+          ) : null}
+        </Link>
 
-      <ThemeToggle />
-      <NavSlot title="Chat">
-        <NavSvgInline svg={chatIntercomSvg} className="size-[18px]" />
-      </NavSlot>
+        <ThemeToggle
+          className={cx(expanded && "h-10 w-full justify-start gap-2 px-2")}
+          label={expanded ? "Theme" : undefined}
+        />
+
+        <NavSlot title="Chat" expanded={expanded}>
+          <NavSvgInline svg={chatIntercomSvg} className="size-[18px]" />
+        </NavSlot>
+      </div>
     </aside>
   );
 }

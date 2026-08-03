@@ -6,7 +6,7 @@ import {
   TimeSeriesHoverRow,
   TimeSeriesHoverTooltip,
 } from "./timeSeriesChartHover";
-import { buildDayBoundaryMarkers, buildDayLabelPositions } from "./timeframeChartUtils";
+import { buildDayBoundaryMarkers, buildDayLabelPositions, niceIntegerYTicks } from "./timeframeChartUtils";
 
 type TimeSeriesSpikeHighlight = {
   index: number;
@@ -59,8 +59,9 @@ export function TimeSeriesBarChart({
   const [hover, setHover] = useState<{ index: number; plotX: number } | null>(null);
   const brushEnabled = onBrushCommit != null;
 
-  const yMax = yMaxProp ?? Math.max(...values, 1);
-  const yTicks = yTicksProp ?? [0, Math.round(yMax / 4), Math.round(yMax / 2), Math.round((yMax * 3) / 4), yMax];
+  const autoScale = niceIntegerYTicks(Math.max(...values, 1));
+  const yMax = yMaxProp ?? autoScale.yMax;
+  const yTicks = yTicksProp ?? (yMaxProp != null ? niceIntegerYTicks(yMaxProp).yTicks : autoScale.yTicks);
   const dayBoundaryMarkers = useMemo(
     () => (bucketStarts ? buildDayBoundaryMarkers(bucketStarts.map((start) => ({ start }))) : []),
     [bucketStarts],
@@ -192,8 +193,8 @@ export function TimeSeriesBarChart({
           style={{ height }}
           aria-hidden
         >
-          {[...yTicks].reverse().map((tick) => (
-            <span key={tick}>{tick}</span>
+          {[...yTicks].reverse().map((tick, index) => (
+            <span key={`y-${tick}-${index}`}>{tick}</span>
           ))}
         </div>
 
@@ -240,9 +241,9 @@ export function TimeSeriesBarChart({
             role="img"
             aria-label={ariaLabel}
           >
-            {yTicks.map((tick) => (
+            {yTicks.map((tick, index) => (
               <line
-                key={tick}
+                key={`grid-${tick}-${index}`}
                 x1={0}
                 y1={toY(tick)}
                 x2={PLOT_VIEW_WIDTH}

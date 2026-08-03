@@ -28,6 +28,7 @@ function ChartGridLines({ xTicks }: { xTicks: readonly number[] }) {
 export function HorizontalBarPanel({
   rows,
   selectedLabel,
+  selectedLabels,
   onBarClick,
   filterAriaLabel = (label) => `Filter by ${label}`,
   xMax = DEFAULT_X_MAX,
@@ -38,6 +39,8 @@ export function HorizontalBarPanel({
 }: {
   rows: readonly BarRow[];
   selectedLabel?: string | null;
+  /** Multi-select highlight; when provided, takes precedence over `selectedLabel`. */
+  selectedLabels?: readonly string[] | null;
   onBarClick?: (label: string) => void;
   filterAriaLabel?: (label: string) => string;
   xMax?: number;
@@ -50,6 +53,12 @@ export function HorizontalBarPanel({
   denseRowGap?: number;
 }) {
   const resolvedDenseRowGap = dense ? (denseRowGap ?? 16) : undefined;
+  const selectedSet =
+    selectedLabels != null
+      ? new Set(selectedLabels)
+      : selectedLabel != null
+        ? new Set([selectedLabel])
+        : null;
 
   return (
     <div className={cx("flex min-h-0 min-w-0 flex-col", chartHeight == null && !dense && "flex-1 lg:h-full")}>
@@ -66,8 +75,8 @@ export function HorizontalBarPanel({
             const pct = Math.min(100, Math.max((row.value / xMax) * 100, row.value > 0 ? 6 : 0));
             const fill = row.color ?? CHART_CATEGORY_FILL;
             const interactive = Boolean(onBarClick);
-            const selected = interactive && selectedLabel === row.label;
-            const filterActive = interactive && selectedLabel != null;
+            const selected = interactive && selectedSet != null && selectedSet.has(row.label);
+            const filterActive = interactive && selectedSet != null && selectedSet.size > 0;
             const dimmed = filterActive && !selected;
 
             const rowBody = (

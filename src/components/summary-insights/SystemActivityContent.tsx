@@ -1,8 +1,9 @@
-import { useMemo, useState } from "react";
+import { useCallback, useMemo, useState } from "react";
 import { DATA_GRID_ABOVE_SECTION_CLASS, DATA_GRID_HEADER_ROW_CLASS, DATA_GRID_RESULTS_SEARCH_PLACEHOLDER, DATA_GRID_TABLE_CLASS, DATA_GRID_TABLE_SCROLL_CLASS, DATA_GRID_THEAD_CLASS } from "../ui/dataGridTableStyles";
-import { Checkbox, Icon, type SeverityShapeIconName } from "../../design-system";
+import { Checkbox, Icon, type SeverityShapeIconName, withCategoricalColors } from "../../design-system";
 import { Button } from "@/components/shadcn/button";
 import { ColumnHeaderMenu } from "../ui/ColumnHeaderMenu";
+import { DonutChartPanel } from "../ui/DonutChartPanel";
 import { FilterColumnPanel, type FilterColumnPanelTool } from "../ui/FilterColumnPanel";
 import { eventGridFacetDefinitions } from "../ui/dataGridFacetDefinitions";
 import {
@@ -13,6 +14,7 @@ import {
 } from "../ui/dataGridFilterTypes";
 import { Input } from "../ui/Input";
 import { DataGridExportButton } from "../ui/DataGridExportButton";
+import { DataGridSearchSelectedActions } from "../ui/DataGridSearchSelectedActions";
 import { Snackbar } from "../ui/Snackbar";
 import { useDataGridJsonExport } from "../ui/useDataGridJsonExport";
 import { SeverityTableIcon } from "../ui/SeverityTableIcon";
@@ -35,30 +37,35 @@ import { ResultsDetailSlideOver, useResultsDetailSlideOver } from "../ui/useResu
 import { useResultsDetailPaginationSync } from "../ui/useResultsDetailPaginationSync";
 import { demoTableConnector } from "../connectors/demoTableConnectors";
 import { ConnectorTableCell } from "../ui/ConnectorTableCell";
-import { cx, InsightCard } from "./datavisCard";
+import { useCopilot } from "../../context/CopilotContext";
+import { buildTitlesFsqlQuery } from "../../lib/buildEntitiesFsqlQuery";
+import { cx, InsightCard, InsightCardHeaderActions } from "./datavisCard";
+import {
+  ExpandableColumnWidgetLayout,
+  ExpandableColumnWidgetShell,
+  useExpandableColumnWidgets,
+} from "./useExpandableColumnWidgets";
 import {
   buildHourlyEventRows,
   ChartZoomHint,
   countByLabel,
   formatAnalyticsRowTime,
   horizontalBarScale,
+  parseAnalyticsRowTime,
   rowTimeInTimeframe,
   topCountsByLabel,
   useFederatedAnalyticsTimeframeZoom,
 } from "./federatedAnalyticsZoom";
+import { chartFiltersActive, formatChartFilterLabels, toggleChartFilter } from "./chartFilterSet";
 import { CHART_CATEGORY_FILL, HorizontalBarPanel } from "./horizontalBarPanel";
 import { TimeSeriesAreaChart } from "./timeSeriesAreaChart";
-import {
-  buildHourlyAxisTicks,
-  buildHourlyBuckets,
-  formatBucketTimeLabel,
-  shouldIncludeDateInBucketLabels,
-  hourlySeverityValues,
-  resolveAnalyticsSpikeIndices,
-  SPIKE_CLOCK_HOUR,
-} from "./timeframeChartUtils";
+import { SEVERITY_TIMELINE_VIZ_OPTIONS, type SeverityTimelineViz } from "./severityTimelineViz";
+import { buildSeverityTimelineChart } from "./severityTimelineSeries";
+import { CATEGORICAL_WIDGET_VIZ_OPTIONS, type CategoricalWidgetViz } from "./categoricalWidgetViz";
 
 type SystemSeverity = "Critical" | "High" | "Medium" | "Low" | "Informational";
+
+const SYSTEM_COLUMN_WIDGET_ORDER = ["activity", "severity", "hosts"] as const;
 
 const SEV_BAR: Record<SystemSeverity, string> = {
   Critical: "#ff604a",
@@ -75,6 +82,14 @@ const SEV_ICONS: Record<SystemSeverity, SeverityShapeIconName> = {
   Low: "severity-low",
   Informational: "severity-info",
 };
+
+const SEVERITY_TIMELINE_STYLES = {
+  Informational: { color: SEV_BAR.Informational, icon: SEV_ICONS.Informational },
+  Low: { color: SEV_BAR.Low, icon: SEV_ICONS.Low },
+  Medium: { color: SEV_BAR.Medium, icon: SEV_ICONS.Medium },
+  High: { color: SEV_BAR.High, icon: SEV_ICONS.High },
+  Critical: { color: SEV_BAR.Critical, icon: SEV_ICONS.Critical },
+} as const;
 
 const SEVERITY_ORDER: Record<SystemSeverity, number> = {
   Critical: 0,
@@ -376,14 +391,17 @@ function SystemActivityTable({
   tableColumnIds,
   onOpenDetail,
   highlightedRowId,
+  selected,
+  onSelectedChange,
 }: {
   displayRows: SystemActivityRow[];
   getSortProps: ReturnType<typeof useSystemActivityTableGrid>["getSortProps"];
   tableColumnIds: readonly string[];
   onOpenDetail: (id: string) => void;
   highlightedRowId?: string | null;
+  selected: ReadonlySet<string>;
+  onSelectedChange: (next: Set<string>) => void;
 }) {
-  const [selected, setSelected] = useState<Set<string>>(() => new Set());
   const {
     containerRef,
     colStyle,
@@ -400,16 +418,14 @@ function SystemActivityTable({
   const someSelected = selectedOnPage > 0 && !allSelected;
 
   const toggleAll = (checked: boolean) => {
-    setSelected(checked ? new Set(allIds) : new Set());
+    onSelectedChange(checked ? new Set([...selected, ...allIds]) : new Set());
   };
 
   const toggleRow = (id: string, checked: boolean) => {
-    setSelected((prev) => {
-      const next = new Set(prev);
-      if (checked) next.add(id);
-      else next.delete(id);
-      return next;
-    });
+    const next = new Set(selected);
+    if (checked) next.add(id);
+    else next.delete(id);
+    onSelectedChange(next);
   };
 
   const renderHeaderCell = (columnId: string, colIndex: number) => {
@@ -581,14 +597,21 @@ function SystemActivityTable({
 
 /** Figma concept — System Activity body for Federated Analytics. */
 export function SystemActivityContent() {
+  const { setPendingFsqlSearch } = useCopilot();
   const { timeframe, initialTimeframe, isChartZoomed, handleTimelineBrush, handleChartZoomReset } =
-    useFederatedAnalyticsTimeframeZoom("hourly");
+    useFederatedAnalyticsTimeframeZoom("adaptive");
   const [activityClassFilter, setActivityClassFilter] = useState<ActivityClass | null>(null);
-  const [severityFilter, setSeverityFilter] = useState<SystemSeverity | null>(null);
+  const [severityFilters, setSeverityFilters] = useState<ReadonlySet<string>>(() => new Set());
   const [hostFilter, setHostFilter] = useState<string | null>(null);
+  const [timelineViz, setTimelineViz] = useState<SeverityTimelineViz>("area");
+  const [activityViz, setActivityViz] = useState<CategoricalWidgetViz>("bar");
+  const [severityViz, setSeverityViz] = useState<CategoricalWidgetViz>("bar");
+  const [hostsViz, setHostsViz] = useState<CategoricalWidgetViz>("bar");
   const [searchQuery, setSearchQuery] = useState("");
   const [tableTool, setTableTool] = useState<FilterColumnPanelTool | null>(null);
   const [facetSelections, setFacetSelections] = useState<DataGridFacetSelections>({});
+  const [selectedIds, setSelectedIds] = useState<Set<string>>(() => new Set());
+  const columnExpand = useExpandableColumnWidgets(SYSTEM_COLUMN_WIDGET_ORDER);
 
   const facetDefs = useMemo(
     () =>
@@ -623,14 +646,31 @@ export function SystemActivityContent() {
     [tableRows, timeframe],
   );
 
+  const chartScopedRows = useMemo(() => {
+    return timeframeScopedRows.filter((row) => {
+      if (activityClassFilter && row.activityClass !== activityClassFilter) return false;
+      if (severityFilters.size > 0 && !severityFilters.has(row.severity)) return false;
+      if (hostFilter && row.host !== hostFilter) return false;
+      return true;
+    });
+  }, [timeframeScopedRows, activityClassFilter, severityFilters, hostFilter]);
+
+  const timelineScopedRows = useMemo(() => {
+    return timeframeScopedRows.filter((row) => {
+      if (activityClassFilter && row.activityClass !== activityClassFilter) return false;
+      if (hostFilter && row.host !== hostFilter) return false;
+      return true;
+    });
+  }, [timeframeScopedRows, activityClassFilter, hostFilter]);
+
   const facets = useMemo(
     () => buildDataGridFacets(timeframeScopedRows, facetDefs),
     [timeframeScopedRows, facetDefs],
   );
 
   const activityClassRows = useMemo(
-    () => countByLabel(timeframeScopedRows, ACTIVITY_CLASS_ORDER, (row) => row.activityClass),
-    [timeframeScopedRows],
+    () => countByLabel(chartScopedRows, ACTIVITY_CLASS_ORDER, (row) => row.activityClass),
+    [chartScopedRows],
   );
 
   const activityClassBarScale = useMemo(
@@ -638,13 +678,18 @@ export function SystemActivityContent() {
     [activityClassRows],
   );
 
+  const activityClassSegments = useMemo(
+    () => withCategoricalColors(activityClassRows),
+    [activityClassRows],
+  );
+
   const severityChartRows = useMemo(
     () =>
-      countByLabel(timeframeScopedRows, SEVERITY_CHART_ORDER, (row) => row.severity).map((row) => ({
+      countByLabel(chartScopedRows, SEVERITY_CHART_ORDER, (row) => row.severity).map((row) => ({
         ...row,
         color: SEV_BAR[row.label as SystemSeverity],
       })),
-    [timeframeScopedRows],
+    [chartScopedRows],
   );
 
   const severityBarScale = useMemo(
@@ -653,8 +698,8 @@ export function SystemActivityContent() {
   );
 
   const hostChartRows = useMemo(
-    () => topCountsByLabel(timeframeScopedRows, (row) => row.host, 4, CHART_CATEGORY_FILL),
-    [timeframeScopedRows],
+    () => topCountsByLabel(chartScopedRows, (row) => row.host, 4, CHART_CATEGORY_FILL),
+    [chartScopedRows],
   );
 
   const hostBarScale = useMemo(
@@ -662,18 +707,16 @@ export function SystemActivityContent() {
     [hostChartRows],
   );
 
-  const filteredRows = useMemo(() => {
-    const chartFiltered = timeframeScopedRows.filter((row) => {
-      if (activityClassFilter && row.activityClass !== activityClassFilter) return false;
-      if (severityFilter && row.severity !== severityFilter) return false;
-      if (hostFilter && row.host !== hostFilter) return false;
-      return true;
-    });
+  const hostSegments = useMemo(
+    () => withCategoricalColors(hostChartRows.map(({ label, value }) => ({ label, value }))),
+    [hostChartRows],
+  );
 
-    return applyDataGridFacetFilters(chartFiltered, facetSelections, facetDefs).filter((row) =>
+  const filteredRows = useMemo(() => {
+    return applyDataGridFacetFilters(chartScopedRows, facetSelections, facetDefs).filter((row) =>
       systemMatchesSearch(row, searchQuery),
     );
-  }, [timeframeScopedRows, activityClassFilter, severityFilter, hostFilter, facetSelections, facetDefs, searchQuery]);
+  }, [chartScopedRows, facetSelections, facetDefs, searchQuery]);
   const tableGrid = useSystemActivityTableGrid(filteredRows);
   const resultsDetail = useResultsDetailSlideOver(filteredRows);
   useResultsDetailPaginationSync({
@@ -689,9 +732,17 @@ export function SystemActivityContent() {
     SYSTEM_ACTIVITY_DATA_GRID_COLUMNS,
   );
 
+  const handleSearchSelected = useCallback(() => {
+    const selectedRows = filteredRows.filter((row) => selectedIds.has(row.id));
+    const query = buildTitlesFsqlQuery(selectedRows.map((row) => row.title));
+    if (!query.trim()) return;
+    setPendingFsqlSearch({ query, autoExecute: true });
+    setSelectedIds(new Set());
+  }, [filteredRows, selectedIds, setPendingFsqlSearch]);
+
   const hasActiveFilters =
     activityClassFilter != null ||
-    severityFilter != null ||
+    chartFiltersActive(severityFilters) ||
     hostFilter != null ||
     hasDataGridFacetSelections(facetSelections);
 
@@ -702,103 +753,166 @@ export function SystemActivityContent() {
 
   const handleSeverityClick = (label: string) => {
     if (!isSystemSeverity(label)) return;
-    setSeverityFilter((current) => (current === label ? null : label));
+    setSeverityFilters((current) => toggleChartFilter(current, label));
   };
 
   const handleHostClick = (label: string) => {
     setHostFilter((current) => (current === label ? null : label));
   };
 
-  const eventsPerHourChart = useMemo(() => {
-    const buckets = buildHourlyBuckets(timeframe);
-    const { spikeIndex, secondarySpikeIndex } = resolveAnalyticsSpikeIndices(buckets, timeframe.to);
-    const includeDate = shouldIncludeDateInBucketLabels(timeframe);
-    const xLabels = buckets.map((bucket) => formatBucketTimeLabel(bucket.start, includeDate));
-    const { indices: xTickIndices, labels: xTickLabels } = buildHourlyAxisTicks(buckets, timeframe);
-
-    const series = [
-      {
-        id: "Medium",
-        label: "Medium",
-        color: SEV_BAR.Medium,
-        icon: SEV_ICONS.Medium,
-        values: hourlySeverityValues(14, buckets, spikeIndex, secondarySpikeIndex),
-      },
-      {
-        id: "High",
-        label: "High",
-        color: SEV_BAR.High,
-        icon: SEV_ICONS.High,
-        values: hourlySeverityValues(10, buckets, spikeIndex, secondarySpikeIndex),
-      },
-      {
-        id: "Critical",
-        label: "Critical",
-        color: SEV_BAR.Critical,
-        icon: SEV_ICONS.Critical,
-        values: hourlySeverityValues(4, buckets, spikeIndex, secondarySpikeIndex),
-      },
-    ] as const;
-
-    const spikeHighlight =
-      spikeIndex != null
-        ? { index: spikeIndex, label: `spike ~${SPIKE_CLOCK_HOUR}:00` }
-        : undefined;
-
-    return { series, xLabels, xTickIndices, xTickLabels, spikeHighlight, buckets };
-  }, [timeframe]);
+  const eventsPerHourChart = useMemo(
+    () =>
+      buildSeverityTimelineChart(
+        timeframe,
+        timelineScopedRows,
+        SEVERITY_TIMELINE_STYLES,
+        (row) => row.severity,
+        (row) => parseAnalyticsRowTime(row.time),
+      ),
+    [timeframe, timelineScopedRows],
+  );
 
   return (
     <div className="flex shrink-0 flex-col gap-4 p-4 sm:p-5">
       <div className={DATA_GRID_ABOVE_SECTION_CLASS}>
-      <InsightCard title="System Events Per Hour By Severity">
-        <ChartZoomHint unit="Hours" isChartZoomed={isChartZoomed} onReset={handleChartZoomReset} />
+      <InsightCard
+        title={`System Events ${eventsPerHourChart.titleCadence} By Severity`}
+        headerActions={
+          <InsightCardHeaderActions
+            visualization={{
+              value: timelineViz,
+              options: SEVERITY_TIMELINE_VIZ_OPTIONS,
+              onChange: (id) => setTimelineViz(id as SeverityTimelineViz),
+            }}
+          />
+        }
+      >
+        <ChartZoomHint unit={eventsPerHourChart.zoomUnit} isChartZoomed={isChartZoomed} onReset={handleChartZoomReset} />
         <TimeSeriesAreaChart
+          mode={timelineViz}
           series={eventsPerHourChart.series}
           xLabels={eventsPerHourChart.xLabels}
           xTickIndices={eventsPerHourChart.xTickIndices}
           xTickLabels={eventsPerHourChart.xTickLabels}
           bucketStarts={eventsPerHourChart.buckets.map((bucket) => bucket.start)}
           spikeHighlight={eventsPerHourChart.spikeHighlight}
+          yMax={eventsPerHourChart.yMax}
+          yTicks={eventsPerHourChart.yTicks}
           ariaLabel="System activity events per hour by severity"
-          selectedSeriesId={severityFilter}
+          selectedSeriesIds={[...severityFilters]}
           onSeriesClick={handleSeverityClick}
-          onBrushCommit={(selection) => handleTimelineBrush(selection, eventsPerHourChart.buckets)}
+          onBrushCommit={(selection) =>
+            handleTimelineBrush(selection, eventsPerHourChart.buckets, eventsPerHourChart.durationMs)
+          }
         />
       </InsightCard>
 
-      <div className="grid min-h-0 shrink-0 grid-cols-1 items-stretch gap-4 lg:grid-cols-3">
-        <InsightCard title="Activity Classes" fillHeight>
-          <HorizontalBarPanel
-            rows={activityClassRows}
-            selectedLabel={activityClassFilter}
-            onBarClick={handleActivityClassClick}
-            filterAriaLabel={(label) => `Filter system activity by ${label}`}
-            xMax={activityClassBarScale.xMax}
-            xTicks={activityClassBarScale.xTicks}
-          />
-        </InsightCard>
-        <InsightCard title="Severity ID" fillHeight>
-          <HorizontalBarPanel
-            rows={severityChartRows}
-            selectedLabel={severityFilter}
-            onBarClick={handleSeverityClick}
-            filterAriaLabel={(label) => `Filter system activity by ${label} severity`}
-            xMax={severityBarScale.xMax}
-            xTicks={severityBarScale.xTicks}
-          />
-        </InsightCard>
-        <InsightCard title="Top Hosts By Process Launches" fillHeight>
-          <HorizontalBarPanel
-            rows={hostChartRows}
-            selectedLabel={hostFilter}
-            onBarClick={handleHostClick}
-            filterAriaLabel={(label) => `Filter system activity by host ${label}`}
-            xMax={hostBarScale.xMax}
-            xTicks={hostBarScale.xTicks}
-          />
-        </InsightCard>
-      </div>
+      <ExpandableColumnWidgetLayout
+        expandedIds={columnExpand.expandedIds}
+        collapsedIds={columnExpand.collapsedIds}
+        renderWidget={(id, expanded) => {
+          const chart =
+            id === "activity" ? (
+              activityViz === "donut" ? (
+                <DonutChartPanel
+                  segments={activityClassSegments}
+                  total={chartScopedRows.length}
+                  centerLabel="events"
+                  selectedLabel={activityClassFilter}
+                  onSegmentClick={handleActivityClassClick}
+                  ariaLabel="System activity classes"
+                />
+              ) : (
+                <HorizontalBarPanel
+                  rows={activityClassRows}
+                  selectedLabel={activityClassFilter}
+                  onBarClick={handleActivityClassClick}
+                  filterAriaLabel={(label) => `Filter system activity by ${label}`}
+                  xMax={activityClassBarScale.xMax}
+                  xTicks={activityClassBarScale.xTicks}
+                />
+              )
+            ) : id === "severity" ? (
+              severityViz === "donut" ? (
+                <DonutChartPanel
+                  segments={severityChartRows}
+                  total={chartScopedRows.length}
+                  centerLabel="events"
+                  selectedLabels={[...severityFilters]}
+                  onSegmentClick={handleSeverityClick}
+                  ariaLabel="System activity by severity"
+                />
+              ) : (
+                <HorizontalBarPanel
+                  rows={severityChartRows}
+                  selectedLabels={[...severityFilters]}
+                  onBarClick={handleSeverityClick}
+                  filterAriaLabel={(label) => `Filter system activity by ${label} severity`}
+                  xMax={severityBarScale.xMax}
+                  xTicks={severityBarScale.xTicks}
+                />
+              )
+            ) : hostsViz === "donut" ? (
+              <DonutChartPanel
+                segments={hostSegments}
+                total={hostSegments.reduce((sum, segment) => sum + segment.value, 0)}
+                centerLabel="events"
+                selectedLabel={hostFilter}
+                onSegmentClick={handleHostClick}
+                ariaLabel="Top hosts by process launches"
+              />
+            ) : (
+              <HorizontalBarPanel
+                rows={hostChartRows}
+                selectedLabel={hostFilter}
+                onBarClick={handleHostClick}
+                filterAriaLabel={(label) => `Filter system activity by host ${label}`}
+                xMax={hostBarScale.xMax}
+                xTicks={hostBarScale.xTicks}
+              />
+            );
+          const title =
+            id === "activity"
+              ? "Activity Classes"
+              : id === "severity"
+                ? "Severity ID"
+                : "Top Hosts By Process Launches";
+          const visualization =
+            id === "activity"
+              ? {
+                  value: activityViz,
+                  options: CATEGORICAL_WIDGET_VIZ_OPTIONS,
+                  onChange: (next: string) => setActivityViz(next as CategoricalWidgetViz),
+                }
+              : id === "severity"
+                ? {
+                    value: severityViz,
+                    options: CATEGORICAL_WIDGET_VIZ_OPTIONS,
+                    onChange: (next: string) => setSeverityViz(next as CategoricalWidgetViz),
+                  }
+                : {
+                    value: hostsViz,
+                    options: CATEGORICAL_WIDGET_VIZ_OPTIONS,
+                    onChange: (next: string) => setHostsViz(next as CategoricalWidgetViz),
+                  };
+          return (
+            <ExpandableColumnWidgetShell id={id} expanded={expanded} api={columnExpand}>
+              <InsightCard
+                title={title}
+                fillHeight
+                headerActions={
+                  <InsightCardHeaderActions
+                    expand={{ expanded, onToggle: () => columnExpand.toggle(id) }}
+                    visualization={visualization}
+                  />
+                }
+              >
+                {chart}
+              </InsightCard>
+            </ExpandableColumnWidgetShell>
+          );
+        }}
+      />
       </div>
 
       <DataGridSection
@@ -806,42 +920,51 @@ export function SystemActivityContent() {
           <>
             <h2 className="text-base-semibold text-text-primary">System Activity Events</h2>
             <div className="mt-2 flex flex-wrap items-center gap-3">
-              <p className="shrink-0 text-base-small text-text-secondary">
-                {filteredRows.length} of {timeframeScopedRows.length} Results
-                {activityClassFilter ? ` · ${activityClassFilter}` : ""}
-                {severityFilter ? ` · ${severityFilter}` : ""}
-                {hostFilter ? ` · ${hostFilter}` : ""}
-                {searchQuery.trim() ? ` · “${searchQuery.trim()}”` : ""}
-              </p>
-              <div className="w-[300px] shrink-0">
-                <Input
-                  variant="search"
-                  placeholder={DATA_GRID_RESULTS_SEARCH_PLACEHOLDER}
-                  value={searchQuery}
-                  onChange={(event) => setSearchQuery(event.target.value)}
-                  onClear={() => setSearchQuery("")}
-                  className="!bg-datavis-card-bg"
-                  aria-label="Search system activity events"
-                />
+              <div className="flex min-w-0 flex-1 flex-wrap items-center gap-3">
+                <p className="shrink-0 text-base-small text-text-secondary">
+                  {filteredRows.length} of {timeframeScopedRows.length} Results
+                  {activityClassFilter ? ` · ${activityClassFilter}` : ""}
+                  {severityFilters.size > 0 ? ` · ${formatChartFilterLabels(severityFilters)}` : ""}
+                  {hostFilter ? ` · ${hostFilter}` : ""}
+                  {searchQuery.trim() ? ` · “${searchQuery.trim()}”` : ""}
+                </p>
+                <div className="w-[300px] shrink-0">
+                  <Input
+                    variant="search"
+                    placeholder={DATA_GRID_RESULTS_SEARCH_PLACEHOLDER}
+                    value={searchQuery}
+                    onChange={(event) => setSearchQuery(event.target.value)}
+                    onClear={() => setSearchQuery("")}
+                    className="!bg-datavis-card-bg"
+                    aria-label="Search system activity events"
+                  />
+                </div>
+                {hasActiveFilters ? (
+                  <Button
+                    type="button"
+                    variant="ghost"
+                    className="h-8 shrink-0 gap-1.5 px-2 text-base-small text-text-tertiary hover:text-text-primary [&_svg]:!h-2 [&_svg]:!w-3"
+                    onClick={() => {
+                      setActivityClassFilter(null);
+                      setSeverityFilters(new Set());
+                      setHostFilter(null);
+                      setFacetSelections({});
+                      setSearchQuery("");
+                    }}
+                  >
+                    <Icon name="action-filter-list" size={14} aria-hidden />
+                    Clear all filters
+                  </Button>
+                ) : null}
+                <DataGridExportButton onClick={exportAll} />
               </div>
-              {hasActiveFilters ? (
-                <Button
-                  type="button"
-                  variant="ghost"
-                  className="h-8 shrink-0 gap-1.5 px-2 text-base-small text-text-tertiary hover:text-text-primary [&_svg]:!h-2 [&_svg]:!w-3"
-                  onClick={() => {
-                    setActivityClassFilter(null);
-                    setSeverityFilter(null);
-                    setHostFilter(null);
-                    setFacetSelections({});
-                    setSearchQuery("");
-                  }}
-                >
-                  <Icon name="action-filter-list" size={14} aria-hidden />
-                  Clear all filters
-                </Button>
+              {selectedIds.size > 0 ? (
+                <DataGridSearchSelectedActions
+                  className="!ml-0"
+                  onSearch={handleSearchSelected}
+                  onClear={() => setSelectedIds(new Set())}
+                />
               ) : null}
-              <DataGridExportButton onClick={exportAll} />
             </div>
           </>
         }
@@ -863,6 +986,8 @@ export function SystemActivityContent() {
             tableColumnIds={tableColumnIds}
             onOpenDetail={resultsDetail.open}
             highlightedRowId={resultsDetail.isOpen ? resultsDetail.activeId : null}
+            selected={selectedIds}
+            onSelectedChange={setSelectedIds}
           />
         }
         footer={<DataGridPaginationFooter grid={tableGrid} />}

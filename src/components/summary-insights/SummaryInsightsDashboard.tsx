@@ -35,6 +35,7 @@ import { DataGridPaginationFooter } from "../ui/DataGridTableLayout";
 import { Input } from "../ui/Input";
 import { DataGridExportHeaderAction } from "../ui/DataGridExportHeaderAction";
 import { DataGridExportSelectionBanner } from "../ui/DataGridExportSelectionBanner";
+import { DataGridSearchSelectedActions } from "../ui/DataGridSearchSelectedActions";
 import { buildExportFilename, downloadJsonExport } from "../ui/exportRowsToJson";
 import { Snackbar } from "../ui/Snackbar";
 import {
@@ -49,6 +50,7 @@ import { ConnectorTableCell } from "../ui/ConnectorTableCell";
 import { useResizableColumns } from "../ui/useResizableColumns";
 import { ROUTES } from "../../app/routes";
 import { useCopilot } from "../../context/CopilotContext";
+import { buildTitlesFsqlQuery } from "../../lib/buildEntitiesFsqlQuery";
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -64,7 +66,12 @@ import { useResultsDetailPaginationSync } from "../ui/useResultsDetailPagination
 import { useTimeframe, type TimeframeRange } from "../../context/TimeframeContext";
 import { EntitiesOverviewContent } from "./EntitiesOverviewContent";
 import { NetworkActivityContent } from "./NetworkActivityContent";
-import { cx, DatavisGridlineRule, InsightCard } from "./datavisCard";
+import { cx, DatavisGridlineRule, InsightCard, InsightCardHeaderActions } from "./datavisCard";
+import {
+  ExpandableColumnWidgetLayout,
+  ExpandableColumnWidgetShell,
+  useExpandableColumnWidgets,
+} from "./useExpandableColumnWidgets";
 import {
   FEDERATED_ANALYTICS_TABS,
   federatedViewLabel,
@@ -72,6 +79,7 @@ import {
   readDefaultFederatedView,
   type FederatedViewId,
 } from "./FederatedAnalyticsBreadcrumb";
+import { chartFiltersActive, formatChartFilterLabels, toggleChartFilter } from "./chartFilterSet";
 import { HorizontalBarPanel } from "./horizontalBarPanel";
 import { ApplicationActivityContent } from "./ApplicationActivityContent";
 import { DiscoveryContent } from "./DiscoveryContent";
@@ -80,16 +88,10 @@ import { RemediationContent } from "./RemediationContent";
 import { SystemActivityContent } from "./SystemActivityContent";
 import { ChartZoomHint, buildHourlyEventRows } from "./federatedAnalyticsZoom";
 import { TimeSeriesAreaChart } from "./timeSeriesAreaChart";
-import {
-  buildHourlyAxisTicks,
-  buildHourlyBuckets,
-  formatBucketTimeLabel,
-  shouldIncludeDateInBucketLabels,
-  hourlySeverityValues,
-  resolveAnalyticsSpikeIndices,
-  SPIKE_CLOCK_HOUR,
-  timeframeFromBucketSelection,
-} from "./timeframeChartUtils";
+import { SEVERITY_TIMELINE_VIZ_OPTIONS, type SeverityTimelineViz } from "./severityTimelineViz";
+import { buildSeverityTimelineChart } from "./severityTimelineSeries";
+import { CATEGORICAL_WIDGET_VIZ_OPTIONS, type CategoricalWidgetViz } from "./categoricalWidgetViz";
+import { timeframeFromBucketSelection } from "./timeframeChartUtils";
 
 const SEV_BAR: Record<"Critical" | "High" | "Medium" | "Low" | "Informational", string> = {
   Critical: "#ff604a",
@@ -152,6 +154,14 @@ const SEVERITY_ICON: Record<
   Low: "severity-low",
   Informational: "severity-info",
 };
+
+const SEVERITY_TIMELINE_STYLES = {
+  Informational: { color: SEV_BAR.Informational, icon: SEVERITY_ICON.Informational },
+  Low: { color: SEV_BAR.Low, icon: SEVERITY_ICON.Low },
+  Medium: { color: SEV_BAR.Medium, icon: SEVERITY_ICON.Medium },
+  High: { color: SEV_BAR.High, icon: SEVERITY_ICON.High },
+  Critical: { color: SEV_BAR.Critical, icon: SEVERITY_ICON.Critical },
+} as const;
 
 function findingMatchesSearch(row: FindingRow, query: string): boolean {
   const q = query.trim().toLowerCase();
@@ -288,6 +298,10 @@ const FINDING_COLUMN_WIDTHS: Record<string, { default: number; min: number }> = 
 const FINDING_OPTIONAL_COL_WIDTH = { default: 120, min: 80 };
 
 const ROW_ACTION_ITEMS = ["Action one", "Action two", "Action three"] as const;
+
+type FindingColumnWidgetId = "category" | "severity" | "status";
+
+const FINDING_COLUMN_WIDGET_ORDER = ["category", "severity", "status"] as const;
 
 const ANALYTICS_TAB_CONTENT_CLASS = "mt-0 min-h-0 flex-1 focus-visible:outline-none";
 
@@ -634,9 +648,14 @@ export function SummaryInsightsDashboard() {
     resetAnalyticsChartZoom,
   } = useTimeframe();
   const [activeView, setActiveView] = useState<FederatedViewId>(readDefaultFederatedView);
-  const [severityFilter, setSeverityFilter] = useState<SeverityLevel | null>(null);
+  const [severityFilters, setSeverityFilters] = useState<ReadonlySet<string>>(() => new Set());
   const [categoryFilter, setCategoryFilter] = useState<FindingCategory | null>(null);
   const [statusFilter, setStatusFilter] = useState<FindingStatus | null>(null);
+  const [categoryViz, setCategoryViz] = useState<CategoricalWidgetViz>("bar");
+  const [severityViz, setSeverityViz] = useState<CategoricalWidgetViz>("bar");
+  const [statusViz, setStatusViz] = useState<CategoricalWidgetViz>("donut");
+  const [timelineViz, setTimelineViz] = useState<SeverityTimelineViz>("area");
+  const columnExpand = useExpandableColumnWidgets(FINDING_COLUMN_WIDGET_ORDER);
   const [searchQuery, setSearchQuery] = useState("");
   const [tableTool, setTableTool] = useState<FilterColumnPanelTool | null>(null);
   const [facetSelections, setFacetSelections] = useState<DataGridFacetSelections>({});
@@ -837,25 +856,44 @@ export function SummaryInsightsDashboard() {
     [tableRows, timeframe],
   );
 
+  const chartScopedRows = useMemo(() => {
+    return timeframeScopedRows.filter((row) => {
+      if (categoryFilter && row.category !== categoryFilter) return false;
+      if (severityFilters.size > 0 && !severityFilters.has(row.severity)) return false;
+      if (statusFilter && row.status !== statusFilter) return false;
+      return true;
+    });
+  }, [timeframeScopedRows, categoryFilter, severityFilters, statusFilter]);
+
+  const timelineScopedRows = useMemo(() => {
+    return timeframeScopedRows.filter((row) => {
+      if (categoryFilter && row.category !== categoryFilter) return false;
+      if (statusFilter && row.status !== statusFilter) return false;
+      return true;
+    });
+  }, [timeframeScopedRows, categoryFilter, statusFilter]);
+
   const categoryRows = useMemo(() => {
     const counts = new Map<FindingCategory, number>();
-    for (const row of timeframeScopedRows) {
+    for (const row of chartScopedRows) {
       counts.set(row.category, (counts.get(row.category) ?? 0) + 1);
     }
     return FINDING_CATEGORY_ORDER.map((label) => ({
       label,
       value: counts.get(label) ?? 0,
     }));
-  }, [timeframeScopedRows]);
+  }, [chartScopedRows]);
 
   const categoryBarScale = useMemo(
     () => horizontalBarScale(categoryRows.map((row) => row.value)),
     [categoryRows],
   );
 
+  const categorySegments = useMemo(() => withCategoricalColors(categoryRows), [categoryRows]);
+
   const severityRows = useMemo(() => {
     const counts = new Map<SeverityLevel, number>();
-    for (const row of timeframeScopedRows) {
+    for (const row of chartScopedRows) {
       counts.set(row.severity, (counts.get(row.severity) ?? 0) + 1);
     }
     return FINDING_SEVERITY_CHART_ORDER.map((label) => ({
@@ -863,7 +901,7 @@ export function SummaryInsightsDashboard() {
       value: counts.get(label) ?? 0,
       color: SEV_BAR[label],
     }));
-  }, [timeframeScopedRows]);
+  }, [chartScopedRows]);
 
   const severityBarScale = useMemo(
     () => horizontalBarScale(severityRows.map((row) => row.value)),
@@ -872,7 +910,7 @@ export function SummaryInsightsDashboard() {
 
   const findingStatusSegments = useMemo(() => {
     const counts = new Map<FindingStatus, number>();
-    for (const row of timeframeScopedRows) {
+    for (const row of chartScopedRows) {
       counts.set(row.status, (counts.get(row.status) ?? 0) + 1);
     }
     return withCategoricalColors(
@@ -881,7 +919,17 @@ export function SummaryInsightsDashboard() {
         value: counts.get(label) ?? 0,
       })),
     );
-  }, [timeframeScopedRows]);
+  }, [chartScopedRows]);
+
+  const statusBarRows = useMemo(
+    () => findingStatusSegments.map(({ label, value }) => ({ label, value })),
+    [findingStatusSegments],
+  );
+
+  const statusBarScale = useMemo(
+    () => horizontalBarScale(statusBarRows.map((row) => row.value)),
+    [statusBarRows],
+  );
 
   const findingFacets = useMemo(
     () => buildDataGridFacets(timeframeScopedRows, findingFacetDefs),
@@ -889,25 +937,10 @@ export function SummaryInsightsDashboard() {
   );
 
   const filteredTableRows = useMemo(() => {
-    const chartFiltered = timeframeScopedRows.filter((row) => {
-      if (categoryFilter && row.category !== categoryFilter) return false;
-      if (severityFilter && row.severity !== severityFilter) return false;
-      if (statusFilter && row.status !== statusFilter) return false;
-      return true;
-    });
-
-    return applyDataGridFacetFilters(chartFiltered, facetSelections, findingFacetDefs).filter((row) =>
+    return applyDataGridFacetFilters(chartScopedRows, facetSelections, findingFacetDefs).filter((row) =>
       findingMatchesSearch(row, searchQuery),
     );
-  }, [
-    timeframeScopedRows,
-    categoryFilter,
-    severityFilter,
-    statusFilter,
-    facetSelections,
-    findingFacetDefs,
-    searchQuery,
-  ]);
+  }, [chartScopedRows, facetSelections, findingFacetDefs, searchQuery]);
   const tableGrid = useFindingEventsTableGrid(filteredTableRows);
   const resultsDetail = useResultsDetailSlideOver(filteredTableRows);
   useResultsDetailPaginationSync({
@@ -978,11 +1011,33 @@ export function SummaryInsightsDashboard() {
     findingExportSelection.allResultsSelected,
   ]);
 
+  const findingSelectedCount = findingExportSelection.allResultsSelected
+    ? filteredTableRows.length
+    : findingExportSelection.selectedIds.size;
+
+  const handleSearchSelectedFindings = useCallback(() => {
+    const rows = resolveExportRows(
+      filteredTableRows,
+      findingExportSelection.selectedIds,
+      findingExportSelection.allResultsSelected,
+    );
+    const query = buildTitlesFsqlQuery(rows.map((row) => row.title));
+    if (!query.trim()) return;
+    setPendingFsqlSearch({ query, autoExecute: true });
+    findingExportSelection.clearSelection();
+  }, [
+    filteredTableRows,
+    findingExportSelection.selectedIds,
+    findingExportSelection.allResultsSelected,
+    findingExportSelection.clearSelection,
+    setPendingFsqlSearch,
+  ]);
+
   useEffect(() => {
     findingExportSelection.clearSelection();
   }, [
     categoryFilter,
-    severityFilter,
+    severityFilters,
     statusFilter,
     facetSelections,
     searchQuery,
@@ -991,7 +1046,7 @@ export function SummaryInsightsDashboard() {
 
   const hasActiveFilters =
     categoryFilter != null ||
-    severityFilter != null ||
+    chartFiltersActive(severityFilters) ||
     statusFilter != null ||
     hasDataGridFacetSelections(facetSelections);
 
@@ -1002,7 +1057,7 @@ export function SummaryInsightsDashboard() {
 
   const handleSeverityBarClick = (label: string) => {
     if (!isSeverityLevel(label)) return;
-    setSeverityFilter((current) => (current === label ? null : label));
+    setSeverityFilters((current) => toggleChartFilter(current, label));
   };
 
   const handleStatusClick = (label: string) => {
@@ -1010,44 +1065,126 @@ export function SummaryInsightsDashboard() {
     setStatusFilter((current) => (current === label ? null : label));
   };
 
-  const eventsPerHourChart = useMemo(() => {
-    const buckets = buildHourlyBuckets(timeframe);
-    const { spikeIndex, secondarySpikeIndex } = resolveAnalyticsSpikeIndices(buckets, timeframe.to);
-    const includeDate = shouldIncludeDateInBucketLabels(timeframe);
-    const xLabels = buckets.map((bucket) => formatBucketTimeLabel(bucket.start, includeDate));
-    const { indices: xTickIndices, labels: xTickLabels } = buildHourlyAxisTicks(buckets, timeframe);
+  const renderFindingColumnWidget = (id: FindingColumnWidgetId, expanded: boolean) => {
+    const chart =
+      id === "category" ? (
+        categoryViz === "donut" ? (
+          <DonutChartPanel
+            segments={categorySegments}
+            total={chartScopedRows.length}
+            centerLabel="findings"
+            selectedLabel={categoryFilter}
+            onSegmentClick={handleCategoryBarClick}
+            ariaLabel="Finding event classes"
+          />
+        ) : (
+          <HorizontalBarPanel
+            rows={categoryRows}
+            selectedLabel={categoryFilter}
+            onBarClick={handleCategoryBarClick}
+            filterAriaLabel={(label) => `Filter findings by ${label}`}
+            xMax={categoryBarScale.xMax}
+            xTicks={categoryBarScale.xTicks}
+          />
+        )
+      ) : id === "severity" ? (
+        severityViz === "donut" ? (
+          <DonutChartPanel
+            segments={severityRows}
+            total={chartScopedRows.length}
+            centerLabel="findings"
+            selectedLabels={[...severityFilters]}
+            onSegmentClick={handleSeverityBarClick}
+            ariaLabel="Findings by severity"
+          />
+        ) : (
+          <HorizontalBarPanel
+            rows={severityRows}
+            selectedLabels={[...severityFilters]}
+            onBarClick={handleSeverityBarClick}
+            filterAriaLabel={(label) => `Filter findings by ${label} severity`}
+            xMax={severityBarScale.xMax}
+            xTicks={severityBarScale.xTicks}
+          />
+        )
+      ) : statusViz === "bar" ? (
+        <HorizontalBarPanel
+          rows={statusBarRows}
+          selectedLabel={statusFilter}
+          onBarClick={handleStatusClick}
+          filterAriaLabel={(label) => `Filter findings by ${label} status`}
+          xMax={statusBarScale.xMax}
+          xTicks={statusBarScale.xTicks}
+        />
+      ) : (
+        <DonutChartPanel
+          segments={findingStatusSegments}
+          total={chartScopedRows.length}
+          centerLabel="findings"
+          selectedLabel={statusFilter}
+          onSegmentClick={handleStatusClick}
+          ariaLabel="Findings by status"
+        />
+      );
 
-    const series = [
-      {
-        id: "Medium",
-        label: "Medium",
-        color: SEV_BAR.Medium,
-        icon: SEVERITY_ICON.Medium,
-        values: hourlySeverityValues(11, buckets, spikeIndex, secondarySpikeIndex),
-      },
-      {
-        id: "High",
-        label: "High",
-        color: SEV_BAR.High,
-        icon: SEVERITY_ICON.High,
-        values: hourlySeverityValues(9, buckets, spikeIndex, secondarySpikeIndex),
-      },
-      {
-        id: "Critical",
-        label: "Critical",
-        color: SEV_BAR.Critical,
-        icon: SEVERITY_ICON.Critical,
-        values: hourlySeverityValues(3, buckets, spikeIndex, secondarySpikeIndex),
-      },
-    ] as const;
+    const title =
+      id === "category"
+        ? "Finding Event Classes"
+        : id === "severity"
+          ? "Findings Severity ID"
+          : "Findings By Status";
 
-    const spikeHighlight =
-      spikeIndex != null
-        ? { index: spikeIndex, label: `spike ~${SPIKE_CLOCK_HOUR}:00` }
-        : undefined;
+    const visualization =
+      id === "category"
+        ? {
+            value: categoryViz,
+            options: CATEGORICAL_WIDGET_VIZ_OPTIONS,
+            onChange: (nextId: string) => setCategoryViz(nextId as CategoricalWidgetViz),
+          }
+        : id === "severity"
+          ? {
+              value: severityViz,
+              options: CATEGORICAL_WIDGET_VIZ_OPTIONS,
+              onChange: (nextId: string) => setSeverityViz(nextId as CategoricalWidgetViz),
+            }
+          : {
+              value: statusViz,
+              options: CATEGORICAL_WIDGET_VIZ_OPTIONS,
+              onChange: (nextId: string) => setStatusViz(nextId as CategoricalWidgetViz),
+            };
 
-    return { series, xLabels, xTickIndices, xTickLabels, spikeHighlight, buckets };
-  }, [timeframe]);
+    return (
+      <ExpandableColumnWidgetShell id={id} expanded={expanded} api={columnExpand}>
+        <InsightCard
+          title={title}
+          fillHeight
+          headerActions={
+            <InsightCardHeaderActions
+              expand={{
+                expanded,
+                onToggle: () => columnExpand.toggle(id),
+              }}
+              visualization={visualization}
+            />
+          }
+        >
+          {chart}
+        </InsightCard>
+      </ExpandableColumnWidgetShell>
+    );
+  };
+
+  const eventsPerHourChart = useMemo(
+    () =>
+      buildSeverityTimelineChart(
+        timeframe,
+        timelineScopedRows,
+        SEVERITY_TIMELINE_STYLES,
+        (row) => row.severity,
+        (row) => parseFindingRowTime(row.time),
+      ),
+    [timeframe, timelineScopedRows],
+  );
 
   const handleFindingsTimelineBrush = useCallback(
     ({ startIndex, endIndex }: { startIndex: number; endIndex: number }) => {
@@ -1056,11 +1193,12 @@ export function SummaryInsightsDashboard() {
         eventsPerHourChart.buckets,
         startIndex,
         endIndex,
+        eventsPerHourChart.durationMs,
       );
       if (!nextRange) return;
       applyAnalyticsChartZoom(nextRange);
     },
-    [timeframe, eventsPerHourChart.buckets, applyAnalyticsChartZoom],
+    [timeframe, eventsPerHourChart.buckets, eventsPerHourChart.durationMs, applyAnalyticsChartZoom],
   );
 
   return (
@@ -1132,58 +1270,45 @@ export function SummaryInsightsDashboard() {
             ) : (
               <div className="flex shrink-0 flex-col gap-4 p-4 sm:p-5">
                 <div className={DATA_GRID_ABOVE_SECTION_CLASS}>
-                <InsightCard title="Finding Events Per Hour By Severity">
+                <InsightCard
+                  title={`Finding Events ${eventsPerHourChart.titleCadence} By Severity`}
+                  headerActions={
+                    <InsightCardHeaderActions
+                      visualization={{
+                        value: timelineViz,
+                        options: SEVERITY_TIMELINE_VIZ_OPTIONS,
+                        onChange: (id) => setTimelineViz(id as SeverityTimelineViz),
+                      }}
+                    />
+                  }
+                >
                   <ChartZoomHint
-                    unit="Hours"
+                    unit={eventsPerHourChart.zoomUnit}
                     isChartZoomed={isAnalyticsChartZoomed}
                     onReset={resetAnalyticsChartZoom}
                   />
                   <TimeSeriesAreaChart
+                    mode={timelineViz}
                     series={eventsPerHourChart.series}
                     xLabels={eventsPerHourChart.xLabels}
                     xTickIndices={eventsPerHourChart.xTickIndices}
                     xTickLabels={eventsPerHourChart.xTickLabels}
                     bucketStarts={eventsPerHourChart.buckets.map((bucket) => bucket.start)}
                     spikeHighlight={eventsPerHourChart.spikeHighlight}
+                    yMax={eventsPerHourChart.yMax}
+                    yTicks={eventsPerHourChart.yTicks}
                     ariaLabel="Finding events per hour by severity"
-                    selectedSeriesId={severityFilter}
+                    selectedSeriesIds={[...severityFilters]}
                     onSeriesClick={handleSeverityBarClick}
                     onBrushCommit={handleFindingsTimelineBrush}
                   />
                 </InsightCard>
 
-                <div className="grid min-h-0 shrink-0 grid-cols-1 items-stretch gap-4 lg:grid-cols-3">
-                  <InsightCard title="Finding Event Classes" fillHeight>
-                    <HorizontalBarPanel
-                      rows={categoryRows}
-                      selectedLabel={categoryFilter}
-                      onBarClick={handleCategoryBarClick}
-                      filterAriaLabel={(label) => `Filter findings by ${label}`}
-                      xMax={categoryBarScale.xMax}
-                      xTicks={categoryBarScale.xTicks}
-                    />
-                  </InsightCard>
-                  <InsightCard title="Findings Severity ID" fillHeight>
-                    <HorizontalBarPanel
-                      rows={severityRows}
-                      selectedLabel={severityFilter}
-                      onBarClick={handleSeverityBarClick}
-                      filterAriaLabel={(label) => `Filter findings by ${label} severity`}
-                      xMax={severityBarScale.xMax}
-                      xTicks={severityBarScale.xTicks}
-                    />
-                  </InsightCard>
-                  <InsightCard title="Findings By Status" fillHeight>
-                    <DonutChartPanel
-                      segments={findingStatusSegments}
-                      total={timeframeScopedRows.length}
-                      centerLabel="findings"
-                      selectedLabel={statusFilter}
-                      onSegmentClick={handleStatusClick}
-                      ariaLabel="Findings by status"
-                    />
-                  </InsightCard>
-                </div>
+                <ExpandableColumnWidgetLayout
+                  expandedIds={columnExpand.expandedIds}
+                  collapsedIds={columnExpand.collapsedIds}
+                  renderWidget={renderFindingColumnWidget}
+                />
                 </div>
 
                 <DataGridSection
@@ -1191,48 +1316,57 @@ export function SummaryInsightsDashboard() {
                     <>
                       <h2 className="text-base-semibold text-text-primary">Finding Events</h2>
                       <div className="mt-2 flex flex-wrap items-center gap-3">
-                        <p className="shrink-0 text-base-small text-text-secondary">
-                          {tableGrid.pageCount > 1
-                            ? `${findingPageRowIds.length} of ${filteredTableRows.length.toLocaleString()} Results`
-                            : `${filteredTableRows.length} of ${timeframeScopedRows.length} Results`}
-                          {categoryFilter ? ` · ${categoryFilter}` : ""}
-                          {severityFilter ? ` · ${severityFilter}` : ""}
-                          {statusFilter ? ` · ${statusFilter}` : ""}
-                          {searchQuery.trim() ? ` · “${searchQuery.trim()}”` : ""}
-                        </p>
-                        <div className="w-[300px] shrink-0">
-                          <Input
-                            variant="search"
-                            placeholder={DATA_GRID_RESULTS_SEARCH_PLACEHOLDER}
-                            value={searchQuery}
-                            onChange={(event) => setSearchQuery(event.target.value)}
-                            onClear={() => setSearchQuery("")}
-                            className="!bg-datavis-card-bg"
-                            aria-label="Search findings"
+                        <div className="flex min-w-0 flex-1 flex-wrap items-center gap-3">
+                          <p className="shrink-0 text-base-small text-text-secondary">
+                            {tableGrid.pageCount > 1
+                              ? `${findingPageRowIds.length} of ${filteredTableRows.length.toLocaleString()} Results`
+                              : `${filteredTableRows.length} of ${timeframeScopedRows.length} Results`}
+                            {categoryFilter ? ` · ${categoryFilter}` : ""}
+                            {severityFilters.size > 0 ? ` · ${formatChartFilterLabels(severityFilters)}` : ""}
+                            {statusFilter ? ` · ${statusFilter}` : ""}
+                            {searchQuery.trim() ? ` · “${searchQuery.trim()}”` : ""}
+                          </p>
+                          <div className="w-[300px] shrink-0">
+                            <Input
+                              variant="search"
+                              placeholder={DATA_GRID_RESULTS_SEARCH_PLACEHOLDER}
+                              value={searchQuery}
+                              onChange={(event) => setSearchQuery(event.target.value)}
+                              onClear={() => setSearchQuery("")}
+                              className="!bg-datavis-card-bg"
+                              aria-label="Search findings"
+                            />
+                          </div>
+                          {hasActiveFilters ? (
+                            <Button
+                              type="button"
+                              variant="ghost"
+                              className="h-8 shrink-0 gap-1.5 px-2 text-base-small text-text-tertiary hover:text-text-primary [&_svg]:!h-2 [&_svg]:!w-3"
+                              onClick={() => {
+                                setCategoryFilter(null);
+                                setSeverityFilters(new Set());
+                                setStatusFilter(null);
+                                setFacetSelections({});
+                                setSearchQuery("");
+                              }}
+                            >
+                              <Icon name="action-filter-list" size={14} aria-hidden />
+                              Clear all filters
+                            </Button>
+                          ) : null}
+                          <DataGridExportHeaderAction
+                            snapshot={findingExportSnapshot}
+                            onExportAll={runFindingExport}
+                            onExportSelected={runFindingExport}
                           />
                         </div>
-                        {hasActiveFilters ? (
-                          <Button
-                            type="button"
-                            variant="ghost"
-                            className="h-8 shrink-0 gap-1.5 px-2 text-base-small text-text-tertiary hover:text-text-primary [&_svg]:!h-2 [&_svg]:!w-3"
-                            onClick={() => {
-                              setCategoryFilter(null);
-                              setSeverityFilter(null);
-                              setStatusFilter(null);
-                              setFacetSelections({});
-                              setSearchQuery("");
-                            }}
-                          >
-                            <Icon name="action-filter-list" size={14} aria-hidden />
-                            Clear all filters
-                          </Button>
+                        {findingSelectedCount > 0 ? (
+                          <DataGridSearchSelectedActions
+                            className="!ml-0"
+                            onSearch={handleSearchSelectedFindings}
+                            onClear={findingExportSelection.clearSelection}
+                          />
                         ) : null}
-                        <DataGridExportHeaderAction
-                          snapshot={findingExportSnapshot}
-                          onExportAll={runFindingExport}
-                          onExportSelected={runFindingExport}
-                        />
                       </div>
                     </>
                   }

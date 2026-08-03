@@ -9,7 +9,7 @@ import {
   TimeSeriesHoverRow,
   TimeSeriesHoverTooltip,
 } from "./timeSeriesChartHover";
-import { buildDayBoundaryMarkers, buildDayLabelPositions } from "./timeframeChartUtils";
+import { buildDayBoundaryMarkers, buildDayLabelPositions, niceIntegerYTicks } from "./timeframeChartUtils";
 import type { TimeSeriesBrushSelection } from "./timeSeriesBarChart";
 
 export type TimeSeriesSeries = {
@@ -36,7 +36,10 @@ type TimeSeriesAreaChartProps = {
   /** Plot area height in px; axis labels and legend sit outside this. */
   height?: number;
   ariaLabel: string;
+  /** @deprecated Prefer `selectedSeriesIds` for multi-select legend filters. */
   selectedSeriesId?: string | null;
+  /** Active legend filters; empty/omitted shows all series. Supports multi-select. */
+  selectedSeriesIds?: readonly string[] | null;
   onSeriesClick?: (seriesId: string) => void;
   /** Vertical band + x-axis callout for an anomalous peak. */
   spikeHighlight?: TimeSeriesSpikeHighlight;
@@ -48,6 +51,8 @@ type TimeSeriesAreaChartProps = {
   bucketStarts?: readonly Date[];
   /** When set, drag on the plot to select a range and zoom in. */
   onBrushCommit?: (selection: TimeSeriesBrushSelection) => void;
+  /** Stacked bar (default for severity timelines) or stacked area. */
+  mode?: "stacked-bar" | "area";
 };
 
 const MIN_BRUSH_WIDTH_PX = 8;
@@ -93,12 +98,14 @@ export function TimeSeriesAreaChart({
   height = 140,
   ariaLabel,
   selectedSeriesId = null,
+  selectedSeriesIds = null,
   onSeriesClick,
   spikeHighlight,
   xTickIndices: xTickIndicesProp,
   xTickLabels,
   bucketStarts,
   onBrushCommit,
+  mode = "stacked-bar",
 }: TimeSeriesAreaChartProps) {
   const gradientId = useId();
   const plotRef = useRef<HTMLDivElement>(null);
@@ -107,6 +114,8 @@ export function TimeSeriesAreaChart({
   const [hover, setHover] = useState<{ index: number; plotX: number } | null>(null);
   const brushEnabled = onBrushCommit != null;
   const bucketCount = xLabels.length;
+  const hoverMode = mode === "stacked-bar" ? "bar" : "area";
+  const isStackedBar = mode === "stacked-bar";
   const dayBoundaryMarkers = useMemo(
     () => (bucketStarts ? buildDayBoundaryMarkers(bucketStarts.map((start) => ({ start }))) : []),
     [bucketStarts],
@@ -161,8 +170,8 @@ export function TimeSeriesAreaChart({
   const updateHover = useCallback((clientX: number) => {
     const rect = plotRef.current?.getBoundingClientRect();
     if (!rect) return;
-    setHover(nearestTimeSeriesIndex(clientX, rect, bucketCount, "area"));
-  }, [bucketCount]);
+    setHover(nearestTimeSeriesIndex(clientX, rect, bucketCount, hoverMode));
+  }, [bucketCount, hoverMode]);
 
   const clearHover = useCallback(() => setHover(null), []);
 
@@ -202,22 +211,36 @@ export function TimeSeriesAreaChart({
     commitBrush(drag);
   };
 
+  const selectedIdSet = useMemo(() => {
+    if (selectedSeriesIds != null) return new Set(selectedSeriesIds);
+    if (selectedSeriesId != null) return new Set([selectedSeriesId]);
+    return new Set<string>();
+  }, [selectedSeriesIds, selectedSeriesId]);
+
+  const visibleSeries = useMemo(
+    () => (selectedIdSet.size > 0 ? series.filter((s) => selectedIdSet.has(s.id)) : series),
+    [series, selectedIdSet],
+  );
+
   const stackedTotals = useMemo(() => {
     const len = xLabels.length;
     return Array.from({ length: len }, (_, i) =>
-      series.reduce((sum, s) => sum + (s.values[i] ?? 0), 0),
+      visibleSeries.reduce((sum, s) => sum + (s.values[i] ?? 0), 0),
     );
-  }, [series, xLabels.length]);
+  }, [visibleSeries, xLabels.length]);
 
   const legendSeries = useMemo(() => seriesForHoverLegend(series), [series]);
+  const hoverLegendSeries = useMemo(() => seriesForHoverLegend(visibleSeries), [visibleSeries]);
 
-  const yMax = yMaxProp ?? Math.max(...stackedTotals, 1);
-  const yTicks = yTicksProp ?? [0, Math.round(yMax / 4), Math.round(yMax / 2), Math.round((yMax * 3) / 4), yMax];
+  const stackedPeak = Math.max(...stackedTotals, 1);
+  const autoScale = niceIntegerYTicks(stackedPeak);
+  const yMax = yMaxProp ?? autoScale.yMax;
+  const yTicks = yTicksProp ?? (yMaxProp != null ? niceIntegerYTicks(yMaxProp).yTicks : autoScale.yTicks);
 
   const layers = useMemo(() => {
     const cumulative: number[] = new Array(xLabels.length).fill(0);
 
-    return series.map((s) => {
+    return visibleSeries.map((s) => {
       const bottom = [...cumulative];
       const top = s.values.map((v, i) => {
         cumulative[i] += v;
@@ -225,7 +248,7 @@ export function TimeSeriesAreaChart({
       });
       return { ...s, bottom, top };
     });
-  }, [series, xLabels.length]);
+  }, [visibleSeries, xLabels.length]);
 
   const xTickIndices = useMemo(() => {
     if (xTickIndicesProp) return xTickIndicesProp;
@@ -234,28 +257,32 @@ export function TimeSeriesAreaChart({
     return Array.from({ length: 7 }, (_, i) => Math.min(i * step, xLabels.length - 1));
   }, [xLabels.length, xTickIndicesProp]);
 
-  const spikeX = spikeHighlight ? plotX(spikeHighlight.index, xLabels.length) : null;
+  const spikeX = spikeHighlight
+    ? isStackedBar
+      ? ((spikeHighlight.index + 0.5) / Math.max(bucketCount, 1)) * PLOT_VIEW_WIDTH
+      : plotX(spikeHighlight.index, xLabels.length)
+    : null;
   const spikeLabel =
     spikeHighlight != null
       ? (spikeHighlight.label ?? `spike ~${xLabels[spikeHighlight.index] ?? ""}`)
       : null;
 
-  const interactive = Boolean(onSeriesClick) && !brushEnabled;
-  const filterActive = selectedSeriesId != null;
+  const legendInteractive = Boolean(onSeriesClick);
+  const filterActive = selectedIdSet.size > 0;
 
   const hoverIndex = hover?.index ?? null;
   const hoverCrosshairX =
     hoverIndex != null
-      ? (timeSeriesCrosshairPercent(hoverIndex, bucketCount, "area") / 100) * PLOT_VIEW_WIDTH
+      ? (timeSeriesCrosshairPercent(hoverIndex, bucketCount, hoverMode) / 100) * PLOT_VIEW_WIDTH
       : null;
 
   const legendItemClass = (seriesId: string) => {
-    const selected = selectedSeriesId === seriesId;
+    const selected = selectedIdSet.has(seriesId);
     const dimmed = filterActive && !selected;
 
     return cx(
       "inline-flex items-center gap-1.5 rounded-sm text-base-small transition-colors",
-      interactive && "group",
+      legendInteractive && "group",
       selected
         ? "font-semibold text-text-primary"
         : dimmed
@@ -272,8 +299,8 @@ export function TimeSeriesAreaChart({
           style={{ height }}
           aria-hidden
         >
-          {[...yTicks].reverse().map((tick) => (
-            <span key={tick}>{tick}</span>
+          {[...yTicks].reverse().map((tick, index) => (
+            <span key={`y-${tick}-${index}`}>{tick}</span>
           ))}
         </div>
 
@@ -300,7 +327,7 @@ export function TimeSeriesAreaChart({
               plotX={hover.plotX}
               timeLabel={formatTimeSeriesHoverLabel(hover.index, xLabels, bucketStarts)}
             >
-              {legendSeries.map((s) => (
+              {hoverLegendSeries.map((s) => (
                 <TimeSeriesHoverRow
                   key={s.id}
                   label={s.label}
@@ -328,19 +355,21 @@ export function TimeSeriesAreaChart({
             aria-label={ariaLabel}
           >
             <defs>
-              {layers.map((layer) => (
-                <linearGradient key={layer.id} id={`${gradientId}-${layer.id}`} x1="0" y1="0" x2="0" y2="1">
-                  <stop offset="0%" stopColor={layer.color} stopOpacity={0.55} />
-                  <stop offset="100%" stopColor={layer.color} stopOpacity={0.12} />
-                </linearGradient>
-              ))}
+              {!isStackedBar
+                ? layers.map((layer) => (
+                    <linearGradient key={layer.id} id={`${gradientId}-${layer.id}`} x1="0" y1="0" x2="0" y2="1">
+                      <stop offset="0%" stopColor={layer.color} stopOpacity={0.55} />
+                      <stop offset="100%" stopColor={layer.color} stopOpacity={0.12} />
+                    </linearGradient>
+                  ))
+                : null}
             </defs>
 
-            {yTicks.map((tick) => {
+            {yTicks.map((tick, index) => {
               const y = height - (tick / yMax) * height;
               return (
                 <line
-                  key={tick}
+                  key={`grid-${tick}-${index}`}
                   x1={0}
                   y1={y}
                   x2={PLOT_VIEW_WIDTH}
@@ -369,9 +398,13 @@ export function TimeSeriesAreaChart({
 
             {spikeX != null ? (
               <rect
-                x={spikeX - 18}
+                x={
+                  isStackedBar
+                    ? spikeX - PLOT_VIEW_WIDTH / Math.max(bucketCount, 1) / 2
+                    : spikeX - 18
+                }
                 y={0}
-                width={36}
+                width={isStackedBar ? PLOT_VIEW_WIDTH / Math.max(bucketCount, 1) : 36}
                 height={height}
                 fill="var(--color-feedback-negative)"
                 opacity={0.14}
@@ -379,26 +412,43 @@ export function TimeSeriesAreaChart({
               />
             ) : null}
 
-            {layers.map((layer) => {
-              const dimmed = filterActive && selectedSeriesId !== layer.id;
+            {isStackedBar
+              ? Array.from({ length: bucketCount }, (_, bucketIndex) => {
+                  const slotWidth = PLOT_VIEW_WIDTH / Math.max(bucketCount, 1);
+                  const barWidth = slotWidth * 0.72;
+                  const barX = bucketIndex * slotWidth + (slotWidth - barWidth) / 2;
 
-              return (
-                <path
-                  key={layer.id}
-                  d={buildAreaPath(layer.top, layer.bottom, PLOT_VIEW_WIDTH, height, yMax)}
-                  fill={`url(#${gradientId}-${layer.id})`}
-                  stroke={layer.color}
-                  strokeWidth={interactive ? 1.5 : 1}
-                  vectorEffect="non-scaling-stroke"
-                  className={cx(
-                    "transition-opacity duration-150",
-                    dimmed ? "opacity-35" : "opacity-100",
-                    interactive && "cursor-pointer",
-                  )}
-                  onClick={interactive ? () => onSeriesClick!(layer.id) : undefined}
-                />
-              );
-            })}
+                  return layers.map((layer) => {
+                    const value = layer.values[bucketIndex] ?? 0;
+                    if (value <= 0) return null;
+                    const stackedBottom = layer.bottom[bucketIndex] ?? 0;
+                    const stackedTop = layer.top[bucketIndex] ?? 0;
+                    const yTop = height - (stackedTop / yMax) * height;
+                    const yBottom = height - (stackedBottom / yMax) * height;
+                    const barHeight = Math.max(0, yBottom - yTop);
+
+                    return (
+                      <rect
+                        key={`${layer.id}-${bucketIndex}`}
+                        x={barX}
+                        y={yTop}
+                        width={barWidth}
+                        height={barHeight}
+                        fill={layer.color}
+                      />
+                    );
+                  });
+                })
+              : layers.map((layer) => (
+                  <path
+                    key={layer.id}
+                    d={buildAreaPath(layer.top, layer.bottom, PLOT_VIEW_WIDTH, height, yMax)}
+                    fill={`url(#${gradientId}-${layer.id})`}
+                    stroke={layer.color}
+                    strokeWidth={1}
+                    vectorEffect="non-scaling-stroke"
+                  />
+                ))}
 
             {hoverCrosshairX != null ? (
               <line
@@ -494,7 +544,13 @@ export function TimeSeriesAreaChart({
           {spikeX != null && spikeLabel ? (
             <p
               className="pointer-events-none absolute top-full mt-0.5 -translate-x-1/2 whitespace-nowrap text-base-small font-semibold text-feedback-negative"
-              style={{ left: `${(spikeHighlight!.index / Math.max(xLabels.length - 1, 1)) * 100}%` }}
+              style={{
+                left: `${
+                  isStackedBar
+                    ? ((spikeHighlight!.index + 0.5) / Math.max(bucketCount, 1)) * 100
+                    : (spikeHighlight!.index / Math.max(xLabels.length - 1, 1)) * 100
+                }%`,
+              }}
             >
               {spikeLabel}
             </p>
@@ -514,10 +570,10 @@ export function TimeSeriesAreaChart({
 
           return (
             <li key={s.id}>
-              {interactive ? (
+              {legendInteractive ? (
                 <button
                   type="button"
-                  aria-pressed={selectedSeriesId === s.id}
+                  aria-pressed={selectedIdSet.has(s.id)}
                   className={legendItemClass(s.id)}
                   onClick={() => onSeriesClick!(s.id)}
                 >
