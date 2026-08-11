@@ -10,7 +10,7 @@ const filterChipVariants = cva(
   {
     variants: {
       active: {
-        true: "border-interactive-active bg-interactive-selected",
+        true: "border-border-rule bg-surface-modal hover:border-interactive-active hover:bg-interactive-selected",
         false: "border-border-container bg-surface-container opacity-80",
       },
       draggable: {
@@ -55,8 +55,8 @@ function FilterChipToggle({
       <span
         aria-hidden
         className={cn(
-          "absolute top-1/2 size-[7px] -translate-y-1/2 rounded-full bg-surface-page transition-[left]",
-          checked ? "left-[12px]" : "left-[1px]",
+          "absolute top-1/2 size-[7px] -translate-y-1/2 rounded-full transition-[left,background-color]",
+          checked ? "left-[12px] bg-surface-page" : "left-[1px] bg-text-tertiary",
         )}
       />
     </button>
@@ -138,7 +138,7 @@ function FilterChip({
         filterChipVariants({ active: isActive, draggable }),
         disabled && "pointer-events-none opacity-50",
         isDragging && "opacity-50",
-        isDragOver && !isDragging && cn("ring-1 ring-interactive-active ring-offset-1", ringOffsetClassName),
+        isDragOver && !isDragging && cn("ring-1 ring-border-rule ring-offset-1", ringOffsetClassName),
         className,
       )}
       {...props}

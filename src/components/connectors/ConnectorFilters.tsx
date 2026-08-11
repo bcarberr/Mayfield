@@ -67,8 +67,8 @@ function FilterTagToggle({
       <span
         aria-hidden
         className={cx(
-          "absolute top-1/2 size-[7px] -translate-y-1/2 rounded-full bg-surface-page transition-[left]",
-          checked ? "left-[12px]" : "left-[1px]",
+          "absolute top-1/2 size-[7px] -translate-y-1/2 rounded-full transition-[left,background-color]",
+          checked ? "left-[12px] bg-surface-page" : "left-[1px] bg-text-tertiary",
         )}
       />
     </button>
@@ -135,12 +135,12 @@ function FilterTag({
       onDrop={onDrop}
       aria-grabbed={isDragging}
       className={cx(
-        "inline-flex h-[26px] max-w-full items-center gap-1 rounded-[14px] border py-1 pl-2 pr-2 transition-[opacity,box-shadow,border-color]",
+        "inline-flex h-[26px] max-w-full items-center gap-1 rounded-[14px] border py-1 pl-2 pr-2 transition-[opacity,box-shadow,border-color,background-color]",
         enabled
-          ? "border-interactive-active bg-interactive-selected"
+          ? "border-border-rule bg-surface-modal hover:border-interactive-active hover:bg-interactive-selected"
           : "border-border-container bg-surface-container opacity-80",
         isDragging && "opacity-50",
-        isDragOver && !isDragging && cx("ring-1 ring-interactive-active ring-offset-1", ringOffsetClass),
+        isDragOver && !isDragging && cx("ring-1 ring-border-rule ring-offset-1", ringOffsetClass),
       )}
     >
       <FilterTagMoveHandle isDragging={isDragging} label={label} />
