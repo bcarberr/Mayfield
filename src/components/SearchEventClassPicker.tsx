@@ -134,9 +134,10 @@ export function SearchEventClassPicker({
   const [open, setOpen] = useState(false);
   const handleClose = useCallback(() => setOpen(false), []);
   const selected = searchEventById(value);
-  const iconClassName = selected
-    ? (eventCategoryById(selected.categoryId)?.iconClassName ?? "text-text-secondary")
-    : "text-text-secondary";
+  const iconClassName =
+    selected != null
+      ? (eventCategoryById(selected.categoryId)?.iconClassName ?? "text-text-secondary")
+      : "text-text-secondary";
 
   return (
     <div className={cn("relative shrink-0", className)}>
@@ -151,12 +152,14 @@ export function SearchEventClassPicker({
         className="h-7 w-60 justify-start gap-1 border-border-rule bg-surface-modal px-3 font-semibold text-text-primary"
         onClick={() => setOpen((current) => !current)}
       >
-        <Icon
-          name={selected?.icon ?? "ocsf-network-activity"}
-          size={16}
-          className={cx("shrink-0", iconClassName)}
-          aria-hidden
-        />
+        {selected ? (
+          <Icon
+            name={selected.icon}
+            size={16}
+            className={cx("shrink-0", iconClassName)}
+            aria-hidden
+          />
+        ) : null}
         <span className="min-w-0 flex-1 truncate text-left text-sm font-semibold">
           {selected?.label ?? "Select event class"}
         </span>

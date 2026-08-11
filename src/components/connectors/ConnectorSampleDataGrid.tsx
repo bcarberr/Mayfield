@@ -3,7 +3,9 @@ import {
   type ConnectorSampleDataRow,
 } from "./connectorDemoSchema";
 
-const COLUMN_MIN_WIDTH: Record<keyof ConnectorSampleDataRow, string> = {
+const DEFAULT_COLUMN_MIN_WIDTH = "8.5rem";
+
+const COLUMN_MIN_WIDTH: Partial<Record<keyof ConnectorSampleDataRow, string>> = {
   action: "6.5rem",
   appclass: "9.5rem",
   appname: "9.5rem",
@@ -13,6 +15,12 @@ const COLUMN_MIN_WIDTH: Record<keyof ConnectorSampleDataRow, string> = {
   clientip: "8.5rem",
   clientpublicip: "10rem",
   clientsslcipher: "18rem",
+  cs_user_agent: "18rem",
+  cs_referer: "14rem",
+  event_time: "12rem",
+  start_time: "12rem",
+  end_time: "12rem",
+  message: "12rem",
 };
 
 export type ConnectorSampleDataGridRow = ConnectorSampleDataRow & { previewRowId: string };
@@ -28,7 +36,7 @@ export function ConnectorSampleDataGrid({ rows }: { rows: readonly ConnectorSamp
               <th
                 key={id}
                 scope="col"
-                style={{ minWidth: COLUMN_MIN_WIDTH[id] }}
+                style={{ minWidth: COLUMN_MIN_WIDTH[id] ?? DEFAULT_COLUMN_MIN_WIDTH }}
                 className="h-[40px] max-h-[40px] border border-border-rule px-4 py-0 align-middle text-left text-xs font-bold uppercase tracking-wide whitespace-nowrap text-text-primary"
               >
                 {header}
@@ -42,7 +50,7 @@ export function ConnectorSampleDataGrid({ rows }: { rows: readonly ConnectorSamp
               {DEMO_CONNECTOR_SAMPLE_COLUMNS.map(({ id }) => (
                 <td
                   key={id}
-                  style={{ minWidth: COLUMN_MIN_WIDTH[id] }}
+                  style={{ minWidth: COLUMN_MIN_WIDTH[id] ?? DEFAULT_COLUMN_MIN_WIDTH }}
                   className="h-[40px] max-h-[40px] border border-border-rule px-4 py-0 align-middle text-sm whitespace-nowrap text-text-primary"
                 >
                   {row[id]}

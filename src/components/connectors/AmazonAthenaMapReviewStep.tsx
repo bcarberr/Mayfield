@@ -27,6 +27,11 @@ import {
   getOcsfFieldDescription,
   ocsfFieldMappingTag,
 } from "../../data/ocsfFieldDescriptions";
+import {
+  HTTP_ACTIVITY_DEMO_INITIAL_ROWS,
+  buildHttpActivityDemoMappedRows,
+  buildHttpActivityDemoUnmappedRows,
+} from "../../data/httpActivityDemoSourceFields";
 import { DataTable, type DataTableColumn } from "../ui/DataTable";
 import { Input } from "../ui/Input";
 import { Switch } from "../ui/Switch";
@@ -68,9 +73,11 @@ type MapVisibilityMode = "all" | "hideMapped" | "hideUnmapped";
 function MapVisibilityTrimode({
   value,
   onChange,
+  disabled = false,
 }: {
   value: MapVisibilityMode;
   onChange: (next: MapVisibilityMode) => void;
+  disabled?: boolean;
 }) {
   const gid = useId().replace(/:/g, "");
   const leftRadioId = `${gid}-radio-left`;
@@ -81,13 +88,18 @@ function MapVisibilityTrimode({
     <div
       role="radiogroup"
       aria-label="Filter rows by mapping status"
-      className="flex flex-wrap items-center gap-x-3 gap-y-2"
+      aria-disabled={disabled || undefined}
+      className={cx(
+        "flex flex-wrap items-center gap-x-3 gap-y-2",
+        disabled && "pointer-events-none opacity-50",
+      )}
     >
       <label
         htmlFor={leftRadioId}
         className={cx(
-          "cursor-pointer select-none text-sm font-semibold leading-[18px] underline-offset-2",
-          value === "hideMapped" ? "text-text-primary" : "text-text-tertiary hover:text-text-secondary",
+          "select-none text-sm font-semibold leading-[18px] underline-offset-2",
+          disabled ? "cursor-not-allowed text-text-disabled" : "cursor-pointer",
+          !disabled && (value === "hideMapped" ? "text-text-primary" : "text-text-tertiary hover:text-text-secondary"),
         )}
       >
         Hide Mapped
@@ -96,17 +108,32 @@ function MapVisibilityTrimode({
       <div
         className={cx(
           "relative h-[18px] w-12 shrink-0 overflow-hidden rounded-full px-[3px] transition-colors duration-150 ease-out",
-          value === "all" && "border border-solid border-border-rule bg-transparent",
-          (value === "hideMapped" || value === "hideUnmapped") &&
+          value === "all" &&
+            !disabled &&
+            "border border-solid border-[var(--color-switch-track-off)] bg-transparent",
+          value === "all" &&
+            disabled &&
+            "border border-solid border-[var(--color-switch-off-disabled)] bg-transparent",
+          !disabled &&
+            (value === "hideMapped" || value === "hideUnmapped") &&
             "border-0 bg-interactive-active hover:bg-[var(--color-primary-hover)] active:bg-[var(--color-primary-pressed)]",
+          disabled &&
+            (value === "hideMapped" || value === "hideUnmapped") &&
+            "border-0 bg-[var(--color-switch-track-on-disabled)]",
         )}
       >
         <span
           aria-hidden
           className={cx(
             "pointer-events-none absolute top-1/2 z-0 size-3 rounded-full transition-[left,transform,background-color] duration-200 ease-out",
-            value === "all" && "bg-border-container",
-            (value === "hideMapped" || value === "hideUnmapped") && "bg-text-on-primary",
+            value === "all" && !disabled && "bg-[var(--color-switch-thumb-off)]",
+            value === "all" && disabled && "bg-[var(--color-switch-thumb-off-disabled)]",
+            !disabled &&
+              (value === "hideMapped" || value === "hideUnmapped") &&
+              "bg-text-on-primary",
+            disabled &&
+              (value === "hideMapped" || value === "hideUnmapped") &&
+              "bg-[var(--color-switch-thumb-on-disabled)]",
             value === "hideMapped" && "left-[3px] -translate-y-1/2",
             value === "all" && "left-1/2 -translate-x-1/2 -translate-y-1/2",
             value === "hideUnmapped" && "left-[calc(100%-15px)] -translate-y-1/2",
@@ -118,9 +145,10 @@ function MapVisibilityTrimode({
           role="radio"
           aria-checked={value === "hideMapped"}
           aria-label="Show only unmapped fields"
-          tabIndex={0}
+          disabled={disabled}
+          tabIndex={disabled ? -1 : 0}
           onClick={() => onChange("hideMapped")}
-          className="absolute inset-y-0 left-0 z-[1] w-1/3 cursor-pointer rounded-l-full border-0 bg-transparent p-0 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-interactive-active focus-visible:ring-offset-2 focus-visible:ring-offset-surface-modal"
+          className="absolute inset-y-0 left-0 z-[1] w-1/3 cursor-pointer rounded-l-full border-0 bg-transparent p-0 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-interactive-active focus-visible:ring-offset-2 focus-visible:ring-offset-surface-modal disabled:cursor-not-allowed"
         />
         <button
           id={midRadioId}
@@ -128,9 +156,10 @@ function MapVisibilityTrimode({
           role="radio"
           aria-checked={value === "all"}
           aria-label="Show all rows"
-          tabIndex={0}
+          disabled={disabled}
+          tabIndex={disabled ? -1 : 0}
           onClick={() => onChange("all")}
-          className="absolute inset-y-0 left-1/3 z-[1] w-1/3 cursor-pointer border-0 bg-transparent p-0 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-interactive-active focus-visible:ring-offset-2 focus-visible:ring-offset-surface-modal"
+          className="absolute inset-y-0 left-1/3 z-[1] w-1/3 cursor-pointer border-0 bg-transparent p-0 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-interactive-active focus-visible:ring-offset-2 focus-visible:ring-offset-surface-modal disabled:cursor-not-allowed"
         />
         <button
           id={rightRadioId}
@@ -138,17 +167,19 @@ function MapVisibilityTrimode({
           role="radio"
           aria-checked={value === "hideUnmapped"}
           aria-label="Show only mapped fields"
-          tabIndex={0}
+          disabled={disabled}
+          tabIndex={disabled ? -1 : 0}
           onClick={() => onChange("hideUnmapped")}
-          className="absolute inset-y-0 left-2/3 z-[1] w-1/3 cursor-pointer rounded-r-full border-0 bg-transparent p-0 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-interactive-active focus-visible:ring-offset-2 focus-visible:ring-offset-surface-modal"
+          className="absolute inset-y-0 left-2/3 z-[1] w-1/3 cursor-pointer rounded-r-full border-0 bg-transparent p-0 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-interactive-active focus-visible:ring-offset-2 focus-visible:ring-offset-surface-modal disabled:cursor-not-allowed"
         />
       </div>
 
       <label
         htmlFor={rightRadioId}
         className={cx(
-          "cursor-pointer select-none text-sm font-semibold leading-[18px] underline-offset-2",
-          value === "hideUnmapped" ? "text-text-primary" : "text-text-tertiary hover:text-text-secondary",
+          "select-none text-sm font-semibold leading-[18px] underline-offset-2",
+          disabled ? "cursor-not-allowed text-text-disabled" : "cursor-pointer",
+          !disabled && (value === "hideUnmapped" ? "text-text-primary" : "text-text-tertiary hover:text-text-secondary"),
         )}
       >
         Hide Unmapped
@@ -157,58 +188,20 @@ function MapVisibilityTrimode({
   );
 }
 
-const INITIAL_ROWS: MappingRow[] = [
-  { source: "action", sample: "allow_st*", mapped: false },
-  { source: "appclass", sample: "gostringsam*", mapped: false },
-  { source: "appname", sample: "thisApp_name*", mapped: false },
-  { source: "bwclassname", sample: "thbwe_junk_classname*", mapped: false },
-  { source: "bytes_in", sample: "1024", mapped: false },
-  { source: "bytes_out", sample: "2048", mapped: false },
-  { source: "client_ip", sample: "10.0.0.1", mapped: false },
-  { source: "dest_port", sample: "443", mapped: false },
-  { source: "duration_ms", sample: "42", mapped: false },
-  { source: "hostname", sample: "web-01.internal", mapped: false },
-  { source: "http_method", sample: "GET", mapped: false },
-  { source: "http_status", sample: "200", mapped: false },
-  { source: "protocol", sample: "HTTPS", mapped: false },
-  { source: "request_path", sample: "/api/v1/health", mapped: false },
-  { source: "user_agent", sample: "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36", mapped: false },
-];
-
 const DEFAULT_EVENT_CLASS_ID = "http_activity";
 
-/** Demo OCSF target tags — ~93% of source fields mapped (all except `bwclassname`). */
-const DEMO_SOURCE_FIELD_TAGS: Record<string, string[]> = {
-  action: ["activity_name"],
-  appclass: ["category_name"],
-  appname: ["type_name"],
-  bytes_in: ["traffic_bytes_in"],
-  bytes_out: ["traffic_bytes_out"],
-  client_ip: ["src_endpoint_ip"],
-  dest_port: ["dst_endpoint_port"],
-  duration_ms: ["time"],
-  hostname: ["dst_endpoint_domain"],
-  http_method: ["http_request_http_method"],
-  http_status: ["http_response_code"],
-  protocol: ["http_request_version"],
-  request_path: ["http_request_url"],
-  user_agent: ["http_request_user_agent"],
-};
+const INITIAL_ROWS = HTTP_ACTIVITY_DEMO_INITIAL_ROWS;
 
 function aiMappingDelayMs(): number {
   return 6000 + Math.floor(Math.random() * 2001);
 }
 
 function buildDemoMappedRows(sourceRows: readonly MappingRow[]): MappingRow[] {
-  return sourceRows.map((row) => {
-    const tags = DEMO_SOURCE_FIELD_TAGS[row.source];
-    if (!tags?.length) return { ...row, mapped: false, tags: undefined };
-    return { ...row, mapped: true, tags: [...tags] };
-  });
+  return buildHttpActivityDemoMappedRows(sourceRows);
 }
 
 function buildUnmappedRows(sourceRows: readonly MappingRow[]): MappingRow[] {
-  return sourceRows.map((row) => ({ ...row, mapped: false, tags: undefined }));
+  return buildHttpActivityDemoUnmappedRows(sourceRows);
 }
 
 const MAPPING_FIELD_COLGROUP = (
@@ -451,9 +444,9 @@ function MapSchemaAttributeRowContent({
   expand?: { expanded: boolean; onToggle: () => void; label: string };
 }) {
   return (
-    <>
+    <div className="flex min-w-0 flex-1 items-center gap-1">
       <MapSchemaMoveSlot active={showMove} />
-      <MapSchemaTreeSlot show={showTreeBranch} />
+      {showTreeBranch ? <MapSchemaTreeSlot show /> : null}
       <span
         className={cx(
           "inline-flex min-w-0 flex-1 items-center gap-1 truncate text-xs font-semibold leading-4 tracking-[0.4px]",
@@ -471,7 +464,7 @@ function MapSchemaAttributeRowContent({
           label={expand.label}
         />
       ) : null}
-    </>
+    </div>
   );
 }
 
@@ -514,14 +507,16 @@ function MapSchemaExpandableEnumFieldRow({
   indent = 0,
   showParentDrag = true,
   showTreeBranch = false,
+  defaultExpanded = false,
 }: {
   fieldPath: string;
   label?: string;
   indent?: number;
   showParentDrag?: boolean;
   showTreeBranch?: boolean;
+  defaultExpanded?: boolean;
 }) {
-  const [expanded, setExpanded] = useState(false);
+  const [expanded, setExpanded] = useState(defaultExpanded);
   const displayLabel = label ?? formatOcsfPathLabel(fieldPath);
   const enumValues = getHttpActivityEnumValues(fieldPath);
 
@@ -641,6 +636,27 @@ function sortOcsfPathTree(nodes: OcsfPathTreeNode[]): OcsfPathTreeNode[] {
     }));
 }
 
+/** Collect every expandable node key so tree view can open fully by default. */
+function collectExpandableOcsfPathKeys(
+  nodes: readonly OcsfPathTreeNode[],
+  pathKeyPrefix = "",
+): string[] {
+  const keys: string[] = [];
+  for (const node of nodes) {
+    const pathKey = pathKeyPrefix
+      ? node.isEnumValue
+        ? `${pathKeyPrefix}.__enum.${node.segment}`
+        : `${pathKeyPrefix}.${node.segment}`
+      : node.segment;
+    const children = resolveOcsfPathTreeChildren(node);
+    if (children.length > 0) {
+      keys.push(pathKey);
+      keys.push(...collectExpandableOcsfPathKeys(children, pathKey));
+    }
+  }
+  return keys;
+}
+
 function MapSchemaFieldTypeSuffix({ fieldPath }: { fieldPath: string }) {
   if (isHttpActivityEnumField(fieldPath)) {
     return <span className="font-semibold italic text-[#b4b0ff]">enum</span>;
@@ -747,6 +763,7 @@ function MapSchemaExpandablePathTreeBranch({
         indent={depth * MAP_SCHEMA_TREE_INDENT_PX}
         showParentDrag={false}
         showTreeBranch={depth > 0}
+        defaultExpanded
       />
     );
   }
@@ -794,12 +811,21 @@ function MapSchemaExpandablePathTreeBranch({
 function MapSchemaExpandablePathTree({
   paths,
   className,
+  defaultExpandAll = false,
 }: {
   paths: readonly string[];
   className?: string;
+  defaultExpandAll?: boolean;
 }) {
   const tree = useMemo(() => sortOcsfPathTree(buildOcsfPathTree(paths)), [paths]);
-  const [expandedPaths, setExpandedPaths] = useState<ReadonlySet<string>>(() => new Set());
+  const allExpandableKeys = useMemo(() => collectExpandableOcsfPathKeys(tree), [tree]);
+  const [expandedPaths, setExpandedPaths] = useState<ReadonlySet<string>>(
+    () => (defaultExpandAll ? new Set(allExpandableKeys) : new Set()),
+  );
+
+  useEffect(() => {
+    setExpandedPaths(defaultExpandAll ? new Set(allExpandableKeys) : new Set());
+  }, [allExpandableKeys, defaultExpandAll]);
 
   const toggleExpanded = useCallback((pathKey: string) => {
     setExpandedPaths((current) => {
@@ -830,7 +856,7 @@ function MapSchemaExpandablePathTree({
 }
 
 function MapSchemaEntityOcsfPathTree({ paths }: { paths: readonly string[] }) {
-  return <MapSchemaExpandablePathTree paths={paths} />;
+  return <MapSchemaExpandablePathTree paths={paths} defaultExpandAll />;
 }
 
 function TargetMappingDropZone({
@@ -1061,6 +1087,7 @@ function MapSchemaOverviewCard({
 
   useEffect(() => {
     setExpandedEntityIds(new Set());
+    setTreeView(false);
   }, [eventClassId]);
 
   const toggleEntity = useCallback((entityId: string) => {
@@ -1071,6 +1098,16 @@ function MapSchemaOverviewCard({
       return next;
     });
   }, []);
+
+  const handleTreeViewChange = useCallback(
+    (checked: boolean) => {
+      setTreeView(checked);
+      if (checked) {
+        setExpandedEntityIds(new Set(mapSchemaEntities.map((entity) => entity.id)));
+      }
+    },
+    [mapSchemaEntities],
+  );
 
   return (
     <TooltipProvider delayDuration={200}>
@@ -1169,7 +1206,7 @@ function MapSchemaOverviewCard({
                   <span className="ml-auto flex min-w-0 flex-1 items-center justify-end gap-2 pl-2">
                     <Checkbox
                       checked={treeView}
-                      onCheckedChange={setTreeView}
+                      onCheckedChange={handleTreeViewChange}
                       label="Show As Tree View"
                       labelClassName="text-base-small text-text-secondary"
                     />
@@ -1233,16 +1270,21 @@ function AiAssistedMappingControl({
   settings,
   onSuggest,
   isMapping = false,
+  enabled,
+  onEnabledChange,
 }: {
   settings: AiAssistedMappingSettings;
   onSuggest: (next: AiAssistedMappingSettings) => void;
   isMapping?: boolean;
+  enabled: boolean;
+  onEnabledChange: (enabled: boolean) => void;
 }) {
   const [open, setOpen] = useState(false);
   const [draft, setDraft] = useState(settings);
 
   const handleOpenChange = (nextOpen: boolean) => {
     if (nextOpen) {
+      if (!enabled) return;
       setDraft(settings);
     }
     setOpen(nextOpen);
@@ -1255,18 +1297,27 @@ function AiAssistedMappingControl({
 
   return (
     <div className="flex shrink-0 items-center gap-2">
-      <CopilotSparkMark className="size-[21.6px]" />
+      <Switch
+        checked={enabled}
+        onCheckedChange={(checked) => {
+          onEnabledChange(checked);
+          if (!checked) setOpen(false);
+        }}
+        id="copilot-mapping-enabled"
+      />
       <DropdownMenu open={open} onOpenChange={handleOpenChange} modal={false}>
         <DropdownMenuTrigger asChild>
           <Button
             type="button"
-            variant="secondary-outline"
+            variant="ghost"
             size="sm"
-            className="h-7 gap-1 border-border-rule bg-surface-modal px-2 font-semibold text-text-primary"
-            aria-label="AI assisted mapping options"
+            disabled={!enabled}
+            className="group h-7 gap-1.5 px-0 font-semibold text-text-primary hover:bg-transparent disabled:opacity-60"
+            aria-label="Copilot mapping options"
           >
-            AI Assisted Mapping
-            <Icon name="chevron-down" size={16} className="shrink-0 text-text-secondary" />
+            <CopilotSparkMark className="size-[21.6px] transition-[filter] duration-150 group-hover:brightness-125 group-disabled:brightness-100" />
+            <span className="text-[0.96rem] transition-colors group-hover:text-interactive-active">Copilot</span>
+            <Icon name="chevron-down" size={16} className="shrink-0 text-text-secondary transition-colors group-hover:text-interactive-active" />
           </Button>
         </DropdownMenuTrigger>
         <DropdownMenuContent
@@ -1300,7 +1351,7 @@ function AiAssistedMappingControl({
                 onCheckedChange={(checked) =>
                   setDraft((current) => ({ ...current, suggestMappingsForEventClass: checked }))
                 }
-                label="Suggest Mappings for Suggested Event Class"
+                label="Suggest Mappings for Event Class"
                 labelClassName={
                   !draft.suggestEventClass
                     ? "text-text-disabled"
@@ -1340,6 +1391,8 @@ function MappingToolbarV2({
   isAiMapping,
   aiAssistedMappingSettings,
   onAiAssistedMappingSuggest,
+  copilotEnabled,
+  onCopilotEnabledChange,
 }: {
   hasMappedFields: boolean;
   selectedEventClassId: string;
@@ -1347,6 +1400,8 @@ function MappingToolbarV2({
   isAiMapping: boolean;
   aiAssistedMappingSettings: AiAssistedMappingSettings;
   onAiAssistedMappingSuggest: (settings: AiAssistedMappingSettings) => void;
+  copilotEnabled: boolean;
+  onCopilotEnabledChange: (enabled: boolean) => void;
 }) {
   const [allowAutosave, setAllowAutosave] = useState(true);
   return (
@@ -1366,6 +1421,8 @@ function MappingToolbarV2({
             settings={aiAssistedMappingSettings}
             onSuggest={onAiAssistedMappingSuggest}
             isMapping={isAiMapping}
+            enabled={copilotEnabled}
+            onEnabledChange={onCopilotEnabledChange}
           />
         </div>
         <div className="flex shrink-0 flex-wrap items-center gap-x-6 gap-y-2">
@@ -1398,6 +1455,8 @@ function FieldMappingBar({
   showHiddenFields,
   onShowHiddenFieldsChange,
   hasHiddenFields,
+  hasMappedFields,
+  onClearHiddenFields,
   sourceSearchQuery,
   onSourceSearchQueryChange,
   table,
@@ -1408,6 +1467,8 @@ function FieldMappingBar({
   showHiddenFields: boolean;
   onShowHiddenFieldsChange: (checked: boolean) => void;
   hasHiddenFields: boolean;
+  hasMappedFields: boolean;
+  onClearHiddenFields: () => void;
   sourceSearchQuery: string;
   onSourceSearchQueryChange: (query: string) => void;
   table: ReactNode;
@@ -1419,7 +1480,7 @@ function FieldMappingBar({
         <p className="mb-3 text-sm font-semibold text-text-secondary">
           Mapped Fields: <span className="text-text-primary">{mapped}</span>
         </p>
-        <div className="grid w-full min-w-0 grid-cols-1 gap-y-3 md:grid-cols-[minmax(0,1fr)_3rem_minmax(0,1fr)_4rem] md:gap-x-0">
+        <div className="grid w-full min-w-0 grid-cols-1 gap-y-3 md:grid-cols-[minmax(0,1fr)_3rem_minmax(0,1fr)] md:gap-x-0">
           <div className="flex min-w-0 flex-wrap items-baseline gap-x-[16px] md:min-w-0">
             <p className="min-w-0 text-sm font-semibold leading-[18px]">
               <span className="text-text-primary">Source: </span>
@@ -1437,7 +1498,6 @@ function FieldMappingBar({
             </p>
             <Info size={16} strokeWidth={1.5} className="shrink-0 text-text-tertiary" aria-label="About query data model" />
           </div>
-          <div className="hidden md:block" aria-hidden />
 
           <div className="flex min-w-0 items-center gap-3 md:min-w-0">
             <div className="w-[240px] shrink-0">
@@ -1459,12 +1519,26 @@ function FieldMappingBar({
                 showHiddenFields ? "text-text-primary" : "text-text-tertiary hover:text-text-secondary"
               }
             />
+            {hasHiddenFields ? (
+              <Button
+                type="button"
+                variant="ghost"
+                onClick={onClearHiddenFields}
+                className="ml-auto gap-1 px-0 text-sm font-semibold text-text-secondary hover:bg-transparent hover:text-text-primary"
+              >
+                <CircleX size={16} strokeWidth={1.5} aria-hidden />
+                Clear All Hidden Fields
+              </Button>
+            ) : null}
           </div>
           <div className="hidden md:block" aria-hidden />
           <div className="flex min-w-0 items-center justify-start">
-            <MapVisibilityTrimode value={mapVisibility} onChange={onMapVisibilityChange} />
+            <MapVisibilityTrimode
+              value={mapVisibility}
+              onChange={onMapVisibilityChange}
+              disabled={!hasMappedFields}
+            />
           </div>
-          <div className="hidden md:block" aria-hidden />
         </div>
       </div>
       <div className="min-h-0 w-full min-w-0 flex-1 overflow-y-auto px-0 pb-28 pt-2">{table}</div>
@@ -1479,7 +1553,8 @@ export function AmazonAthenaMapReviewStep({
   onHasMappedFieldsChange?: (hasMappedFields: boolean) => void;
 }) {
   const [rows, setRows] = useState<MappingRow[]>(() => INITIAL_ROWS.map((row) => ({ ...row })));
-  const [selectedEventClassId, setSelectedEventClassId] = useState("");
+  const [selectedEventClassId, setSelectedEventClassId] = useState(DEFAULT_EVENT_CLASS_ID);
+  const [copilotEnabled, setCopilotEnabled] = useState(true);
   const [isAiMapping, setIsAiMapping] = useState(false);
   const [aiAssistedMappingSettings, setAiAssistedMappingSettings] = useState<AiAssistedMappingSettings>(
     DEFAULT_AI_ASSISTED_MAPPING_SETTINGS,
@@ -1522,12 +1597,32 @@ export function AmazonAthenaMapReviewStep({
     setRows(buildUnmappedRows(INITIAL_ROWS));
   }, []);
 
+  const handleCopilotEnabledChange = useCallback((enabled: boolean) => {
+    setCopilotEnabled(enabled);
+    if (enabled) {
+      setSelectedEventClassId(DEFAULT_EVENT_CLASS_ID);
+      runAiMappingDemo(DEFAULT_AI_ASSISTED_MAPPING_SETTINGS);
+      return;
+    }
+    aiMappingRunRef.current += 1;
+    setIsAiMapping(false);
+    setSelectedEventClassId("");
+    setRows(buildUnmappedRows(INITIAL_ROWS));
+  }, [runAiMappingDemo]);
+
   const handleAiAssistedMappingSuggest = useCallback(
     (settings: AiAssistedMappingSettings) => {
       runAiMappingDemo(settings);
     },
     [runAiMappingDemo],
   );
+
+  const didAutomapOnMountRef = useRef(false);
+  useEffect(() => {
+    if (!copilotEnabled || didAutomapOnMountRef.current) return;
+    didAutomapOnMountRef.current = true;
+    runAiMappingDemo(DEFAULT_AI_ASSISTED_MAPPING_SETTINGS);
+  }, [copilotEnabled, runAiMappingDemo]);
 
   const handleMapSchemaPanelResizePointerDown = useCallback((event: PointerEvent<HTMLButtonElement>) => {
     event.preventDefault();
@@ -1559,10 +1654,14 @@ export function AmazonAthenaMapReviewStep({
         next.delete(source);
       } else {
         next.add(source);
-        setShowHiddenFields(true);
       }
       return next;
     });
+  }, []);
+
+  const clearHiddenFields = useCallback(() => {
+    setHiddenFields(new Set());
+    setShowHiddenFields(false);
   }, []);
 
   useEffect(() => {
@@ -1574,6 +1673,12 @@ export function AmazonAthenaMapReviewStep({
   useEffect(() => {
     onHasMappedFieldsChange?.(hasMappedFields);
   }, [hasMappedFields, onHasMappedFieldsChange]);
+
+  useEffect(() => {
+    if (!hasMappedFields && mapVisibility !== "all") {
+      setMapVisibility("all");
+    }
+  }, [hasMappedFields, mapVisibility]);
 
   const mapOcsfFieldToSource = useCallback((source: string, fieldPath: string) => {
     const tag = ocsfFieldMappingTag(fieldPath) || formatOcsfPathLabel(fieldPath);
@@ -1707,6 +1812,8 @@ export function AmazonAthenaMapReviewStep({
               isAiMapping={isAiMapping}
               aiAssistedMappingSettings={aiAssistedMappingSettings}
               onAiAssistedMappingSuggest={handleAiAssistedMappingSuggest}
+              copilotEnabled={copilotEnabled}
+              onCopilotEnabledChange={handleCopilotEnabledChange}
             />
           </div>
           <FieldMappingBar
@@ -1716,6 +1823,8 @@ export function AmazonAthenaMapReviewStep({
             showHiddenFields={showHiddenFields}
             onShowHiddenFieldsChange={setShowHiddenFields}
             hasHiddenFields={hasHiddenFields}
+            hasMappedFields={hasMappedFields}
+            onClearHiddenFields={clearHiddenFields}
             sourceSearchQuery={sourceSearchQuery}
             onSourceSearchQueryChange={setSourceSearchQuery}
             table={
