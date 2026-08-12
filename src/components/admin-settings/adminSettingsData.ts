@@ -53,7 +53,7 @@ export const ADMIN_TENANTS: AdminTenant[] = [
         id: "team-kopolowsk",
         name: "Kopolowsk Carrots",
         members: [
-          { id: "m1", name: "Bonnie Kopolowsk", initials: "CK", avatarColor: "#4a9eff", role: "Tenant Admin" },
+          { id: "m1", name: "Chanice Kopolowski", initials: "CK", avatarColor: "#4a9eff", role: "Tenant Admin" },
           { id: "m2", name: "Brian Tiddley", initials: "BT", avatarColor: "#57969e", role: "Default Team Member" },
           { id: "m3", name: "Tom Kearns", initials: "TK", avatarColor: "#f28830", role: "Team Admin" },
           { id: "m4", name: "Jane Smith", initials: "JS", avatarColor: "#9b6bac", role: "Default Team Member" },
@@ -73,7 +73,7 @@ export const ADMIN_TENANTS: AdminTenant[] = [
         name: "Tiny Tot Toys",
         members: [
           { id: "m8", name: "Brian Tiddley", initials: "BT", avatarColor: "#57969e", role: "Team Admin" },
-          { id: "m9", name: "Bonnie Kopolowsk", initials: "CK", avatarColor: "#4a9eff", role: "Default Team Member" },
+          { id: "m9", name: "Chanice Kopolowski", initials: "CK", avatarColor: "#4a9eff", role: "Default Team Member" },
         ],
       },
     ],

@@ -61,7 +61,10 @@ export const CONNECTOR_PLATFORM_TYPES_BY_CATEGORY = CONNECTOR_CATEGORIES.map((ca
 
 export type ConnectorSetupTarget = {
   id: string;
+  /** Editable connector instance display name (shown on cards). */
   name: string;
+  /** Product / platform label for docs and helper copy. */
+  platformName: string;
   icon: ConnectorLargeIconName;
   categoryId: ConnectorCategoryId;
 };
@@ -79,6 +82,7 @@ export function resolveConnectorSetupTarget(connectorId: string): ConnectorSetup
     return {
       id: platform.id,
       name: platform.name,
+      platformName: platform.name,
       icon: platform.icon,
       categoryId: platform.categoryId,
     };
@@ -86,9 +90,11 @@ export function resolveConnectorSetupTarget(connectorId: string): ConnectorSetup
 
   const instance = CONNECTOR_INSTANCES.find((entry) => entry.id === connectorId);
   if (instance) {
+    const platformLabel = displayName(instance.connectorType);
     return {
       id: instance.id,
-      name: displayName(instance.connectorType),
+      name: instance.instanceName,
+      platformName: platformLabel,
       icon: instance.icon,
       categoryId: instance.categoryId,
     };
@@ -97,6 +103,7 @@ export function resolveConnectorSetupTarget(connectorId: string): ConnectorSetup
   return {
     id: connectorId,
     name: connectorId,
+    platformName: connectorId,
     icon: CONNECTOR_PLATFORM_TYPES[0]?.icon ?? "connector-large-aws-athena",
     categoryId: CONNECTOR_PLATFORM_TYPES[0]?.categoryId ?? "cloud-infrastructure",
   };

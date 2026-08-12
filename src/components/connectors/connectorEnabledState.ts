@@ -12,8 +12,14 @@ import { CONNECTOR_CATEGORIES, CONNECTOR_INSTANCES, type ConnectorInstance } fro
 
 const CONNECTOR_ENABLED_STORAGE_KEY = "mayfield.connectors.enabled-by-id";
 const CONNECTOR_ADDED_STORAGE_KEY = "mayfield.connectors.added-instances";
+const CONNECTOR_NAME_OVERRIDES_STORAGE_KEY = "mayfield.connectors.instance-name-overrides";
+const CONNECTOR_SCHEMA_PREVIEW_STORAGE_KEY = "mayfield.connectors.schema-preview-fetched";
+const CONNECTOR_MAPPINGS_STORAGE_KEY = "mayfield.connectors.mappings-complete";
 
 type EnabledById = Record<string, boolean>;
+type InstanceNameOverrides = Record<string, string>;
+type SchemaPreviewFetchedById = Record<string, boolean>;
+type MappingsCompleteById = Record<string, boolean>;
 
 export type ConnectorSelectionCounts = {
   selectedCount: number;
@@ -43,6 +49,38 @@ function sanitizeEnabledById(value: unknown, instances: readonly ConnectorInstan
     if (typeof stored === "boolean") {
       sanitized[connector.id] = stored;
     }
+  }
+  return sanitized;
+}
+
+function sanitizeNameOverrides(value: unknown): InstanceNameOverrides {
+  if (!value || typeof value !== "object") return {};
+  const record = value as Record<string, unknown>;
+  const sanitized: InstanceNameOverrides = {};
+  for (const [id, name] of Object.entries(record)) {
+    if (typeof name === "string" && name.trim()) {
+      sanitized[id] = name.trim();
+    }
+  }
+  return sanitized;
+}
+
+function sanitizeSchemaPreviewFetched(value: unknown): SchemaPreviewFetchedById {
+  if (!value || typeof value !== "object") return {};
+  const record = value as Record<string, unknown>;
+  const sanitized: SchemaPreviewFetchedById = {};
+  for (const [id, fetched] of Object.entries(record)) {
+    if (fetched === true) sanitized[id] = true;
+  }
+  return sanitized;
+}
+
+function sanitizeMappingsComplete(value: unknown): MappingsCompleteById {
+  if (!value || typeof value !== "object") return {};
+  const record = value as Record<string, unknown>;
+  const sanitized: MappingsCompleteById = {};
+  for (const [id, complete] of Object.entries(record)) {
+    if (complete === true) sanitized[id] = true;
   }
   return sanitized;
 }
@@ -103,6 +141,66 @@ function writeStoredAddedInstances(next: ConnectorInstance[]): void {
   }
 }
 
+function readStoredNameOverrides(): InstanceNameOverrides {
+  if (!canUseSessionStorage()) return {};
+  try {
+    const raw = window.sessionStorage.getItem(CONNECTOR_NAME_OVERRIDES_STORAGE_KEY);
+    if (!raw) return {};
+    return sanitizeNameOverrides(JSON.parse(raw));
+  } catch {
+    return {};
+  }
+}
+
+function writeStoredNameOverrides(next: InstanceNameOverrides): void {
+  if (!canUseSessionStorage()) return;
+  try {
+    window.sessionStorage.setItem(CONNECTOR_NAME_OVERRIDES_STORAGE_KEY, JSON.stringify(next));
+  } catch {
+    /* ignore quota / private mode */
+  }
+}
+
+function readStoredSchemaPreviewFetched(): SchemaPreviewFetchedById {
+  if (!canUseSessionStorage()) return {};
+  try {
+    const raw = window.sessionStorage.getItem(CONNECTOR_SCHEMA_PREVIEW_STORAGE_KEY);
+    if (!raw) return {};
+    return sanitizeSchemaPreviewFetched(JSON.parse(raw));
+  } catch {
+    return {};
+  }
+}
+
+function writeStoredSchemaPreviewFetched(next: SchemaPreviewFetchedById): void {
+  if (!canUseSessionStorage()) return;
+  try {
+    window.sessionStorage.setItem(CONNECTOR_SCHEMA_PREVIEW_STORAGE_KEY, JSON.stringify(next));
+  } catch {
+    /* ignore quota / private mode */
+  }
+}
+
+function readStoredMappingsComplete(): MappingsCompleteById {
+  if (!canUseSessionStorage()) return {};
+  try {
+    const raw = window.sessionStorage.getItem(CONNECTOR_MAPPINGS_STORAGE_KEY);
+    if (!raw) return {};
+    return sanitizeMappingsComplete(JSON.parse(raw));
+  } catch {
+    return {};
+  }
+}
+
+function writeStoredMappingsComplete(next: MappingsCompleteById): void {
+  if (!canUseSessionStorage()) return;
+  try {
+    window.sessionStorage.setItem(CONNECTOR_MAPPINGS_STORAGE_KEY, JSON.stringify(next));
+  } catch {
+    /* ignore quota / private mode */
+  }
+}
+
 function readStoredEnabledById(instances: readonly ConnectorInstance[]): EnabledById {
   if (!canUseSessionStorage()) return defaultEnabledById(instances);
   try {
@@ -124,9 +222,68 @@ function writeStoredEnabledById(next: EnabledById): void {
 }
 
 let addedInstances: ConnectorInstance[] = readStoredAddedInstances();
+let instanceNameOverrides: InstanceNameOverrides = readStoredNameOverrides();
+let schemaPreviewFetchedById: SchemaPreviewFetchedById = readStoredSchemaPreviewFetched();
+let mappingsCompleteById: MappingsCompleteById = readStoredMappingsComplete();
 
 function getAllConnectorInstances(): ConnectorInstance[] {
-  return [...CONNECTOR_INSTANCES, ...addedInstances];
+  return [...CONNECTOR_INSTANCES, ...addedInstances].map((connector) => {
+    const overrideName = instanceNameOverrides[connector.id];
+    return overrideName ? { ...connector, instanceName: overrideName } : connector;
+  });
+}
+
+export function getConnectorInstanceById(connectorId: string): ConnectorInstance | undefined {
+  return getAllConnectorInstances().find((connector) => connector.id === connectorId);
+}
+
+/** True when this connector already has a fetched schema preview to restore on edit. */
+export function hasConnectorSchemaPreview(connectorId: string): boolean {
+  if (schemaPreviewFetchedById[connectorId]) return true;
+  // Existing instances already have imported data from a prior setup.
+  return getConnectorInstanceById(connectorId) != null;
+}
+
+export function markConnectorSchemaPreviewFetched(connectorId: string): void {
+  if (schemaPreviewFetchedById[connectorId]) return;
+  schemaPreviewFetchedById = { ...schemaPreviewFetchedById, [connectorId]: true };
+  writeStoredSchemaPreviewFetched(schemaPreviewFetchedById);
+}
+
+function transferConnectorSchemaPreview(fromId: string, toId: string): void {
+  if (!fromId || !toId || fromId === toId) return;
+  if (!schemaPreviewFetchedById[fromId] && !schemaPreviewFetchedById[toId]) return;
+  const next = { ...schemaPreviewFetchedById };
+  if (next[fromId]) {
+    next[toId] = true;
+    delete next[fromId];
+  }
+  schemaPreviewFetchedById = next;
+  writeStoredSchemaPreviewFetched(schemaPreviewFetchedById);
+}
+
+/** True when AI mapping has already been completed for this connector (skip auto re-run on edit). */
+export function hasConnectorMappings(connectorId: string): boolean {
+  if (mappingsCompleteById[connectorId]) return true;
+  return getConnectorInstanceById(connectorId) != null;
+}
+
+export function markConnectorMappingsComplete(connectorId: string): void {
+  if (mappingsCompleteById[connectorId]) return;
+  mappingsCompleteById = { ...mappingsCompleteById, [connectorId]: true };
+  writeStoredMappingsComplete(mappingsCompleteById);
+}
+
+function transferConnectorMappings(fromId: string, toId: string): void {
+  if (!fromId || !toId || fromId === toId) return;
+  if (!mappingsCompleteById[fromId] && !mappingsCompleteById[toId]) return;
+  const next = { ...mappingsCompleteById };
+  if (next[fromId]) {
+    next[toId] = true;
+    delete next[fromId];
+  }
+  mappingsCompleteById = next;
+  writeStoredMappingsComplete(mappingsCompleteById);
 }
 
 let enabledById: EnabledById = readStoredEnabledById(getAllConnectorInstances());
@@ -183,11 +340,17 @@ function emitChange(): void {
   for (const listener of listeners) listener();
 }
 
-function persistStore(nextEnabledById: EnabledById, nextAddedInstances: ConnectorInstance[]): void {
+function persistStore(
+  nextEnabledById: EnabledById,
+  nextAddedInstances: ConnectorInstance[],
+  nextNameOverrides: InstanceNameOverrides = instanceNameOverrides,
+): void {
   enabledById = nextEnabledById;
   addedInstances = nextAddedInstances;
+  instanceNameOverrides = nextNameOverrides;
   writeStoredEnabledById(nextEnabledById);
   writeStoredAddedInstances(nextAddedInstances);
+  writeStoredNameOverrides(nextNameOverrides);
   emitChange();
 }
 
@@ -267,12 +430,40 @@ function createAddedConnectorInstance(target: ConnectorSetupTarget, enabled: boo
 
 /** Persist setup completion — updates an existing instance or registers a newly added connector. */
 export function saveConnectorFromSetup(target: ConnectorSetupTarget, enabled: boolean): void {
+  const nextName = target.name.trim();
   const existing = getAllConnectorInstances().find((connector) => connector.id === target.id);
+
   if (existing) {
-    persistStore({ ...enabledById, [target.id]: enabled }, addedInstances);
+    const nextEnabledById = { ...enabledById, [target.id]: enabled };
+    const isAddedInstance = addedInstances.some((connector) => connector.id === target.id);
+
+    if (isAddedInstance) {
+      const nextAdded = addedInstances.map((connector) =>
+        connector.id === target.id
+          ? { ...connector, instanceName: nextName || connector.instanceName, enabled }
+          : connector,
+      );
+      const nextOverrides = { ...instanceNameOverrides };
+      delete nextOverrides[target.id];
+      persistStore(nextEnabledById, nextAdded, nextOverrides);
+      return;
+    }
+
+    const nextOverrides = { ...instanceNameOverrides };
+    if (nextName && nextName !== CONNECTOR_INSTANCES.find((connector) => connector.id === target.id)?.instanceName) {
+      nextOverrides[target.id] = nextName;
+    } else {
+      delete nextOverrides[target.id];
+    }
+    persistStore(nextEnabledById, addedInstances, nextOverrides);
     return;
   }
 
-  const nextInstance = createAddedConnectorInstance(target, enabled);
+  const nextInstance = createAddedConnectorInstance(
+    { ...target, name: nextName || target.name },
+    enabled,
+  );
+  transferConnectorSchemaPreview(target.id, nextInstance.id);
+  transferConnectorMappings(target.id, nextInstance.id);
   persistStore({ ...enabledById, [nextInstance.id]: enabled }, [...addedInstances, nextInstance]);
 }

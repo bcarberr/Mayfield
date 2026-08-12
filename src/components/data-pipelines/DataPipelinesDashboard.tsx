@@ -314,11 +314,17 @@ function PipelinesTable({
     }
   };
 
-  const renderBodyCell = (columnId: string, row: DataPipelineRow, colIndex: number, expanded: boolean) => {
+  const renderBodyCell = (
+    columnId: string,
+    row: DataPipelineRow,
+    colIndex: number,
+    expanded: boolean,
+    inactiveCellClass: string,
+  ) => {
     switch (columnId) {
       case "expand":
         return (
-          <td key={columnId} style={colStyle(colIndex)} className={tdClass(columnId)}>
+          <td key={columnId} style={colStyle(colIndex)} className={cx(tdClass(columnId), inactiveCellClass)}>
             <div className="flex justify-center">
               <button type="button" className="p-1 text-text-tertiary hover:text-text-primary" aria-expanded={expanded} aria-label={expanded ? `Collapse details for ${row.name}` : `Expand details for ${row.name}`} onClick={() => onToggleExpand(row.id)}>
                 <Icon name="navi-arrow-drop-down" size={32} className={cx("block transition-transform", expanded ? "rotate-0" : "-rotate-90")} aria-hidden />
@@ -328,37 +334,37 @@ function PipelinesTable({
         );
       case "name":
         return (
-          <td key={columnId} style={colStyle(colIndex)} className={cx(tdClass(columnId), "min-w-0")}>
+          <td key={columnId} style={colStyle(colIndex)} className={cx(tdClass(columnId), "min-w-0", inactiveCellClass)}>
             <TruncatedText className="w-full font-semibold text-interactive-active">{row.name}</TruncatedText>
           </td>
         );
       case "source":
         return (
-          <td key={columnId} style={colStyle(colIndex)} className={cx(tdClass(columnId), "min-w-0")}>
+          <td key={columnId} style={colStyle(colIndex)} className={cx(tdClass(columnId), "min-w-0", inactiveCellClass)}>
             <TruncatedText className="w-full">{row.source}</TruncatedText>
           </td>
         );
       case "destination":
         return (
-          <td key={columnId} style={colStyle(colIndex)} className={cx(tdClass(columnId), "min-w-0")}>
+          <td key={columnId} style={colStyle(colIndex)} className={cx(tdClass(columnId), "min-w-0", inactiveCellClass)}>
             <TruncatedText className="w-full">{row.destination}</TruncatedText>
           </td>
         );
       case "state":
         return (
-          <td key={columnId} style={colStyle(colIndex)} className={tdClass(columnId)}>
+          <td key={columnId} style={colStyle(colIndex)} className={cx(tdClass(columnId), inactiveCellClass)}>
             <Switch checked={pipelineIsActive(row, activeById)} onCheckedChange={(checked) => onActiveChange(row.id, checked)} aria-label={`Toggle ${row.name}`} />
           </td>
         );
       case "records":
         return (
-          <td key={columnId} style={colStyle(colIndex)} className={tdClass(columnId)}>
+          <td key={columnId} style={colStyle(colIndex)} className={cx(tdClass(columnId), inactiveCellClass)}>
             <span className="font-semibold tabular-nums text-text-primary">{row.records}</span>
           </td>
         );
       case "lastRun":
         return (
-          <td key={columnId} style={colStyle(colIndex)} className={tdClass(columnId)}>
+          <td key={columnId} style={colStyle(colIndex)} className={cx(tdClass(columnId), inactiveCellClass)}>
             {row.lastRun}
           </td>
         );
@@ -378,7 +384,7 @@ function PipelinesTable({
           rowId: row.id,
           colIndex,
           colStyle,
-          className: tdClass(columnId),
+          className: cx(tdClass(columnId), inactiveCellClass),
         });
     }
   };
@@ -456,13 +462,17 @@ function PipelinesTable({
             <tbody>
               {displayRows.map((row) => {
                 const expanded = expandedIds.has(row.id);
+                const active = pipelineIsActive(row, activeById);
+                const inactiveCellClass = !active ? "opacity-70" : "";
                 return (
                   <Fragment key={row.id}>
                     <tr className="border-b border-datavis-gridlines hover:bg-overlay-subtle">
-                      {tableColumnIds.map((columnId, colIndex) => renderBodyCell(columnId, row, colIndex, expanded))}
+                      {tableColumnIds.map((columnId, colIndex) =>
+                        renderBodyCell(columnId, row, colIndex, expanded, inactiveCellClass),
+                      )}
                     </tr>
                     {expanded ? (
-                      <tr className={DATA_GRID_EXPANDED_ROW_CLASS}>
+                      <tr className={cx(DATA_GRID_EXPANDED_ROW_CLASS, !active && "opacity-70")}>
                         <td colSpan={tableColumnIds.length} className={DATA_GRID_EXPANDED_CELL_WIDE_CLASS}>
                           <PipelineExpandedRow
                             row={row}

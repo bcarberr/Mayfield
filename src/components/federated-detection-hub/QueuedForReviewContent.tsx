@@ -123,11 +123,13 @@ function ReviewStatCard({
   value,
   selected,
   onClick,
+  severityIcon,
 }: {
   label: string;
   value: number;
   selected: boolean;
   onClick: () => void;
+  severityIcon?: { name: SeverityShapeIconName; color: string };
 }) {
   return (
     <button
@@ -144,11 +146,14 @@ function ReviewStatCard({
     >
       <p
         className={cx(
-          "text-xs font-bold uppercase tracking-wide",
+          "flex items-center gap-1.5 text-xs font-bold uppercase tracking-wide",
           selected ? "text-interactive-active" : "text-text-tertiary",
         )}
       >
-        {label}
+        {severityIcon ? (
+          <Icon name={severityIcon.name} size={14} style={{ color: severityIcon.color }} aria-hidden className="shrink-0" />
+        ) : null}
+        <span>{label}</span>
       </p>
       <p className="mt-2 text-3xl font-bold tabular-nums text-text-primary">{value}</p>
     </button>
@@ -961,12 +966,14 @@ export function QueuedForReviewContent({
           value={summaryStats.highFindings}
           selected={statFilter === "high-findings"}
           onClick={() => handleStatFilterClick("high-findings")}
+          severityIcon={{ name: SEV_ICONS.High, color: SEV_COLORS.High }}
         />
         <ReviewStatCard
           label="Critical Severity"
           value={summaryStats.criticalSeverity}
           selected={statFilter === "critical"}
           onClick={() => handleStatFilterClick("critical")}
+          severityIcon={{ name: SEV_ICONS.Critical, color: SEV_COLORS.Critical }}
         />
       </div>
 

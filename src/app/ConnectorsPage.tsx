@@ -8,7 +8,10 @@ import {
   type ConnectorPlatformType,
   type ConnectorSetupTarget,
 } from "../components/connectors/connectorPlatformTypes";
-import { saveConnectorFromSetup } from "../components/connectors/connectorEnabledState";
+import {
+  getConnectorInstanceById,
+  saveConnectorFromSetup,
+} from "../components/connectors/connectorEnabledState";
 import { ConnectorSelectionCountText } from "../components/connectors/ConnectorSelectionCountText";
 import { SearchTopHeader } from "../components/SearchTopHeader";
 import {
@@ -40,20 +43,36 @@ function useConnectorsSetupSlideOver() {
     setSlideOverMode({ kind: "add" });
   }, []);
 
-  const openSetup = useCallback((connectorId = "new") => {
-    setSlideOverMode({ kind: "setup", connector: resolveConnectorSetupTarget(connectorId) });
-  }, []);
-
   const handleSelectPlatform = useCallback((platform: ConnectorPlatformType) => {
     setSlideOverMode({
       kind: "setup",
       connector: {
         id: platform.id,
         name: platform.name,
+        platformName: platform.name,
         icon: platform.icon,
         categoryId: platform.categoryId,
       },
     });
+  }, []);
+
+  const openSetup = useCallback((connectorId = "new") => {
+    const instance = getConnectorInstanceById(connectorId);
+    if (instance) {
+      const paren = instance.connectorType.indexOf("(");
+      setSlideOverMode({
+        kind: "setup",
+        connector: {
+          id: instance.id,
+          name: instance.instanceName,
+          platformName: paren === -1 ? instance.connectorType : instance.connectorType.slice(0, paren).trim(),
+          icon: instance.icon,
+          categoryId: instance.categoryId,
+        },
+      });
+      return;
+    }
+    setSlideOverMode({ kind: "setup", connector: resolveConnectorSetupTarget(connectorId) });
   }, []);
 
   const handleSetupSave = useCallback((connector: ConnectorSetupTarget, enabled: boolean) => {
