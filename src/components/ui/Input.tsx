@@ -2,7 +2,7 @@ import { forwardRef, type InputHTMLAttributes, type ReactNode } from "react";
 import { CircleX, Search } from "lucide-react";
 
 const base =
-  "flex w-full min-w-0 items-center gap-1 rounded border border-border-rule bg-surface-modal px-1.5 text-sm text-text-primary outline-none transition-[box-shadow] focus-within:ring-1 focus-within:ring-interactive-active";
+  "flex w-full min-w-0 items-center gap-1 rounded border border-border-rule bg-surface-modal px-1.5 text-sm text-text-primary outline-none transition-[border-color] focus-within:border-interactive-active";
 
 /** Matches secondary `Button` default height (`min-h-8`). */
 const searchShell = "h-8 min-h-8 py-0";

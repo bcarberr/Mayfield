@@ -130,23 +130,23 @@ function ConnectionTitleLink({ connectorName }: { connectorName: string }) {
 
   return (
     <div className="flex min-w-0 max-w-md flex-1 flex-col items-end justify-end pb-0.5 text-right">
-      <a
-        href={isAthena ? "https://docs.aws.amazon.com/athena/" : "#"}
-        target="_blank"
-        rel="noopener noreferrer"
-        className="inline-flex flex-wrap items-center justify-end gap-1 text-sm leading-[18px] text-text-tertiary hover:text-text-secondary"
-        onClick={isAthena ? undefined : (event) => event.preventDefault()}
-      >
+      <p className="inline-flex flex-wrap items-center justify-end gap-1 text-sm leading-[18px] text-text-tertiary">
         <span>
           {isAthena
             ? "Search and manage Amazon Athena Data Base."
             : `Configure your ${connectorName} connector.`}
         </span>
-        <span className="inline-flex shrink-0 items-center gap-1 font-normal whitespace-nowrap text-interactive-active">
+        <a
+          href={isAthena ? "https://docs.aws.amazon.com/athena/" : "#"}
+          target="_blank"
+          rel="noopener noreferrer"
+          className="inline-flex shrink-0 items-center gap-1 font-normal whitespace-nowrap text-interactive-active hover:underline"
+          onClick={isAthena ? undefined : (event) => event.preventDefault()}
+        >
           Learn more
           <Icon name="external" size={14} className="text-interactive-active" />
-        </span>
-      </a>
+        </a>
+      </p>
     </div>
   );
 }

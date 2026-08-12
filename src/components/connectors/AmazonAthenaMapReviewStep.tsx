@@ -16,9 +16,12 @@ import {
 import {
   getHttpActivityEnumValues,
   getHttpActivityFullSchemaPaths,
+  getHttpActivityShowAllAttributes,
   isHttpActivityArrayField,
   isHttpActivityEnumField,
+  isHttpActivityShowAllObjectRoot,
   isHttpActivitySimpleMappableField,
+  type HttpActivityShowAllAttribute,
 } from "../../data/httpActivityFullSchema";
 import treeBranchSvg from "../../assets/icons/tree.svg?raw";
 import {
@@ -812,10 +815,12 @@ function MapSchemaExpandablePathTree({
   paths,
   className,
   defaultExpandAll = false,
+  baseDepth = 0,
 }: {
   paths: readonly string[];
   className?: string;
   defaultExpandAll?: boolean;
+  baseDepth?: number;
 }) {
   const tree = useMemo(() => sortOcsfPathTree(buildOcsfPathTree(paths)), [paths]);
   const allExpandableKeys = useMemo(() => collectExpandableOcsfPathKeys(tree), [tree]);
@@ -846,11 +851,231 @@ function MapSchemaExpandablePathTree({
           node={node}
           pathPrefix={[]}
           pathKey={node.segment}
-          depth={0}
+          depth={baseDepth}
           expandedPaths={expandedPaths}
           onToggleExpand={toggleExpanded}
         />
       ))}
+    </div>
+  );
+}
+
+function MapSchemaShowAllTypeSuffix({
+  attribute,
+}: {
+  attribute: HttpActivityShowAllAttribute;
+}) {
+  if (attribute.required) {
+    return <span className="font-semibold italic text-accent-required">required</span>;
+  }
+  if (isHttpActivityEnumField(attribute.name)) {
+    return <span className="font-semibold italic text-[#b4b0ff]">enum</span>;
+  }
+  if (isHttpActivityArrayField(attribute.name)) {
+    return <span className="font-semibold italic text-datavis-data-smalt-green-40">array</span>;
+  }
+  return null;
+}
+
+function MapSchemaAdvancedShowAllAttributeRow({
+  attribute,
+  childPaths,
+}: {
+  attribute: HttpActivityShowAllAttribute;
+  childPaths: readonly string[];
+}) {
+  const [expanded, setExpanded] = useState(false);
+  const displayLabel = attribute.label ?? attribute.name;
+  const enumValues = getHttpActivityEnumValues(attribute.name);
+  const isEnum = isHttpActivityEnumField(attribute.name) && enumValues.length > 0;
+  const isArray = isHttpActivityArrayField(attribute.name);
+  const isObjectRoot = isHttpActivityShowAllObjectRoot(attribute.name);
+  const hasNestedPaths = childPaths.length > 0;
+  const expandable = isEnum || isArray || isObjectRoot || hasNestedPaths;
+
+  if (isEnum) {
+    return (
+      <MapSchemaExpandableEnumFieldRow
+        fieldPath={attribute.name}
+        label={displayLabel}
+        indent={0}
+        showTreeBranch={false}
+      />
+    );
+  }
+
+  return (
+    <>
+      <MapSchemaFieldRowShell
+        fieldPath={attribute.name}
+        label={displayLabel}
+        contentIndent={0}
+        draggable
+        onDragStart={(event) => {
+          event.dataTransfer.setData(MAP_SCHEMA_DRAG_MIME, attribute.name);
+          event.dataTransfer.setData("text/plain", attribute.name);
+          event.dataTransfer.effectAllowed = "copy";
+        }}
+      >
+        <MapSchemaAttributeRowContent
+          showMove
+          showTreeBranch={false}
+          label={displayLabel}
+          typeSuffix={<MapSchemaShowAllTypeSuffix attribute={attribute} />}
+          expand={
+            expandable
+              ? {
+                  expanded,
+                  onToggle: () => setExpanded((value) => !value),
+                  label: displayLabel,
+                }
+              : undefined
+          }
+        />
+      </MapSchemaFieldRowShell>
+      {expanded && hasNestedPaths ? (
+        <MapSchemaShowAllNestedPaths rootName={attribute.name} paths={childPaths} />
+      ) : null}
+    </>
+  );
+}
+
+function MapSchemaShowAllNestedPaths({
+  rootName,
+  paths,
+}: {
+  rootName: string;
+  paths: readonly string[];
+}) {
+  const tree = useMemo(() => sortOcsfPathTree(buildOcsfPathTree(paths)), [paths]);
+  const root = tree.find((node) => node.segment === rootName);
+  const children = root?.children ?? [];
+  const allExpandableKeys = useMemo(
+    () => collectExpandableOcsfPathKeys(children, rootName),
+    [children, rootName],
+  );
+  const [expandedPaths, setExpandedPaths] = useState<ReadonlySet<string>>(() => new Set());
+
+  useEffect(() => {
+    setExpandedPaths(new Set());
+  }, [allExpandableKeys]);
+
+  const toggleExpanded = useCallback((pathKey: string) => {
+    setExpandedPaths((current) => {
+      const next = new Set(current);
+      if (next.has(pathKey)) next.delete(pathKey);
+      else next.add(pathKey);
+      return next;
+    });
+  }, []);
+
+  if (children.length === 0) return null;
+
+  return (
+    <>
+      {children.map((node) => (
+        <MapSchemaExpandablePathTreeBranch
+          key={node.segment}
+          node={node}
+          pathPrefix={[rootName]}
+          pathKey={`${rootName}.${node.segment}`}
+          depth={1}
+          expandedPaths={expandedPaths}
+          onToggleExpand={toggleExpanded}
+        />
+      ))}
+    </>
+  );
+}
+
+function MapSchemaAdvancedShowAllList({
+  searchQuery,
+}: {
+  searchQuery: string;
+}) {
+  const [advancedOptionsOpen, setAdvancedOptionsOpen] = useState(false);
+  const attributes = useMemo(() => getHttpActivityShowAllAttributes(), []);
+  const fullSchemaPaths = useMemo(() => getHttpActivityFullSchemaPaths(), []);
+
+  const childPathsByRoot = useMemo(() => {
+    const map = new Map<string, string[]>();
+    for (const path of fullSchemaPaths) {
+      const root = path.split(".")[0] ?? path;
+      if (path === root) continue;
+      const existing = map.get(root) ?? [];
+      existing.push(path);
+      map.set(root, existing);
+    }
+    return map;
+  }, [fullSchemaPaths]);
+
+  const filteredAttributes = useMemo(() => {
+    const query = searchQuery.trim().toLowerCase();
+    if (!query) return attributes;
+    return attributes.filter((attribute) => {
+      const label = (attribute.label ?? attribute.name).toLowerCase();
+      return label.includes(query) || attribute.name.toLowerCase().includes(query);
+    });
+  }, [attributes, searchQuery]);
+
+  return (
+    <div className="flex flex-col gap-px">
+      <div className="flex h-7 w-full min-h-7 items-center gap-2 py-1">
+        <button
+          type="button"
+          onClick={() => setAdvancedOptionsOpen((value) => !value)}
+          aria-expanded={advancedOptionsOpen}
+          className="flex min-w-0 items-center gap-2 rounded py-0.5 pr-1 text-left text-text-tertiary hover:bg-overlay-subtle hover:text-text-secondary focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-interactive-active"
+        >
+          <MapSchemaSectionCaret open={advancedOptionsOpen} />
+          <span className="text-xs font-semibold leading-4 tracking-[0.4px]">Advanced Options</span>
+        </button>
+      </div>
+      {filteredAttributes.map((attribute) => (
+        <MapSchemaAdvancedShowAllAttributeRow
+          key={attribute.name}
+          attribute={attribute}
+          childPaths={childPathsByRoot.get(attribute.name) ?? []}
+        />
+      ))}
+    </div>
+  );
+}
+
+function MapSchemaAttributesShowAllControl() {
+  return (
+    <div className="flex min-w-0 flex-wrap items-center gap-1">
+      <button
+        type="button"
+        className="flex min-w-0 items-center gap-1 rounded py-0.5 text-left text-sm font-semibold leading-[18px] hover:bg-overlay-subtle focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-interactive-active"
+        aria-haspopup="listbox"
+        aria-label="Attributes filter: Show All"
+      >
+        <span className="text-text-primary">Attributes:</span>
+        <span className="text-interactive-active">Show All</span>
+        <Icon name="chevron-down" size={12} className="ml-0.5 shrink-0 text-interactive-active" aria-hidden />
+      </button>
+      <Tooltip delayDuration={200}>
+        <TooltipTrigger asChild>
+          <button
+            type="button"
+            className="shrink-0 rounded p-0.5 text-text-tertiary hover:bg-overlay-subtle hover:text-text-secondary focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-interactive-active data-[state=delayed-open]:bg-overlay-subtle data-[state=delayed-open]:text-text-primary data-[state=instant-open]:bg-overlay-subtle data-[state=instant-open]:text-text-primary"
+            aria-label="About attributes filter"
+          >
+            <Info size={16} strokeWidth={1.5} aria-hidden />
+          </button>
+        </TooltipTrigger>
+        <TooltipContent
+          side="bottom"
+          align="start"
+          sideOffset={8}
+          showArrow={false}
+          className="max-w-[280px] rounded border border-border-container bg-surface-modal px-3 py-2 text-base-small text-text-primary shadow-none"
+        >
+          Show every top-level OCSF attribute for this event class. Expand objects, arrays, and enums to map nested
+          fields.
+        </TooltipContent>
+      </Tooltip>
     </div>
   );
 }
@@ -890,7 +1115,7 @@ function TargetMappingDropZone({
         if (fieldPath) onMapField(source, fieldPath);
       }}
       className={cx(
-        "flex min-h-7 w-full min-w-0 items-center gap-1 rounded border border-border-rule bg-surface-modal px-3 py-1 transition-shadow",
+        "flex h-full min-h-7 w-full min-w-0 items-center gap-1 rounded border border-border-rule bg-surface-modal px-3 py-1 transition-shadow",
         isDragOver && "ring-2 ring-inset ring-interactive-active",
       )}
     >
@@ -1055,6 +1280,17 @@ function MapSchemaModeDropdown({
   );
 }
 
+function MapSchemaSectionCaret({ open }: { open: boolean }) {
+  return (
+    <Icon
+      name="navi-arrow-drop-down"
+      size={23}
+      className={cx("shrink-0 transition-transform duration-150", !open && "-rotate-90")}
+      aria-hidden
+    />
+  );
+}
+
 function MapSchemaOverviewCard({
   eventClassId,
   mode,
@@ -1068,6 +1304,7 @@ function MapSchemaOverviewCard({
   const [entitiesOpen, setEntitiesOpen] = useState(true);
   const [recommendedOpen, setRecommendedOpen] = useState(true);
   const [expandedEntityIds, setExpandedEntityIds] = useState<ReadonlySet<string>>(() => new Set());
+  const [attributeSearchQuery, setAttributeSearchQuery] = useState("");
 
   const selectedEventClass = searchEventById(eventClassId);
 
@@ -1077,18 +1314,18 @@ function MapSchemaOverviewCard({
     [eventClassId],
   );
 
-  const fullSchemaPaths = useMemo(
-    () => (eventClassId === "http_activity" ? getHttpActivityFullSchemaPaths() : []),
-    [eventClassId],
-  );
-
   const isAdvanced = mode === "advanced";
   const supportsSchema = eventClassId === "http_activity";
 
   useEffect(() => {
     setExpandedEntityIds(new Set());
     setTreeView(false);
+    setAttributeSearchQuery("");
   }, [eventClassId]);
+
+  useEffect(() => {
+    if (!isAdvanced) setAttributeSearchQuery("");
+  }, [isAdvanced]);
 
   const toggleEntity = useCallback((entityId: string) => {
     setExpandedEntityIds((current) => {
@@ -1097,6 +1334,14 @@ function MapSchemaOverviewCard({
       else next.add(entityId);
       return next;
     });
+  }, []);
+
+  const handleEntitiesOpenChange = useCallback((open: boolean) => {
+    setEntitiesOpen(open);
+    if (!open) {
+      setTreeView(false);
+      setExpandedEntityIds(new Set());
+    }
   }, []);
 
   const handleTreeViewChange = useCallback(
@@ -1128,24 +1373,17 @@ function MapSchemaOverviewCard({
           {isAdvanced ? (
             <>
               <div className="mt-3 border-t border-border-rule pt-3">
-                <button
-                  type="button"
-                  className="flex w-full items-center gap-1 rounded py-0.5 text-left text-sm font-semibold leading-[18px] hover:bg-overlay-subtle focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-interactive-active"
-                  aria-haspopup="listbox"
-                  aria-label="Attributes filter"
-                >
-                  <span className="text-text-primary">Attributes:</span>
-                  <span className="text-interactive-active">Show All</span>
-                  <Icon name="chevron-down" size={12} className="ml-0.5 shrink-0 text-interactive-active" aria-hidden />
-                </button>
+                <MapSchemaAttributesShowAllControl />
               </div>
               <div className="mt-3">
                 <div className="w-[240px] shrink-0">
                   <Input
                     variant="search"
-                    readOnly
-                    tabIndex={-1}
                     placeholder="Search attributes"
+                    value={attributeSearchQuery}
+                    onChange={(event) => setAttributeSearchQuery(event.target.value)}
+                    onClear={() => setAttributeSearchQuery("")}
+                    aria-label="Search attributes"
                     className="border-border-rule px-1.5"
                   />
                 </div>
@@ -1180,10 +1418,7 @@ function MapSchemaOverviewCard({
                     Full OCSF schema is available for HTTP Activity.
                   </p>
                 ) : (
-                  <>
-                    <MapSchemaRequiredTimeRow />
-                    <MapSchemaExpandablePathTree paths={fullSchemaPaths} />
-                  </>
+                  <MapSchemaAdvancedShowAllList searchQuery={attributeSearchQuery} />
                 )}
               </>
             ) : (
@@ -1191,16 +1426,11 @@ function MapSchemaOverviewCard({
                 <div className="flex h-7 w-full min-h-7 flex-wrap items-center gap-2 py-1">
                   <button
                     type="button"
-                    onClick={() => setEntitiesOpen((v) => !v)}
+                    onClick={() => handleEntitiesOpenChange(!entitiesOpen)}
                     aria-expanded={entitiesOpen}
                     className="flex min-w-0 shrink-0 items-center gap-2 rounded py-0.5 pr-1 text-left text-text-primary hover:bg-overlay-subtle focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-interactive-active"
                   >
-                    <Icon
-                      name="chevron-down"
-                      size={12}
-                      className={cx("shrink-0 transition-transform duration-150", !entitiesOpen && "-rotate-90")}
-                      aria-hidden
-                    />
+                    <MapSchemaSectionCaret open={entitiesOpen} />
                     <span className="text-xs font-semibold uppercase leading-4 tracking-[0.4px]">Entities</span>
                   </button>
                   <span className="ml-auto flex min-w-0 flex-1 items-center justify-end gap-2 pl-2">
@@ -1232,12 +1462,7 @@ function MapSchemaOverviewCard({
                     aria-expanded={recommendedOpen}
                     className="flex min-w-0 items-center gap-2 rounded py-0.5 pr-1 text-left text-text-primary hover:bg-overlay-subtle focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-interactive-active"
                   >
-                    <Icon
-                      name="chevron-down"
-                      size={12}
-                      className={cx("shrink-0 transition-transform duration-150", !recommendedOpen && "-rotate-90")}
-                      aria-hidden
-                    />
+                    <MapSchemaSectionCaret open={recommendedOpen} />
                     <span className="text-xs font-semibold uppercase leading-4 tracking-[0.4px]">Recommended</span>
                   </button>
                 </div>
@@ -1405,18 +1630,33 @@ function MappingToolbarV2({
 }) {
   const [allowAutosave, setAllowAutosave] = useState(true);
   return (
+    <TooltipProvider delayDuration={200}>
     <div className="bg-surface-modal">
       <p className="text-base-semibold text-text-primary">Event Class to Map</p>
       <div className="mt-2 flex min-h-[32px] flex-wrap items-center justify-between gap-x-3 gap-y-2">
         <div className="flex min-w-0 flex-wrap items-center gap-x-3 gap-y-2">
           <SearchEventClassPicker value={selectedEventClassId} onChange={onEventClassChange} />
-          <button
-            type="button"
-            className="shrink-0 rounded p-0.5 text-text-tertiary hover:bg-overlay-subtle hover:text-text-secondary"
-            aria-label="About event class"
-          >
-            <Info size={16} strokeWidth={1.5} aria-hidden />
-          </button>
+          <Tooltip delayDuration={200}>
+            <TooltipTrigger asChild>
+              <button
+                type="button"
+                className="shrink-0 rounded p-0.5 text-text-tertiary hover:bg-overlay-subtle hover:text-text-secondary focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-interactive-active data-[state=delayed-open]:bg-overlay-subtle data-[state=delayed-open]:text-text-primary data-[state=instant-open]:bg-overlay-subtle data-[state=instant-open]:text-text-primary"
+                aria-label="About event class"
+              >
+                <Info size={16} strokeWidth={1.5} aria-hidden />
+              </button>
+            </TooltipTrigger>
+            <TooltipContent
+              side="bottom"
+              align="start"
+              sideOffset={8}
+              showArrow={false}
+              className="max-w-[280px] rounded border border-border-container bg-surface-modal px-3 py-2 text-base-small text-text-primary shadow-none"
+            >
+              This class captures granular details of HTTP communications, enabling cross-source analysis for
+              threat detection and network observability.
+            </TooltipContent>
+          </Tooltip>
           <AiAssistedMappingControl
             settings={aiAssistedMappingSettings}
             onSuggest={onAiAssistedMappingSuggest}
@@ -1445,6 +1685,7 @@ function MappingToolbarV2({
         </div>
       </div>
     </div>
+    </TooltipProvider>
   );
 }
 
@@ -1459,6 +1700,7 @@ function FieldMappingBar({
   onClearHiddenFields,
   sourceSearchQuery,
   onSourceSearchQueryChange,
+  isAiMapping,
   table,
 }: {
   rows: MappingRow[];
@@ -1471,11 +1713,19 @@ function FieldMappingBar({
   onClearHiddenFields: () => void;
   sourceSearchQuery: string;
   onSourceSearchQueryChange: (query: string) => void;
+  isAiMapping: boolean;
   table: ReactNode;
 }) {
   const mapped = rows.filter(isMappedRow).length;
   return (
-    <div className="flex min-h-0 min-w-0 flex-1 flex-col bg-surface-modal px-0 py-4">
+    <TooltipProvider delayDuration={200}>
+    <div
+      className={cx(
+        "flex min-h-0 min-w-0 flex-1 flex-col overflow-hidden bg-surface-modal px-0 py-4 transition-opacity duration-200",
+        isAiMapping && "pointer-events-none opacity-60",
+      )}
+      aria-busy={isAiMapping || undefined}
+    >
       <div className="shrink-0">
         <p className="mb-3 text-sm font-semibold text-text-secondary">
           Mapped Fields: <span className="text-text-primary">{mapped}</span>
@@ -1496,7 +1746,28 @@ function FieldMappingBar({
               <span className="text-text-primary">Target: </span>
               <span className="text-text-secondary">Query Data Model</span>
             </p>
-            <Info size={16} strokeWidth={1.5} className="shrink-0 text-text-tertiary" aria-label="About query data model" />
+            <Tooltip delayDuration={200}>
+              <TooltipTrigger asChild>
+                <button
+                  type="button"
+                  className="shrink-0 rounded p-0.5 text-text-tertiary hover:bg-overlay-subtle hover:text-text-secondary focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-interactive-active data-[state=delayed-open]:bg-overlay-subtle data-[state=delayed-open]:text-text-primary data-[state=instant-open]:bg-overlay-subtle data-[state=instant-open]:text-text-primary"
+                  aria-label="About query data model"
+                >
+                  <Info size={16} strokeWidth={1.5} aria-hidden />
+                </button>
+              </TooltipTrigger>
+              <TooltipContent
+                side="bottom"
+                align="start"
+                sideOffset={8}
+                showArrow={false}
+                className="max-w-[320px] rounded border border-border-container bg-surface-modal px-3 py-2 text-base-small text-text-primary shadow-none"
+              >
+                Query’s Data Model (QDM) is based on the Open Cybersecurity Schema Framework (OCSF). QDM aims to
+                standardize cybersecurity data representation across diverse tools and platforms, facilitating more
+                effective threat hunting and incident response processes.
+              </TooltipContent>
+            </Tooltip>
           </div>
 
           <div className="flex min-w-0 items-center gap-3 md:min-w-0">
@@ -1543,6 +1814,7 @@ function FieldMappingBar({
       </div>
       <div className="min-h-0 w-full min-w-0 flex-1 overflow-y-auto px-0 pb-28 pt-2">{table}</div>
     </div>
+    </TooltipProvider>
   );
 }
 
@@ -1732,12 +2004,12 @@ export function AmazonAthenaMapReviewStep({
       {
         id: "source",
         header: "Source",
-        className: "min-w-0 py-2 pl-0 pr-2 align-middle",
+        className: "min-w-0 py-0 pl-0 pr-2",
         cell: (r) => {
           const fieldHidden = hiddenFields.has(r.source);
 
           return (
-            <div className="flex min-h-7 w-full min-w-0 items-center gap-2 rounded border border-border-rule bg-surface-modal px-3 py-1">
+            <div className="flex h-full min-h-7 w-full min-w-0 items-center gap-2 rounded border border-border-rule bg-surface-modal px-3 py-1">
               <p className="min-w-0 flex-1 truncate text-xs font-semibold tracking-[0.4px]">
                 <span className="text-text-primary">{r.source}</span>
                 <span className="whitespace-pre"> </span>
@@ -1750,9 +2022,9 @@ export function AmazonAthenaMapReviewStep({
                 onClick={() => toggleFieldVisibility(r.source)}
               >
                 {fieldHidden ? (
-                  <EyeOff size={20} strokeWidth={1.5} aria-hidden />
+                  <EyeOff size={16} strokeWidth={1.5} aria-hidden />
                 ) : (
-                  <Eye size={20} strokeWidth={1.5} aria-hidden />
+                  <Eye size={16} strokeWidth={1.5} aria-hidden />
                 )}
               </button>
             </div>
@@ -1762,13 +2034,13 @@ export function AmazonAthenaMapReviewStep({
       {
         id: "_barGap",
         header: "",
-        className: "p-0 align-middle",
+        className: "p-0",
         cell: () => null,
       },
       {
         id: "target",
         header: "Target",
-        className: "min-w-0 py-2 pl-0 pr-2 align-middle",
+        className: "min-w-0 py-0 pl-0 pr-2",
         cell: (r) => (
           <TargetMappingDropZone
             source={r.source}
@@ -1803,7 +2075,7 @@ export function AmazonAthenaMapReviewStep({
       ) : null}
 
       <div className="flex min-h-0 flex-1 flex-col bg-surface-modal md:flex-row md:items-stretch">
-        <div className="flex min-h-0 min-w-0 flex-1 flex-col overflow-hidden">
+        <div className="flex min-h-0 min-w-0 flex-1 flex-col">
           <div className="shrink-0 border-b border-border-rule px-0 py-4">
             <MappingToolbarV2
               hasMappedFields={hasMappedFields}
@@ -1827,12 +2099,14 @@ export function AmazonAthenaMapReviewStep({
             onClearHiddenFields={clearHiddenFields}
             sourceSearchQuery={sourceSearchQuery}
             onSourceSearchQueryChange={setSourceSearchQuery}
+            isAiMapping={isAiMapping}
             table={
               <DataTable<MappingRow>
                 caption="Map source fields from the security schema to the query data model."
                 colgroup={MAPPING_FIELD_COLGROUP}
                 hideHeader
-                className="w-full min-w-0"
+                autoHeight
+                className="w-full min-w-0 !overflow-visible"
                 rowKey={(r) => r.source}
                 rows={visibleRows}
                 columns={columns}

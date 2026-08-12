@@ -19,6 +19,8 @@ export type DataTableProps<Row> = {
   hideHeader?: boolean;
   /** Optional column sizing (e.g. colgroup for fixed layouts) */
   colgroup?: ReactNode;
+  /** Grow rows to content height; cells stretch to match siblings in the row. */
+  autoHeight?: boolean;
 };
 
 export function DataTable<Row>({
@@ -29,7 +31,13 @@ export function DataTable<Row>({
   caption,
   hideHeader,
   colgroup,
+  autoHeight = false,
 }: DataTableProps<Row>) {
+  const rowClass = autoHeight
+    ? "min-h-[40px] hover:bg-surface-container/40"
+    : "h-[40px] max-h-[40px] hover:bg-surface-container/40";
+  const cellSizeClass = autoHeight ? "h-px min-h-[40px] py-2 align-top" : "h-[40px] max-h-[40px] py-0 align-middle";
+
   return (
     <div className={`min-w-0 w-full overflow-x-auto ${className}`.trim()}>
       <table className="w-full min-w-0 table-fixed border-collapse text-left text-sm">
@@ -52,13 +60,17 @@ export function DataTable<Row>({
         ) : null}
         <tbody>
           {rows.map((row) => (
-            <tr key={rowKey(row)} className="h-[40px] max-h-[40px] hover:bg-surface-container/40">
+            <tr key={rowKey(row)} className={rowClass}>
               {columns.map((c) => (
                 <td
                   key={c.id}
-                  className={`h-[40px] max-h-[40px] py-0 align-middle text-text-primary ${c.className ?? "px-3"}`.trim()}
+                  className={`${cellSizeClass} text-text-primary ${c.className ?? "px-3"}`.trim()}
                 >
-                  {c.cell(row)}
+                  {autoHeight ? (
+                    <div className="flex h-full min-h-7 flex-col justify-center">{c.cell(row)}</div>
+                  ) : (
+                    c.cell(row)
+                  )}
                 </td>
               ))}
             </tr>

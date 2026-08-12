@@ -202,3 +202,104 @@ export function getHttpActivityEnumValues(fieldPath: string): readonly HttpActiv
   const leaf = fieldPath.split(".").at(-1) ?? fieldPath;
   return HTTP_ACTIVITY_ENUM_VALUES[leaf.toLowerCase()] ?? [];
 }
+
+/**
+ * Advanced Mode → Attributes: Show All
+ * Top-level HTTP Activity attributes in Figma Config-Schema-v2 order (corrected OCSF spellings).
+ */
+export type HttpActivityShowAllAttribute = {
+  name: string;
+  /** Display label override (e.g. time*). */
+  label?: string;
+  required?: boolean;
+};
+
+export const HTTP_ACTIVITY_SHOW_ALL_ATTRIBUTES: readonly HttpActivityShowAllAttribute[] = [
+  { name: "time", label: "time*", required: true },
+  { name: "action_id" },
+  { name: "action" },
+  { name: "activity_id" },
+  { name: "activity_name" },
+  { name: "actor" },
+  { name: "api" },
+  { name: "app_name" },
+  { name: "attacks" },
+  { name: "authorizations" },
+  { name: "cloud" },
+  { name: "confidence_id" },
+  { name: "confidence_name" },
+  { name: "confidence_score" },
+  { name: "connection_info" },
+  { name: "count" },
+  { name: "device" },
+  { name: "disposition_id" },
+  { name: "disposition" },
+  { name: "dst_endpoint" },
+  { name: "duration" },
+  { name: "end_time" },
+  { name: "end_time_dt" },
+  { name: "enrichments" },
+  { name: "file" },
+  { name: "firewall_rule" },
+  { name: "http_cookies" },
+  { name: "http_request" },
+  { name: "http_response" },
+  { name: "is_alert" },
+  { name: "ja4_fingerprint_list" },
+  { name: "load_balancer" },
+  { name: "malware" },
+  { name: "message" },
+  { name: "metadata" },
+  { name: "policy" },
+  { name: "proxy_connection_info" },
+  { name: "proxy_endpoint" },
+  { name: "proxy_http_request" },
+  { name: "proxy_tls" },
+  { name: "proxy_traffic" },
+  { name: "raw_data" },
+  { name: "risk_details" },
+  { name: "risk_level_id" },
+  { name: "risk_level" },
+  { name: "risk_score" },
+  { name: "severity_id" },
+  { name: "severity" },
+  { name: "src_endpoint" },
+  { name: "status_id" },
+  { name: "status" },
+  { name: "status_detail" },
+  { name: "trace" },
+  { name: "traffic" },
+] as const;
+
+/** Object-like top-level attributes that expand even without nested demo paths yet. */
+const HTTP_ACTIVITY_SHOW_ALL_OBJECT_ROOTS = new Set([
+  "actor",
+  "api",
+  "cloud",
+  "connection_info",
+  "device",
+  "dst_endpoint",
+  "file",
+  "firewall_rule",
+  "http_request",
+  "http_response",
+  "load_balancer",
+  "metadata",
+  "policy",
+  "proxy_connection_info",
+  "proxy_endpoint",
+  "proxy_http_request",
+  "proxy_tls",
+  "proxy_traffic",
+  "src_endpoint",
+  "trace",
+  "traffic",
+]);
+
+export function getHttpActivityShowAllAttributes(): readonly HttpActivityShowAllAttribute[] {
+  return HTTP_ACTIVITY_SHOW_ALL_ATTRIBUTES;
+}
+
+export function isHttpActivityShowAllObjectRoot(fieldPath: string): boolean {
+  return HTTP_ACTIVITY_SHOW_ALL_OBJECT_ROOTS.has(fieldPath.toLowerCase());
+}
