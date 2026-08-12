@@ -85,7 +85,7 @@ function AttributeValueCell({
       {searchable ? (
         <button
           type="button"
-          className="ml-4 shrink-0 text-text-tertiary transition-colors hover:text-interactive-active focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-interactive-active"
+          className="ml-4 shrink-0 text-text-tertiary transition-colors hover:text-interactive-active"
           aria-label={`Search for ${field.value}`}
           title="Search"
           onClick={() => onSearchValue(field)}
@@ -161,7 +161,7 @@ function AttributeGroupSection({
         <td colSpan={2} className="py-1 pr-2" style={depthStyle(group.depth)}>
           <button
             type="button"
-            className="flex w-full items-center gap-2 rounded-sm px-1 text-left text-sm font-semibold text-text-primary hover:text-interactive-active focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-interactive-active"
+            className="flex w-full items-center gap-2 rounded-sm px-1 text-left text-sm font-semibold text-text-primary hover:text-interactive-active"
             onClick={() => setOpen((value) => !value)}
             aria-expanded={open}
           >
@@ -372,7 +372,7 @@ export function ResultsDetailPanel({
           <Separator orientation="vertical" className="mb-3 h-5 bg-border-container" />
           <button
             type="button"
-            className="mb-0 inline-flex items-center gap-1.5 pb-3 text-sm font-semibold text-text-tertiary transition-colors hover:text-text-secondary focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-interactive-active"
+            className="mb-0 inline-flex items-center gap-1.5 pb-3 text-sm font-semibold text-text-tertiary transition-colors hover:text-text-secondary"
             aria-label={copilotOpen ? "Close AI Copilot and Agents" : "Investigate with AI Copilot and Agents"}
             aria-expanded={copilotOpen}
             onClick={() => setCopilotOpen((open) => !open)}
@@ -428,7 +428,7 @@ export function ResultsDetailPanel({
                 <CollapsibleTrigger asChild>
                   <button
                     type="button"
-                    className="flex w-full items-center justify-between gap-3 px-3 py-2.5 text-left text-sm font-semibold text-text-primary hover:bg-surface-container-low focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-interactive-active"
+                    className="flex w-full items-center justify-between gap-3 px-3 py-2.5 text-left text-sm font-semibold text-text-primary hover:bg-surface-container-low"
                   >
                     <span className="inline-flex items-center gap-2">
                       <Icon name="navi-chevron-right" size={16} className="size-4 [&_svg]:!size-4" aria-hidden />

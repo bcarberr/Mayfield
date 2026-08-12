@@ -35,7 +35,7 @@ function AgentPickerCard({
     <button
       type="button"
       className={cx(
-        "w-full rounded border px-3 py-2.5 text-left transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-interactive-active",
+        "w-full rounded border px-3 py-2.5 text-left transition-colors",
         active
           ? "border-interactive-secondary-pressed bg-interactive-selected/50"
           : "border-border-container bg-surface-page hover:border-interactive-secondary-pressed hover:bg-overlay-subtle",
@@ -107,7 +107,7 @@ function AgentIntroContent({
           <button
             key={prompt}
             type="button"
-            className="w-full rounded border border-border-container bg-surface-container px-3 py-2.5 text-left text-sm leading-relaxed text-text-secondary transition-colors hover:border-interactive-secondary-pressed hover:bg-overlay-subtle hover:text-text-primary focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-interactive-active"
+            className="w-full rounded border border-border-container bg-surface-container px-3 py-2.5 text-left text-sm leading-relaxed text-text-secondary transition-colors hover:border-interactive-secondary-pressed hover:bg-overlay-subtle hover:text-text-primary"
             onClick={() => onPromptSelect(prompt)}
           >
             {prompt}

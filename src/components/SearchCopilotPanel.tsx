@@ -236,7 +236,7 @@ function AssistantModeSwitch({
             role="tab"
             aria-selected={selected}
             className={cx(
-              "flex-1 rounded px-3 py-1.5 text-sm font-semibold leading-5 transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-interactive-active focus-visible:ring-offset-2 focus-visible:ring-offset-surface-modal",
+              "flex-1 rounded px-3 py-1.5 text-sm font-semibold leading-5 transition-colors",
               selected
                 ? "bg-surface-modal text-text-primary shadow-sm"
                 : "text-text-tertiary hover:text-text-secondary",
@@ -601,7 +601,7 @@ export function SearchCopilotAside({
       {!open ? (
         <button
           type="button"
-          className="flex h-full w-full flex-col items-center px-1 pt-4 text-text-primary transition-colors hover:bg-overlay-subtle focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-interactive-active"
+          className="flex h-full w-full flex-col items-center px-1 pt-4 text-text-primary transition-colors hover:bg-overlay-subtle"
           aria-label="Open search copilot"
           onClick={() => onOpenChange(true)}
         >

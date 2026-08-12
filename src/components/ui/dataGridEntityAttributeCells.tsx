@@ -42,7 +42,7 @@ function DataGridEntityAttributeCellContent({
         <DropdownMenuTrigger asChild>
           <button
             type="button"
-            className="shrink-0 px-0.5 text-sm font-semibold text-text-tertiary transition-colors hover:text-interactive-active focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-interactive-active"
+            className="shrink-0 px-0.5 text-sm font-semibold text-text-tertiary transition-colors hover:text-interactive-active"
             aria-label={`Show all ${values.length} values`}
           >
             …

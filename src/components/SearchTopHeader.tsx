@@ -22,7 +22,7 @@ export type SearchTopHeaderProps = {
   /** Content rendered after the account avatar (e.g. copilot trigger). */
   accountTrailing?: ReactNode;
   className?: string;
-  /** Header + focus ring offset surface — `page` matches Figma Page BG. */
+  /** Header surface — `page` matches Figma Page BG. */
   chromeSurface?: "container" | "page";
 };
 
@@ -40,8 +40,6 @@ export function SearchTopHeader({
 }: SearchTopHeaderProps) {
   const { open: copilotOpen, setOpen: setCopilotOpen } = useCopilot();
   const bg = chromeSurface === "page" ? "bg-surface-page" : "bg-surface-container";
-  const ringOffset =
-    chromeSurface === "page" ? "focus-visible:ring-offset-surface-page" : "focus-visible:ring-offset-surface-container";
 
   const headerActions = (
     <>
@@ -51,7 +49,7 @@ export function SearchTopHeader({
           type="button"
           variant="ghost"
           size="icon"
-          className={cn(HEADER_UTILITY_ICON_BTN_CLASS, ringOffset)}
+          className={HEADER_UTILITY_ICON_BTN_CLASS}
           aria-label="Help"
           disabled
         >
@@ -61,7 +59,7 @@ export function SearchTopHeader({
           type="button"
           variant="ghost"
           size="icon"
-          className={cn(HEADER_UTILITY_ICON_BTN_CLASS, ringOffset)}
+          className={HEADER_UTILITY_ICON_BTN_CLASS}
           aria-label="Notifications"
           disabled
         >
@@ -73,10 +71,7 @@ export function SearchTopHeader({
         type="button"
         variant="outline"
         size="icon-lg"
-        className={cn(
-          "size-9 shrink-0 rounded-full border-border-container !bg-datavis-data-pop-teal-20 text-xs font-bold tracking-[0.4px] !text-text-on-primary hover:brightness-95 hover:!bg-datavis-data-pop-teal-20 hover:!text-text-on-primary",
-          ringOffset,
-        )}
+        className="size-9 shrink-0 rounded-full border-border-container !bg-datavis-data-pop-teal-20 text-xs font-bold tracking-[0.4px] !text-text-on-primary hover:brightness-95 hover:!bg-datavis-data-pop-teal-20 hover:!text-text-on-primary"
         aria-label="Account menu"
       >
         BC
@@ -85,7 +80,7 @@ export function SearchTopHeader({
         type="button"
         variant="ghost"
         size="icon-lg"
-        className={cn("group size-9 shrink-0 rounded-full", ringOffset)}
+        className="group size-9 shrink-0 rounded-full"
         aria-label={copilotOpen ? "Close assistant panel" : "Open AI Copilot & Agents"}
         aria-expanded={copilotOpen}
         onClick={() => setCopilotOpen((open) => !open)}

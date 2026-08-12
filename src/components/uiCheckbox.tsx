@@ -79,7 +79,6 @@ export function Checkbox({
       onClick={toggle}
       className={cx(
         "relative box-border flex size-4 shrink-0 items-center justify-center rounded-sm outline-none transition-colors duration-150 ease-out",
-        "focus-visible:ring-2 focus-visible:ring-interactive-active focus-visible:ring-offset-2 focus-visible:ring-offset-surface-modal",
         interactive ? "cursor-pointer" : "cursor-default",
         disabled &&
           !filled &&

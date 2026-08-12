@@ -343,7 +343,7 @@ function LibraryStatCard({
       aria-label={`Filter by ${label}`}
       onClick={onClick}
       className={cx(
-        "rounded-[4px] border bg-datavis-card-bg px-6 py-5 text-left shadow-datavis-card transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-interactive-active",
+        "rounded-[4px] border bg-datavis-card-bg px-6 py-5 text-left shadow-datavis-card transition-colors",
         selected
           ? "border-interactive-active hover:bg-overlay-subtle"
           : "border-border-container hover:border-border-rule hover:bg-overlay-subtle",
@@ -730,7 +730,7 @@ function LibraryDetectionsTable({
               <Icon name="nav-detections" size={16} className="shrink-0 text-text-tertiary" aria-hidden />
               <TruncatedText
                 as="button"
-                className="text-left font-semibold text-interactive-active hover:underline focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-interactive-active"
+                className="text-left font-semibold text-interactive-active hover:underline"
                 wrapperClassName="min-w-0 flex-1"
                 onClick={() => onOpenDetection(row.id)}
               >

@@ -2,7 +2,7 @@ import { forwardRef, type InputHTMLAttributes, type ReactNode } from "react";
 import { CircleX, Search } from "lucide-react";
 
 const base =
-  "flex w-full min-w-0 items-center gap-1 rounded border border-border-rule bg-surface-modal px-1.5 text-sm text-text-primary outline-none transition-[border-color] focus-within:border-interactive-active";
+  "focus-ring-within flex w-full min-w-0 items-center gap-2 rounded border border-border-rule bg-surface-modal px-2 text-sm text-text-primary transition-[border-color] focus-within:!border-interactive-active";
 
 /** Matches secondary `Button` default height (`min-h-8`). */
 const searchShell = "h-8 min-h-8 py-0";
@@ -26,7 +26,8 @@ export const Input = forwardRef<HTMLInputElement, InputProps>(function Input(
     variant === "search"
       ? "h-full min-h-0 min-w-0 flex-1 bg-transparent py-0 pr-1 text-sm font-semibold outline-none file:border-0 file:bg-transparent"
       : "min-h-6 min-w-0 flex-1 bg-transparent py-1 pr-1 text-sm font-semibold outline-none file:border-0 file:bg-transparent";
-  const effectiveAdornment = startAdornment ?? (variant === "search" ? <Search size={14} strokeWidth={1.5} /> : null);
+  const effectiveAdornment =
+    startAdornment ?? (variant === "search" ? <Search size={16} strokeWidth={1.5} aria-hidden /> : null);
   const showClear = Boolean(onClear && rest.value);
   return (
     <div className={`${base} ${shellClass} ${className}`.trim()}>
@@ -45,7 +46,7 @@ export const Input = forwardRef<HTMLInputElement, InputProps>(function Input(
           onClick={onClear}
           aria-label="Clear"
         >
-          <CircleX size={14} strokeWidth={1.5} />
+          <CircleX size={16} strokeWidth={1.5} aria-hidden />
         </button>
       ) : null}
     </div>

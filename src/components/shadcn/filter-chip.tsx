@@ -123,7 +123,7 @@ function FilterChip({
   showCheckIcon = true,
   isDragging = false,
   isDragOver = false,
-  ringOffsetClassName = "ring-offset-surface-page",
+  ringOffsetClassName = "",
   disabled = false,
   ...props
 }: FilterChipProps) {
@@ -164,7 +164,7 @@ function FilterChip({
         <button
           type="button"
           disabled={disabled}
-          className="ml-0.5 shrink-0 rounded p-0.5 text-text-tertiary hover:bg-overlay-subtle hover:text-text-primary focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-interactive-active"
+          className="ml-0.5 shrink-0 rounded p-0.5 text-text-tertiary hover:bg-overlay-subtle hover:text-text-primary"
           aria-label={`Remove ${label} filter`}
           onClick={(event) => {
             event.stopPropagation()

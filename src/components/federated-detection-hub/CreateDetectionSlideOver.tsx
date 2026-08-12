@@ -1162,7 +1162,7 @@ export function CreateDetectionSlideOver({
     <div className="relative flex min-h-0 flex-1 flex-col bg-surface-modal text-text-primary">
       <header className="flex shrink-0 items-start justify-between gap-3 border-b border-border-rule px-5 py-4">
         <div className="flex min-w-0 flex-wrap items-center gap-3">
-          <SlideOverHeaderBackButton onClose={onClose} className="ring-offset-surface-modal" />
+          <SlideOverHeaderBackButton onClose={onClose} className="" />
           <h2 className="text-page-title text-text-primary">
             {isViewMode
               ? "View Detection"

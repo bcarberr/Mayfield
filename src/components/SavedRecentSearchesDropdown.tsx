@@ -139,7 +139,7 @@ const ALL_RECENT_SEARCHES: RecentSearch[] = [
 const SORTED_RECENT_SEARCHES = [...ALL_RECENT_SEARCHES].sort((a, b) => b.timestamp - a.timestamp);
 
 const ROW_CLASS =
-  "w-full cursor-pointer rounded px-3 py-2.5 text-left transition-colors hover:bg-overlay-subtle focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-interactive-active";
+  "w-full cursor-pointer rounded px-3 py-2.5 text-left transition-colors hover:bg-overlay-subtle";
 
 function SavedSearchRow({ item, onSelect }: { item: SavedSearch; onSelect: (item: SavedSearch) => void }) {
   return (
@@ -258,7 +258,7 @@ export function SavedRecentSearchesDropdown() {
               <div className="shrink-0 border-t border-border-container px-3 py-2">
                 <button
                   type="button"
-                  className="text-sm font-semibold text-interactive-active hover:underline focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-interactive-active"
+                  className="text-sm font-semibold text-interactive-active hover:underline"
                   onClick={() => setExpanded(true)}
                 >
                   View more

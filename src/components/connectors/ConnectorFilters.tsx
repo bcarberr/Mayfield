@@ -166,7 +166,7 @@ export function ConnectorFilters({
   ringOffsetSurface = "page",
 }: ConnectorFiltersProps) {
   const ringOffsetClass =
-    ringOffsetSurface === "modal" ? "ring-offset-surface-modal" : "ring-offset-surface-page";
+    ringOffsetSurface === "modal" ? "" : "";
   const useLiveInstanceCounts = visibleCount == null || totalCount == null;
   const [draggedId, setDraggedId] = useState<ConnectorCategoryId | null>(null);
   const [dragOverId, setDragOverId] = useState<ConnectorCategoryId | null>(null);
@@ -207,7 +207,7 @@ export function ConnectorFilters({
           type="button"
           aria-expanded={expanded}
           className={cx(
-            "-ml-[7px] flex items-center gap-0.5 rounded py-0.5 text-left focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-interactive-active focus-visible:ring-offset-2",
+            "-ml-[7px] flex items-center gap-0.5 rounded py-0.5 text-left",
             ringOffsetClass,
           )}
           onClick={() => onExpandedChange(!expanded)}

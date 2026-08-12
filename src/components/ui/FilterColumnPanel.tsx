@@ -88,7 +88,7 @@ export function FilterColumnPanel({
   const sectionClass =
     "group flex w-full shrink-0 items-center justify-center bg-datavis-card-bg px-1 transition-colors hover:bg-interactive-secondary-hover";
   const iconButtonClass =
-    "p-[3px] text-text-secondary transition-colors group-hover:text-text-primary focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-interactive-active";
+    "p-[3px] text-text-secondary transition-colors group-hover:text-text-primary";
   const railIconClass = "shrink-0 [&>svg]:!w-3";
   const filterIconClass = cx(railIconClass, "[&>svg]:!h-2");
   const columnIconClass = cx(railIconClass, "[&>svg]:!h-[9px]");

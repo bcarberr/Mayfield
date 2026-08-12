@@ -85,7 +85,6 @@ function NavSlot({
     expanded ? "w-full gap-2 px-2" : "size-10 justify-center p-0",
     !active && "text-nav-icon hover:bg-nav-overlay-subtle hover:text-nav-icon-hover",
     active && "text-nav-icon-active hover:text-nav-icon-active",
-    "focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-nav-icon-active",
     to && "no-underline",
     className,
   );
@@ -317,7 +316,6 @@ export function V4NavThinner({
             "relative flex h-10 shrink-0 items-center rounded-sm bg-transparent",
             "text-nav-icon transition-[color,background-color] duration-150 ease-out",
             "hover:bg-nav-overlay-subtle hover:text-nav-icon-hover",
-            "focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-nav-icon-active",
             expanded ? "w-full gap-2 px-2" : "size-10 justify-center p-0",
           )}
         >
@@ -344,7 +342,6 @@ export function V4NavThinner({
           title="Design system"
           className={cx(
             "relative flex h-10 shrink-0 items-center rounded-sm transition-colors duration-150",
-            "focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-nav-icon-active",
             expanded ? "w-full gap-2 px-2" : "size-10 justify-center",
             SHOW_DESIGN_SYSTEM_NAV
               ? "text-nav-icon hover:bg-nav-overlay-subtle hover:text-nav-icon-hover"

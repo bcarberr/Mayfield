@@ -138,7 +138,7 @@ function ReviewStatCard({
       aria-label={`Filter by ${label}`}
       onClick={onClick}
       className={cx(
-        "rounded-[4px] border bg-datavis-card-bg px-6 py-5 text-left shadow-datavis-card transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-interactive-active",
+        "rounded-[4px] border bg-datavis-card-bg px-6 py-5 text-left shadow-datavis-card transition-colors",
         selected
           ? "border-interactive-active hover:bg-overlay-subtle"
           : "border-border-container hover:border-border-rule hover:bg-overlay-subtle",
@@ -634,7 +634,7 @@ function QueuedReviewTable({
       case "name":
         return (
           <td key={columnId} style={colStyle(colIndex)} className={cx(tdClass(columnId), "min-w-0", inactiveCellClass)}>
-            <TruncatedText as="button" className="w-full text-left font-semibold text-interactive-active hover:underline focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-interactive-active" onClick={() => onOpenDetection(row.id)}>
+            <TruncatedText as="button" className="w-full text-left font-semibold text-interactive-active hover:underline" onClick={() => onOpenDetection(row.id)}>
               {row.name}
             </TruncatedText>
           </td>

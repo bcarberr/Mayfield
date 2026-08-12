@@ -15,11 +15,13 @@ const CONNECTOR_ADDED_STORAGE_KEY = "mayfield.connectors.added-instances";
 const CONNECTOR_NAME_OVERRIDES_STORAGE_KEY = "mayfield.connectors.instance-name-overrides";
 const CONNECTOR_SCHEMA_PREVIEW_STORAGE_KEY = "mayfield.connectors.schema-preview-fetched";
 const CONNECTOR_MAPPINGS_STORAGE_KEY = "mayfield.connectors.mappings-complete";
+const CONNECTOR_DELETED_STORAGE_KEY = "mayfield.connectors.deleted-ids";
 
 type EnabledById = Record<string, boolean>;
 type InstanceNameOverrides = Record<string, string>;
 type SchemaPreviewFetchedById = Record<string, boolean>;
 type MappingsCompleteById = Record<string, boolean>;
+type DeletedIds = Set<string>;
 
 export type ConnectorSelectionCounts = {
   selectedCount: number;
@@ -201,6 +203,35 @@ function writeStoredMappingsComplete(next: MappingsCompleteById): void {
   }
 }
 
+function sanitizeDeletedIds(value: unknown): DeletedIds {
+  if (!Array.isArray(value)) return new Set();
+  const deleted = new Set<string>();
+  for (const entry of value) {
+    if (typeof entry === "string" && entry.trim()) deleted.add(entry);
+  }
+  return deleted;
+}
+
+function readStoredDeletedIds(): DeletedIds {
+  if (!canUseSessionStorage()) return new Set();
+  try {
+    const raw = window.sessionStorage.getItem(CONNECTOR_DELETED_STORAGE_KEY);
+    if (!raw) return new Set();
+    return sanitizeDeletedIds(JSON.parse(raw));
+  } catch {
+    return new Set();
+  }
+}
+
+function writeStoredDeletedIds(next: DeletedIds): void {
+  if (!canUseSessionStorage()) return;
+  try {
+    window.sessionStorage.setItem(CONNECTOR_DELETED_STORAGE_KEY, JSON.stringify([...next]));
+  } catch {
+    /* ignore quota / private mode */
+  }
+}
+
 function readStoredEnabledById(instances: readonly ConnectorInstance[]): EnabledById {
   if (!canUseSessionStorage()) return defaultEnabledById(instances);
   try {
@@ -225,12 +256,15 @@ let addedInstances: ConnectorInstance[] = readStoredAddedInstances();
 let instanceNameOverrides: InstanceNameOverrides = readStoredNameOverrides();
 let schemaPreviewFetchedById: SchemaPreviewFetchedById = readStoredSchemaPreviewFetched();
 let mappingsCompleteById: MappingsCompleteById = readStoredMappingsComplete();
+let deletedIds: DeletedIds = readStoredDeletedIds();
 
 function getAllConnectorInstances(): ConnectorInstance[] {
-  return [...CONNECTOR_INSTANCES, ...addedInstances].map((connector) => {
-    const overrideName = instanceNameOverrides[connector.id];
-    return overrideName ? { ...connector, instanceName: overrideName } : connector;
-  });
+  return [...CONNECTOR_INSTANCES, ...addedInstances]
+    .filter((connector) => !deletedIds.has(connector.id))
+    .map((connector) => {
+      const overrideName = instanceNameOverrides[connector.id];
+      return overrideName ? { ...connector, instanceName: overrideName } : connector;
+    });
 }
 
 export function getConnectorInstanceById(connectorId: string): ConnectorInstance | undefined {
@@ -344,14 +378,53 @@ function persistStore(
   nextEnabledById: EnabledById,
   nextAddedInstances: ConnectorInstance[],
   nextNameOverrides: InstanceNameOverrides = instanceNameOverrides,
+  nextDeletedIds: DeletedIds = deletedIds,
 ): void {
   enabledById = nextEnabledById;
   addedInstances = nextAddedInstances;
   instanceNameOverrides = nextNameOverrides;
+  deletedIds = nextDeletedIds;
   writeStoredEnabledById(nextEnabledById);
   writeStoredAddedInstances(nextAddedInstances);
   writeStoredNameOverrides(nextNameOverrides);
+  writeStoredDeletedIds(nextDeletedIds);
   emitChange();
+}
+
+function clearConnectorMetadata(connectorId: string): void {
+  if (schemaPreviewFetchedById[connectorId]) {
+    const next = { ...schemaPreviewFetchedById };
+    delete next[connectorId];
+    schemaPreviewFetchedById = next;
+    writeStoredSchemaPreviewFetched(schemaPreviewFetchedById);
+  }
+  if (mappingsCompleteById[connectorId]) {
+    const next = { ...mappingsCompleteById };
+    delete next[connectorId];
+    mappingsCompleteById = next;
+    writeStoredMappingsComplete(mappingsCompleteById);
+  }
+}
+
+/** Remove a connector instance from the dashboard (persisted for the session). */
+export function deleteConnectorInstance(connectorId: string): void {
+  if (!connectorId || deletedIds.has(connectorId)) return;
+  if (!getAllConnectorInstances().some((connector) => connector.id === connectorId)) return;
+
+  const nextEnabledById = { ...enabledById };
+  delete nextEnabledById[connectorId];
+
+  const nextOverrides = { ...instanceNameOverrides };
+  delete nextOverrides[connectorId];
+
+  const isAddedInstance = addedInstances.some((connector) => connector.id === connectorId);
+  const nextAdded = isAddedInstance
+    ? addedInstances.filter((connector) => connector.id !== connectorId)
+    : addedInstances;
+  const nextDeleted = isAddedInstance ? deletedIds : new Set(deletedIds).add(connectorId);
+
+  clearConnectorMetadata(connectorId);
+  persistStore(nextEnabledById, nextAdded, nextOverrides, nextDeleted);
 }
 
 export function getConnectorSelectionCounts(): ConnectorSelectionCounts {
@@ -397,6 +470,7 @@ export function resetAllConnectorsEnabled(): void {
 export function usePersistedConnectorInstances(): {
   connectors: ConnectorInstance[];
   setConnectorEnabled: (connectorId: string, enabled: boolean) => void;
+  deleteConnector: (connectorId: string) => void;
 } {
   useSyncExternalStore(subscribe, getStoreVersion, getStoreVersion);
   const connectors = computeConnectorsList();
@@ -405,7 +479,11 @@ export function usePersistedConnectorInstances(): {
     persistStore({ ...enabledById, [connectorId]: enabled }, addedInstances);
   }, []);
 
-  return { connectors, setConnectorEnabled };
+  const deleteConnector = useCallback((connectorId: string) => {
+    deleteConnectorInstance(connectorId);
+  }, []);
+
+  return { connectors, setConnectorEnabled, deleteConnector };
 }
 
 function createAddedConnectorInstance(target: ConnectorSetupTarget, enabled: boolean): ConnectorInstance {

@@ -453,7 +453,6 @@ function SourceDestinationPairsPanel({ rows, selectedId = null, onPairClick }: S
                   className={cx(
                     "group flex min-h-6 w-full shrink-0 items-center gap-2 rounded-sm text-left sm:gap-3",
                     "cursor-pointer transition-colors",
-                    "focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-interactive-active focus-visible:ring-offset-2 focus-visible:ring-offset-datavis-card-bg",
                   )}
                   onClick={() => onPairClick!(row.id)}
                 >

@@ -107,7 +107,7 @@ function RolePermissionPanel({
         <AdminExpandTrigger expanded={open} label={title} />
         <span className="min-w-0 flex-1 text-sm font-semibold text-text-primary">{title}</span>
         <Tooltip>
-          <TooltipTrigger className="inline-flex cursor-default items-center focus-visible:outline-none">
+          <TooltipTrigger className="inline-flex cursor-default items-center">
             <Info size={12} className="text-text-tertiary" aria-label={`About ${title} permissions`} />
           </TooltipTrigger>
           <TooltipContent side="top" className="max-w-[240px]">

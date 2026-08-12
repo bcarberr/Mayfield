@@ -303,7 +303,7 @@ type FindingColumnWidgetId = "category" | "severity" | "status";
 
 const FINDING_COLUMN_WIDGET_ORDER = ["category", "severity", "status"] as const;
 
-const ANALYTICS_TAB_CONTENT_CLASS = "mt-0 min-h-0 flex-1 focus-visible:outline-none";
+const ANALYTICS_TAB_CONTENT_CLASS = "mt-0 min-h-0 flex-1";
 
 function RowActionsMenu({ rowId }: { rowId: string }) {
   return (
@@ -1228,7 +1228,7 @@ export function SummaryInsightsDashboard() {
           <Button
             type="button"
             variant="secondary-outline"
-            className="mb-3 h-8 shrink-0 ring-offset-surface-page"
+            className="mb-3 h-8 shrink-0"
             onClick={() => {
               setPendingFsqlSearch({ query: "" });
               void navigate(ROUTES.search);

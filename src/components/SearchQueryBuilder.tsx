@@ -29,7 +29,7 @@ const ICON_GHOST_BUTTON_CLASS =
   "shrink-0 text-text-tertiary hover:bg-overlay-subtle hover:text-text-primary disabled:opacity-40";
 
 const CHIP_INPUT_CLASS =
-  "h-auto min-w-[80px] flex-1 border-0 bg-transparent px-0 py-0 text-sm leading-5 shadow-none focus-visible:ring-0 placeholder:font-normal placeholder:italic placeholder:text-text-tertiary dark:bg-transparent";
+  "h-auto min-w-[80px] flex-1 border-0 bg-transparent px-0 py-0 text-sm leading-5 shadow-none focus-ring-none placeholder:font-normal placeholder:italic placeholder:text-text-tertiary dark:bg-transparent";
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 

@@ -76,7 +76,7 @@ function EntityPickerItem({
   return (
     <button
       type="button"
-      className="flex h-8 w-full min-w-0 items-center gap-2 rounded px-1 text-left transition-colors hover:bg-interactive-secondary-hover focus-visible:bg-interactive-secondary-hover focus-visible:outline-none"
+      className="flex h-8 w-full min-w-0 items-center gap-2 rounded px-1 text-left transition-colors hover:bg-interactive-secondary-hover focus-visible:bg-interactive-secondary-hover"
       onClick={() => onSelect(option)}
     >
       <Icon
@@ -105,7 +105,7 @@ function EventCategoryItem({
     <button
       type="button"
       className={cx(
-        "flex h-10 w-full items-center gap-2 px-4 text-left transition-colors focus-visible:outline-none",
+        "flex h-10 w-full items-center gap-2 px-4 text-left transition-colors",
         selected ? "bg-interactive-secondary-hover" : "hover:bg-interactive-secondary-hover",
       )}
       onClick={onSelect}
@@ -135,7 +135,7 @@ function EventPickerItem({
   return (
     <button
       type="button"
-      className="flex h-8 w-full min-w-0 items-center gap-2 rounded px-1 text-left transition-colors hover:bg-interactive-secondary-hover focus-visible:bg-interactive-secondary-hover focus-visible:outline-none"
+      className="flex h-8 w-full min-w-0 items-center gap-2 rounded px-1 text-left transition-colors hover:bg-interactive-secondary-hover focus-visible:bg-interactive-secondary-hover"
       onClick={() => onSelect(option)}
     >
       <Icon name={option.icon} size={PICKER_ICON_SIZE} className={cx("shrink-0", iconClassName)} aria-hidden />

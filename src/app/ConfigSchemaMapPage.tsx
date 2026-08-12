@@ -1,4 +1,4 @@
-import { lazy, Suspense, useEffect, useMemo, useState } from "react";
+import { lazy, Suspense, useCallback, useEffect, useMemo, useState } from "react";
 import { Loader2 } from "lucide-react";
 import { toast } from "sonner";
 import { Icon, type ConnectorLargeIconName } from "../design-system";
@@ -32,6 +32,16 @@ import {
 import type { SchemaMappingPreviewPayload } from "../components/connectors/AmazonAthenaMapReviewStep";
 import { SHOW_ATHENA_CONNECTOR_STEP_3 } from "./navRailConfig";
 
+const cx = (...c: (string | false | undefined)[]) => c.filter(Boolean).join(" ");
+
+async function copyTextToClipboard(text: string): Promise<boolean> {
+  try {
+    await navigator.clipboard.writeText(text);
+    return true;
+  } catch {
+    return false;
+  }
+}
 const AmazonAthenaMapReviewStep = lazy(() =>
   import("../components/connectors/AmazonAthenaMapReviewStep").then((module) => ({
     default: module.AmazonAthenaMapReviewStep,
@@ -49,9 +59,109 @@ const SETUP_STEP_TABS: ReadonlyArray<{ step: StepIndex; label: string }> = [
 const SETUP_LINE_TAB_TRIGGER_CLASS =
   "h-auto flex-none rounded-none border-0 px-0 pb-3 text-sm font-semibold text-text-tertiary transition-colors hover:text-text-secondary [&::after]:hidden before:absolute before:inset-x-0 before:bottom-0 before:h-[2px] before:bg-transparent before:transition-colors data-active:!bg-transparent data-active:before:bg-interactive-active data-active:text-text-primary data-active:shadow-none";
 
+function isEditingExistingConnector(connectorId: string): boolean {
+  return getConnectorInstanceById(connectorId) != null;
+}
+
 function initialDynamicSetupStep(connectorId: string, maxStep: StepIndex): StepIndex {
-  if (maxStep >= 3 && getConnectorInstanceById(connectorId) != null) return 3;
+  if (maxStep >= 3 && isEditingExistingConnector(connectorId)) return 3;
   return 1;
+}
+
+function StepIndicator({ status }: { status: "complete" | "current" | "upcoming" }) {
+  if (status === "complete") {
+    return (
+      <div
+        className="box-border flex size-6 shrink-0 items-center justify-center rounded-full border-2 border-interactive-active bg-transparent text-interactive-active"
+        aria-hidden
+      >
+        <svg width="12" height="9" viewBox="0 0 14 10" fill="none" aria-hidden className="shrink-0">
+          <path
+            d="M1 5L5 9L13 1"
+            stroke="currentColor"
+            strokeWidth="2"
+            strokeLinecap="round"
+            strokeLinejoin="round"
+          />
+        </svg>
+      </div>
+    );
+  }
+  if (status === "current") {
+    return <div className="size-6 shrink-0 rounded-full bg-interactive-active" aria-hidden />;
+  }
+  return (
+    <div
+      className="box-border size-6 shrink-0 rounded-full border-2 border-border-rule bg-transparent"
+      aria-hidden
+    />
+  );
+}
+
+function stepStatus(step: StepIndex, currentStep: StepIndex): "complete" | "current" | "upcoming" {
+  if (step < currentStep) return "complete";
+  if (step === currentStep) return "current";
+  return "upcoming";
+}
+
+function ProgressStepper({ currentStep }: { currentStep: StepIndex }) {
+  const seg1Teal = currentStep >= 2;
+  const seg2Teal = currentStep >= 3;
+
+  return (
+    <nav
+      className="flex w-full max-w-[632px] shrink-0 flex-col justify-end px-0 py-0"
+      aria-label="Connector setup progress"
+    >
+      <div className="flex w-full flex-col">
+        <div className="flex w-full items-center gap-0">
+          <div
+            className="relative z-[1] flex w-[110px] shrink-0 flex-col items-center"
+            aria-current={currentStep === 1 ? "step" : undefined}
+          >
+            <div className="flex h-6 w-full items-center justify-center">
+              <StepIndicator status={stepStatus(1, currentStep)} />
+            </div>
+          </div>
+          <div className="relative z-0 flex h-6 min-h-6 min-w-0 flex-1 items-center self-center ml-[calc((24px-110px)/2)] mr-[calc((24px-130px)/2)]">
+            <div
+              className={cx("h-0.5 w-full rounded-full", seg1Teal ? "bg-interactive-active" : "bg-border-rule")}
+              aria-hidden
+            />
+          </div>
+          <div
+            className="relative z-[1] flex w-[130px] shrink-0 flex-col items-center"
+            aria-current={currentStep === 2 ? "step" : undefined}
+          >
+            <div className="flex h-6 w-full items-center justify-center">
+              <StepIndicator status={stepStatus(2, currentStep)} />
+            </div>
+          </div>
+          <div className="relative z-0 flex h-6 min-h-6 min-w-0 flex-1 items-center self-center mx-[calc((24px-130px)/2)]">
+            <div
+              className={cx("h-0.5 w-full rounded-full", seg2Teal ? "bg-interactive-active" : "bg-border-rule")}
+              aria-hidden
+            />
+          </div>
+          <div
+            className="relative z-[1] flex w-[130px] shrink-0 flex-col items-center"
+            aria-current={currentStep === 3 ? "step" : undefined}
+          >
+            <div className="flex h-6 w-full items-center justify-center">
+              <StepIndicator status={stepStatus(3, currentStep)} />
+            </div>
+          </div>
+        </div>
+        <div className="mt-1 flex w-full items-start">
+          <p className="w-[110px] shrink-0 text-center text-sm leading-[18px] text-text-primary">1. Connector Info</p>
+          <div className="min-w-0 flex-1" aria-hidden />
+          <p className="w-[130px] shrink-0 text-center text-sm leading-[18px] text-text-primary">2. Preview/Import Fields</p>
+          <div className="min-w-0 flex-1" aria-hidden />
+          <p className="w-[130px] shrink-0 text-center text-sm leading-[18px] text-text-primary">3. Map & Review Data</p>
+        </div>
+      </div>
+    </nav>
+  );
 }
 
 function SetupStepTabs({
@@ -344,7 +454,7 @@ function PreviewImportFieldsStep({
           <p className="text-sm font-semibold text-text-secondary">
             Data Table: <span className="text-text-primary">{dataTableName}</span>
           </p>
-          <Button variant="secondary-outline" className="h-8 shrink-0 ring-offset-surface-modal" onClick={refetchSample}>
+          <Button variant="secondary-outline" className="h-8 shrink-0" onClick={refetchSample}>
             Re-fetch schema
           </Button>
         </div>
@@ -372,10 +482,16 @@ function MappingPreviewJsonPanel({
 }) {
   const json = useMemo(() => JSON.stringify(preview, null, 2), [preview]);
 
+  const handleCopy = useCallback(async () => {
+    const ok = await copyTextToClipboard(json);
+    if (ok) toast.success("JSON copied to clipboard");
+    else toast.error("Couldn't copy JSON");
+  }, [json]);
+
   return (
     <div className="flex h-full min-h-0 flex-col bg-surface-modal text-text-primary">
       <header className="flex shrink-0 items-center gap-2 border-b border-border-rule px-4 py-4">
-        <SlideOverHeaderBackButton onClose={onClose} className="ring-offset-surface-modal" />
+        <SlideOverHeaderBackButton onClose={onClose} className="" />
         <div className="min-w-0 flex-1">
           <h2 className="truncate text-page-title text-text-primary">Preview JSON</h2>
           <p className="mt-0.5 truncate text-sm text-text-secondary">
@@ -385,6 +501,14 @@ function MappingPreviewJsonPanel({
               : " · No fields mapped yet"}
           </p>
         </div>
+        <button
+          type="button"
+          className="shrink-0 rounded p-1.5 text-text-tertiary hover:bg-overlay-subtle hover:text-text-primary"
+          aria-label="Copy JSON"
+          onClick={handleCopy}
+        >
+          <Icon name="action-content-copy" size={18} className="text-current" />
+        </button>
       </header>
       <div className="min-h-0 flex-1 overflow-auto p-4">
         <JsonSyntaxHighlight
@@ -516,6 +640,7 @@ function ConnectorSetupHeaderIcon({ icon, title }: { icon: ConnectorLargeIconNam
 export function ConnectorSetupPanel({ onClose, onSave, connector }: ConnectorSetupPanelProps) {
   const isDynamicSchema = isDynamicSchemaCategory(connector.categoryId);
   const maxStep: StepIndex = SHOW_ATHENA_CONNECTOR_STEP_3 ? 3 : 2;
+  const isEditingExisting = isEditingExistingConnector(connector.id);
   const initialEnabled = getConnectorInstanceById(connector.id)?.enabled ?? true;
   const [currentStep, setCurrentStep] = useState<StepIndex>(() =>
     isDynamicSchema ? initialDynamicSetupStep(connector.id, maxStep) : 1,
@@ -720,7 +845,12 @@ export function ConnectorSetupPanel({ onClose, onSave, connector }: ConnectorSet
     <div className="relative flex h-full min-h-0 flex-col bg-surface-modal px-5 text-text-primary">
       <header className="relative shrink-0 bg-surface-modal">
         <div className="border-b border-border-rule px-0 pt-5 pb-4">
-          <div className="flex min-w-0 flex-wrap items-center gap-3 pr-52 sm:pr-72">
+          <div
+            className={cx(
+              "flex min-w-0 flex-wrap items-center gap-3",
+              isDynamicSchema && !isEditingExisting ? "pr-52 sm:pr-72" : "pr-12",
+            )}
+          >
             <Button
               variant="ghost"
               className="shrink-0 p-1"
@@ -743,7 +873,7 @@ export function ConnectorSetupPanel({ onClose, onSave, connector }: ConnectorSet
         </div>
 
         <div className="absolute right-0 top-5 z-10 flex items-center gap-2">
-          {isDynamicSchema ? (
+          {isDynamicSchema && !isEditingExisting ? (
             <div className="mr-2 flex items-center gap-1 text-base leading-6 tracking-[0.5px] text-text-primary">
               <Button
                 variant="ghost"
@@ -780,13 +910,22 @@ export function ConnectorSetupPanel({ onClose, onSave, connector }: ConnectorSet
         </div>
 
         {isDynamicSchema ? (
-          <div className="flex flex-wrap items-end justify-between gap-6 border-b border-border-rule px-0 pt-4">
-            <SetupStepTabs
-              currentStep={currentStep}
-              maxStep={maxStep}
-              schemaPreviewLoaded={schemaPreviewLoaded}
-              onStepChange={requestStepChange}
-            />
+          <div
+            className={cx(
+              "flex flex-wrap items-end justify-between gap-6 border-b border-border-rule px-0",
+              isEditingExisting ? "pt-4" : "py-4",
+            )}
+          >
+            {isEditingExisting ? (
+              <SetupStepTabs
+                currentStep={currentStep}
+                maxStep={maxStep}
+                schemaPreviewLoaded={schemaPreviewLoaded}
+                onStepChange={requestStepChange}
+              />
+            ) : (
+              <ProgressStepper currentStep={currentStep} />
+            )}
             <ConnectionTitleLink connectorName={connector.platformName} />
           </div>
         ) : null}

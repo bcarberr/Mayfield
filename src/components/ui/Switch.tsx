@@ -40,7 +40,7 @@ export function Switch({ checked, disabled, label, labelClassName, onCheckedChan
           checked &&
           cx(
             "bg-interactive-active",
-            "enabled:group-hover:bg-[var(--color-primary-hover)] enabled:group-active:bg-[var(--color-primary-pressed)]",
+            "group-hover:bg-[var(--color-primary-hover)] group-active:bg-[var(--color-primary-pressed)]",
           ),
         !disabled &&
           !checked &&
@@ -72,13 +72,14 @@ export function Switch({ checked, disabled, label, labelClassName, onCheckedChan
       disabled={disabled}
       onClick={toggle}
       className={cx(
-        "group relative box-border h-[18px] w-9 shrink-0 overflow-hidden rounded-[9px] p-0 outline-none",
-        "focus-visible:ring-1 focus-visible:ring-interactive-active",
+        "focus-ring-none group relative box-border h-[18px] w-9 shrink-0 rounded-[9px] border-0 p-0",
         interactive ? "cursor-pointer" : "cursor-default",
       )}
     >
-      {track}
-      {thumb}
+      <span className="pointer-events-none absolute inset-0 overflow-hidden rounded-[9px]">
+        {track}
+        {thumb}
+      </span>
     </button>
   );
 

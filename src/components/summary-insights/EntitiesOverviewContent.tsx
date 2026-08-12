@@ -840,7 +840,7 @@ function EntitiesAggregatedTable({
           <td key={columnId} style={colStyle(colIndex)} className={cx(cellClass, "min-w-0")}>
             <TruncatedText
               as="button"
-              className="w-full text-left text-sm font-semibold text-interactive-active hover:underline focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-interactive-active"
+              className="w-full text-left text-sm font-semibold text-interactive-active hover:underline"
             >
               {row.entity}
             </TruncatedText>

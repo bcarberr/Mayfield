@@ -327,7 +327,7 @@ export function ChartZoomHint({
     <p className="mb-2 flex items-center pl-9 text-base-small text-text-tertiary">
       <span>{unit} · drag to zoom</span>
       <Tooltip>
-        <TooltipTrigger className="ml-1 inline-flex cursor-default items-center focus-visible:outline-none">
+        <TooltipTrigger className="ml-1 inline-flex cursor-default items-center">
           <Info size={12} className="text-text-tertiary" aria-label="About zoom" />
         </TooltipTrigger>
         <TooltipContent side="top" className="max-w-[260px]">

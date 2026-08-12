@@ -130,7 +130,6 @@ export function HorizontalBarPanel({
                     "group flex w-full shrink-0 items-center gap-2 rounded-sm text-left sm:gap-3",
                     dense ? "min-h-5" : "min-h-6",
                     "cursor-pointer transition-colors",
-                    "focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-interactive-active focus-visible:ring-offset-2 focus-visible:ring-offset-datavis-card-bg",
                   )}
                   onClick={() => onBarClick!(row.label)}
                 >
