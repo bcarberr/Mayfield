@@ -1,4 +1,6 @@
 import { lazy, Suspense, useEffect, useMemo, useState } from "react";
+import { Loader2 } from "lucide-react";
+import { toast } from "sonner";
 import { Icon, type ConnectorLargeIconName } from "../design-system";
 import { ConnectorSampleDataGrid, ConnectorSampleDataJson } from "../components/connectors/ConnectorSampleDataGrid";
 import {
@@ -7,16 +9,27 @@ import {
   DEMO_CONNECTOR_SAMPLE_DATA,
 } from "../components/connectors/connectorDemoSchema";
 import { Button } from "@/components/shadcn/button";
+import { Tabs, TabsList, TabsTrigger } from "@/components/shadcn/tabs";
 import {
   SLIDE_OVER_FLOATING_FOOTER_PANEL_CLASS,
   SLIDE_OVER_FLOATING_FOOTER_WRAPPER_CLASS,
   SLIDE_OVER_FOOTER_BUTTON_CLASS,
   SLIDE_OVER_FOOTER_GHOST_BUTTON_CLASS,
+  SlideOverHeaderBackButton,
 } from "../components/ui/SlideOver";
+import { JsonSyntaxHighlight } from "../components/ui/JsonSyntaxHighlight";
 import { Input } from "../components/ui/Input";
+import { Modal } from "../components/ui/Modal";
 import { Switch } from "../components/ui/Switch";
 import type { ConnectorSetupTarget } from "../components/connectors/connectorPlatformTypes";
 import { isDynamicSchemaCategory } from "../components/connectors/connectorPlatformTypes";
+import {
+  getConnectorInstanceById,
+  hasConnectorMappings,
+  hasConnectorSchemaPreview,
+  markConnectorSchemaPreviewFetched,
+} from "../components/connectors/connectorEnabledState";
+import type { SchemaMappingPreviewPayload } from "../components/connectors/AmazonAthenaMapReviewStep";
 import { SHOW_ATHENA_CONNECTOR_STEP_3 } from "./navRailConfig";
 
 const AmazonAthenaMapReviewStep = lazy(() =>
@@ -25,103 +38,58 @@ const AmazonAthenaMapReviewStep = lazy(() =>
   })),
 );
 
-const cx = (...c: (string | false | undefined)[]) => c.filter(Boolean).join(" ");
-
 type StepIndex = 1 | 2 | 3;
 
-function StepIndicator({ status }: { status: "complete" | "current" | "upcoming" }) {
-  if (status === "complete") {
-    return (
-      <div
-        className="box-border flex size-6 shrink-0 items-center justify-center rounded-full border-2 border-interactive-active bg-transparent text-interactive-active"
-        aria-hidden
-      >
-        <svg width="12" height="9" viewBox="0 0 14 10" fill="none" aria-hidden className="shrink-0">
-          <path
-            d="M1 5L5 9L13 1"
-            stroke="currentColor"
-            strokeWidth="2"
-            strokeLinecap="round"
-            strokeLinejoin="round"
-          />
-        </svg>
-      </div>
-    );
-  }
-  if (status === "current") {
-    return <div className="size-6 shrink-0 rounded-full bg-interactive-active" aria-hidden />;
-  }
-  return (
-    <div
-      className="box-border size-6 shrink-0 rounded-full border-2 border-border-rule bg-transparent"
-      aria-hidden
-    />
-  );
+const SETUP_STEP_TABS: ReadonlyArray<{ step: StepIndex; label: string }> = [
+  { step: 1, label: "Connector Info" },
+  { step: 2, label: "Preview/Import Fields" },
+  { step: 3, label: "Map and Review Data" },
+];
+
+const SETUP_LINE_TAB_TRIGGER_CLASS =
+  "h-auto flex-none rounded-none border-0 px-0 pb-3 text-sm font-semibold text-text-tertiary transition-colors hover:text-text-secondary [&::after]:hidden before:absolute before:inset-x-0 before:bottom-0 before:h-[2px] before:bg-transparent before:transition-colors data-active:!bg-transparent data-active:before:bg-interactive-active data-active:text-text-primary data-active:shadow-none";
+
+function initialDynamicSetupStep(connectorId: string, maxStep: StepIndex): StepIndex {
+  if (maxStep >= 3 && getConnectorInstanceById(connectorId) != null) return 3;
+  return 1;
 }
 
-function stepStatus(step: StepIndex, currentStep: StepIndex): "complete" | "current" | "upcoming" {
-  if (step < currentStep) return "complete";
-  if (step === currentStep) return "current";
-  return "upcoming";
-}
-
-function ProgressStepper({ currentStep }: { currentStep: StepIndex }) {
-  const seg1Teal = currentStep >= 2;
-  const seg2Teal = currentStep >= 3;
+function SetupStepTabs({
+  currentStep,
+  maxStep,
+  schemaPreviewLoaded,
+  onStepChange,
+}: {
+  currentStep: StepIndex;
+  maxStep: StepIndex;
+  schemaPreviewLoaded: boolean;
+  onStepChange: (step: StepIndex) => void;
+}) {
+  const tabs = SETUP_STEP_TABS.filter((tab) => tab.step <= maxStep);
 
   return (
-    <nav
-      className="flex w-full max-w-[632px] shrink-0 flex-col justify-end px-0 py-0"
-      aria-label="Connector setup progress"
+    <Tabs
+      value={String(currentStep)}
+      onValueChange={(value) => onStepChange(Number(value) as StepIndex)}
+      className="min-w-0 flex-1 gap-0"
     >
-      <div className="flex w-full flex-col">
-        <div className="flex w-full items-center gap-0">
-          <div
-            className="relative z-[1] flex w-[110px] shrink-0 flex-col items-center"
-            aria-current={currentStep === 1 ? "step" : undefined}
+      <TabsList
+        variant="line"
+        aria-label="Connector setup sections"
+        className="h-auto w-full flex-wrap justify-start gap-6 rounded-none bg-transparent p-0"
+      >
+        {tabs.map((tab) => (
+          <TabsTrigger
+            key={tab.step}
+            value={String(tab.step)}
+            disabled={tab.step === 3 && !schemaPreviewLoaded}
+            className={SETUP_LINE_TAB_TRIGGER_CLASS}
           >
-            <div className="flex h-6 w-full items-center justify-center">
-              <StepIndicator status={stepStatus(1, currentStep)} />
-            </div>
-          </div>
-          <div className="relative z-0 flex h-6 min-h-6 min-w-0 flex-1 items-center self-center ml-[calc((24px-110px)/2)] mr-[calc((24px-130px)/2)]">
-            <div
-              className={cx("h-0.5 w-full rounded-full", seg1Teal ? "bg-interactive-active" : "bg-border-rule")}
-              aria-hidden
-            />
-          </div>
-          <div
-            className="relative z-[1] flex w-[130px] shrink-0 flex-col items-center"
-            aria-current={currentStep === 2 ? "step" : undefined}
-          >
-            <div className="flex h-6 w-full items-center justify-center">
-              <StepIndicator status={stepStatus(2, currentStep)} />
-            </div>
-          </div>
-          <div className="relative z-0 flex h-6 min-h-6 min-w-0 flex-1 items-center self-center mx-[calc((24px-130px)/2)]">
-            <div
-              className={cx("h-0.5 w-full rounded-full", seg2Teal ? "bg-interactive-active" : "bg-border-rule")}
-              aria-hidden
-            />
-          </div>
-          <div
-            className="relative z-[1] flex w-[130px] shrink-0 flex-col items-center"
-            aria-current={currentStep === 3 ? "step" : undefined}
-          >
-            <div className="flex h-6 w-full items-center justify-center">
-              <StepIndicator status={stepStatus(3, currentStep)} />
-            </div>
-          </div>
-        </div>
-        <div className="mt-1 flex w-full items-start">
-          <p className="w-[110px] shrink-0 text-center text-sm leading-[18px] text-text-primary">1. Connector Info</p>
-          <div className="min-w-0 flex-1" aria-hidden />
-          <p className="w-[130px] shrink-0 text-center text-sm leading-[18px] text-text-primary">2. Preview/Import Fields</p>
-          <div className="min-w-0 flex-1" aria-hidden />
-          <p className="w-[130px] shrink-0 text-center text-sm leading-[18px] text-text-primary">3. Map & Review Data</p>
-        </div>
-      </div>
-    </nav>
+            {tab.label}
+          </TabsTrigger>
+        ))}
+      </TabsList>
+    </Tabs>
   );
 }
 
@@ -151,27 +119,57 @@ function ConnectionTitleLink({ connectorName }: { connectorName: string }) {
   );
 }
 
-function StaticConnectorForm({ connectorName }: { connectorName: string }) {
+type StaticConnectionFields = {
+  host: string;
+  apiKey: string;
+};
+
+const DEFAULT_STATIC_CONNECTION_FIELDS: StaticConnectionFields = {
+  host: "",
+  apiKey: "",
+};
+
+function StaticConnectorForm({
+  connectorName,
+  onConnectorNameChange,
+  fields,
+  onFieldsChange,
+}: {
+  connectorName: string;
+  onConnectorNameChange: (name: string) => void;
+  fields: StaticConnectionFields;
+  onFieldsChange: (next: StaticConnectionFields) => void;
+}) {
   return (
     <div className="flex min-h-0 flex-1 flex-col gap-6 py-6">
       <div>
         <p className="text-base-semibold text-text-primary">Connection Settings</p>
         <p className="mt-1 text-sm text-text-secondary">
-          Enter connection details for your {connectorName} connector.
+          Enter connection details for your connector.
         </p>
       </div>
       <div className="grid max-w-xl gap-4">
         <label className="flex flex-col gap-1.5">
           <span className="text-sm font-semibold text-text-secondary">Connector Name</span>
-          <Input defaultValue={connectorName} />
+          <Input value={connectorName} onChange={(event) => onConnectorNameChange(event.target.value)} />
         </label>
         <label className="flex flex-col gap-1.5">
           <span className="text-sm font-semibold text-text-secondary">Host / Endpoint</span>
-          <Input placeholder="https://api.example.com" />
+          <Input
+            placeholder="https://api.example.com"
+            value={fields.host}
+            onChange={(event) => onFieldsChange({ ...fields, host: event.target.value })}
+          />
         </label>
         <label className="flex flex-col gap-1.5">
           <span className="text-sm font-semibold text-text-secondary">API Key</span>
-          <Input type="password" placeholder="Enter API key or token" autoComplete="off" />
+          <Input
+            type="password"
+            placeholder="Enter API key or token"
+            autoComplete="off"
+            value={fields.apiKey}
+            onChange={(event) => onFieldsChange({ ...fields, apiKey: event.target.value })}
+          />
         </label>
       </div>
     </div>
@@ -194,35 +192,75 @@ function SchemaTypeBadge({ dynamic }: { dynamic: boolean }) {
   );
 }
 
-function ConnectorInfoStep({ connectorName }: { connectorName: string }) {
+type DynamicConnectionFields = {
+  awsRegion: string;
+  database: string;
+  workgroup: string;
+  s3OutputLocation: string;
+};
+
+const DEFAULT_DYNAMIC_CONNECTION_FIELDS: DynamicConnectionFields = {
+  awsRegion: "us-east-1",
+  database: "security_lake",
+  workgroup: "primary",
+  s3OutputLocation: "s3://my-bucket/athena-results/",
+};
+
+function connectionFieldsEqual<T extends Record<string, string>>(a: T, b: T) {
+  return (Object.keys(a) as Array<keyof T>).every((key) => a[key] === b[key]);
+}
+
+function ConnectorInfoStep({
+  connectorName,
+  onConnectorNameChange,
+  fields,
+  onFieldsChange,
+}: {
+  connectorName: string;
+  onConnectorNameChange: (name: string) => void;
+  fields: DynamicConnectionFields;
+  onFieldsChange: (next: DynamicConnectionFields) => void;
+}) {
   return (
     <div className="flex min-h-0 flex-1 flex-col gap-6 py-6">
       <div>
         <p className="text-base-semibold text-text-primary">Connector Info</p>
         <p className="mt-1 text-sm text-text-secondary">
-          Enter connection details for your {connectorName} data source.
+          Enter connection details for your data source.
         </p>
       </div>
       <div className="grid max-w-xl gap-4">
         <label className="flex flex-col gap-1.5">
           <span className="text-sm font-semibold text-text-secondary">Connector Name</span>
-          <Input defaultValue={connectorName} />
+          <Input value={connectorName} onChange={(event) => onConnectorNameChange(event.target.value)} />
         </label>
         <label className="flex flex-col gap-1.5">
           <span className="text-sm font-semibold text-text-secondary">AWS Region</span>
-          <Input defaultValue="us-east-1" />
+          <Input
+            value={fields.awsRegion}
+            onChange={(event) => onFieldsChange({ ...fields, awsRegion: event.target.value })}
+          />
         </label>
         <label className="flex flex-col gap-1.5">
           <span className="text-sm font-semibold text-text-secondary">Database</span>
-          <Input defaultValue="security_lake" />
+          <Input
+            value={fields.database}
+            onChange={(event) => onFieldsChange({ ...fields, database: event.target.value })}
+          />
         </label>
         <label className="flex flex-col gap-1.5">
           <span className="text-sm font-semibold text-text-secondary">Workgroup</span>
-          <Input defaultValue="primary" />
+          <Input
+            value={fields.workgroup}
+            onChange={(event) => onFieldsChange({ ...fields, workgroup: event.target.value })}
+          />
         </label>
         <label className="flex flex-col gap-1.5">
           <span className="text-sm font-semibold text-text-secondary">S3 Output Location</span>
-          <Input defaultValue="s3://my-bucket/athena-results/" />
+          <Input
+            value={fields.s3OutputLocation}
+            onChange={(event) => onFieldsChange({ ...fields, s3OutputLocation: event.target.value })}
+          />
         </label>
       </div>
     </div>
@@ -234,24 +272,27 @@ const PREVIEW_SAMPLE_INSTRUCTION =
 
 function PreviewImportFieldsStep({
   connectorName,
+  previewLoaded,
   onPreviewLoadedChange,
+  onSchemaRefetch,
 }: {
   connectorName: string;
+  previewLoaded: boolean;
   onPreviewLoadedChange?: (loaded: boolean) => void;
+  onSchemaRefetch?: () => void;
 }) {
-  const [schemaPreviewLoaded, setSchemaPreviewLoaded] = useState(false);
   const [showJson, setShowJson] = useState(false);
   const [fetchGeneration, setFetchGeneration] = useState(0);
 
   const dataTableName = useMemo(() => connectorDemoDataTableName(connectorName), [connectorName]);
 
   const loadPreview = () => {
-    setSchemaPreviewLoaded(true);
     onPreviewLoadedChange?.(true);
   };
 
   const refetchSample = () => {
     setFetchGeneration((generation) => generation + 1);
+    onSchemaRefetch?.();
   };
 
   const sampleRows = useMemo(
@@ -268,7 +309,7 @@ function PreviewImportFieldsStep({
     [fetchGeneration],
   );
 
-  if (!schemaPreviewLoaded) {
+  if (!previewLoaded) {
     return (
       <div className="flex min-h-0 flex-1 flex-col gap-6 py-6">
         <p className="max-w-4xl text-sm leading-[18px] text-text-secondary">{PREVIEW_SAMPLE_INSTRUCTION}</p>
@@ -322,41 +363,131 @@ function PreviewImportFieldsStep({
   );
 }
 
+function MappingPreviewJsonPanel({
+  preview,
+  onClose,
+}: {
+  preview: SchemaMappingPreviewPayload;
+  onClose: () => void;
+}) {
+  const json = useMemo(() => JSON.stringify(preview, null, 2), [preview]);
+
+  return (
+    <div className="flex h-full min-h-0 flex-col bg-surface-modal text-text-primary">
+      <header className="flex shrink-0 items-center gap-2 border-b border-border-rule px-4 py-4">
+        <SlideOverHeaderBackButton onClose={onClose} className="ring-offset-surface-modal" />
+        <div className="min-w-0 flex-1">
+          <h2 className="truncate text-page-title text-text-primary">Preview JSON</h2>
+          <p className="mt-0.5 truncate text-sm text-text-secondary">
+            {preview.eventClass.label}
+            {preview.mappedFieldCount > 0
+              ? ` · ${preview.mappedFieldCount} mapped field${preview.mappedFieldCount === 1 ? "" : "s"}`
+              : " · No fields mapped yet"}
+          </p>
+        </div>
+      </header>
+      <div className="min-h-0 flex-1 overflow-auto p-4">
+        <JsonSyntaxHighlight
+          json={json}
+          className="rounded border border-border-rule bg-surface-container p-4"
+        />
+      </div>
+    </div>
+  );
+}
+
 function FloatingActions({
   onCancel,
   onBack,
   onNext,
+  onPreviewJson,
+  onSave,
   showBack,
   showPreviewJson,
+  showSave = false,
   nextLabel,
   nextDisabled = false,
+  saveDisabled = true,
+  isSaving = false,
 }: {
   onCancel: () => void;
   onBack: () => void;
   onNext: () => void;
+  onPreviewJson?: () => void;
+  onSave?: () => void;
   showBack: boolean;
   showPreviewJson: boolean;
+  showSave?: boolean;
   nextLabel: string;
   nextDisabled?: boolean;
+  saveDisabled?: boolean;
+  isSaving?: boolean;
 }) {
   return (
     <div className={SLIDE_OVER_FLOATING_FOOTER_WRAPPER_CLASS}>
       <div className={SLIDE_OVER_FLOATING_FOOTER_PANEL_CLASS}>
-        <Button type="button" variant="ghost" className={SLIDE_OVER_FOOTER_GHOST_BUTTON_CLASS} onClick={onCancel}>
+        <Button
+          type="button"
+          variant="ghost"
+          className={SLIDE_OVER_FOOTER_GHOST_BUTTON_CLASS}
+          onClick={onCancel}
+          disabled={isSaving}
+        >
           Cancel
         </Button>
         {showPreviewJson ? (
-          <Button variant="ghost" className={SLIDE_OVER_FOOTER_GHOST_BUTTON_CLASS}>
+          <Button
+            type="button"
+            variant="ghost"
+            className={SLIDE_OVER_FOOTER_GHOST_BUTTON_CLASS}
+            onClick={onPreviewJson}
+            disabled={isSaving}
+          >
             Preview JSON
           </Button>
         ) : null}
+        {showSave ? (
+          <Button
+            type="button"
+            variant="secondary-outline"
+            className={SLIDE_OVER_FOOTER_BUTTON_CLASS}
+            onClick={onSave}
+            disabled={saveDisabled || isSaving}
+          >
+            {isSaving ? (
+              <span className="inline-flex items-center gap-1.5">
+                <Loader2 className="size-3.5 shrink-0 animate-spin" aria-hidden />
+                Saving…
+              </span>
+            ) : (
+              "Save"
+            )}
+          </Button>
+        ) : null}
         {showBack ? (
-          <Button variant="secondary-outline" className={SLIDE_OVER_FOOTER_BUTTON_CLASS} onClick={onBack}>
+          <Button
+            variant="secondary-outline"
+            className={SLIDE_OVER_FOOTER_BUTTON_CLASS}
+            onClick={onBack}
+            disabled={isSaving}
+          >
             Back
           </Button>
         ) : null}
-        <Button variant="default" className={SLIDE_OVER_FOOTER_BUTTON_CLASS} onClick={onNext} disabled={nextDisabled}>
-          {nextLabel}
+        <Button
+          variant="default"
+          className={SLIDE_OVER_FOOTER_BUTTON_CLASS}
+          onClick={onNext}
+          disabled={nextDisabled || isSaving}
+        >
+          {!showSave && isSaving ? (
+            <span className="inline-flex items-center gap-1.5">
+              <Loader2 className="size-3.5 shrink-0 animate-spin" aria-hidden />
+              Saving…
+            </span>
+          ) : (
+            nextLabel
+          )}
         </Button>
       </div>
     </div>
@@ -385,54 +516,222 @@ function ConnectorSetupHeaderIcon({ icon, title }: { icon: ConnectorLargeIconNam
 export function ConnectorSetupPanel({ onClose, onSave, connector }: ConnectorSetupPanelProps) {
   const isDynamicSchema = isDynamicSchemaCategory(connector.categoryId);
   const maxStep: StepIndex = SHOW_ATHENA_CONNECTOR_STEP_3 ? 3 : 2;
-  const [currentStep, setCurrentStep] = useState<StepIndex>(1);
-  const [connectorEnabled, setConnectorEnabled] = useState(true);
-  const [schemaPreviewLoaded, setSchemaPreviewLoaded] = useState(false);
-  const [hasMappedFields, setHasMappedFields] = useState(false);
+  const initialEnabled = getConnectorInstanceById(connector.id)?.enabled ?? true;
+  const [currentStep, setCurrentStep] = useState<StepIndex>(() =>
+    isDynamicSchema ? initialDynamicSetupStep(connector.id, maxStep) : 1,
+  );
+  const [pendingStep, setPendingStep] = useState<StepIndex | null>(null);
+  const [connectorEnabled, setConnectorEnabled] = useState(initialEnabled);
+  const [connectorName, setConnectorName] = useState(connector.name);
+  const [savedName, setSavedName] = useState(connector.name);
+  const [savedEnabled, setSavedEnabled] = useState(initialEnabled);
+  const [dynamicFields, setDynamicFields] = useState<DynamicConnectionFields>(
+    DEFAULT_DYNAMIC_CONNECTION_FIELDS,
+  );
+  const [savedDynamicFields, setSavedDynamicFields] = useState<DynamicConnectionFields>(
+    DEFAULT_DYNAMIC_CONNECTION_FIELDS,
+  );
+  const [staticFields, setStaticFields] = useState<StaticConnectionFields>(
+    DEFAULT_STATIC_CONNECTION_FIELDS,
+  );
+  const [savedStaticFields, setSavedStaticFields] = useState<StaticConnectionFields>(
+    DEFAULT_STATIC_CONNECTION_FIELDS,
+  );
+  const [schemaPreviewLoaded, setSchemaPreviewLoaded] = useState(() =>
+    hasConnectorSchemaPreview(connector.id),
+  );
+  const [schemaImportReady, setSchemaImportReady] = useState(false);
+  const [hasMappedFields, setHasMappedFields] = useState(() => hasConnectorMappings(connector.id));
+  const [mappingPreview, setMappingPreview] = useState<SchemaMappingPreviewPayload | null>(null);
+  const [previewJsonOpen, setPreviewJsonOpen] = useState(false);
+  const [unsavedChangesOpen, setUnsavedChangesOpen] = useState(false);
+  const [allowAutosave, setAllowAutosave] = useState(true);
+  const [savedAllowAutosave, setSavedAllowAutosave] = useState(true);
+  const [mappingDirty, setMappingDirty] = useState(false);
+  const [mappingCleanToken, setMappingCleanToken] = useState(0);
+  const [isSaving, setIsSaving] = useState(false);
 
   useEffect(() => {
-    if (currentStep < 2) setSchemaPreviewLoaded(false);
-  }, [currentStep]);
+    const enabled = getConnectorInstanceById(connector.id)?.enabled ?? true;
+    setConnectorName(connector.name);
+    setSavedName(connector.name);
+    setConnectorEnabled(enabled);
+    setSavedEnabled(enabled);
+    setDynamicFields(DEFAULT_DYNAMIC_CONNECTION_FIELDS);
+    setSavedDynamicFields(DEFAULT_DYNAMIC_CONNECTION_FIELDS);
+    setStaticFields(DEFAULT_STATIC_CONNECTION_FIELDS);
+    setSavedStaticFields(DEFAULT_STATIC_CONNECTION_FIELDS);
+    setSchemaPreviewLoaded(hasConnectorSchemaPreview(connector.id));
+    setSchemaImportReady(false);
+    setAllowAutosave(true);
+    setSavedAllowAutosave(true);
+    setMappingDirty(false);
+    setHasMappedFields(hasConnectorMappings(connector.id));
+    setCurrentStep(isDynamicSchema ? initialDynamicSetupStep(connector.id, maxStep) : 1);
+    setPendingStep(null);
+  }, [connector.id, connector.name, isDynamicSchema, maxStep]);
 
   useEffect(() => {
-    if (currentStep !== 3) setHasMappedFields(false);
-  }, [currentStep]);
+    if (currentStep !== 3) {
+      setMappingPreview(null);
+      setPreviewJsonOpen(false);
+      setMappingDirty(false);
+      if (!hasConnectorMappings(connector.id)) {
+        setHasMappedFields(false);
+      }
+    }
+  }, [connector.id, currentStep]);
+
+  useEffect(() => {
+    if (!previewJsonOpen) return;
+    const onKey = (event: KeyboardEvent) => {
+      if (event.key !== "Escape") return;
+      event.stopImmediatePropagation();
+      setPreviewJsonOpen(false);
+    };
+    document.addEventListener("keydown", onKey, true);
+    return () => document.removeEventListener("keydown", onKey, true);
+  }, [previewJsonOpen]);
 
   const connectorSwitchDisabled = isDynamicSchema && !hasMappedFields;
+  const displayName = connectorName.trim() || connector.name;
+  const hasEdits =
+    displayName !== savedName.trim() ||
+    connectorEnabled !== savedEnabled ||
+    (isDynamicSchema
+      ? !connectionFieldsEqual(dynamicFields, savedDynamicFields)
+      : !connectionFieldsEqual(staticFields, savedStaticFields));
 
   const goToPreviousStep = () => {
-    setCurrentStep((step) => (step > 1 ? ((step - 1) as StepIndex) : step));
+    if (isSaving) return;
+    requestStepChange((currentStep > 1 ? (currentStep - 1) : currentStep) as StepIndex);
   };
 
   const goToNextStep = () => {
     setCurrentStep((step) => (step < maxStep ? ((step + 1) as StepIndex) : step));
   };
 
-  const canAdvanceFromCurrentStep =
-    currentStep !== 2 || schemaPreviewLoaded;
-
-  const handlePrimaryAction = () => {
-    if (!canAdvanceFromCurrentStep) return;
-    if (isLastStep) {
-      onSave?.(connector, connectorEnabled);
-      onClose();
+  const advanceAfterUnsavedPrompt = () => {
+    if (pendingStep != null) {
+      setCurrentStep(pendingStep);
+      setPendingStep(null);
       return;
     }
     goToNextStep();
   };
 
+  const requestStepChange = (nextStep: StepIndex) => {
+    if (nextStep === currentStep || isSaving) return;
+    if (nextStep === 3 && !schemaPreviewLoaded) return;
+    if (hasEdits) {
+      setPendingStep(nextStep);
+      setUnsavedChangesOpen(true);
+      return;
+    }
+    setCurrentStep(nextStep);
+  };
+
+  const canAdvanceFromCurrentStep =
+    currentStep !== 2 || schemaImportReady;
+
   const isLastStep = !isDynamicSchema || currentStep === maxStep;
+  const autosaveDirty = allowAutosave !== savedAllowAutosave;
+  const canManualSaveOnMapStep =
+    isDynamicSchema &&
+    currentStep === 3 &&
+    SHOW_ATHENA_CONNECTOR_STEP_3 &&
+    (autosaveDirty || (!allowAutosave && mappingDirty));
+  const canSave = hasEdits || canManualSaveOnMapStep;
+
+  const discardEdits = () => {
+    setConnectorName(savedName);
+    setConnectorEnabled(savedEnabled);
+    setDynamicFields(savedDynamicFields);
+    setStaticFields(savedStaticFields);
+  };
+
+  const handleSave = (afterSave?: () => void) => {
+    if (!canSave || isSaving) return;
+
+    setIsSaving(true);
+    const nextName = displayName;
+    const nextEnabled = connectorEnabled;
+    const nextDynamicFields = dynamicFields;
+    const nextStaticFields = staticFields;
+    const shouldPersistConnectionFields = hasEdits;
+    const shouldClearMapStepDirty = canManualSaveOnMapStep;
+    const nextAllowAutosave = allowAutosave;
+    window.setTimeout(() => {
+      if (shouldPersistConnectionFields) {
+        onSave?.({ ...connector, name: nextName }, nextEnabled);
+        setSavedName(nextName);
+        setSavedEnabled(nextEnabled);
+        setSavedDynamicFields(nextDynamicFields);
+        setSavedStaticFields(nextStaticFields);
+      }
+      if (shouldClearMapStepDirty) {
+        setSavedAllowAutosave(nextAllowAutosave);
+        setMappingCleanToken((token) => token + 1);
+        setMappingDirty(false);
+      }
+      setIsSaving(false);
+      toast.success("Connector saved successfully", {
+        description: `"${nextName}" has been updated.`,
+      });
+      afterSave?.();
+    }, 900);
+  };
+
+  const tryGoToNextStep = () => {
+    if (!canAdvanceFromCurrentStep || isSaving || isLastStep) return;
+    const nextStep = (currentStep + 1) as StepIndex;
+    requestStepChange(nextStep);
+  };
+
+  const handleDisregardAndContinue = () => {
+    discardEdits();
+    setUnsavedChangesOpen(false);
+    advanceAfterUnsavedPrompt();
+  };
+
+  const handleSaveAndContinue = () => {
+    handleSave(() => {
+      setUnsavedChangesOpen(false);
+      advanceAfterUnsavedPrompt();
+    });
+  };
+
+  const handlePrimaryAction = () => {
+    if (!canAdvanceFromCurrentStep || isSaving) return;
+    if (!isLastStep) {
+      tryGoToNextStep();
+      return;
+    }
+    // Dynamic Finish / static Save on last step
+    if (isDynamicSchema) {
+      if (canSave) return;
+      onClose();
+      return;
+    }
+    handleSave();
+  };
 
   return (
     <div className="relative flex h-full min-h-0 flex-col bg-surface-modal px-5 text-text-primary">
       <header className="relative shrink-0 bg-surface-modal">
         <div className="border-b border-border-rule px-0 pt-5 pb-4">
           <div className="flex min-w-0 flex-wrap items-center gap-3 pr-52 sm:pr-72">
-            <Button variant="ghost" className="shrink-0 p-1" aria-label="Back" onClick={onClose}>
+            <Button
+              variant="ghost"
+              className="shrink-0 p-1"
+              aria-label="Back"
+              onClick={onClose}
+              disabled={isSaving}
+            >
               <Icon name="chevron-down" size={20} className="rotate-90 text-text-primary" />
             </Button>
-            <ConnectorSetupHeaderIcon icon={connector.icon} title={connector.name} />
-            <h1 className="truncate text-page-title text-text-primary">{connector.name}</h1>
+            <ConnectorSetupHeaderIcon icon={connector.icon} title={displayName} />
+            <h1 className="truncate text-page-title text-text-primary">{displayName}</h1>
             <Switch
               checked={isDynamicSchema ? (connectorSwitchDisabled ? true : connectorEnabled) : connectorEnabled}
               disabled={connectorSwitchDisabled}
@@ -462,8 +761,8 @@ export function ConnectorSetupPanel({ onClose, onSave, connector }: ConnectorSet
                 variant="ghost"
                 className="p-1"
                 aria-label="Next step"
-                disabled={isLastStep || !canAdvanceFromCurrentStep}
-                onClick={goToNextStep}
+                disabled={isLastStep || !canAdvanceFromCurrentStep || isSaving}
+                onClick={tryGoToNextStep}
               >
                 <Icon name="chevron-down" size={20} className="-rotate-90 text-text-primary" />
               </Button>
@@ -481,9 +780,14 @@ export function ConnectorSetupPanel({ onClose, onSave, connector }: ConnectorSet
         </div>
 
         {isDynamicSchema ? (
-          <div className="flex flex-wrap items-end justify-between gap-6 border-b border-border-rule px-0 py-4">
-            <ProgressStepper currentStep={currentStep} />
-            <ConnectionTitleLink connectorName={connector.name} />
+          <div className="flex flex-wrap items-end justify-between gap-6 border-b border-border-rule px-0 pt-4">
+            <SetupStepTabs
+              currentStep={currentStep}
+              maxStep={maxStep}
+              schemaPreviewLoaded={schemaPreviewLoaded}
+              onStepChange={requestStepChange}
+            />
+            <ConnectionTitleLink connectorName={connector.platformName} />
           </div>
         ) : null}
       </header>
@@ -491,21 +795,49 @@ export function ConnectorSetupPanel({ onClose, onSave, connector }: ConnectorSet
       <div className="flex min-h-0 flex-1 flex-col overflow-hidden">
         {isDynamicSchema ? (
           <>
-            {currentStep === 1 ? <ConnectorInfoStep connectorName={connector.name} /> : null}
+            {currentStep === 1 ? (
+              <ConnectorInfoStep
+                connectorName={connectorName}
+                onConnectorNameChange={setConnectorName}
+                fields={dynamicFields}
+                onFieldsChange={setDynamicFields}
+              />
+            ) : null}
             {currentStep === 2 ? (
               <PreviewImportFieldsStep
-                connectorName={connector.name}
-                onPreviewLoadedChange={setSchemaPreviewLoaded}
+                connectorName={connector.platformName}
+                previewLoaded={schemaPreviewLoaded}
+                onPreviewLoadedChange={(loaded) => {
+                  setSchemaPreviewLoaded(loaded);
+                  if (loaded) {
+                    markConnectorSchemaPreviewFetched(connector.id);
+                    setSchemaImportReady(true);
+                  }
+                }}
+                onSchemaRefetch={() => setSchemaImportReady(true)}
               />
             ) : null}
             {currentStep === 3 && SHOW_ATHENA_CONNECTOR_STEP_3 ? (
               <Suspense fallback={<div className="flex flex-1 items-center justify-center text-sm text-text-secondary">Loading…</div>}>
-                <AmazonAthenaMapReviewStep onHasMappedFieldsChange={setHasMappedFields} />
+                <AmazonAthenaMapReviewStep
+                  connectorId={connector.id}
+                  onHasMappedFieldsChange={setHasMappedFields}
+                  onMappingPreviewChange={setMappingPreview}
+                  allowAutosave={allowAutosave}
+                  onAllowAutosaveChange={setAllowAutosave}
+                  onMappingDirtyChange={setMappingDirty}
+                  mappingCleanToken={mappingCleanToken}
+                />
               </Suspense>
             ) : null}
           </>
         ) : (
-          <StaticConnectorForm connectorName={connector.name} />
+          <StaticConnectorForm
+            connectorName={connectorName}
+            onConnectorNameChange={setConnectorName}
+            fields={staticFields}
+            onFieldsChange={setStaticFields}
+          />
         )}
       </div>
 
@@ -513,11 +845,22 @@ export function ConnectorSetupPanel({ onClose, onSave, connector }: ConnectorSet
         onCancel={onClose}
         onBack={goToPreviousStep}
         onNext={handlePrimaryAction}
+        onPreviewJson={() => setPreviewJsonOpen(true)}
+        onSave={() => handleSave()}
         showBack={isDynamicSchema && currentStep > 1}
         showPreviewJson={isDynamicSchema && currentStep === 3 && SHOW_ATHENA_CONNECTOR_STEP_3}
-        nextDisabled={!canAdvanceFromCurrentStep}
+        showSave={isDynamicSchema && currentStep !== 2}
+        nextDisabled={
+          isDynamicSchema
+            ? isLastStep
+              ? canSave
+              : !canAdvanceFromCurrentStep
+            : !canAdvanceFromCurrentStep || !hasEdits
+        }
+        saveDisabled={!canSave}
+        isSaving={isSaving}
         nextLabel={
-          currentStep === 2 && schemaPreviewLoaded
+          currentStep === 2
             ? "Import Fields"
             : isLastStep
               ? isDynamicSchema
@@ -526,6 +869,64 @@ export function ConnectorSetupPanel({ onClose, onSave, connector }: ConnectorSet
               : "Next"
         }
       />
+
+      {previewJsonOpen && mappingPreview ? (
+        <div className="absolute inset-0 z-40 flex overflow-hidden">
+          <button
+            type="button"
+            className="absolute inset-0 animate-overlay-scrim-in bg-overlay-scrim"
+            aria-label="Close preview JSON"
+            onClick={() => setPreviewJsonOpen(false)}
+          />
+          <aside
+            role="dialog"
+            aria-modal="true"
+            aria-label="Preview mapping JSON"
+            className="relative z-10 ml-auto flex h-full w-[min(100%,calc(42rem+48px))] min-w-0 animate-slide-over-in flex-col overflow-hidden border-l border-border-rule bg-surface-modal shadow-[-4px_0_24px_rgba(0,0,0,0.25)]"
+          >
+            <MappingPreviewJsonPanel preview={mappingPreview} onClose={() => setPreviewJsonOpen(false)} />
+          </aside>
+        </div>
+      ) : null}
+
+      <Modal
+        open={unsavedChangesOpen}
+        title="Unsaved changes"
+        onClose={() => {
+          if (isSaving) return;
+          setUnsavedChangesOpen(false);
+          setPendingStep(null);
+        }}
+        footer={
+          <div className="flex flex-wrap items-center justify-end gap-2">
+            <Button
+              type="button"
+              variant="ghost"
+              disabled={isSaving}
+              onClick={handleDisregardAndContinue}
+            >
+              Disregard
+            </Button>
+            <Button
+              type="button"
+              variant="default"
+              disabled={isSaving}
+              onClick={handleSaveAndContinue}
+            >
+              {isSaving ? (
+                <span className="inline-flex items-center gap-1.5">
+                  <Loader2 className="size-3.5 shrink-0 animate-spin" aria-hidden />
+                  Saving…
+                </span>
+              ) : (
+                "Save"
+              )}
+            </Button>
+          </div>
+        }
+      >
+        You have unsaved changes. Do you want to save them before moving on, or disregard them?
+      </Modal>
     </div>
   );
 }

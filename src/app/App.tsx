@@ -7,6 +7,7 @@ import { SearchProvider } from "../context/SearchContext";
 import { DetectionHubProvider } from "../context/DetectionHubContext";
 import { SearchCopilotSidePanel } from "../components/SearchCopilotPanel";
 import { PendingFsqlSearchLauncher } from "../components/search/PendingFsqlSearchLauncher";
+import { Toaster } from "../components/ui/sonner";
 import { DEFAULT_ROUTE, ROUTES, type ConnectorsLocationState } from "./routes";
 import { SHOW_AI_AGENTS_PAGE } from "./navRailConfig";
 
@@ -120,6 +121,7 @@ export function App() {
         <SearchProvider>
           <DetectionHubProvider>
             <AppShell />
+            <Toaster />
             <Analytics />
           </DetectionHubProvider>
         </SearchProvider>

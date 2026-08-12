@@ -9,7 +9,7 @@ export type ProfileFormValues = {
 };
 
 export const DEFAULT_PROFILE_VALUES: ProfileFormValues = {
-  name: "Bonnie Kopolowsk",
+  name: "Chanice Kopolowski",
   email: "CKopolowski@brquary.com",
   company: "Bedrock Quarry",
   title: "Dog wrangler, Product Designer",
@@ -22,7 +22,7 @@ export const PROFILE_TEAM = {
   id: "team-kopolowsk",
   name: "Kopolowsk Carrots",
   members: [
-    { id: "p1", name: "Bonnie Kopolowsk", initials: "CK", avatarColor: "#4a9eff", role: "Tenant Admin" },
+    { id: "p1", name: "Chanice Kopolowski", initials: "CK", avatarColor: "#4a9eff", role: "Tenant Admin" },
     { id: "p2", name: "Brian Tiddley", initials: "BT", avatarColor: "#57969e", role: "Default Team Member" },
     { id: "p3", name: "Tim Kurgesmayer", initials: "TK", avatarColor: "#f28830", role: "Default Team Member" },
     { id: "p4", name: "Jeanine Smithers", initials: "JS", avatarColor: "#e8a598", role: "Onboarding Team" },

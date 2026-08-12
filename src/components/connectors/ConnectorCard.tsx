@@ -59,7 +59,7 @@ export function ConnectorCard({ connector, onEnabledChange, onConfigure }: Conne
                   onConfigure();
                 }}
               >
-                Configure
+                Edit
               </button>
             ) : null}
           </div>,
@@ -82,9 +82,19 @@ export function ConnectorCard({ connector, onEnabledChange, onConfigure }: Conne
       />
       <div className="flex min-w-0 flex-1 flex-col">
         <div className="flex items-start gap-2">
-          <p className="min-w-0 flex-1 truncate pt-0.5 text-sm font-semibold tracking-[0.4px] text-interactive-active">
-            {connector.instanceName}
-          </p>
+          {onConfigure ? (
+            <button
+              type="button"
+              className="min-w-0 flex-1 truncate pt-0.5 text-left text-sm font-semibold tracking-[0.4px] text-interactive-active hover:underline focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-interactive-active"
+              onClick={onConfigure}
+            >
+              {connector.instanceName}
+            </button>
+          ) : (
+            <p className="min-w-0 flex-1 truncate pt-0.5 text-sm font-semibold tracking-[0.4px] text-interactive-active">
+              {connector.instanceName}
+            </p>
+          )}
           <Switch checked={connector.enabled} onCheckedChange={onEnabledChange} />
           <Button
             ref={buttonRef}

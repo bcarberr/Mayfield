@@ -207,68 +207,71 @@ export function getHttpActivityEnumValues(fieldPath: string): readonly HttpActiv
  * Advanced Mode → Attributes: Show All
  * Top-level HTTP Activity attributes in Figma Config-Schema-v2 order (corrected OCSF spellings).
  */
+export type HttpActivityAttributeGroup = "classification" | "occurrence" | "context" | "primary";
+
 export type HttpActivityShowAllAttribute = {
   name: string;
   /** Display label override (e.g. time*). */
   label?: string;
   required?: boolean;
+  group: HttpActivityAttributeGroup;
 };
 
 export const HTTP_ACTIVITY_SHOW_ALL_ATTRIBUTES: readonly HttpActivityShowAllAttribute[] = [
-  { name: "time", label: "time*", required: true },
-  { name: "action_id" },
-  { name: "action" },
-  { name: "activity_id" },
-  { name: "activity_name" },
-  { name: "actor" },
-  { name: "api" },
-  { name: "app_name" },
-  { name: "attacks" },
-  { name: "authorizations" },
-  { name: "cloud" },
-  { name: "confidence_id" },
-  { name: "confidence_name" },
-  { name: "confidence_score" },
-  { name: "connection_info" },
-  { name: "count" },
-  { name: "device" },
-  { name: "disposition_id" },
-  { name: "disposition" },
-  { name: "dst_endpoint" },
-  { name: "duration" },
-  { name: "end_time" },
-  { name: "end_time_dt" },
-  { name: "enrichments" },
-  { name: "file" },
-  { name: "firewall_rule" },
-  { name: "http_cookies" },
-  { name: "http_request" },
-  { name: "http_response" },
-  { name: "is_alert" },
-  { name: "ja4_fingerprint_list" },
-  { name: "load_balancer" },
-  { name: "malware" },
-  { name: "message" },
-  { name: "metadata" },
-  { name: "policy" },
-  { name: "proxy_connection_info" },
-  { name: "proxy_endpoint" },
-  { name: "proxy_http_request" },
-  { name: "proxy_tls" },
-  { name: "proxy_traffic" },
-  { name: "raw_data" },
-  { name: "risk_details" },
-  { name: "risk_level_id" },
-  { name: "risk_level" },
-  { name: "risk_score" },
-  { name: "severity_id" },
-  { name: "severity" },
-  { name: "src_endpoint" },
-  { name: "status_id" },
-  { name: "status" },
-  { name: "status_detail" },
-  { name: "trace" },
-  { name: "traffic" },
+  { name: "time", label: "time*", required: true, group: "occurrence" },
+  { name: "action_id", group: "primary" },
+  { name: "action", group: "primary" },
+  { name: "activity_id", group: "classification" },
+  { name: "activity_name", group: "classification" },
+  { name: "actor", group: "primary" },
+  { name: "api", group: "context" },
+  { name: "app_name", group: "context" },
+  { name: "attacks", group: "primary" },
+  { name: "authorizations", group: "primary" },
+  { name: "cloud", group: "primary" },
+  { name: "confidence_id", group: "context" },
+  { name: "confidence_name", group: "context" },
+  { name: "confidence_score", group: "context" },
+  { name: "connection_info", group: "primary" },
+  { name: "count", group: "occurrence" },
+  { name: "device", group: "primary" },
+  { name: "disposition_id", group: "primary" },
+  { name: "disposition", group: "primary" },
+  { name: "dst_endpoint", group: "primary" },
+  { name: "duration", group: "occurrence" },
+  { name: "end_time", group: "occurrence" },
+  { name: "end_time_dt", group: "occurrence" },
+  { name: "enrichments", group: "context" },
+  { name: "file", group: "context" },
+  { name: "firewall_rule", group: "primary" },
+  { name: "http_cookies", group: "primary" },
+  { name: "http_request", group: "primary" },
+  { name: "http_response", group: "primary" },
+  { name: "is_alert", group: "primary" },
+  { name: "ja4_fingerprint_list", group: "context" },
+  { name: "load_balancer", group: "primary" },
+  { name: "malware", group: "primary" },
+  { name: "message", group: "primary" },
+  { name: "metadata", group: "context" },
+  { name: "policy", group: "primary" },
+  { name: "proxy_connection_info", group: "context" },
+  { name: "proxy_endpoint", group: "context" },
+  { name: "proxy_http_request", group: "context" },
+  { name: "proxy_tls", group: "context" },
+  { name: "proxy_traffic", group: "context" },
+  { name: "raw_data", group: "context" },
+  { name: "risk_details", group: "context" },
+  { name: "risk_level_id", group: "context" },
+  { name: "risk_level", group: "context" },
+  { name: "risk_score", group: "context" },
+  { name: "severity_id", group: "classification" },
+  { name: "severity", group: "classification" },
+  { name: "src_endpoint", group: "primary" },
+  { name: "status_id", group: "primary" },
+  { name: "status", group: "primary" },
+  { name: "status_detail", group: "primary" },
+  { name: "trace", group: "primary" },
+  { name: "traffic", group: "primary" },
 ] as const;
 
 /** Object-like top-level attributes that expand even without nested demo paths yet. */
@@ -296,10 +299,24 @@ const HTTP_ACTIVITY_SHOW_ALL_OBJECT_ROOTS = new Set([
   "traffic",
 ]);
 
+/** Top-level string-array attributes on HTTP Activity (none in current Show All catalog). */
+const HTTP_ACTIVITY_STRING_ARRAY_FIELDS = new Set<string>([
+  // Reserved for scalar string arrays if added to the Show All catalog later.
+]);
+
 export function getHttpActivityShowAllAttributes(): readonly HttpActivityShowAllAttribute[] {
   return HTTP_ACTIVITY_SHOW_ALL_ATTRIBUTES;
 }
 
 export function isHttpActivityShowAllObjectRoot(fieldPath: string): boolean {
   return HTTP_ACTIVITY_SHOW_ALL_OBJECT_ROOTS.has(fieldPath.toLowerCase());
+}
+
+export function isHttpActivityStringArrayField(fieldPath: string): boolean {
+  const leaf = fieldPath.split(".").at(-1) ?? fieldPath;
+  return HTTP_ACTIVITY_STRING_ARRAY_FIELDS.has(leaf.toLowerCase());
+}
+
+export function isHttpActivityObjectArrayField(fieldPath: string): boolean {
+  return isHttpActivityArrayField(fieldPath) && !isHttpActivityStringArrayField(fieldPath);
 }
