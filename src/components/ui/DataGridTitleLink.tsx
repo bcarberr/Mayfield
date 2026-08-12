@@ -10,7 +10,7 @@ export function DataGridTitleLink({
   return (
     <TruncatedText
       as="button"
-      className="w-full text-left text-sm font-semibold text-interactive-active hover:underline focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-interactive-active"
+      className="w-full text-left text-sm font-semibold text-interactive-active hover:underline"
       onClick={onClick}
     >
       {children}

@@ -20,7 +20,7 @@ function ThemeOptionButton({
       type="button"
       aria-pressed={selected}
       className={cx(
-        "rounded-sm text-sm font-semibold transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-interactive-active focus-visible:ring-offset-2 focus-visible:ring-offset-surface-page",
+        "rounded-sm text-sm font-semibold transition-colors",
         selected ? "text-text-primary" : "text-text-tertiary hover:text-text-secondary",
       )}
       onClick={() => onSelect(option)}

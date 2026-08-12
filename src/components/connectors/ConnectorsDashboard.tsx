@@ -24,7 +24,7 @@ export function ConnectorsDashboard({
   onConfigureConnector,
   chromeSurface = "page",
 }: ConnectorsDashboardProps) {
-  const { connectors, setConnectorEnabled } = usePersistedConnectorInstances();
+  const { connectors, setConnectorEnabled, deleteConnector } = usePersistedConnectorInstances();
   const showResetToDefault = useShowConnectorResetToDefault();
   const {
     categoryOrder,
@@ -104,6 +104,7 @@ export function ConnectorsDashboard({
                         connector={connector}
                         onEnabledChange={(enabled) => setConnectorEnabled(connector.id, enabled)}
                         onConfigure={onConfigureConnector ? () => onConfigureConnector(connector.id) : undefined}
+                        onDelete={() => deleteConnector(connector.id)}
                       />
                     </li>
                   ))}

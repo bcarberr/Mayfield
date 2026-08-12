@@ -147,7 +147,7 @@ export function ConnectorsPanelSlideOver({ open, onClose }: ConnectorsPanelSlide
         <header className="shrink-0 border-b border-border-rule bg-surface-modal px-6 pt-5 pb-4">
           <div className="flex items-center justify-between gap-4">
             <div className="flex min-w-0 items-center gap-2">
-              <SlideOverHeaderBackButton onClose={onClose} className="ring-offset-surface-modal" />
+              <SlideOverHeaderBackButton onClose={onClose} className="" />
               <div className="flex min-w-0 items-baseline gap-3">
                 <h1 className="text-[24px] font-bold leading-8 tracking-[0.7px] text-text-primary">Connectors</h1>
                 <span className="rounded bg-surface-container px-2 py-1 text-sm font-semibold text-text-primary">
@@ -158,7 +158,7 @@ export function ConnectorsPanelSlideOver({ open, onClose }: ConnectorsPanelSlide
             <Button
               type="button"
               variant="ghost"
-              className="size-8 shrink-0 rounded-2xl p-1 ring-offset-surface-modal"
+              className="size-8 shrink-0 rounded-2xl p-1"
               aria-label="Close connectors panel"
               onClick={onClose}
             >
@@ -222,13 +222,13 @@ export function ConnectorsPage() {
               <Button
                 type="button"
                 variant="secondary-outline"
-                className="h-8 shrink-0 ring-offset-surface-page"
+                className="h-8 shrink-0"
                 onClick={openAddConnector}
               >
                 <Plus size={14} strokeWidth={1.5} className="size-3.5 shrink-0 text-current" aria-hidden />
                 Add Connector
               </Button>
-              <Button type="button" variant="secondary-outline" className="h-8 shrink-0 ring-offset-surface-page">
+              <Button type="button" variant="secondary-outline" className="h-8 shrink-0">
                 <Download size={14} strokeWidth={1.5} className="size-3.5 shrink-0 text-current" aria-hidden />
                 Export Connectors
               </Button>

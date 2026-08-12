@@ -105,7 +105,7 @@ export function DataGridPagination({
             onValueChange={(v) => onPageSizeChange(Number(v))}
           >
             <SelectTrigger
-              className="h-8 rounded border-border-container bg-surface-container text-text-primary focus-visible:ring-interactive-active"
+              className="h-8 rounded border-border-container bg-surface-container text-text-primary"
               aria-label="Rows per page"
             >
               <SelectValue />

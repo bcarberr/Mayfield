@@ -179,6 +179,9 @@
   --color-overlay-subtle: rgba(255, 255, 255, 0.06);
   --color-overlay-scrim: rgba(0, 0, 0, 0.6);
 
+  /* Focus: recolor existing border (same width) — see design.md. */
+  --focus-ring-color: var(--color-interactive-active);
+
   /** Left nav rail — always dark chrome; not overridden in light theme. */
   --color-nav-icon: var(--dark-text-secondary);
   --color-nav-icon-hover: var(--dark-text-primary);

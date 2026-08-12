@@ -1,5 +1,6 @@
-/** Demo source fields from connector customer sample data (80 rows).
+/** Demo source fields from connector customer sample data.
  * Copilot automap covers ~80% of MAP Schema entity paths and ~90% of Recommended fields.
+ * Includes a few customer-side enums (expandable parents + value children) for Enums v2 demos.
  */
 
 import { HTTP_ACTIVITY_MAP_SCHEMA_ENTITIES } from "./httpActivityMapSchemaEntities";
@@ -10,15 +11,35 @@ export type HttpActivityDemoSourceRow = {
   sample: string;
   mapped: boolean;
   tags?: string[];
+  /** Expandable customer-side enum parent (e.g. cus_activity). */
+  sourceEnum?: boolean;
+  /** Parent source key when this row is a value under a customer enum. */
+  parentSource?: string;
 };
 
-const DEMO_SOURCE_FIELDS: readonly { source: string; sample: string }[] = [
+const DEMO_SOURCE_FIELDS: readonly {
+  source: string;
+  sample: string;
+  sourceEnum?: boolean;
+  parentSource?: string;
+}[] = [
   { source: "action", sample: "Allowed" },
   { source: "appclass", sample: "General Browsing" },
   { source: "appname", sample: "General Browsing" },
   { source: "bwclassname", sample: "None" },
   { source: "bwrulename", sample: "None" },
   { source: "bwthrottle", sample: "No" },
+  // Customer-side activity enum (maps to OCSF activity_id)
+  { source: "Activity_name", sample: "Create", sourceEnum: true },
+  { source: "activity_connect_1", sample: "Connect_1", parentSource: "Activity_name" },
+  { source: "activity_options", sample: "options", parentSource: "Activity_name" },
+  { source: "activity_head", sample: "head", parentSource: "Activity_name" },
+  { source: "activity_post", sample: "Post", parentSource: "Activity_name" },
+  { source: "activity_delete", sample: "delete", parentSource: "Activity_name" },
+  { source: "activity_unknown", sample: "unknown", parentSource: "Activity_name" },
+  { source: "activity_put", sample: "put", parentSource: "Activity_name" },
+  { source: "activity_trace", sample: "Trace", parentSource: "Activity_name" },
+  { source: "activity_connect", sample: "connect", parentSource: "Activity_name" },
   { source: "clientip", sample: "76.95.243.98" },
   { source: "clientpublicip", sample: "176.95.243.98" },
   { source: "clientsslcipher", sample: "TLS1_3_CK_AES_256_GCM_SHA384" },
@@ -75,6 +96,11 @@ const DEMO_SOURCE_FIELDS: readonly { source: string; sample: string }[] = [
   { source: "event_time", sample: "2024-06-01T12:00:00.128Z" },
   { source: "start_time", sample: "2024-06-01T12:00:00Z" },
   { source: "end_time", sample: "2024-06-01T12:00:01Z" },
+  // Customer-side status enum (maps to OCSF status_id)
+  { source: "cus_status", sample: "Success", sourceEnum: true },
+  { source: "status_success", sample: "success", parentSource: "cus_status" },
+  { source: "status_failure", sample: "failure", parentSource: "cus_status" },
+  { source: "status_unknown", sample: "unknown", parentSource: "cus_status" },
   { source: "status", sample: "Success" },
   { source: "status_code", sample: "0" },
   { source: "status_detail", sample: "ok" },
@@ -89,6 +115,14 @@ const DEMO_SOURCE_FIELDS: readonly { source: string; sample: string }[] = [
   { source: "cache_status", sample: "MISS" },
   { source: "waf_action", sample: "allow" },
   { source: "waf_rule", sample: "SQLi-100" },
+  // Customer-side severity enum (maps to OCSF severity_id)
+  { source: "cus_severity", sample: "Medium", sourceEnum: true },
+  { source: "severity_informational", sample: "informational", parentSource: "cus_severity" },
+  { source: "severity_low", sample: "low", parentSource: "cus_severity" },
+  { source: "severity_medium", sample: "medium", parentSource: "cus_severity" },
+  { source: "severity_high", sample: "high", parentSource: "cus_severity" },
+  // Empty customer enum — used to demo the "no enum values" error after mapping.
+  { source: "cus_empty_enum", sample: "n/a", sourceEnum: true },
   { source: "geo_country", sample: "US" },
   { source: "geo_city", sample: "Austin" },
   { source: "bytes_total", sample: "2360" },
@@ -128,10 +162,13 @@ const REQUIRED_TIME_TAG = ocsfFieldMappingTag("time");
 
 /**
  * Explicit source → OCSF tag overrides (wins over cycling).
- * Ten sources get 2–3 tags so the demo shows multi-mapping.
+ * Customer enum parents map to OCSF enums; value children stay unmapped until the user maps them.
  */
 const SOURCE_TAG_OVERRIDES: Readonly<Record<string, readonly string[]>> = {
   [REQUIRED_TIME_SOURCE]: [REQUIRED_TIME_TAG],
+  Activity_name: ["activity_id"],
+  cus_status: ["status_id"],
+  cus_severity: ["severity_id"],
   clientip: ["src_endpoint_ip", "src_endpoint_name"],
   clientpublicip: ["src_endpoint_ip", "http_request_x_forwarded_for"],
   cs_method: ["http_request_http_method", "activity_name"],
@@ -154,6 +191,8 @@ const UNMAPPED_SOURCES = new Set([
   "waf_rule",
   "ja3",
   "cache_status",
+  // Empty enum parent — maps only when the user maps it (shows "no values" error).
+  "cus_empty_enum",
 ]);
 
 function uniqueTags(tags: readonly string[]): string[] {
@@ -161,11 +200,17 @@ function uniqueTags(tags: readonly string[]): string[] {
 }
 
 function buildMappedRows(): HttpActivityDemoSourceRow[] {
-  const tags = PRIORITY_TAGS.filter((tag) => tag !== REQUIRED_TIME_TAG);
+  const tags = PRIORITY_TAGS.filter(
+    (tag) => tag !== REQUIRED_TIME_TAG && tag !== "activity_id" && tag !== "severity_id",
+  );
   let tagIndex = 0;
 
   return DEMO_SOURCE_FIELDS.map((field) => {
     if (UNMAPPED_SOURCES.has(field.source)) {
+      return { ...field, mapped: false };
+    }
+    // Enum value children are never auto-mapped — only appear after the parent is mapped.
+    if (field.parentSource) {
       return { ...field, mapped: false };
     }
     const override = SOURCE_TAG_OVERRIDES[field.source];
@@ -193,8 +238,22 @@ export function buildHttpActivityDemoMappedRows(
   const bySource = new Map(HTTP_ACTIVITY_DEMO_MAPPED_ROWS.map((row) => [row.source, row]));
   return sourceRows.map((row) => {
     const mapped = bySource.get(row.source);
-    if (!mapped?.mapped || !mapped.tags?.length) return { ...row, mapped: false, tags: undefined };
-    return { ...row, mapped: true, tags: [...mapped.tags] };
+    if (!mapped?.mapped || !mapped.tags?.length) {
+      return {
+        ...row,
+        mapped: false,
+        tags: undefined,
+        sourceEnum: row.sourceEnum ?? mapped?.sourceEnum,
+        parentSource: row.parentSource ?? mapped?.parentSource,
+      };
+    }
+    return {
+      ...row,
+      mapped: true,
+      tags: [...mapped.tags],
+      sourceEnum: row.sourceEnum ?? mapped.sourceEnum,
+      parentSource: row.parentSource ?? mapped.parentSource,
+    };
   });
 }
 

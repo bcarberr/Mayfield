@@ -46,7 +46,7 @@ export function AdminSettingsDashboard() {
               </TabsTrigger>
             ))}
           </TabsList>
-          <Button type="button" variant="secondary-outline" className="mb-3 h-8 shrink-0 ring-offset-surface-page">
+          <Button type="button" variant="secondary-outline" className="mb-3 h-8 shrink-0">
             <Plus size={12} strokeWidth={1.5} className="size-3 shrink-0 text-current" aria-hidden />
             {ADD_ACTION_LABEL[activeTab]}
           </Button>

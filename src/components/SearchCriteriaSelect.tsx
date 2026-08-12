@@ -13,7 +13,7 @@ export type SearchCriteriaSelectOption<T extends string = string> = {
 };
 
 const SELECT_TRIGGER_CLASS =
-  "h-8 w-full min-w-0 rounded-[4px] border-border-rule bg-surface-container px-3 shadow-none hover:bg-overlay-subtle focus:ring-1 focus:ring-interactive-active [&_svg]:size-4 [&_svg]:text-text-tertiary";
+  "h-8 w-full min-w-0 rounded-[4px] border-border-rule bg-surface-container px-3 shadow-none hover:bg-overlay-subtle [&_svg]:size-4 [&_svg]:text-text-tertiary";
 
 const SELECT_CONTENT_CLASS =
   "rounded-[4px] border-border-rule bg-surface-modal shadow-[0px_5px_5px_-3px_rgba(0,0,0,0.2),0px_8px_10px_1px_rgba(0,0,0,0.14),0px_3px_14px_2px_rgba(0,0,0,0.12)] ring-0";

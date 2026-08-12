@@ -130,7 +130,7 @@ function FilterFacetGroup({
       onOpenChange={onExpandedChange}
       className={cx("border-b border-datavis-gridlines", className)}
     >
-      <CollapsibleTrigger className="flex w-full items-center gap-2 px-4 py-2.5 text-left text-sm font-semibold text-text-primary transition-colors hover:bg-overlay-subtle focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-interactive-active">
+      <CollapsibleTrigger className="flex w-full items-center gap-2 px-4 py-2.5 text-left text-sm font-semibold text-text-primary transition-colors hover:bg-overlay-subtle">
         <Icon
           name="navi-chevron-right"
           size={16}

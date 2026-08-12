@@ -111,7 +111,7 @@ export function AdminExpandTrigger({
     <CollapsibleTrigger asChild>
       <button
         type="button"
-        className="inline-flex shrink-0 p-0 text-text-tertiary hover:text-text-primary focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-interactive-active"
+        className="inline-flex shrink-0 p-0 text-text-tertiary hover:text-text-primary"
         aria-expanded={expanded}
         aria-label={expanded ? `Collapse ${label}` : `Expand ${label}`}
       >

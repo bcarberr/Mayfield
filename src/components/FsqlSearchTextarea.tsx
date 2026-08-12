@@ -57,7 +57,7 @@ export function FsqlSearchTextarea({
         placeholder="Search using our FSQL"
         className={cn(
           "field-sizing-fixed min-h-10 max-h-60 resize-none rounded border-border-rule bg-surface-modal px-3 py-2.5 pr-12 text-sm leading-relaxed text-text-primary shadow-none",
-          "placeholder:italic placeholder:text-text-tertiary focus-visible:border-interactive-active focus-visible:ring-1 focus-visible:ring-interactive-active dark:bg-surface-modal",
+          "placeholder:italic placeholder:text-text-tertiary dark:bg-surface-modal",
         )}
       />
       <Button

@@ -1,6 +1,7 @@
-import { useCallback, useEffect, useId, useMemo, useRef, useState, type CSSProperties, type DragEvent, type PointerEvent, type ReactNode } from "react";
-import { CircleX, Eye, EyeOff, Info, Loader2 } from "lucide-react";
+import { createContext, useCallback, useContext, useEffect, useId, useMemo, useRef, useState, type CSSProperties, type DragEvent, type PointerEvent, type ReactNode } from "react";
+import { CircleX, ChevronDown, Eye, EyeOff, Info, Loader2, Minus, Plus, X } from "lucide-react";
 import { Checkbox, Icon } from "../../design-system";
+import { getDemoCommonSampleValues } from "../../data/demoCommonSampleValues";
 import { Button } from "@/components/shadcn/button";
 import {
   DropdownMenu,
@@ -9,22 +10,26 @@ import {
   DropdownMenuTrigger,
 } from "@/components/shadcn/dropdown-menu";
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/shadcn/tooltip";
+import type { MapSchemaEntity } from "../../data/httpActivityMapSchemaEntities";
+import type { HttpActivityShowAllAttribute } from "../../data/httpActivityFullSchema";
 import {
-  getMapSchemaEntitiesForEventClass,
-  type MapSchemaEntity,
-} from "../../data/httpActivityMapSchemaEntities";
+  HTTP_ACTIVITY_SCHEMA_ACCESSOR,
+  buildGenericDemoMappedRows,
+  type OcsfSchemaAccessor,
+} from "../../data/ocsf/ocsfSchemaAccessor";
 import {
-  getHttpActivityEnumValues,
-  getHttpActivityFullSchemaPaths,
-  getHttpActivityShowAllAttributes,
-  isHttpActivityArrayField,
-  isHttpActivityEnumField,
-  isHttpActivityObjectArrayField,
-  isHttpActivityShowAllObjectRoot,
-  isHttpActivitySimpleMappableField,
-  isHttpActivityStringArrayField,
-  type HttpActivityShowAllAttribute,
-} from "../../data/httpActivityFullSchema";
+  loadGeneratedOcsfClassData,
+  useOcsfSchemaAccessor,
+} from "../../data/ocsf/ocsfClassSchemaRegistry";
+import { OCSF_DEMO_SOURCE_FIELDS_BY_CLASS } from "../../data/ocsf/ocsfDemoSourceFields.generated";
+import {
+  buildCopilotDemoMappedRows,
+  buildCopilotDemoUnmappedRows,
+  buildHttpActivityRowsFromScenario,
+  findCopilotDemoScenarioByEventClass,
+  takeNextCopilotDemoScenario,
+  type CopilotDemoScenario,
+} from "../../data/ocsf/copilotDemoScenarios";
 import treeBranchSvg from "../../assets/icons/tree.svg?raw";
 import {
   formatOcsfPathLabel,
@@ -36,9 +41,11 @@ import {
   HTTP_ACTIVITY_DEMO_INITIAL_ROWS,
   buildHttpActivityDemoMappedRows,
   buildHttpActivityDemoUnmappedRows,
+  type HttpActivityDemoSourceRow,
 } from "../../data/httpActivityDemoSourceFields";
 import { DataTable, type DataTableColumn } from "../ui/DataTable";
 import { Input } from "../ui/Input";
+import { Modal } from "../ui/Modal";
 import { Switch } from "../ui/Switch";
 import { CopilotSparkMark } from "../SearchCopilotPanel";
 import { SearchEventClassPicker } from "../SearchEventClassPicker";
@@ -48,14 +55,49 @@ import {
   markConnectorMappingsComplete,
 } from "./connectorEnabledState";
 
+/** Schema accessor for the mapper's currently-selected event class (see MapSchemaOverviewCard). */
+const OcsfSchemaAccessorContext = createContext<OcsfSchemaAccessor>(HTTP_ACTIVITY_SCHEMA_ACCESSOR);
+function useOcsfSchema(): OcsfSchemaAccessor {
+  return useContext(OcsfSchemaAccessorContext);
+}
+
 const cx = (...c: (string | false | undefined)[]) => c.filter(Boolean).join(" ");
 
 const MAP_SCHEMA_DRAG_MIME = "application/x-query-map-field";
+const MAP_SCHEMA_ENUM_VALUE_MIME = "application/x-query-map-enum-value";
 
-const MAP_SCHEMA_PANEL_DEFAULT_WIDTH = 300;
-const MAP_SCHEMA_PANEL_MIN_WIDTH = 240;
-const MAP_SCHEMA_PANEL_MAX_WIDTH = 520;
+type MapSchemaEnumValueDragPayload = {
+  fieldPath: string;
+  id: number;
+  label: string;
+};
+
+function enumValueMappingTag(value: { id: number; label: string }): string {
+  return `${value.id} ${value.label}`;
+}
+
+function parseEnumValueDragPayload(raw: string): MapSchemaEnumValueDragPayload | null {
+  try {
+    const parsed = JSON.parse(raw) as MapSchemaEnumValueDragPayload;
+    if (
+      typeof parsed?.fieldPath === "string" &&
+      typeof parsed.id === "number" &&
+      typeof parsed.label === "string"
+    ) {
+      return parsed;
+    }
+  } catch {
+    /* ignore */
+  }
+  return null;
+}
+
+const MAP_SCHEMA_PANEL_DEFAULT_WIDTH = 320;
+const MAP_SCHEMA_PANEL_MIN_WIDTH = 260;
+const MAP_SCHEMA_PANEL_MAX_WIDTH = 640;
 const MAP_SCHEMA_TREE_INDENT_PX = 12;
+/** Indent for source-side enum value rows (and matching target drop zones). */
+const SOURCE_ENUM_VALUE_INDENT_PX = 64;
 const MAP_SCHEMA_MOVE_SLOT_CLASS = "inline-flex w-[11px] shrink-0 items-center justify-center";
 const MAP_SCHEMA_TREE_SLOT_CLASS = "inline-flex w-3 shrink-0 items-start justify-center";
 
@@ -87,6 +129,10 @@ type MappingRow = {
   sample: string;
   mapped: boolean;
   tags?: string[];
+  /** Expandable customer-side enum parent. */
+  sourceEnum?: boolean;
+  /** Parent source when this row is a customer enum value. */
+  parentSource?: string;
 };
 
 function isMappedRow(r: MappingRow): boolean {
@@ -207,7 +253,7 @@ function MapVisibilityTrimode({
           disabled={disabled}
           tabIndex={disabled ? -1 : 0}
           onClick={() => onChange("hideMapped")}
-          className="absolute inset-y-0 left-0 z-[1] w-1/3 cursor-pointer rounded-l-full border-0 bg-transparent p-0 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-interactive-active focus-visible:ring-offset-2 focus-visible:ring-offset-surface-modal disabled:cursor-not-allowed"
+          className="absolute inset-y-0 left-0 z-[1] w-1/3 cursor-pointer rounded-l-full border-0 bg-transparent p-0 disabled:cursor-not-allowed"
         />
         <button
           id={midRadioId}
@@ -218,7 +264,7 @@ function MapVisibilityTrimode({
           disabled={disabled}
           tabIndex={disabled ? -1 : 0}
           onClick={() => onChange("all")}
-          className="absolute inset-y-0 left-1/3 z-[1] w-1/3 cursor-pointer border-0 bg-transparent p-0 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-interactive-active focus-visible:ring-offset-2 focus-visible:ring-offset-surface-modal disabled:cursor-not-allowed"
+          className="absolute inset-y-0 left-1/3 z-[1] w-1/3 cursor-pointer border-0 bg-transparent p-0 disabled:cursor-not-allowed"
         />
         <button
           id={rightRadioId}
@@ -229,7 +275,7 @@ function MapVisibilityTrimode({
           disabled={disabled}
           tabIndex={disabled ? -1 : 0}
           onClick={() => onChange("hideUnmapped")}
-          className="absolute inset-y-0 left-2/3 z-[1] w-1/3 cursor-pointer rounded-r-full border-0 bg-transparent p-0 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-interactive-active focus-visible:ring-offset-2 focus-visible:ring-offset-surface-modal disabled:cursor-not-allowed"
+          className="absolute inset-y-0 left-2/3 z-[1] w-1/3 cursor-pointer rounded-r-full border-0 bg-transparent p-0 disabled:cursor-not-allowed"
         />
       </div>
 
@@ -261,6 +307,46 @@ function buildDemoMappedRows(sourceRows: readonly MappingRow[]): MappingRow[] {
 
 function buildUnmappedRows(sourceRows: readonly MappingRow[]): MappingRow[] {
   return buildHttpActivityDemoUnmappedRows(sourceRows);
+}
+
+/** Demo *source* connector rows for the mapper's left column, for any event class. */
+function getDemoSourceRowsForEventClass(eventClassId: string): MappingRow[] {
+  if (eventClassId === "http_activity") {
+    return buildHttpActivityRowsFromScenario(false);
+  }
+  const scenario = findCopilotDemoScenarioByEventClass(eventClassId);
+  if (scenario) {
+    return buildCopilotDemoUnmappedRows(scenario).map((row) => ({ ...row }));
+  }
+  const fields = OCSF_DEMO_SOURCE_FIELDS_BY_CLASS[eventClassId] ?? [];
+  return fields.map((field) => ({ ...field, mapped: false }));
+}
+
+function rowsFromCopilotScenario(scenario: CopilotDemoScenario, mapped: boolean): MappingRow[] {
+  if (scenario.eventClassId === "http_activity") {
+    return buildHttpActivityRowsFromScenario(mapped);
+  }
+  if (mapped) {
+    return buildCopilotDemoMappedRows(scenario).map((row) => ({ ...row }));
+  }
+  return buildCopilotDemoUnmappedRows(scenario).map((row) => ({ ...row }));
+}
+
+/** Async because generated classes' schema data (entity/recommended paths) is code-split. */
+async function buildDemoMappedRowsForEventClass(
+  eventClassId: string,
+  sourceRows: readonly MappingRow[],
+): Promise<MappingRow[]> {
+  if (eventClassId === "http_activity") {
+    return buildHttpActivityDemoMappedRows(sourceRows as readonly HttpActivityDemoSourceRow[]);
+  }
+  const scenario = findCopilotDemoScenarioByEventClass(eventClassId);
+  if (scenario) {
+    return buildCopilotDemoMappedRows(scenario).map((row) => ({ ...row }));
+  }
+  const data = await loadGeneratedOcsfClassData(eventClassId);
+  if (!data) return sourceRows.map((row) => ({ ...row, mapped: false }));
+  return buildGenericDemoMappedRows(sourceRows, data);
 }
 
 const MAPPING_FIELD_COLGROUP = (
@@ -305,6 +391,70 @@ const MAP_SCHEMA_RECOMMENDED: MapSchemaRecommendedRow[] = [
   { kind: "plain", name: "type_name" },
 ];
 
+/** Hover/click the italic sample value to preview 10 common values from sample data. */
+function SourceSampleCommonValues({ source, sample }: { source: string; sample: string }) {
+  const [open, setOpen] = useState(false);
+  const values = useMemo(() => getDemoCommonSampleValues(source, sample), [source, sample]);
+
+  return (
+    <Tooltip delayDuration={150} open={open} onOpenChange={setOpen} disableHoverableContent={false}>
+      <TooltipTrigger asChild>
+        <button
+          type="button"
+          className={cx(
+            "max-w-[12rem] truncate rounded-sm text-xs font-semibold italic tracking-[0.4px]",
+            open
+              ? "text-interactive-active"
+              : "text-text-tertiary hover:text-interactive-active",
+          )}
+          aria-label={`Common values for ${source}`}
+          aria-expanded={open}
+        >
+          {sample || "(empty)"}
+        </button>
+      </TooltipTrigger>
+      <TooltipContent
+        side="right"
+        align="start"
+        sideOffset={10}
+        showArrow={false}
+        className={cx(
+          "flex w-[264px] max-w-[264px] flex-col items-stretch gap-0 overflow-hidden rounded-[4px] p-0",
+          "border border-border-rule bg-surface-modal text-text-primary",
+          "shadow-[0px_5px_5px_-3px_rgba(0,0,0,0.2),0px_8px_10px_1px_rgba(0,0,0,0.14),0px_3px_14px_2px_rgba(0,0,0,0.12)]",
+        )}
+      >        <div className="flex items-center justify-between gap-3 border-b border-border-rule px-4 py-3">
+          <p className="min-w-0 flex-1 text-sm font-semibold leading-5 tracking-[0.4px] text-text-primary">
+            Common Values in Sample Data
+          </p>
+          <button
+            type="button"
+            className="shrink-0 rounded p-0.5 text-text-tertiary hover:bg-overlay-subtle hover:text-text-primary"
+            aria-label="Close common values"
+            onClick={(event) => {
+              event.preventDefault();
+              event.stopPropagation();
+              setOpen(false);
+            }}
+          >
+            <X size={16} strokeWidth={1.5} aria-hidden />
+          </button>
+        </div>
+        <ul className="max-h-[320px] overflow-y-auto px-4 py-3">
+          {values.map((value, index) => (
+            <li
+              key={`${source}-common-${index}-${value}`}
+              className="truncate text-xs font-normal leading-5 tracking-[0.4px] text-text-primary"
+            >
+              {value}
+            </li>
+          ))}
+        </ul>
+      </TooltipContent>
+    </Tooltip>
+  );
+}
+
 function MapSchemaFieldInfoPopover({
   label,
   description,
@@ -322,7 +472,7 @@ function MapSchemaFieldInfoPopover({
       <TooltipTrigger asChild>
         <button
           type="button"
-          className="shrink-0 rounded p-0.5 text-text-tertiary hover:bg-overlay-subtle hover:text-text-primary focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-interactive-active data-[state=delayed-open]:bg-overlay-subtle data-[state=delayed-open]:text-text-primary data-[state=instant-open]:bg-overlay-subtle data-[state=instant-open]:text-text-primary"
+          className="shrink-0 rounded p-0.5 text-text-tertiary hover:bg-overlay-subtle hover:text-text-primary data-[state=delayed-open]:bg-overlay-subtle data-[state=delayed-open]:text-text-primary data-[state=instant-open]:bg-overlay-subtle data-[state=instant-open]:text-text-primary"
           aria-label={`About ${label}`}
           onPointerDown={(event) => event.stopPropagation()}
           onClick={(event) => event.stopPropagation()}
@@ -450,7 +600,7 @@ function MapSchemaExpandCollapseButton({
   return (
     <button
       type="button"
-      className="shrink-0 rounded p-0 text-text-tertiary hover:text-text-primary"
+      className="inline-flex size-3.5 shrink-0 items-center justify-center rounded p-0 text-text-tertiary hover:text-text-primary"
       aria-expanded={expanded}
       aria-label={`${expanded ? "Collapse" : "Expand"} ${label}`}
       onClick={(event) => {
@@ -458,7 +608,11 @@ function MapSchemaExpandCollapseButton({
         onToggle();
       }}
     >
-      <Icon name={expanded ? "action-remove" : "action-add"} size={8} className="block" aria-hidden />
+      {expanded ? (
+        <Minus size={10} strokeWidth={2.5} className="block size-2.5" aria-hidden />
+      ) : (
+        <Plus size={10} strokeWidth={2.5} className="block size-2.5" aria-hidden />
+      )}
     </button>
   );
 }
@@ -504,11 +658,11 @@ function MapSchemaAttributeRowContent({
 }) {
   return (
     <div className="flex min-w-0 flex-1 items-center gap-1">
-      <MapSchemaMoveSlot active={showMove} />
       {showTreeBranch ? <MapSchemaTreeSlot show /> : null}
+      {showMove ? <MapSchemaMoveSlot active /> : null}
       <span
         className={cx(
-          "inline-flex min-w-0 flex-1 items-center gap-1 truncate text-xs font-semibold leading-4 tracking-[0.4px]",
+          "inline-flex min-w-0 items-center gap-1 text-xs font-semibold leading-4 tracking-[0.4px]",
           labelClassName,
         )}
       >
@@ -545,8 +699,14 @@ function MapSchemaEnumValueFieldRow({
       contentIndent={indent}
       draggable
       onDragStart={(event) => {
+        const payload: MapSchemaEnumValueDragPayload = {
+          fieldPath,
+          id: value.id,
+          label: value.label,
+        };
+        event.dataTransfer.setData(MAP_SCHEMA_ENUM_VALUE_MIME, JSON.stringify(payload));
         event.dataTransfer.setData(MAP_SCHEMA_DRAG_MIME, fieldPath);
-        event.dataTransfer.setData("text/plain", fieldPath);
+        event.dataTransfer.setData("text/plain", enumValueMappingTag(value));
         event.dataTransfer.effectAllowed = "copy";
       }}
     >
@@ -567,6 +727,7 @@ function MapSchemaExpandableEnumFieldRow({
   showParentDrag = true,
   showTreeBranch = false,
   defaultExpanded = false,
+  searchQuery = "",
 }: {
   fieldPath: string;
   label?: string;
@@ -574,10 +735,31 @@ function MapSchemaExpandableEnumFieldRow({
   showParentDrag?: boolean;
   showTreeBranch?: boolean;
   defaultExpanded?: boolean;
+  searchQuery?: string;
 }) {
-  const [expanded, setExpanded] = useState(defaultExpanded);
+  const query = searchQuery.trim().toLowerCase();
+  const searching = query.length > 0;
+  const [expanded, setExpanded] = useState(defaultExpanded || searching);
+  const schema = useOcsfSchema();
   const displayLabel = label ?? formatOcsfPathLabel(fieldPath);
-  const enumValues = getHttpActivityEnumValues(fieldPath);
+  const enumValues = schema.getEnumValues(fieldPath);
+  const visibleEnumValues = useMemo(() => {
+    if (!searching) return enumValues;
+    const fieldMatches = ocsfPathMatchesSearch(fieldPath, query);
+    if (fieldMatches) return enumValues;
+    return enumValues.filter((value) => {
+      const valueLabel = value.label.toLowerCase();
+      return (
+        valueLabel.includes(query) ||
+        `${value.id} ${valueLabel}`.includes(query) ||
+        String(value.id).includes(query)
+      );
+    });
+  }, [enumValues, fieldPath, query, searching]);
+
+  useEffect(() => {
+    if (searching) setExpanded(true);
+  }, [searching, query, fieldPath]);
 
   return (
     <>
@@ -609,7 +791,7 @@ function MapSchemaExpandableEnumFieldRow({
         />
       </MapSchemaFieldRowShell>
       {expanded
-        ? enumValues.map((value) => (
+        ? visibleEnumValues.map((value) => (
             <MapSchemaEnumValueFieldRow
               key={value.id}
               fieldPath={fieldPath}
@@ -633,8 +815,32 @@ function MapSchemaFieldRow({
   indent?: number;
   enumLabel?: boolean;
 }) {
-  if (isHttpActivityEnumField(fieldPath) && getHttpActivityEnumValues(fieldPath).length > 0) {
-    return <MapSchemaExpandableEnumFieldRow fieldPath={fieldPath} label={label} indent={indent} />;
+  const schema = useOcsfSchema();
+  if (schema.isEnumField(fieldPath) && schema.getEnumValues(fieldPath).length > 0) {
+    return (
+      <MapSchemaExpandableEnumFieldRow
+        fieldPath={fieldPath}
+        label={label}
+        indent={indent}
+      />
+    );
+  }
+
+  if (schema.isArrayField(fieldPath) || schema.isShowAllObjectRoot(fieldPath)) {
+    return (
+      <MapSchemaFieldRowShell fieldPath={fieldPath} label={label ?? formatOcsfPathLabel(fieldPath)} contentIndent={indent}>
+        <MapSchemaAttributeRowContent
+          showMove={false}
+          showTreeBranch={false}
+          label={label ?? formatOcsfPathLabel(fieldPath)}
+          typeSuffix={
+            schema.isArrayField(fieldPath) ? (
+              <span className="font-semibold italic text-datavis-data-smalt-green-40">array</span>
+            ) : undefined
+          }
+        />
+      </MapSchemaFieldRowShell>
+    );
   }
 
   return (
@@ -642,7 +848,7 @@ function MapSchemaFieldRow({
       fieldPath={fieldPath}
       label={label}
       indent={indent}
-      enumLabel={enumLabel ?? isHttpActivityEnumField(fieldPath)}
+      enumLabel={enumLabel ?? schema.isEnumField(fieldPath)}
     />
   );
 }
@@ -717,10 +923,11 @@ function collectExpandableOcsfPathKeys(
 }
 
 function MapSchemaFieldTypeSuffix({ fieldPath }: { fieldPath: string }) {
-  if (isHttpActivityEnumField(fieldPath)) {
+  const schema = useOcsfSchema();
+  if (schema.isEnumField(fieldPath)) {
     return <span className="font-semibold italic text-[#b4b0ff]">enum</span>;
   }
-  if (isHttpActivityArrayField(fieldPath)) {
+  if (schema.isArrayField(fieldPath)) {
     return <span className="font-semibold italic text-datavis-data-smalt-green-40">array</span>;
   }
   return null;
@@ -745,14 +952,17 @@ function MapSchemaExpandablePathTreeRow({
   onToggleExpand?: () => void;
   isEnumValue?: boolean;
 }) {
+  const schema = useOcsfSchema();
   const label = isEnumValue ? segment : segment.toLowerCase();
-  const isMappable = isHttpActivitySimpleMappableField(fieldPath, {
-    hasPathChildren,
-    isEnumValue,
-  });
+  const isMappable =
+    !hasChildren &&
+    schema.isSimpleMappableField(fieldPath, {
+      hasPathChildren,
+      isEnumValue,
+    });
   const showTypeSuffix =
     !isEnumValue &&
-    (isHttpActivityEnumField(fieldPath) || isHttpActivityArrayField(fieldPath)) &&
+    (schema.isEnumField(fieldPath) || schema.isArrayField(fieldPath)) &&
     hasChildren;
   const contentIndent = depth * MAP_SCHEMA_TREE_INDENT_PX;
 
@@ -799,6 +1009,7 @@ function MapSchemaExpandablePathTreeBranch({
   pathKey,
   expandedPaths,
   onToggleExpand,
+  searchQuery = "",
 }: {
   node: OcsfPathTreeNode;
   depth: number;
@@ -806,23 +1017,25 @@ function MapSchemaExpandablePathTreeBranch({
   pathKey: string;
   expandedPaths: ReadonlySet<string>;
   onToggleExpand: (pathKey: string) => void;
+  searchQuery?: string;
 }) {
+  const schema = useOcsfSchema();
   const segments = [...pathPrefix, node.segment];
   const fieldPath = node.fullPath ?? segments.join(".").toLowerCase();
   const hasPathChildren = node.children.length > 0;
 
   if (
     !hasPathChildren &&
-    isHttpActivityEnumField(fieldPath) &&
-    getHttpActivityEnumValues(fieldPath).length > 0
+    schema.isEnumField(fieldPath) &&
+    schema.getEnumValues(fieldPath).length > 0
   ) {
     return (
       <MapSchemaExpandableEnumFieldRow
         fieldPath={fieldPath}
         indent={depth * MAP_SCHEMA_TREE_INDENT_PX}
-        showParentDrag={false}
         showTreeBranch={depth > 0}
         defaultExpanded
+        searchQuery={searchQuery}
       />
     );
   }
@@ -859,6 +1072,7 @@ function MapSchemaExpandablePathTreeBranch({
                 pathKey={childPathKey}
                 expandedPaths={expandedPaths}
                 onToggleExpand={onToggleExpand}
+                searchQuery={searchQuery}
               />
             );
           })
@@ -921,32 +1135,112 @@ function MapSchemaShowAllTypeSuffix({
 }: {
   attribute: HttpActivityShowAllAttribute;
 }) {
+  const schema = useOcsfSchema();
   if (attribute.required) {
     return <span className="font-semibold italic text-accent-required">required</span>;
   }
-  if (isHttpActivityEnumField(attribute.name)) {
+  if (schema.isEnumField(attribute.name)) {
     return <span className="font-semibold italic text-[#b4b0ff]">enum</span>;
   }
-  if (isHttpActivityArrayField(attribute.name)) {
+  if (schema.isArrayField(attribute.name)) {
     return <span className="font-semibold italic text-datavis-data-smalt-green-40">array</span>;
   }
   return null;
 }
 
+function ocsfPathMatchesSearch(path: string, query: string): boolean {
+  const q = query.toLowerCase();
+  const lower = path.toLowerCase();
+  if (lower.includes(q)) return true;
+  return lower.split(".").some((segment) => segment.includes(q));
+}
+
+function ocsfEnumValuesMatchSearch(
+  schema: OcsfSchemaAccessor,
+  fieldPath: string,
+  query: string,
+): boolean {
+  const q = query.toLowerCase();
+  return schema.getEnumValues(fieldPath).some((value) => {
+    const label = value.label.toLowerCase();
+    return label.includes(q) || `${value.id} ${label}`.includes(q) || String(value.id).includes(q);
+  });
+}
+
+/** Keep matching paths plus their ancestors so the tree still has context. */
+function filterOcsfPathsForSearch(
+  paths: readonly string[],
+  query: string,
+  schema: OcsfSchemaAccessor,
+): string[] {
+  const q = query.trim().toLowerCase();
+  if (!q) return [...paths];
+
+  const matching = new Set<string>();
+  for (const path of paths) {
+    if (ocsfPathMatchesSearch(path, q) || ocsfEnumValuesMatchSearch(schema, path, q)) {
+      matching.add(path);
+    }
+  }
+
+  const keep = new Set<string>();
+  for (const path of matching) {
+    const parts = path.split(".");
+    for (let i = 1; i <= parts.length; i += 1) {
+      keep.add(parts.slice(0, i).join("."));
+    }
+  }
+  return paths.filter((path) => keep.has(path));
+}
+
+function attributeMatchesSearch(
+  attribute: HttpActivityShowAllAttribute,
+  childPaths: readonly string[],
+  schema: OcsfSchemaAccessor,
+  query: string,
+): boolean {
+  const q = query.trim().toLowerCase();
+  if (!q) return true;
+  const label = (attribute.label ?? attribute.name).toLowerCase();
+  if (label.includes(q) || attribute.name.toLowerCase().includes(q)) return true;
+  if (ocsfEnumValuesMatchSearch(schema, attribute.name, q)) return true;
+  return childPaths.some(
+    (path) => ocsfPathMatchesSearch(path, q) || ocsfEnumValuesMatchSearch(schema, path, q),
+  );
+}
+
 function MapSchemaAdvancedShowAllAttributeRow({
   attribute,
   childPaths,
+  searchQuery = "",
 }: {
   attribute: HttpActivityShowAllAttribute;
   childPaths: readonly string[];
+  searchQuery?: string;
 }) {
-  const [expanded, setExpanded] = useState(false);
+  const schema = useOcsfSchema();
+  const query = searchQuery.trim().toLowerCase();
+  const searching = query.length > 0;
+  const rootMatches =
+    !searching ||
+    (attribute.label ?? attribute.name).toLowerCase().includes(query) ||
+    attribute.name.toLowerCase().includes(query);
+  const visibleChildPaths = useMemo(() => {
+    if (!searching || rootMatches) return childPaths;
+    return filterOcsfPathsForSearch(childPaths, query, schema);
+  }, [childPaths, query, rootMatches, schema, searching]);
+
+  const [expanded, setExpanded] = useState(searching);
+  useEffect(() => {
+    if (searching) setExpanded(true);
+  }, [searching, query, attribute.name]);
+
   const displayLabel = attribute.label ?? attribute.name;
-  const enumValues = getHttpActivityEnumValues(attribute.name);
-  const isEnum = isHttpActivityEnumField(attribute.name) && enumValues.length > 0;
-  const isArray = isHttpActivityArrayField(attribute.name);
-  const isObjectRoot = isHttpActivityShowAllObjectRoot(attribute.name);
-  const hasNestedPaths = childPaths.length > 0;
+  const enumValues = schema.getEnumValues(attribute.name);
+  const isEnum = schema.isEnumField(attribute.name) && enumValues.length > 0;
+  const isArray = schema.isArrayField(attribute.name);
+  const isObjectRoot = schema.isShowAllObjectRoot(attribute.name);
+  const hasNestedPaths = visibleChildPaths.length > 0;
   const expandable = isEnum || isArray || isObjectRoot || hasNestedPaths;
 
   if (isEnum) {
@@ -956,9 +1250,13 @@ function MapSchemaAdvancedShowAllAttributeRow({
         label={displayLabel}
         indent={0}
         showTreeBranch={false}
+        defaultExpanded={searching}
+        searchQuery={searchQuery}
       />
     );
   }
+
+  const isMappable = !isArray && !isObjectRoot && !hasNestedPaths && childPaths.length === 0;
 
   return (
     <>
@@ -966,15 +1264,19 @@ function MapSchemaAdvancedShowAllAttributeRow({
         fieldPath={attribute.name}
         label={displayLabel}
         contentIndent={0}
-        draggable
-        onDragStart={(event) => {
-          event.dataTransfer.setData(MAP_SCHEMA_DRAG_MIME, attribute.name);
-          event.dataTransfer.setData("text/plain", attribute.name);
-          event.dataTransfer.effectAllowed = "copy";
-        }}
+        draggable={isMappable}
+        onDragStart={
+          isMappable
+            ? (event) => {
+                event.dataTransfer.setData(MAP_SCHEMA_DRAG_MIME, attribute.name);
+                event.dataTransfer.setData("text/plain", attribute.name);
+                event.dataTransfer.effectAllowed = "copy";
+              }
+            : undefined
+        }
       >
         <MapSchemaAttributeRowContent
-          showMove
+          showMove={isMappable}
           showTreeBranch={false}
           label={displayLabel}
           typeSuffix={<MapSchemaShowAllTypeSuffix attribute={attribute} />}
@@ -990,7 +1292,11 @@ function MapSchemaAdvancedShowAllAttributeRow({
         />
       </MapSchemaFieldRowShell>
       {expanded && hasNestedPaths ? (
-        <MapSchemaShowAllNestedPaths rootName={attribute.name} paths={childPaths} />
+        <MapSchemaShowAllNestedPaths
+          rootName={attribute.name}
+          paths={visibleChildPaths}
+          searchQuery={searchQuery}
+        />
       ) : null}
     </>
   );
@@ -999,9 +1305,11 @@ function MapSchemaAdvancedShowAllAttributeRow({
 function MapSchemaShowAllNestedPaths({
   rootName,
   paths,
+  searchQuery = "",
 }: {
   rootName: string;
   paths: readonly string[];
+  searchQuery?: string;
 }) {
   const tree = useMemo(() => sortOcsfPathTree(buildOcsfPathTree(paths)), [paths]);
   const root = tree.find((node) => node.segment === rootName);
@@ -1010,11 +1318,14 @@ function MapSchemaShowAllNestedPaths({
     () => collectExpandableOcsfPathKeys(children, rootName),
     [children, rootName],
   );
-  const [expandedPaths, setExpandedPaths] = useState<ReadonlySet<string>>(() => new Set());
+  const searching = searchQuery.trim().length > 0;
+  const [expandedPaths, setExpandedPaths] = useState<ReadonlySet<string>>(
+    () => (searching ? new Set(allExpandableKeys) : new Set()),
+  );
 
   useEffect(() => {
-    setExpandedPaths(new Set());
-  }, [allExpandableKeys]);
+    setExpandedPaths(searching ? new Set(allExpandableKeys) : new Set());
+  }, [allExpandableKeys, searching, searchQuery]);
 
   const toggleExpanded = useCallback((pathKey: string) => {
     setExpandedPaths((current) => {
@@ -1038,6 +1349,7 @@ function MapSchemaShowAllNestedPaths({
           depth={1}
           expandedPaths={expandedPaths}
           onToggleExpand={toggleExpanded}
+          searchQuery={searchQuery}
         />
       ))}
     </>
@@ -1047,13 +1359,15 @@ function MapSchemaShowAllNestedPaths({
 function MapSchemaAdvancedShowAllList({
   searchQuery,
   attributesFilter,
+  isLoading = false,
 }: {
   searchQuery: string;
   attributesFilter: MapSchemaAttributesFilter;
+  isLoading?: boolean;
 }) {
-  const [advancedOptionsOpen, setAdvancedOptionsOpen] = useState(false);
-  const attributes = useMemo(() => getHttpActivityShowAllAttributes(), []);
-  const fullSchemaPaths = useMemo(() => getHttpActivityFullSchemaPaths(), []);
+  const schema = useOcsfSchema();
+  const attributes = useMemo(() => schema.getShowAllAttributes(), [schema]);
+  const fullSchemaPaths = useMemo(() => schema.getFullSchemaPaths(), [schema]);
 
   const childPathsByRoot = useMemo(() => {
     const map = new Map<string, string[]>();
@@ -1068,29 +1382,25 @@ function MapSchemaAdvancedShowAllList({
   }, [fullSchemaPaths]);
 
   const filteredAttributes = useMemo(() => {
-    const byFilter = attributes.filter((attribute) => matchesAttributesFilter(attribute, attributesFilter));
-    const query = searchQuery.trim().toLowerCase();
+    // `time*` is always pinned above this list — skip the duplicate schema entry.
+    const byFilter = attributes.filter(
+      (attribute) => attribute.name !== "time" && matchesAttributesFilter(attribute, attributesFilter, schema),
+    );
+    const query = searchQuery.trim();
     if (!query) return byFilter;
-    return byFilter.filter((attribute) => {
-      const label = (attribute.label ?? attribute.name).toLowerCase();
-      return label.includes(query) || attribute.name.toLowerCase().includes(query);
-    });
-  }, [attributes, attributesFilter, searchQuery]);
+    return byFilter.filter((attribute) =>
+      attributeMatchesSearch(attribute, childPathsByRoot.get(attribute.name) ?? [], schema, query),
+    );
+  }, [attributes, attributesFilter, childPathsByRoot, schema, searchQuery]);
 
   return (
     <div className="flex flex-col gap-px">
-      <div className="flex h-7 w-full min-h-7 items-center gap-2 py-1">
-        <button
-          type="button"
-          onClick={() => setAdvancedOptionsOpen((value) => !value)}
-          aria-expanded={advancedOptionsOpen}
-          className="flex min-w-0 items-center gap-2 rounded py-0.5 pr-1 text-left text-text-tertiary hover:bg-overlay-subtle hover:text-text-secondary focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-interactive-active"
-        >
-          <MapSchemaSectionCaret open={advancedOptionsOpen} />
-          <span className="text-xs font-semibold leading-4 tracking-[0.4px]">Advanced Options</span>
-        </button>
-      </div>
-      {filteredAttributes.length === 0 ? (
+      {isLoading ? (
+        <div className="flex items-center gap-2 px-2 py-2 text-xs font-semibold text-text-tertiary">
+          <Loader2 size={14} strokeWidth={2} className="size-3.5 shrink-0 animate-spin" aria-hidden />
+          Loading schema…
+        </div>
+      ) : filteredAttributes.length === 0 ? (
         <p className="px-2 py-2 text-xs font-semibold text-text-tertiary">No attributes match this filter.</p>
       ) : (
         filteredAttributes.map((attribute) => (
@@ -1098,6 +1408,7 @@ function MapSchemaAdvancedShowAllList({
             key={attribute.name}
             attribute={attribute}
             childPaths={childPathsByRoot.get(attribute.name) ?? []}
+            searchQuery={searchQuery}
           />
         ))
       )}
@@ -1165,6 +1476,7 @@ const MAP_SCHEMA_ATTRIBUTES_FILTER_OPTIONS: {
 function matchesAttributesFilter(
   attribute: HttpActivityShowAllAttribute,
   filter: MapSchemaAttributesFilter,
+  schema: OcsfSchemaAccessor,
 ): boolean {
   switch (filter) {
     case "classification":
@@ -1175,11 +1487,11 @@ function matchesAttributesFilter(
     case "showAll":
       return true;
     case "showAllEnums":
-      return isHttpActivityEnumField(attribute.name);
+      return schema.isEnumField(attribute.name);
     case "showStringArrays":
-      return isHttpActivityStringArrayField(attribute.name);
+      return schema.isStringArrayField(attribute.name);
     case "showObjectArrays":
-      return isHttpActivityObjectArrayField(attribute.name);
+      return schema.isObjectArrayField(attribute.name);
     default:
       return true;
   }
@@ -1202,7 +1514,7 @@ function MapSchemaAttributesFilterControl({
         <DropdownMenuTrigger asChild>
           <button
             type="button"
-            className="flex min-w-0 items-center gap-1 rounded py-0.5 text-left text-sm font-semibold leading-[18px] hover:bg-overlay-subtle focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-interactive-active"
+            className="focus-ring-none flex min-w-0 items-center gap-1 rounded border border-transparent py-0.5 text-left text-sm font-semibold leading-[18px] hover:bg-overlay-subtle"
             aria-haspopup="listbox"
             aria-label={`Attributes filter: ${selected.label}`}
           >
@@ -1245,7 +1557,7 @@ function MapSchemaAttributesFilterControl({
         <TooltipTrigger asChild>
           <button
             type="button"
-            className="shrink-0 rounded p-0.5 text-text-tertiary hover:bg-overlay-subtle hover:text-text-secondary focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-interactive-active data-[state=delayed-open]:bg-overlay-subtle data-[state=delayed-open]:text-text-primary data-[state=instant-open]:bg-overlay-subtle data-[state=instant-open]:text-text-primary"
+            className="shrink-0 rounded p-0.5 text-text-tertiary hover:bg-overlay-subtle hover:text-text-secondary data-[state=delayed-open]:bg-overlay-subtle data-[state=delayed-open]:text-text-primary data-[state=instant-open]:bg-overlay-subtle data-[state=instant-open]:text-text-primary"
             aria-label="About attributes filter"
           >
             <Info size={16} strokeWidth={1.5} aria-hidden />
@@ -1272,14 +1584,20 @@ function MapSchemaEntityOcsfPathTree({ paths }: { paths: readonly string[] }) {
 function TargetMappingDropZone({
   source,
   onMapField,
+  onMapEnumValue,
   onClearAll,
   showClearAll,
+  acceptDrops = true,
+  contentIndent = 0,
   children,
 }: {
   source: string;
   onMapField: (source: string, fieldPath: string) => void;
+  onMapEnumValue?: (source: string, value: MapSchemaEnumValueDragPayload) => void;
   onClearAll?: () => void;
   showClearAll?: boolean;
+  acceptDrops?: boolean;
+  contentIndent?: number;
   children: ReactNode;
 }) {
   const [isDragOver, setIsDragOver] = useState(false);
@@ -1287,22 +1605,33 @@ function TargetMappingDropZone({
   return (
     <div
       onDragOver={(event) => {
-        if (!event.dataTransfer.types.includes(MAP_SCHEMA_DRAG_MIME)) return;
+        if (!acceptDrops) return;
+        const types = event.dataTransfer.types;
+        if (!types.includes(MAP_SCHEMA_DRAG_MIME) && !types.includes(MAP_SCHEMA_ENUM_VALUE_MIME)) return;
         event.preventDefault();
         event.dataTransfer.dropEffect = "copy";
         setIsDragOver(true);
       }}
       onDragLeave={() => setIsDragOver(false)}
       onDrop={(event) => {
+        if (!acceptDrops) return;
         event.preventDefault();
         setIsDragOver(false);
+        const enumRaw = event.dataTransfer.getData(MAP_SCHEMA_ENUM_VALUE_MIME);
+        const enumPayload = enumRaw ? parseEnumValueDragPayload(enumRaw) : null;
+        if (enumPayload && onMapEnumValue) {
+          onMapEnumValue(source, enumPayload);
+          return;
+        }
         const fieldPath = event.dataTransfer.getData(MAP_SCHEMA_DRAG_MIME);
         if (fieldPath) onMapField(source, fieldPath);
       }}
       className={cx(
-        "flex h-full min-h-7 w-full min-w-0 items-center gap-1 rounded border border-border-rule bg-surface-modal px-3 py-1 transition-shadow",
-        isDragOver && "ring-2 ring-inset ring-interactive-active",
+        "flex h-full min-h-7 w-full min-w-0 items-center gap-1 rounded border px-3 py-1 transition-shadow",
+        acceptDrops ? "border-border-rule bg-surface-modal" : "border-border-rule/50 bg-surface-modal/70",
+        isDragOver && acceptDrops && "ring-2 ring-inset ring-interactive-active",
       )}
+      style={contentIndent > 0 ? { paddingLeft: contentIndent } : undefined}
     >
       <div className="flex min-w-0 flex-1 items-center gap-1">{children}</div>
       {showClearAll ? (
@@ -1344,7 +1673,7 @@ function MapSchemaEntityRow({
         disabled={!expandable}
         className={cx(
           "flex h-7 w-full min-w-0 items-center gap-2 rounded py-1 text-left",
-          expandable && "hover:bg-overlay-subtle focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-interactive-active",
+          expandable && "hover:bg-overlay-subtle",
           !expandable && "cursor-default",
         )}
       >
@@ -1414,47 +1743,88 @@ function MapSchemaModeDropdown({
   mode: MapSchemaMode;
   onModeChange: (next: MapSchemaMode) => void;
 }) {
+  const [open, setOpen] = useState(false);
   const selected = MAP_SCHEMA_MODE_OPTIONS.find((option) => option.id === mode) ?? MAP_SCHEMA_MODE_OPTIONS[0]!;
 
   return (
-    <DropdownMenu modal={false}>
+    <DropdownMenu modal={false} open={open} onOpenChange={setOpen}>
       <DropdownMenuTrigger asChild>
         <button
           type="button"
           aria-label={`Map schema mode: ${selected.label}`}
+          aria-expanded={open}
           className={cx(
-            "flex h-7 min-w-0 flex-1 items-center justify-between gap-2 rounded-full border px-3 text-left transition-colors",
+            "group relative flex h-7 min-w-0 flex-1 items-center justify-between gap-2 overflow-hidden rounded-full border px-3 text-left",
+            "transition-[border-color,background-color,color,box-shadow,transform] duration-200 ease-out",
             "border-border-container bg-surface-container text-text-secondary hover:text-text-primary",
+            open &&
+              "border-interactive-active bg-surface-modal text-text-primary shadow-[0_0_0_1px_color-mix(in_srgb,var(--color-interactive-active)_45%,transparent),0_8px_20px_-8px_rgba(0,0,0,0.45)]",
           )}
         >
-          <span className="min-w-0 truncate text-[14px] font-bold leading-5 tracking-[0.4px]">{selected.label}</span>
-          <Icon name="chevron-down" size={20} className="shrink-0" />
+          <span
+            aria-hidden
+            className={cx(
+              "pointer-events-none absolute inset-y-0 left-0 w-0.5 rounded-full bg-interactive-active transition-[opacity,transform] duration-300 ease-out",
+              open ? "opacity-100" : "opacity-0 -translate-x-1",
+            )}
+          />
+          <span className="min-w-0 truncate text-[14px] font-bold leading-5 tracking-[0.4px] transition-colors duration-200">
+            {selected.label}
+          </span>
+          <Icon
+            name="chevron-down"
+            size={20}
+            className={cx(
+              "shrink-0 transition-transform duration-300 ease-[cubic-bezier(0.16,1,0.3,1)]",
+              open && "rotate-180 text-interactive-active",
+            )}
+            aria-hidden
+          />
         </button>
       </DropdownMenuTrigger>
       <DropdownMenuContent
         align="start"
-        className="w-[min(360px,calc(100vw-2.5rem))] rounded-[4px] border border-border-container bg-surface-modal p-2 text-text-primary shadow-[0_3px_14px_2px_rgba(0,0,0,0.12),0_8px_10px_1px_rgba(0,0,0,0.14),0_5px_5px_-3px_rgba(0,0,0,0.2)] ring-0"
+        sideOffset={6}
+        className={cx(
+          "map-schema-mode-menu w-[min(360px,calc(100vw-2.5rem))] overflow-hidden rounded-lg p-1.5 text-text-primary ring-0",
+          "border border-interactive-active/35 bg-surface-modal",
+          "shadow-[0_12px_28px_-8px_rgba(0,0,0,0.55),0_0_0_1px_color-mix(in_srgb,var(--color-interactive-active)_20%,transparent)]",
+          /* Override default shadcn open/close animations — custom keyframes handle motion. */
+          "data-open:!animate-none data-closed:!animate-none",
+        )}
       >
         {MAP_SCHEMA_MODE_OPTIONS.map((option) => {
           const isSelected = option.id === mode;
           return (
             <DropdownMenuItem
               key={option.id}
-              className="flex cursor-pointer flex-col items-start gap-1 rounded px-3 py-2 focus:bg-overlay-subtle"
+              className={cx(
+                "map-schema-mode-item flex cursor-pointer flex-col items-start gap-1 rounded-md px-3 py-2.5",
+                "outline-none transition-colors duration-150 focus:bg-overlay-subtle",
+                isSelected && "bg-interactive-selected/40",
+              )}
               onSelect={() => onModeChange(option.id)}
             >
               <div className="flex w-full items-center justify-between gap-2">
                 <span
                   className={cx(
-                    "text-sm font-semibold leading-[18px]",
-                    isSelected ? "text-text-primary" : "text-text-secondary",
+                    "text-sm font-semibold leading-[18px] transition-colors",
+                    isSelected ? "text-interactive-active" : "text-text-secondary",
                   )}
                 >
                   {option.label}
                 </span>
-                {isSelected ? (
-                  <Icon name="action-check" size={12} className="shrink-0 text-interactive-active" aria-hidden />
-                ) : null}
+                <span
+                  className={cx(
+                    "flex size-4 shrink-0 items-center justify-center rounded-full transition-all duration-200",
+                    isSelected
+                      ? "bg-interactive-active/15 text-interactive-active scale-100 opacity-100"
+                      : "scale-75 opacity-0",
+                  )}
+                  aria-hidden
+                >
+                  <Icon name="action-check" size={12} />
+                </span>
               </div>
               <span className="text-xs font-normal leading-4 text-text-tertiary">{option.description}</span>
             </DropdownMenuItem>
@@ -1497,14 +1867,10 @@ function MapSchemaOverviewCard({
 
   const selectedEventClass = searchEventById(eventClassId);
 
-  const mapSchemaEntities = useMemo(
-    () =>
-      eventClassId === "http_activity" ? getMapSchemaEntitiesForEventClass("http_activity") : [],
-    [eventClassId],
-  );
+  const { accessor: schemaAccessor, isLoading: schemaLoading } = useOcsfSchemaAccessor(eventClassId);
+  const mapSchemaEntities: readonly MapSchemaEntity[] = schemaAccessor.entities;
 
   const isAdvanced = mode === "advanced";
-  const supportsSchema = eventClassId === "http_activity";
 
   useEffect(() => {
     setExpandedEntityIds(new Set());
@@ -1559,8 +1925,42 @@ function MapSchemaOverviewCard({
     [mapSchemaEntities],
   );
 
+  const attributeSearchNormalized = attributeSearchQuery.trim().toLowerCase();
+  const isSearchingAttributes = attributeSearchNormalized.length > 0;
+
+  const filteredEntities = useMemo(() => {
+    if (!isSearchingAttributes) return mapSchemaEntities;
+    return mapSchemaEntities
+      .map((entity) => {
+        const labelMatches = entity.label.toLowerCase().includes(attributeSearchNormalized);
+        if (labelMatches) return entity;
+        const paths = entity.paths.filter(
+          (path) =>
+            ocsfPathMatchesSearch(path, attributeSearchNormalized) ||
+            ocsfEnumValuesMatchSearch(schemaAccessor, path, attributeSearchNormalized),
+        );
+        return paths.length > 0 ? { ...entity, paths } : null;
+      })
+      .filter((entity): entity is MapSchemaEntity => entity != null);
+  }, [attributeSearchNormalized, isSearchingAttributes, mapSchemaEntities, schemaAccessor]);
+
+  const filteredRecommended = useMemo(() => {
+    if (!isSearchingAttributes) return MAP_SCHEMA_RECOMMENDED;
+    return MAP_SCHEMA_RECOMMENDED.filter((row) =>
+      row.name.toLowerCase().includes(attributeSearchNormalized),
+    );
+  }, [attributeSearchNormalized, isSearchingAttributes]);
+
+  useEffect(() => {
+    if (!isSearchingAttributes || isAdvanced) return;
+    setEntitiesOpen(true);
+    setRecommendedOpen(true);
+    setExpandedEntityIds(new Set(filteredEntities.map((entity) => entity.id)));
+  }, [filteredEntities, isAdvanced, isSearchingAttributes, attributeSearchNormalized]);
+
   return (
     <TooltipProvider delayDuration={200}>
+      <OcsfSchemaAccessorContext.Provider value={schemaAccessor}>
       <div className="flex min-h-0 flex-1 flex-col rounded border border-border-rule bg-surface-modal px-4 pt-2 pb-3">
       <div className="flex min-h-0 flex-1 flex-col">
         <div className="shrink-0">
@@ -1575,116 +1975,108 @@ function MapSchemaOverviewCard({
               {selectedEventClass?.label ?? "Event class"}
             </p>
           </div>
-          {isAdvanced ? (
-            <>
-              <div className="mt-3 border-t border-border-rule pt-3">
-                <MapSchemaAttributesFilterControl value={attributesFilter} onChange={setAttributesFilter} />
-              </div>
-              <div className="mt-3">
-                <div className="w-[240px] shrink-0">
-                  <Input
-                    variant="search"
-                    placeholder="Search attributes"
-                    value={attributeSearchQuery}
-                    onChange={(event) => setAttributeSearchQuery(event.target.value)}
-                    onClear={() => setAttributeSearchQuery("")}
-                    aria-label="Search attributes"
-                    className="border-border-rule px-1.5"
-                  />
-                </div>
-              </div>
-            </>
-          ) : (
-            <>
-              <div className="mt-3 border-t border-border-rule pt-3">
-                <div className="w-[240px] shrink-0">
-                  <Input
-                    variant="search"
-                    readOnly
-                    tabIndex={-1}
-                    placeholder="Search attributes"
-                    className="border-border-rule px-1.5"
-                  />
-                </div>
-              </div>
-              <div className="mt-3">
-                <MapSchemaRequiredTimeRow />
-              </div>
-            </>
-          )}
         </div>
 
-        <div className="mt-3 min-h-0 flex-1 overflow-y-auto">
-          <div className="flex flex-col gap-px">
-            {isAdvanced ? (
-              <>
-                {!supportsSchema ? (
-                  <p className="py-2 text-xs font-semibold text-text-tertiary">
-                    Full OCSF schema is available for HTTP Activity.
-                  </p>
-                ) : (
-                  <MapSchemaAdvancedShowAllList
-                    searchQuery={attributeSearchQuery}
-                    attributesFilter={attributesFilter}
-                  />
-                )}
-              </>
-            ) : (
-              <>
-                <div className="flex h-7 w-full min-h-7 flex-wrap items-center gap-2 py-1">
-                  <button
-                    type="button"
-                    onClick={() => handleEntitiesOpenChange(!entitiesOpen)}
-                    aria-expanded={entitiesOpen}
-                    className="flex min-w-0 shrink-0 items-center gap-2 rounded py-0.5 pr-1 text-left text-text-primary hover:bg-overlay-subtle focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-interactive-active"
-                  >
-                    <MapSchemaSectionCaret open={entitiesOpen} />
-                    <span className="text-xs font-semibold uppercase leading-4 tracking-[0.4px]">Entities</span>
-                  </button>
-                  <span className="ml-auto flex min-w-0 flex-1 items-center justify-end gap-2 pl-2">
-                    <Checkbox
-                      checked={treeView}
-                      onCheckedChange={handleTreeViewChange}
-                      label="Show As Tree View"
-                      labelClassName="text-base-small text-text-secondary"
-                    />
-                  </span>
-                </div>
+        <div key={mode} className="map-schema-mode-body mt-3 flex min-h-0 flex-1 flex-col">
+          {isAdvanced ? (
+            <div className="shrink-0 border-t border-border-rule pt-3">
+              <MapSchemaAttributesFilterControl value={attributesFilter} onChange={setAttributesFilter} />
+            </div>
+          ) : null}
+          <div className={cx("shrink-0", isAdvanced ? "mt-3" : "border-t border-border-rule pt-3")}>
+            <div className="w-full min-w-0">
+              <Input
+                variant="search"
+                placeholder="Search attributes"
+                value={attributeSearchQuery}
+                onChange={(event) => setAttributeSearchQuery(event.target.value)}
+                onClear={() => setAttributeSearchQuery("")}
+                aria-label="Search attributes"
+              />
+            </div>
+          </div>
+          <div className="mt-3 shrink-0">
+            <MapSchemaRequiredTimeRow />
+          </div>
 
-                {entitiesOpen
-                  ? mapSchemaEntities.map((entity) => (
-                      <MapSchemaEntityRow
-                        key={entity.id}
-                        entity={entity}
-                        expanded={expandedEntityIds.has(entity.id)}
-                        onToggle={() => toggleEntity(entity.id)}
-                        treeView={treeView}
+          <div className="mt-3 min-h-0 flex-1 overflow-y-auto">
+            <div className="flex flex-col gap-px">
+              {isAdvanced ? (
+                <MapSchemaAdvancedShowAllList
+                  searchQuery={attributeSearchQuery}
+                  attributesFilter={attributesFilter}
+                  isLoading={schemaLoading}
+                />
+              ) : (
+                <>
+                  <div className="flex h-7 w-full min-h-7 flex-wrap items-center gap-2 py-1">
+                    <button
+                      type="button"
+                      onClick={() => handleEntitiesOpenChange(!entitiesOpen)}
+                      aria-expanded={entitiesOpen}
+                      className="flex min-w-0 shrink-0 items-center gap-2 rounded py-0.5 pr-1 text-left text-text-primary hover:bg-overlay-subtle"
+                    >
+                      <MapSchemaSectionCaret open={entitiesOpen} />
+                      <span className="text-xs font-semibold uppercase leading-4 tracking-[0.4px]">Entities</span>
+                    </button>
+                    <span className="ml-auto flex min-w-0 flex-1 items-center justify-end gap-2 pl-2">
+                      <Checkbox
+                        checked={treeView}
+                        onCheckedChange={handleTreeViewChange}
+                        label="Show As Tree View"
+                        labelClassName="text-base-small text-text-secondary"
                       />
-                    ))
-                  : null}
+                    </span>
+                  </div>
 
-                <div className="flex h-7 w-full min-h-7 items-center gap-2 py-1">
-                  <button
-                    type="button"
-                    onClick={() => setRecommendedOpen((v) => !v)}
-                    aria-expanded={recommendedOpen}
-                    className="flex min-w-0 items-center gap-2 rounded py-0.5 pr-1 text-left text-text-primary hover:bg-overlay-subtle focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-interactive-active"
-                  >
-                    <MapSchemaSectionCaret open={recommendedOpen} />
-                    <span className="text-xs font-semibold uppercase leading-4 tracking-[0.4px]">Recommended</span>
-                  </button>
-                </div>
-                {recommendedOpen
-                  ? MAP_SCHEMA_RECOMMENDED.map((row, i) => (
-                      <MapSchemaRecommendedFieldRow key={`${row.kind}-${"name" in row ? row.name : i}`} row={row} />
-                    ))
-                  : null}
-              </>
-            )}
+                  {entitiesOpen
+                    ? filteredEntities.length === 0 && isSearchingAttributes
+                      ? (
+                          <p className="px-2 py-2 text-xs font-semibold text-text-tertiary">
+                            No entities match this search.
+                          </p>
+                        )
+                      : filteredEntities.map((entity) => (
+                        <MapSchemaEntityRow
+                          key={entity.id}
+                          entity={entity}
+                          expanded={expandedEntityIds.has(entity.id)}
+                          onToggle={() => toggleEntity(entity.id)}
+                          treeView={treeView}
+                        />
+                      ))
+                    : null}
+
+                  <div className="flex h-7 w-full min-h-7 items-center gap-2 py-1">
+                    <button
+                      type="button"
+                      onClick={() => setRecommendedOpen((v) => !v)}
+                      aria-expanded={recommendedOpen}
+                      className="flex min-w-0 items-center gap-2 rounded py-0.5 pr-1 text-left text-text-primary hover:bg-overlay-subtle"
+                    >
+                      <MapSchemaSectionCaret open={recommendedOpen} />
+                      <span className="text-xs font-semibold uppercase leading-4 tracking-[0.4px]">Recommended</span>
+                    </button>
+                  </div>
+                  {recommendedOpen
+                    ? filteredRecommended.length === 0 && isSearchingAttributes
+                      ? (
+                          <p className="px-2 py-2 text-xs font-semibold text-text-tertiary">
+                            No recommended fields match this search.
+                          </p>
+                        )
+                      : filteredRecommended.map((row, i) => (
+                        <MapSchemaRecommendedFieldRow key={`${row.kind}-${"name" in row ? row.name : i}`} row={row} />
+                      ))
+                    : null}
+                </>
+              )}
+            </div>
           </div>
         </div>
       </div>
     </div>
+      </OcsfSchemaAccessorContext.Provider>
     </TooltipProvider>
   );
 }
@@ -1745,7 +2137,7 @@ function AiAssistedMappingControl({
             variant="ghost"
             size="sm"
             disabled={!enabled}
-            className="group h-7 gap-1.5 px-0 font-semibold text-text-primary hover:bg-transparent disabled:opacity-60"
+            className="focus-ring-none group h-7 gap-1.5 px-0 font-semibold text-text-primary hover:bg-transparent disabled:opacity-60"
             aria-label="Copilot mapping options"
           >
             <CopilotSparkMark className="size-[21.6px] transition-[filter] duration-150 group-hover:brightness-125 group-disabled:brightness-100" />
@@ -1861,7 +2253,7 @@ function MappingToolbarV2({
             <TooltipTrigger asChild>
               <button
                 type="button"
-                className="shrink-0 rounded p-0.5 text-text-tertiary hover:bg-overlay-subtle hover:text-text-secondary focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-interactive-active data-[state=delayed-open]:bg-overlay-subtle data-[state=delayed-open]:text-text-primary data-[state=instant-open]:bg-overlay-subtle data-[state=instant-open]:text-text-primary"
+                className="shrink-0 rounded p-0.5 text-text-tertiary hover:bg-overlay-subtle hover:text-text-secondary data-[state=delayed-open]:bg-overlay-subtle data-[state=delayed-open]:text-text-primary data-[state=instant-open]:bg-overlay-subtle data-[state=instant-open]:text-text-primary"
                 aria-label="About event class"
               >
                 <Info size={16} strokeWidth={1.5} aria-hidden />
@@ -1942,12 +2334,12 @@ function FieldMappingBar({
     <TooltipProvider delayDuration={200}>
     <div
       className={cx(
-        "flex min-h-0 min-w-0 flex-1 flex-col overflow-hidden bg-surface-modal px-0 py-4 transition-opacity duration-200",
+        "flex min-h-0 min-w-0 flex-1 flex-col bg-surface-modal px-0 py-4 transition-opacity duration-200",
         isAiMapping && "pointer-events-none opacity-60",
       )}
       aria-busy={isAiMapping || undefined}
     >
-      <div className="shrink-0">
+      <div className="shrink-0 overflow-visible px-1">
         <p className="mb-3 text-sm font-semibold text-text-secondary">
           Mapped Fields: <span className="text-text-primary">{mapped}</span>
         </p>
@@ -1971,7 +2363,7 @@ function FieldMappingBar({
               <TooltipTrigger asChild>
                 <button
                   type="button"
-                  className="shrink-0 rounded p-0.5 text-text-tertiary hover:bg-overlay-subtle hover:text-text-secondary focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-interactive-active data-[state=delayed-open]:bg-overlay-subtle data-[state=delayed-open]:text-text-primary data-[state=instant-open]:bg-overlay-subtle data-[state=instant-open]:text-text-primary"
+                  className="shrink-0 rounded p-0.5 text-text-tertiary hover:bg-overlay-subtle hover:text-text-secondary data-[state=delayed-open]:bg-overlay-subtle data-[state=delayed-open]:text-text-primary data-[state=instant-open]:bg-overlay-subtle data-[state=instant-open]:text-text-primary"
                   aria-label="About query data model"
                 >
                   <Info size={16} strokeWidth={1.5} aria-hidden />
@@ -2033,7 +2425,7 @@ function FieldMappingBar({
           </div>
         </div>
       </div>
-      <div className="min-h-0 w-full min-w-0 flex-1 overflow-y-auto px-0 pb-28 pt-2">{table}</div>
+      <div className="min-h-0 w-full min-w-0 flex-1 overflow-y-auto px-1 pb-28 pt-2">{table}</div>
     </div>
     </TooltipProvider>
   );
@@ -2082,10 +2474,12 @@ export function AmazonAthenaMapReviewStep({
   const [hiddenFields, setHiddenFields] = useState<Set<string>>(() => new Set());
   const [showHiddenFields, setShowHiddenFields] = useState(false);
   const [sourceSearchQuery, setSourceSearchQuery] = useState("");
+  const [expandedSourceEnums, setExpandedSourceEnums] = useState<ReadonlySet<string>>(() => new Set());
   const [mapSchemaPanelWidth, setMapSchemaPanelWidth] = useState(MAP_SCHEMA_PANEL_DEFAULT_WIDTH);
   const [isResizingMapSchemaPanel, setIsResizingMapSchemaPanel] = useState(false);
   const [mapSchemaMode, setMapSchemaMode] = useState<MapSchemaMode>("basic");
   const [mapSchemaLayoutResetKey, setMapSchemaLayoutResetKey] = useState(0);
+  const [pendingEventClassId, setPendingEventClassId] = useState<string | null>(null);
   const mapSchemaResizeRef = useRef<{ startX: number; startWidth: number } | null>(null);
 
   const runAiMappingDemo = useCallback((settings: AiAssistedMappingSettings) => {
@@ -2093,35 +2487,83 @@ export function AmazonAthenaMapReviewStep({
     setIsAiMapping(true);
     setAiAssistedMappingSettings(settings);
 
+    let scenario: CopilotDemoScenario | undefined;
+    let targetEventClassId = selectedEventClassId;
+
     if (settings.suggestEventClass) {
-      setSelectedEventClassId(DEFAULT_EVENT_CLASS_ID);
+      scenario = takeNextCopilotDemoScenario();
+      targetEventClassId = scenario.eventClassId;
+      setSelectedEventClassId(targetEventClassId);
+    } else {
+      scenario = findCopilotDemoScenarioByEventClass(selectedEventClassId);
     }
 
     window.setTimeout(() => {
       if (aiMappingRunRef.current !== runId) return;
 
-      setRows(
-        settings.suggestMappingsForEventClass
-          ? buildDemoMappedRows(INITIAL_ROWS)
-          : buildUnmappedRows(INITIAL_ROWS),
-      );
-      setMapSchemaMode("basic");
-      setMapSchemaLayoutResetKey((key) => key + 1);
-      setIsAiMapping(false);
-    }, aiMappingDelayMs());
-  }, []);
+      if (!settings.suggestMappingsForEventClass) {
+        setRows(
+          scenario
+            ? rowsFromCopilotScenario(scenario, false)
+            : getDemoSourceRowsForEventClass(targetEventClassId),
+        );
+        setMapSchemaMode("basic");
+        setMapSchemaLayoutResetKey((key) => key + 1);
+        setIsAiMapping(false);
+        return;
+      }
 
-  const handleEventClassChange = useCallback((eventClassId: string) => {
+      if (scenario) {
+        setRows(rowsFromCopilotScenario(scenario, true));
+        setMapSchemaMode("basic");
+        setMapSchemaLayoutResetKey((key) => key + 1);
+        setIsAiMapping(false);
+        return;
+      }
+
+      const sourceRows = getDemoSourceRowsForEventClass(targetEventClassId);
+      void buildDemoMappedRowsForEventClass(targetEventClassId, sourceRows).then((mappedRows) => {
+        if (aiMappingRunRef.current !== runId) return;
+        setRows(mappedRows);
+        setMapSchemaMode("basic");
+        setMapSchemaLayoutResetKey((key) => key + 1);
+        setIsAiMapping(false);
+      });
+    }, aiMappingDelayMs());
+  }, [selectedEventClassId]);
+
+  const applyEventClassChange = useCallback((eventClassId: string) => {
     aiMappingRunRef.current += 1;
     setIsAiMapping(false);
     setSelectedEventClassId(eventClassId);
-    setRows(buildUnmappedRows(INITIAL_ROWS));
+    setRows(getDemoSourceRowsForEventClass(eventClassId));
+  }, []);
+
+  const handleEventClassChange = useCallback(
+    (eventClassId: string) => {
+      if (eventClassId === selectedEventClassId) return;
+      if (rows.some(isMappedRow)) {
+        setPendingEventClassId(eventClassId);
+        return;
+      }
+      applyEventClassChange(eventClassId);
+    },
+    [applyEventClassChange, rows, selectedEventClassId],
+  );
+
+  const handleConfirmEventClassChange = useCallback(() => {
+    if (pendingEventClassId == null) return;
+    applyEventClassChange(pendingEventClassId);
+    setPendingEventClassId(null);
+  }, [applyEventClassChange, pendingEventClassId]);
+
+  const handleCancelEventClassChange = useCallback(() => {
+    setPendingEventClassId(null);
   }, []);
 
   const handleCopilotEnabledChange = useCallback((enabled: boolean) => {
     setCopilotEnabled(enabled);
     if (enabled) {
-      setSelectedEventClassId(DEFAULT_EVENT_CLASS_ID);
       runAiMappingDemo(DEFAULT_AI_ASSISTED_MAPPING_SETTINGS);
       return;
     }
@@ -2161,6 +2603,7 @@ export function AmazonAthenaMapReviewStep({
   const handleMapSchemaPanelResizePointerMove = useCallback((event: PointerEvent<HTMLButtonElement>) => {
     if (!mapSchemaResizeRef.current) return;
     const { startX, startWidth } = mapSchemaResizeRef.current;
+    // Dragging the gutter left widens the MAP Schema panel.
     setMapSchemaPanelWidth(clampMapSchemaPanelWidth(startWidth + (startX - event.clientX)));
   }, []);
 
@@ -2171,6 +2614,18 @@ export function AmazonAthenaMapReviewStep({
     mapSchemaResizeRef.current = null;
     setIsResizingMapSchemaPanel(false);
   }, []);
+
+  useEffect(() => {
+    if (!isResizingMapSchemaPanel) return;
+    const previousCursor = document.body.style.cursor;
+    const previousUserSelect = document.body.style.userSelect;
+    document.body.style.cursor = "col-resize";
+    document.body.style.userSelect = "none";
+    return () => {
+      document.body.style.cursor = previousCursor;
+      document.body.style.userSelect = previousUserSelect;
+    };
+  }, [isResizingMapSchemaPanel]);
 
   const hasHiddenFields = hiddenFields.size > 0;
 
@@ -2239,27 +2694,116 @@ export function AmazonAthenaMapReviewStep({
     );
   }, []);
 
+  const mapOcsfEnumValueToSource = useCallback(
+    (source: string, value: MapSchemaEnumValueDragPayload) => {
+      const tag = enumValueMappingTag(value);
+      setRows((current) =>
+        current.map((row) => {
+          if (row.source !== source) return row;
+          const existingTags = row.tags ?? [];
+          if (existingTags.includes(tag)) return row;
+          return { ...row, mapped: true, tags: [...existingTags, tag] };
+        }),
+      );
+    },
+    [],
+  );
+
+  const toggleSourceEnumExpanded = useCallback((source: string) => {
+    setExpandedSourceEnums((current) => {
+      const next = new Set(current);
+      if (next.has(source)) next.delete(source);
+      else next.add(source);
+      return next;
+    });
+  }, []);
+
   const removeTagFromSource = useCallback((source: string, tag: string) => {
-    setRows((current) =>
-      current.map((row) => {
+    setRows((current) => {
+      const updated = current.map((row) => {
         if (row.source !== source) return row;
         const nextTags = (row.tags ?? []).filter((existing) => existing !== tag);
         if (nextTags.length === 0) return { ...row, mapped: false, tags: undefined };
         return { ...row, mapped: true, tags: nextTags };
-      }),
-    );
+      });
+      const parent = updated.find((row) => row.source === source);
+      // Clearing the last parent mapping hides values and clears any value mappings.
+      if (parent?.sourceEnum && !isMappedRow(parent)) {
+        return updated.map((row) =>
+          row.parentSource === source ? { ...row, mapped: false, tags: undefined } : row,
+        );
+      }
+      return updated;
+    });
   }, []);
 
   const clearRowMapping = useCallback((source: string) => {
-    setRows((current) =>
-      current.map((row) => (row.source === source ? { ...row, mapped: false, tags: undefined } : row)),
-    );
+    setRows((current) => {
+      const parent = current.find((row) => row.source === source);
+      return current.map((row) => {
+        if (row.source === source) return { ...row, mapped: false, tags: undefined };
+        if (parent?.sourceEnum && row.parentSource === source) {
+          return { ...row, mapped: false, tags: undefined };
+        }
+        return row;
+      });
+    });
+    setExpandedSourceEnums((current) => {
+      if (!current.has(source)) return current;
+      const next = new Set(current);
+      next.delete(source);
+      return next;
+    });
   }, []);
+
+  // Reveal customer enum values only after the parent enum is mapped.
+  useEffect(() => {
+    setExpandedSourceEnums((current) => {
+      let changed = false;
+      const next = new Set(current);
+      for (const row of rows) {
+        if (!row.sourceEnum) continue;
+        if (isMappedRow(row)) {
+          if (!next.has(row.source)) {
+            next.add(row.source);
+            changed = true;
+          }
+        } else if (next.has(row.source)) {
+          next.delete(row.source);
+          changed = true;
+        }
+      }
+      return changed ? next : current;
+    });
+  }, [rows]);
+
+  const parentMappedBySource = useMemo(() => {
+    const map = new Map<string, boolean>();
+    for (const row of rows) {
+      if (row.sourceEnum) map.set(row.source, isMappedRow(row));
+    }
+    return map;
+  }, [rows]);
+
+  const enumChildCountBySource = useMemo(() => {
+    const map = new Map<string, number>();
+    for (const row of rows) {
+      if (!row.parentSource) continue;
+      map.set(row.parentSource, (map.get(row.parentSource) ?? 0) + 1);
+    }
+    return map;
+  }, [rows]);
 
   const visibleRows = useMemo(() => {
     const query = sourceSearchQuery.trim().toLowerCase();
 
     return rows.filter((r) => {
+      if (r.parentSource) {
+        // Values stay hidden until the parent enum is mapped (and expanded).
+        if (parentMappedBySource.get(r.parentSource) !== true) return false;
+        if (!expandedSourceEnums.has(r.parentSource)) return false;
+      }
+
       if (hiddenFields.has(r.source) && !showHiddenFields) return false;
 
       if (query && !r.source.toLowerCase().includes(query) && !r.sample.toLowerCase().includes(query)) {
@@ -2271,7 +2815,15 @@ export function AmazonAthenaMapReviewStep({
       if (mapVisibility === "hideUnmapped" && !mapped) return false;
       return true;
     });
-  }, [rows, mapVisibility, hiddenFields, showHiddenFields, sourceSearchQuery]);
+  }, [
+    rows,
+    mapVisibility,
+    hiddenFields,
+    showHiddenFields,
+    sourceSearchQuery,
+    expandedSourceEnums,
+    parentMappedBySource,
+  ]);
 
   const columns: DataTableColumn<MappingRow>[] = useMemo(
     () => [
@@ -2281,26 +2833,66 @@ export function AmazonAthenaMapReviewStep({
         className: "min-w-0 py-0 pl-0 pr-2",
         cell: (r) => {
           const fieldHidden = hiddenFields.has(r.source);
+          const isEnumParent = Boolean(r.sourceEnum);
+          const isEnumChild = Boolean(r.parentSource);
+          const enumExpanded = isEnumParent && expandedSourceEnums.has(r.source);
+          const parentMapped = isEnumParent && isMappedRow(r);
+          const enumChildCount = isEnumParent ? (enumChildCountBySource.get(r.source) ?? 0) : 0;
+          const showNoEnumValuesError = parentMapped && enumChildCount === 0;
 
           return (
-            <div className="flex h-full min-h-7 w-full min-w-0 items-center gap-2 rounded border border-border-rule bg-surface-modal px-3 py-1">
-              <p className="min-w-0 flex-1 truncate text-xs font-semibold tracking-[0.4px]">
-                <span className="text-text-primary">{r.source}</span>
-                <span className="whitespace-pre"> </span>
-                <span className="font-semibold italic text-text-tertiary">{r.sample}</span>
-              </p>
-              <button
-                type="button"
-                className="shrink-0 rounded p-0.5 text-text-tertiary hover:bg-overlay-subtle hover:text-text-primary"
-                aria-label={fieldHidden ? "Show field" : "Hide field"}
-                onClick={() => toggleFieldVisibility(r.source)}
+            <div className="flex w-full min-w-0 flex-col gap-1">
+              <div
+                className="w-full min-w-0"
+                style={isEnumChild ? { paddingLeft: SOURCE_ENUM_VALUE_INDENT_PX } : undefined}
               >
-                {fieldHidden ? (
-                  <EyeOff size={16} strokeWidth={1.5} aria-hidden />
-                ) : (
-                  <Eye size={16} strokeWidth={1.5} aria-hidden />
-                )}
-              </button>
+                <div className="flex h-full min-h-7 w-full min-w-0 items-center gap-2 rounded border border-border-rule bg-surface-modal px-3 py-1">
+                  {isEnumChild ? (
+                    <>
+                      <p className="min-w-0 flex-1 truncate text-xs font-semibold tracking-[0.4px] text-text-primary">
+                        {r.sample || r.source}
+                      </p>
+                      <ChevronDown
+                        size={14}
+                        strokeWidth={1.5}
+                        className="shrink-0 text-text-tertiary"
+                        aria-hidden
+                      />
+                    </>
+                  ) : (
+                    <>
+                      <p className="flex min-w-0 flex-1 items-center gap-1 truncate text-xs font-semibold tracking-[0.4px]">
+                        <span className="min-w-0 truncate text-text-primary">{r.source}</span>
+                        <SourceSampleCommonValues source={r.source} sample={r.sample} />
+                      </p>
+                      {isEnumParent && parentMapped && enumChildCount > 0 ? (
+                        <MapSchemaExpandCollapseButton
+                          expanded={enumExpanded}
+                          onToggle={() => toggleSourceEnumExpanded(r.source)}
+                          label={r.source}
+                        />
+                      ) : null}
+                      <button
+                        type="button"
+                        className="shrink-0 rounded p-0.5 text-text-tertiary hover:bg-overlay-subtle hover:text-text-primary"
+                        aria-label={fieldHidden ? "Show field" : "Hide field"}
+                        onClick={() => toggleFieldVisibility(r.source)}
+                      >
+                        {fieldHidden ? (
+                          <EyeOff size={16} strokeWidth={1.5} aria-hidden />
+                        ) : (
+                          <Eye size={16} strokeWidth={1.5} aria-hidden />
+                        )}
+                      </button>
+                    </>
+                  )}
+                </div>
+              </div>
+              {showNoEnumValuesError ? (
+                <p className="px-1 text-xs font-semibold leading-4 tracking-[0.4px] text-feedback-negative">
+                  There are no enum values to map.
+                </p>
+              ) : null}
             </div>
           );
         },
@@ -2315,38 +2907,63 @@ export function AmazonAthenaMapReviewStep({
         id: "target",
         header: "Target",
         className: "min-w-0 py-0 pl-0 pr-2",
-        cell: (r) => (
-          <TargetMappingDropZone
-            source={r.source}
-            onMapField={mapOcsfFieldToSource}
-            showClearAll={isMappedRow(r)}
-            onClearAll={() => clearRowMapping(r.source)}
-          >
-            {isMappedRow(r) ? (
-              <div className="flex min-w-0 w-full flex-wrap gap-1">
-                {(r.tags ?? []).map((t) => (
-                  <Tag key={t} onRemove={() => removeTagFromSource(r.source, t)}>
-                    {t}
-                  </Tag>
-                ))}
-              </div>
-            ) : (
-              <span className="min-w-0 flex-1 truncate px-1 text-xs font-semibold italic tracking-[0.4px] text-text-tertiary">
-                Unmapped
-              </span>
-            )}
-          </TargetMappingDropZone>
-        ),
+        cell: (r) => {
+          const isEnumChild = Boolean(r.parentSource);
+          const parentMapped = r.parentSource ? parentMappedBySource.get(r.parentSource) === true : true;
+          // Enum values can only be mapped once the parent attribute is mapped.
+          const acceptDrops = !isEnumChild || parentMapped;
+
+          return (
+            <div
+              className="w-full min-w-0"
+              style={isEnumChild ? { paddingLeft: SOURCE_ENUM_VALUE_INDENT_PX } : undefined}
+            >
+              <TargetMappingDropZone
+                source={r.source}
+                onMapField={mapOcsfFieldToSource}
+                onMapEnumValue={isEnumChild ? mapOcsfEnumValueToSource : undefined}
+                acceptDrops={acceptDrops}
+                showClearAll={isMappedRow(r)}
+                onClearAll={() => clearRowMapping(r.source)}
+              >
+                {isMappedRow(r) ? (
+                  <div className="flex min-w-0 w-full flex-wrap gap-1">
+                    {(r.tags ?? []).map((t) => (
+                      <Tag key={t} onRemove={() => removeTagFromSource(r.source, t)}>
+                        {t}
+                      </Tag>
+                    ))}
+                  </div>
+                ) : (
+                  <span className="min-w-0 flex-1 truncate px-1 text-xs font-semibold italic tracking-[0.4px] text-text-tertiary">
+                    Unmapped
+                  </span>
+                )}
+              </TargetMappingDropZone>
+            </div>
+          );
+        },
       },
     ],
-    [clearRowMapping, hiddenFields, mapOcsfFieldToSource, removeTagFromSource, toggleFieldVisibility],
+    [
+      clearRowMapping,
+      enumChildCountBySource,
+      expandedSourceEnums,
+      hiddenFields,
+      mapOcsfEnumValueToSource,
+      mapOcsfFieldToSource,
+      parentMappedBySource,
+      removeTagFromSource,
+      toggleFieldVisibility,
+      toggleSourceEnumExpanded,
+    ],
   );
 
   return (
     <>
       <div className="flex min-h-0 flex-1 flex-col bg-surface-modal md:flex-row md:items-stretch">
         <div className="flex min-h-0 min-w-0 flex-1 flex-col">
-          <div className="shrink-0 border-b border-border-rule px-0 py-4">
+          <div className="shrink-0 border-b border-border-rule px-1 py-4">
             <MappingToolbarV2
               hasMappedFields={hasMappedFields}
               selectedEventClassId={selectedEventClassId}
@@ -2389,39 +3006,45 @@ export function AmazonAthenaMapReviewStep({
           />
         </div>
 
+        <button
+          type="button"
+          tabIndex={-1}
+          aria-label="Resize MAP Schema panel"
+          aria-orientation="vertical"
+          aria-valuemin={MAP_SCHEMA_PANEL_MIN_WIDTH}
+          aria-valuemax={MAP_SCHEMA_PANEL_MAX_WIDTH}
+          aria-valuenow={mapSchemaPanelWidth}
+          className={cx(
+            "group/resize relative hidden w-3 shrink-0 cursor-col-resize touch-none border-0 bg-transparent p-0 md:block",
+            "hover:bg-overlay-subtle active:bg-overlay-subtle",
+            isResizingMapSchemaPanel && "bg-overlay-subtle",
+          )}
+          onPointerDown={handleMapSchemaPanelResizePointerDown}
+          onPointerMove={handleMapSchemaPanelResizePointerMove}
+          onPointerUp={handleMapSchemaPanelResizePointerEnd}
+          onPointerCancel={handleMapSchemaPanelResizePointerEnd}
+          onLostPointerCapture={() => {
+            mapSchemaResizeRef.current = null;
+            setIsResizingMapSchemaPanel(false);
+          }}
+        >
+          <span
+            className={cx(
+              "pointer-events-none absolute inset-y-0 left-1/2 w-px -translate-x-1/2 bg-transparent transition-colors",
+              "group-hover/resize:bg-interactive-active group-active/resize:bg-interactive-active",
+              isResizingMapSchemaPanel && "bg-interactive-active",
+            )}
+            aria-hidden
+          />
+        </button>
+
         <div
           className={cx(
-            "relative flex min-h-0 w-full shrink-0 flex-col border-t border-border-rule py-4 md:w-[var(--map-schema-panel-width)] md:max-w-[var(--map-schema-panel-width)] md:min-w-[var(--map-schema-panel-width)] md:border-t-0 md:py-4 md:pl-4",
+            "relative flex min-h-0 w-full shrink-0 flex-col border-t border-border-rule py-4 md:w-[var(--map-schema-panel-width)] md:max-w-[var(--map-schema-panel-width)] md:min-w-[var(--map-schema-panel-width)] md:border-t-0 md:py-4",
             !isResizingMapSchemaPanel && "md:transition-[width] duration-200 ease-out",
           )}
           style={{ "--map-schema-panel-width": `${mapSchemaPanelWidth}px` } as CSSProperties}
         >
-          <button
-            type="button"
-            tabIndex={-1}
-            aria-label="Resize MAP Schema panel"
-            aria-orientation="vertical"
-            aria-valuemin={MAP_SCHEMA_PANEL_MIN_WIDTH}
-            aria-valuemax={MAP_SCHEMA_PANEL_MAX_WIDTH}
-            aria-valuenow={mapSchemaPanelWidth}
-            className={cx(
-              "group/resize absolute -left-1.5 top-0 z-10 hidden h-full w-3 cursor-col-resize touch-none border-0 bg-transparent p-0 md:block",
-              "hover:bg-overlay-subtle active:bg-overlay-subtle",
-            )}
-            onPointerDown={handleMapSchemaPanelResizePointerDown}
-            onPointerMove={handleMapSchemaPanelResizePointerMove}
-            onPointerUp={handleMapSchemaPanelResizePointerEnd}
-            onPointerCancel={handleMapSchemaPanelResizePointerEnd}
-            onLostPointerCapture={() => {
-              mapSchemaResizeRef.current = null;
-              setIsResizingMapSchemaPanel(false);
-            }}
-          >
-            <span
-              className="pointer-events-none absolute inset-y-0 left-1/2 w-px -translate-x-1/2 bg-transparent transition-colors group-hover/resize:bg-interactive-active group-active/resize:bg-interactive-active"
-              aria-hidden
-            />
-          </button>
           <MapSchemaOverviewCard
             eventClassId={selectedEventClassId}
             mode={mapSchemaMode}
@@ -2430,6 +3053,24 @@ export function AmazonAthenaMapReviewStep({
           />
         </div>
       </div>
+
+      <Modal
+        open={pendingEventClassId != null}
+        title="Change event class?"
+        onClose={handleCancelEventClassChange}
+        footer={
+          <div className="flex flex-wrap items-center justify-end gap-2">
+            <Button type="button" variant="ghost" onClick={handleCancelEventClassChange}>
+              Cancel
+            </Button>
+            <Button type="button" variant="default" onClick={handleConfirmEventClassChange}>
+              Proceed
+            </Button>
+          </div>
+        }
+      >
+        You will lose your current mappings. Are you sure you want to proceed?
+      </Modal>
     </>
   );
 }

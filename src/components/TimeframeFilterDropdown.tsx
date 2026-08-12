@@ -163,7 +163,7 @@ export function TimeframeFilterDropdown() {
           </div>
         </div>
         <div className="mt-4 flex justify-end gap-2">
-          <Button type="button" variant="secondary-outline" className="h-8 ring-offset-surface-modal" onClick={() => setOpen(false)}>
+          <Button type="button" variant="secondary-outline" className="h-8" onClick={() => setOpen(false)}>
             Cancel
           </Button>
           <Button type="button" variant="default" className="h-8" disabled={!canApply} onClick={applyDraftRange}>

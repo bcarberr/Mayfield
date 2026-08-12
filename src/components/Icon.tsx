@@ -383,11 +383,20 @@ export function Icon({ name, size = 18, title, className, style, ...rest }: Icon
 
   if (isConnectorLargeIcon(name)) {
     const markup = withDisplaySize(CONNECTOR_LARGE_RAW_BY_NAME[name], size);
+    // Clip to shared 4px rounded frame with a 1px inner border.
+    const connectorFrameClass =
+      "overflow-hidden rounded-[4px] shadow-[inset_0_0_0_1px_#F6F6F6] [&_svg]:block [&_svg]:h-full [&_svg]:w-full";
     return (
       <span
         {...rest}
-        className={spanClass}
-        style={{ lineHeight: 0, ...style }}
+        className={[spanClass, connectorFrameClass].filter(Boolean).join(" ")}
+        style={{
+          lineHeight: 0,
+          width: size,
+          height: size,
+          clipPath: "inset(0 round 4px)",
+          ...style,
+        }}
         dangerouslySetInnerHTML={{ __html: markup }}
         role={title ? "img" : undefined}
         aria-label={title}

@@ -35,10 +35,10 @@ import { PageSlideOver, FORM_CONTENT_SLIDE_OVER_PANEL_CLASS } from "../component
 import { Snackbar } from "../components/ui/Snackbar";
 import { useDetectionHub } from "../context/DetectionHubContext";
 
-const TOOLBAR_SECONDARY_BTN_CLASS = "shrink-0 ring-offset-surface-page";
+const TOOLBAR_SECONDARY_BTN_CLASS = "shrink-0";
 const TOOLBAR_ICON_CLASS = "size-3.5 shrink-0 text-current";
 const TOOLBAR_PRIMARY_BUTTON_CLASS =
-  "h-8 shrink-0 bg-interactive-active text-text-on-primary hover:bg-interactive-active/90 focus-visible:ring-interactive-active ring-offset-surface-page";
+  "h-8 shrink-0 bg-interactive-active text-text-on-primary hover:bg-interactive-active/90";
 
 const SEARCH_CRITERIA_MODE_OPTIONS: readonly {
   id: SearchCriteriaMode;
@@ -171,7 +171,7 @@ function SearchToolbarActions({
             <Button
               type="button"
               variant="ghost"
-              className="h-auto gap-2 rounded px-1 py-1 font-semibold tracking-[0.4px] text-text-primary hover:bg-overlay-subtle ring-offset-surface-page"
+              className="h-auto gap-2 rounded px-1 py-1 font-semibold tracking-[0.4px] text-text-primary hover:bg-overlay-subtle"
               aria-controls="search-criteria-panel"
             >
               <Icon

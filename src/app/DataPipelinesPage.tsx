@@ -30,11 +30,11 @@ export function DataPipelinesPage() {
           chromeSurface="page"
           titleTrailing={
             <div className="flex items-center gap-4" role="toolbar" aria-label="Pipeline actions">
-              <Button type="button" variant="secondary-outline" className="h-8 shrink-0 ring-offset-surface-page">
+              <Button type="button" variant="secondary-outline" className="h-8 shrink-0">
                 <Plus size={12} strokeWidth={1.5} className="size-3 shrink-0 text-current" aria-hidden />
                 Add Data Pipeline
               </Button>
-              <Button type="button" variant="secondary-outline" className="h-8 shrink-0 ring-offset-surface-page">
+              <Button type="button" variant="secondary-outline" className="h-8 shrink-0">
                 <Download size={12} strokeWidth={1.5} className="size-3 shrink-0 text-current" aria-hidden />
                 Export Data Pipeline
               </Button>

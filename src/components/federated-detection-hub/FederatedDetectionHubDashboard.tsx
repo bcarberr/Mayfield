@@ -424,7 +424,7 @@ function QueuedForReviewIndicator({ onClear }: { onClear: () => void }) {
       <DropdownMenuTrigger asChild>
         <button
           type="button"
-          className="shrink-0 rounded p-0.5 text-feedback-caution hover:bg-overlay-subtle focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-interactive-active"
+          className="shrink-0 rounded p-0.5 text-feedback-caution hover:bg-overlay-subtle"
           aria-label="Queued for review"
         >
           <Icon name="action-time" size={14} aria-hidden />
@@ -908,7 +908,7 @@ function DetectionsTable({
                   />
                   <TruncatedText
                     as="button"
-                    className="min-w-0 flex-1 text-left font-semibold text-interactive-active hover:underline focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-interactive-active"
+                    className="min-w-0 flex-1 text-left font-semibold text-interactive-active hover:underline"
                     onClick={() => onViewLibraryDetection(row.id)}
                   >
                     {row.name}
@@ -917,7 +917,7 @@ function DetectionsTable({
               ) : (
                 <TruncatedText
                   as="button"
-                  className="min-w-0 flex-1 text-left font-semibold text-interactive-active hover:underline focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-interactive-active"
+                  className="min-w-0 flex-1 text-left font-semibold text-interactive-active hover:underline"
                   onClick={() => onEditDetection(row.id)}
                 >
                   {row.name}
@@ -1604,7 +1604,7 @@ export function FederatedDetectionHubDashboard({
         <Button
           type="button"
           variant="secondary-outline"
-          className="mb-3 h-8 shrink-0 ring-offset-surface-page"
+          className="mb-3 h-8 shrink-0"
           onClick={() => {
             setSlideOverMode("create");
             setCreateDetectionOpen(true);

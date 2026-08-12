@@ -63,7 +63,7 @@ export function CollapsibleSettingsSection({
         <CollapsibleTrigger asChild>
           <button
             type="button"
-            className="flex w-full items-center gap-1 py-1 text-left text-text-tertiary hover:text-text-primary focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-interactive-active"
+            className="flex w-full items-center gap-1 py-1 text-left text-text-tertiary hover:text-text-primary"
             aria-expanded={open}
           >
             <Icon
@@ -352,7 +352,7 @@ export function TagsField({
             id={id}
             value={inputValue}
             placeholder={tags.length === 0 ? "Press Enter to add" : ""}
-            className="h-7 min-w-[8rem] flex-1 border-0 bg-transparent px-1 shadow-none focus-visible:ring-0"
+            className="h-7 min-w-[8rem] flex-1 border-0 bg-transparent px-1 shadow-none focus-ring-none"
             onChange={(event) => setInputValue(event.target.value)}
             onKeyDown={handleInputKeyDown}
             onBlur={() => addTag(inputValue)}

@@ -129,7 +129,7 @@ export function ConnectorSummaryPanel({
           <header className="shrink-0 border-b border-border-rule bg-surface-modal px-6 pt-5 pb-4">
             <div className="flex items-center justify-between gap-4">
               <div className="flex min-w-0 items-center gap-3">
-                <SlideOverHeaderBackButton onClose={onClose} className="ring-offset-surface-modal" />
+                <SlideOverHeaderBackButton onClose={onClose} className="" />
                 <h1 className="text-[24px] font-bold leading-8 tracking-[0.7px] text-text-primary">
                   Connector Summary
                 </h1>

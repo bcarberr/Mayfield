@@ -1,3 +1,6 @@
+import { useCallback, useState } from "react";
+import { toast } from "sonner";
+import { Icon } from "../../design-system";
 import {
   DEMO_CONNECTOR_SAMPLE_COLUMNS,
   type ConnectorSampleDataRow,
@@ -65,7 +68,32 @@ export function ConnectorSampleDataGrid({ rows }: { rows: readonly ConnectorSamp
 }
 
 export function ConnectorSampleDataJson({ json }: { json: string }) {
+  const [copied, setCopied] = useState(false);
+
+  const handleCopy = useCallback(async () => {
+    try {
+      await navigator.clipboard.writeText(json);
+      setCopied(true);
+      toast.success("JSON copied to clipboard");
+      window.setTimeout(() => setCopied(false), 1500);
+    } catch {
+      toast.error("Couldn't copy JSON");
+    }
+  }, [json]);
+
   return (
-    <pre className="h-full min-h-0 overflow-auto p-4 text-xs leading-relaxed whitespace-pre text-text-primary">{json}</pre>
+    <div className="relative h-full min-h-0">
+      <button
+        type="button"
+        className="absolute right-3 top-3 z-[1] rounded p-1.5 text-text-tertiary hover:bg-overlay-subtle hover:text-text-primary"
+        aria-label={copied ? "JSON copied" : "Copy JSON"}
+        onClick={handleCopy}
+      >
+        <Icon name="action-content-copy" size={18} className="text-current" />
+      </button>
+      <pre className="h-full min-h-0 overflow-auto p-4 pr-12 text-xs leading-relaxed whitespace-pre text-text-primary">
+        {json}
+      </pre>
+    </div>
   );
 }

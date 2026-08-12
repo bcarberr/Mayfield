@@ -12,7 +12,7 @@ export function ConnectorPlatformTile({ platform, onSelect }: ConnectorPlatformT
     <button
       type="button"
       onClick={onSelect}
-      className="flex h-[144px] w-[251px] flex-col items-center justify-center gap-3 rounded border border-border-container bg-surface-container px-4 pt-2 pb-3 text-left shadow-datavis-card transition-colors hover:border-border-rule hover:bg-overlay-subtle focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-interactive-active"
+      className="flex h-[144px] w-[251px] flex-col items-center justify-center gap-3 rounded border border-border-container bg-surface-container px-4 pt-2 pb-3 text-left shadow-datavis-card transition-colors hover:border-border-rule hover:bg-overlay-subtle"
     >
       <Icon
         name={platform.icon}

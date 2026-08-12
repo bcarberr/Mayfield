@@ -15,7 +15,7 @@ type FindingsSearchCellProps = {
 };
 
 const LINK_CLASS =
-  "inline-flex items-center gap-1.5 text-sm font-semibold text-interactive-active hover:underline focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-interactive-active";
+  "inline-flex items-center gap-1.5 text-sm font-semibold text-interactive-active hover:underline";
 
 function FindingsSearchLink({
   detectionId,

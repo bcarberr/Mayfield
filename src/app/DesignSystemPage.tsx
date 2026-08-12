@@ -386,7 +386,7 @@ function FormSection() {
         <div className="flex flex-col gap-2">
           <label className="text-xs font-semibold text-text-secondary">Textarea</label>
           <textarea
-            className="min-h-[72px] w-full rounded-lg border border-input bg-transparent px-2.5 py-1.5 text-sm text-text-primary placeholder:text-text-tertiary focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-interactive-active disabled:opacity-50"
+            className="min-h-[72px] w-full rounded-lg border border-input bg-transparent px-2.5 py-1.5 text-sm text-text-primary placeholder:text-text-tertiary disabled:opacity-50"
             placeholder="Multi-line input…"
             disabled={disabled}
           />

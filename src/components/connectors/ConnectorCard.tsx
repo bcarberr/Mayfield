@@ -2,6 +2,7 @@ import { useEffect, useRef, useState } from "react";
 import { createPortal } from "react-dom";
 import { Icon, Switch } from "../../design-system";
 import { Button } from "@/components/shadcn/button";
+import { Modal } from "../ui/Modal";
 import type { ConnectorInstance } from "./connectorsData";
 
 const cx = (...c: (string | false | undefined)[]) => c.filter(Boolean).join(" ");
@@ -10,12 +11,20 @@ export type ConnectorCardProps = {
   connector: ConnectorInstance;
   onEnabledChange: (enabled: boolean) => void;
   onConfigure?: () => void;
+  onDelete?: () => void;
 };
 
-export function ConnectorCard({ connector, onEnabledChange, onConfigure }: ConnectorCardProps) {
+export function ConnectorCard({
+  connector,
+  onEnabledChange,
+  onConfigure,
+  onDelete,
+}: ConnectorCardProps) {
   const [menuOpen, setMenuOpen] = useState(false);
+  const [deleteConfirmOpen, setDeleteConfirmOpen] = useState(false);
   const buttonRef = useRef<HTMLButtonElement>(null);
   const menuRef = useRef<HTMLDivElement>(null);
+  const hasMenuActions = Boolean(onConfigure || onDelete);
 
   useEffect(() => {
     if (!menuOpen) return;
@@ -62,6 +71,19 @@ export function ConnectorCard({ connector, onEnabledChange, onConfigure }: Conne
                 Edit
               </button>
             ) : null}
+            {onDelete ? (
+              <button
+                type="button"
+                role="menuitem"
+                className="block w-full px-3 py-1.5 text-left text-sm text-feedback-negative transition-colors hover:bg-overlay-subtle"
+                onClick={() => {
+                  setMenuOpen(false);
+                  setDeleteConfirmOpen(true);
+                }}
+              >
+                Delete
+              </button>
+            ) : null}
           </div>,
           document.body,
         )
@@ -85,7 +107,7 @@ export function ConnectorCard({ connector, onEnabledChange, onConfigure }: Conne
           {onConfigure ? (
             <button
               type="button"
-              className="min-w-0 flex-1 truncate pt-0.5 text-left text-sm font-semibold tracking-[0.4px] text-interactive-active hover:underline focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-interactive-active"
+              className="min-w-0 flex-1 truncate pt-0.5 text-left text-sm font-semibold tracking-[0.4px] text-interactive-active hover:underline"
               onClick={onConfigure}
             >
               {connector.instanceName}
@@ -96,19 +118,21 @@ export function ConnectorCard({ connector, onEnabledChange, onConfigure }: Conne
             </p>
           )}
           <Switch checked={connector.enabled} onCheckedChange={onEnabledChange} />
-          <Button
-            ref={buttonRef}
-            type="button"
-            variant="ghost"
-            size="icon-sm"
-            className="shrink-0 p-0 text-text-tertiary hover:text-text-primary [&_svg]:!size-4"
-            aria-label={`Actions for ${connector.instanceName}`}
-            aria-expanded={menuOpen}
-            aria-haspopup="menu"
-            onClick={() => setMenuOpen((open) => !open)}
-          >
-            <Icon name="navi-more-vert" size={16} />
-          </Button>
+          {hasMenuActions ? (
+            <Button
+              ref={buttonRef}
+              type="button"
+              variant="ghost"
+              size="icon-sm"
+              className="shrink-0 p-0 text-text-tertiary hover:text-text-primary [&_svg]:!size-4"
+              aria-label={`Actions for ${connector.instanceName}`}
+              aria-expanded={menuOpen}
+              aria-haspopup="menu"
+              onClick={() => setMenuOpen((open) => !open)}
+            >
+              <Icon name="navi-more-vert" size={16} />
+            </Button>
+          ) : null}
         </div>
 
         <div className="mt-auto border-t border-border-rule pt-3">
@@ -116,6 +140,33 @@ export function ConnectorCard({ connector, onEnabledChange, onConfigure }: Conne
         </div>
       </div>
       {menu}
+      <Modal
+        open={deleteConfirmOpen}
+        title="Delete Connector"
+        onClose={() => setDeleteConfirmOpen(false)}
+        footer={
+          <div className="flex justify-end gap-2">
+            <Button type="button" variant="secondary-outline" onClick={() => setDeleteConfirmOpen(false)}>
+              Cancel
+            </Button>
+            <Button
+              type="button"
+              variant="default"
+              className="!bg-feedback-negative hover:!opacity-90"
+              onClick={() => {
+                setDeleteConfirmOpen(false);
+                onDelete?.();
+              }}
+            >
+              Delete
+            </Button>
+          </div>
+        }
+      >
+        Are you sure you want to delete{" "}
+        <span className="font-semibold text-text-primary">{connector.instanceName}</span>? This action
+        cannot be undone.
+      </Modal>
     </article>
   );
 }

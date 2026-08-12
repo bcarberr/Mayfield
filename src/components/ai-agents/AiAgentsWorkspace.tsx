@@ -87,7 +87,7 @@ function AgentIntroPanel({
             <button
               key={prompt}
               type="button"
-              className="rounded border border-border-container bg-surface-container px-4 py-3 text-left text-sm leading-relaxed text-text-secondary transition-colors hover:border-interactive-secondary-pressed hover:bg-overlay-subtle hover:text-text-primary focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-interactive-active"
+              className="rounded border border-border-container bg-surface-container px-4 py-3 text-left text-sm leading-relaxed text-text-secondary transition-colors hover:border-interactive-secondary-pressed hover:bg-overlay-subtle hover:text-text-primary"
               onClick={() => onPromptSelect(prompt)}
             >
               {prompt}
@@ -118,7 +118,7 @@ function AgentsSidebar({
       >
         <button
           type="button"
-          className="flex h-12 w-full items-center justify-center text-text-tertiary transition-colors hover:bg-overlay-subtle hover:text-text-primary focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-interactive-active"
+          className="flex h-12 w-full items-center justify-center text-text-tertiary transition-colors hover:bg-overlay-subtle hover:text-text-primary"
           aria-label="Expand agents panel"
           onClick={() => onOpenChange(true)}
         >
@@ -130,7 +130,7 @@ function AgentsSidebar({
               key={agent.id}
               type="button"
               className={cx(
-                "rounded p-1 transition-colors hover:bg-overlay-subtle focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-interactive-active",
+                "rounded p-1 transition-colors hover:bg-overlay-subtle",
                 activeAgentId === agent.id && "bg-interactive-selected",
               )}
               aria-label={`Switch to ${agent.name}`}
@@ -193,7 +193,7 @@ function AgentsSidebar({
                 ) : (
                   <button
                     type="button"
-                    className="shrink-0 text-xs font-semibold uppercase tracking-[0.4px] text-interactive-active transition-colors hover:text-interactive-primary-hover focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-interactive-active"
+                    className="shrink-0 text-xs font-semibold uppercase tracking-[0.4px] text-interactive-active transition-colors hover:text-interactive-primary-hover"
                     aria-label={`Switch to ${agent.name}`}
                     onClick={() => onSwitchAgent(agent.id)}
                   >

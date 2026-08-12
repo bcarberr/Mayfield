@@ -63,3 +63,25 @@ Do not replace these with Lucide equivalents.
 
 - Font: **Lato** (set on `body` in `src/index.css`).
 - Page titles: `text-page-title`. Table headers: uppercase `text-xs font-bold text-text-tertiary`.
+
+## Focus
+
+The distinction is **interactive vs. not** — not form-field vs. button.
+
+| Gets focus | Doesn't |
+|---|---|
+| Buttons (with label), links | Decorative icons |
+| Form fields, selects | Static text, headings |
+| Tabs, menu items, disclosure toggles | Layout containers |
+| Drag handles | Non-interactive list rows |
+| | Icons that are purely informational |
+| | Icon buttons (icon-only chrome) |
+| | Switches |
+
+### Implementation
+
+- Token: `--focus-ring-color` (must keep ≥3:1 contrast vs the control and page background).
+- Focus **recolors** the existing border to `--focus-ring-color` — same width as the resting gray border. Do **not** thicken the border, and do **not** use `outline` / `outline-offset` (those draw a second floating ring).
+- Global rules live in `src/index.css` (unlayered + `!important`). Composite inputs use `.focus-ring-within`; nested field focus is suppressed.
+- **No focus border** on switches, icon buttons, or `.focus-ring-none` (text-style menu triggers like Attributes / Copilot).
+- Non-interactive elements must not be focusable (`tabIndex={-1}` only when needed; decorative icons `aria-hidden`).

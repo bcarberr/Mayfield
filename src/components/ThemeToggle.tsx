@@ -59,7 +59,6 @@ export function ThemeToggle({ className = "", label }: ThemeToggleProps) {
         "relative flex size-10 shrink-0 items-center justify-center rounded-sm bg-transparent p-0",
         "text-nav-icon transition-[color,background-color] duration-150 ease-out",
         "hover:bg-nav-overlay-subtle hover:text-nav-icon-hover",
-        "focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-nav-icon-active",
         className,
       )}
     >
